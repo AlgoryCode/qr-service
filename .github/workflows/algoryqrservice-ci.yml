@@ -1,0 +1,43 @@
+name: AlgoryQr-Service Server CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Build and push Docker image with Jib
+        run: |
+          mvn compile jib:build -B \
+            -Djib.to.auth.username=${{ secrets.DOCKERHUB_USERNAME }} \
+            -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | tr -d '\n\r ' | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Restart gatewayserver deployment
+        run: |
+          kubectl --insecure-skip-tls-verify -n default rollout restart deployment/algoryqr-service
+          kubectl --insecure-skip-tls-verify -n default rollout status deployment/algoryqr-service
