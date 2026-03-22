@@ -5,10 +5,14 @@ import com.ael.algoryqrservice.model.dto.ContactRequest;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
 import com.google.zxing.WriterException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.Map;
 
+@Service
+@RequiredArgsConstructor
 public class ContactProvider implements QrProvider {
     @Override
     public Type getType() {

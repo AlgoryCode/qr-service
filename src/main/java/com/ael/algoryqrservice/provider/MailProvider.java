@@ -4,10 +4,15 @@ import com.ael.algoryqrservice.model.Type;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
 import com.google.zxing.WriterException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.Map;
 
+@Service
+@RequiredArgsConstructor
 public class MailProvider implements QrProvider{
     @Override
     public Type getType() {
