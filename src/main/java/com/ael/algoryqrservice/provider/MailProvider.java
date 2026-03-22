@@ -3,17 +3,17 @@ package com.ael.algoryqrservice.provider;
 import com.ael.algoryqrservice.model.Type;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
-import com.google.zxing.WriterException;
+import com.ael.algoryqrservice.service.QrGenerationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class MailProvider implements QrProvider{
+    private final QrGenerationService qrGenerationService;
+
     @Override
     public Type getType() {
         return Type.MAIL;
@@ -25,8 +25,13 @@ public class MailProvider implements QrProvider{
     }
 
     @Override
-    public QrResponse createQr(QrRequest request) throws WriterException, IOException {
-        return null;
+    public QrResponse createQr(QrRequest request) {
+        try {
+            String content = buildMailContent(request.getDetails());
+            return qrGenerationService.createAndSave(request, content);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to generate mail QR", e);
+        }
     }
 
     public String buildMailContent(Map<String, Object> details) {

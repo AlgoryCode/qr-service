@@ -3,7 +3,7 @@ package com.ael.algoryqrservice.provider;
 import com.ael.algoryqrservice.model.Type;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
-import com.ael.algoryqrservice.repository.QrRepository;
+import com.ael.algoryqrservice.service.QrGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +12,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class LinkProvider implements QrProvider<QrRequest> {
-    private final QrRepository qrRepository;
+    private final QrGenerationService qrGenerationService;
 
     @Override
     public Type getType() {
@@ -26,7 +26,12 @@ public class LinkProvider implements QrProvider<QrRequest> {
 
     @Override
     public QrResponse createQr(QrRequest request) {
-        return null;
+        try {
+            String content = buildLinkContent(request.getDetails());
+            return qrGenerationService.createAndSave(request, content);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to generate link QR", e);
+        }
     }
 
     public String buildLinkContent(Map<String, Object> details) {
