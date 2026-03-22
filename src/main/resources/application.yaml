@@ -6,6 +6,10 @@ spring:
 #    username: root
 #    password: algorycode1.
 #    driver-class-name: com.mysql.cj.jdbc.Driver
+  cloud:
+    kubernetes:
+      discovery:
+        all-namespaces: true
   datasource:
     url: jdbc:postgresql://45.147.47.129:5432/algoryqrdb
     username: postgres
@@ -28,3 +32,23 @@ eureka:
     fetchRegistry: true
     serviceUrl:
       defaultZone: "http://localhost:8070/eureka/"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    shutdown:
+      access: unrestricted
+    health:
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  info:
+    env:
+      enabled: true
