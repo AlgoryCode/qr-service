@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.model.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @Builder
@@ -13,6 +13,6 @@ public class QrListResponse {
     private Long userId;
     private String qrName;
     private String imgSrc;
-    private JsonNode details;
+    private Map<String, Object> details;
     private LocalDateTime createdAt;
 }

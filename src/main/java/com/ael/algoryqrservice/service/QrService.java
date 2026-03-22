@@ -2,28 +2,21 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.factory.QrProviderFactory;
 import com.ael.algoryqrservice.model.Qr;
-import com.ael.algoryqrservice.model.QrType;
 import com.ael.algoryqrservice.model.Type;
 import com.ael.algoryqrservice.model.dto.QrListResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
 import com.ael.algoryqrservice.provider.QrProvider;
 import com.ael.algoryqrservice.repository.QrRepository;
-import com.google.zxing.BarcodeFormat;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.zxing.WriterException;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.List;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.AuthProvider;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +25,7 @@ public class QrService {
 
     private final QrProviderFactory qrProviderFactory;
     private final QrRepository qrRepository;
+    private final ObjectMapper objectMapper;
 
     public <T extends QrRequest> QrResponse createQR(T req) throws IOException, WriterException {
         Type qrType = Type.from(req.getType());
@@ -75,7 +69,7 @@ public class QrService {
                 .userId(qr.getUserId())
                 .qrName(qr.getQrName())
                 .imgSrc(qr.getImgSrc())
-                .details(qr.getDetails())
+                .details(objectMapper.convertValue(qr.getDetails(), new TypeReference<Map<String, Object>>() {}))
                 .createdAt(qr.getCreatedAt())
                 .build();
     }

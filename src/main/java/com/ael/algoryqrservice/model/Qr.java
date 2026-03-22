@@ -26,7 +26,7 @@ public class Qr extends QrBaseModel {
 
     private String qrName;
 
-    @Lob
+
     @Column(columnDefinition = "text")
     private String imgSrc;
 
