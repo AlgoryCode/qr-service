@@ -1,15 +1,15 @@
 spring:
   application:
     name: algoryqr-service
-#  datasource:
-#    url: jdbc:mysql://45.147.47.129:3306/algoryqrdb
-#    username: root
-#    password: algorycode1.
-#    driver-class-name: com.mysql.cj.jdbc.Driver
+  #  datasource:
+  #    url: jdbc:mysql://45.147.47.129:3306/algoryqrdb
+  #    username: root
+  #    password: algorycode1.
+  #    driver-class-name: com.mysql.cj.jdbc.Driver
   datasource:
-    url: jdbc:postgresql://45.147.47.129:5432/algoryqrdb
+    url: jdbc:postgresql://localhost:5432/algoryqrdb
     username: postgres
-    password: algorycode1.
+    password: postgres
     driver-class-name: org.postgresql.Driver
 
   jpa:
