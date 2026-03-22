@@ -13,6 +13,8 @@ import java.util.Map;
 @NoArgsConstructor
 @SuperBuilder
 public class QrRequest {
+    private Long userId;
+
     private String qrName;
 
     private String type;

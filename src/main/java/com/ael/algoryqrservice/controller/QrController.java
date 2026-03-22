@@ -7,6 +7,8 @@ import com.ael.algoryqrservice.service.QrService;
 import com.google.zxing.WriterException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,5 +27,10 @@ public class QrController {
     @PostMapping("/create")
     public ResponseEntity<?> createQr(@RequestBody QrRequest req) throws IOException, WriterException {
         return ResponseEntity.ok(qrService.createQR(req));
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getUserQrs(@PathVariable Long userId) {
+        return ResponseEntity.ok(qrService.getUserQrs(userId));
     }
 }

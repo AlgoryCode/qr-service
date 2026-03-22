@@ -51,6 +51,7 @@ public class WifiProvider implements QrProvider<QrRequest> {
             String base64 = Base64.getEncoder().encodeToString(outputStream.toByteArray());
 
             qrRepository.save(Qr.builder()
+                    .userId(req.getUserId())
                     .qrName(req.getQrName())
                     .details(objectMapper.valueToTree(req.getDetails()))
                     .imgSrc(base64)
