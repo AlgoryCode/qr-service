@@ -12,20 +12,17 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuthResponse {
+public class SessionResponse {
 
-    private String accessToken;
-    private String refreshToken;
-    private String type;
     private UUID sessionId;
-    private Long userId;
-    private String email;
-    private String firstName;
-    private String lastName;
     private LocalDateTime loggedInAt;
+    private LocalDateTime lastActivityAt;
     private LocalDateTime accessExpiresAt;
     private LocalDateTime refreshExpiresAt;
     private boolean revoked;
+    private LocalDateTime revokedAt;
+    private boolean expired;
+    private boolean active;
     private String ipAddress;
     private String userAgent;
     private String device;

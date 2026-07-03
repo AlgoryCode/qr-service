@@ -38,6 +38,18 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "registration_ip_address")
+    private String registrationIpAddress;
+
+    @Column(name = "registration_user_agent", length = 512)
+    private String registrationUserAgent;
+
+    @Column(name = "registration_device")
+    private String registrationDevice;
+
+    @Column(name = "registration_device_type")
+    private String registrationDeviceType;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
