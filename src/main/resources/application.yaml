@@ -1,19 +1,10 @@
 spring:
   application:
     name: algoryqr-service
-#  datasource:
-#    url: jdbc:mysql://45.147.47.129:3306/algoryqrdb
-#    username: root
-#    password: algorycode1.
-#    driver-class-name: com.mysql.cj.jdbc.Driver
-  cloud:
-    kubernetes:
-      discovery:
-        all-namespaces: true
   datasource:
-    url: jdbc:postgresql://45.147.47.129:5432/algoryqrdb
-    username: postgres
-    password: algorycode1.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/algoryqrdb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 30000
@@ -31,15 +22,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
-eureka:
-  instance:
-    preferIpAddress: true
-  client:
-    registerWithEureka: true
-    fetchRegistry: true
-    serviceUrl:
-      defaultZone: "http://localhost:8070/eureka/"
 
 management:
   endpoints:
@@ -63,4 +45,4 @@ management:
 
 
 server:
-  port: 8055
+  port: ${SERVER_PORT:8055}
