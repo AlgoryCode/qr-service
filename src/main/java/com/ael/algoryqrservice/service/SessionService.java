@@ -51,7 +51,7 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), sessionId);
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), sessionId, user.getId());
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
 
         return new SessionTokens(session, accessToken, refreshToken, user);
@@ -81,7 +81,7 @@ public class SessionService {
         session.setLastActivityAt(now);
         sessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), session.getId());
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), session.getId(), user.getId());
         String newRefreshToken = formatRefreshToken(session.getId(), newRawRefreshToken);
 
         return buildAuthResponse(user, session, accessToken, newRefreshToken);

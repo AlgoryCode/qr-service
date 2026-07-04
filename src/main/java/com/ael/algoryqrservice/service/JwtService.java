@@ -24,11 +24,12 @@ public class JwtService {
 
     private final JwtProperties jwtProperties;
 
-    public String generateAccessToken(String email, UUID sessionId) {
+    public String generateAccessToken(String email, UUID sessionId, Long userId) {
         Date now = new Date();
         return Jwts.builder()
                 .id(sessionId.toString())
                 .subject(email)
+                .claim("userId", userId)
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
