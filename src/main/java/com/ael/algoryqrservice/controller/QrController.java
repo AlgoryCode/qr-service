@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.model.dto.QrNameRequest;
 import com.ael.algoryqrservice.model.dto.QrNameResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.service.QrService;
+import com.ael.algoryqrservice.util.SecurityUtils;
 import com.google.zxing.WriterException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class QrController {
     private final QrService qrService;
+    private final SecurityUtils securityUtils;
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserQrs(@PathVariable Long userId) {
@@ -24,7 +26,8 @@ public class QrController {
 
     @PostMapping("/create")
     public ResponseEntity<?> createQr(@RequestBody QrRequest req) throws IOException, WriterException {
-        return ResponseEntity.ok(qrService.createQR(req));
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(qrService.createQR(req, userId));
     }
 
     @PutMapping("/update/{qrId}")
