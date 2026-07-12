@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/algoryqrdb}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:femmiens123.}
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 30000

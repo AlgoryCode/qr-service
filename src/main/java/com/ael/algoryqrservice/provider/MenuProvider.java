@@ -52,7 +52,6 @@ public class MenuProvider implements QrProvider<QrRequest> {
             String publicUrl = menuService.buildPublicUrl(menu);
             qr = qrGenerationService.updateQrContent(qr, publicUrl);
 
-            String publicUrl = menuService.buildPublicUrl(menu);
             return QrResponse.builder()
                     .qrId(qr.getQrId())
                     .imgSrc(qr.getImgSrc())

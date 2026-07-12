@@ -40,7 +40,7 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "role", nullable = false, length = 32)
     @Builder.Default
     private UserRole role = UserRole.USER;
 

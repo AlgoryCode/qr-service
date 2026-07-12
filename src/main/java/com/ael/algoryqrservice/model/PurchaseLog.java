@@ -26,7 +26,7 @@ public class PurchaseLog {
     @Column(name = "purchase_id")
     private Long purchaseId;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
 
     @Enumerated(EnumType.STRING)

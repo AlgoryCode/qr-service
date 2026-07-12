@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.controller;
 
+import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.service.MenuService;
 import lombok.RequiredArgsConstructor;
