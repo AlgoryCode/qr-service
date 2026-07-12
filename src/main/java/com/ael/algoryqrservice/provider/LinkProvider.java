@@ -28,7 +28,7 @@ public class LinkProvider implements QrProvider<QrRequest> {
     public QrResponse createQr(QrRequest request) {
         try {
             String content = buildLinkContent(request.getDetails());
-            return qrGenerationService.createAndSave(request, content);
+            return qrGenerationService.toResponse(qrGenerationService.createAndSave(request, content));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate link QR", e);
         }

@@ -29,7 +29,7 @@ public class WifiProvider implements QrProvider<QrRequest> {
     public QrResponse createQr(QrRequest req) {
         try {
             String content = buildWifiContent(req.getDetails());
-            return qrGenerationService.createAndSave(req, content);
+            return qrGenerationService.toResponse(qrGenerationService.createAndSave(req, content));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate wifi QR", e);
         }

@@ -28,7 +28,7 @@ public class TextProvider implements QrProvider{
     public QrResponse createQr(QrRequest request) {
         try {
             String content = buildTextContent(request.getDetails());
-            return qrGenerationService.createAndSave(request, content);
+            return qrGenerationService.toResponse(qrGenerationService.createAndSave(request, content));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate text QR", e);
         }

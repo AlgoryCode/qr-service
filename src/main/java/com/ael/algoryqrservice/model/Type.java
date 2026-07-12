@@ -11,7 +11,8 @@ public enum Type {
     LOCATION(3,"location"),
     CONTACT(4,"contact"),
     WIFI(5,"wifi"),
-    TEXT(6,"text");
+    TEXT(6,"text"),
+    MENU(7,"menu");
 
     private final Integer typeId;
     private final String value;

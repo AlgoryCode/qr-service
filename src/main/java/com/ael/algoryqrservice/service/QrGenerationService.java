@@ -20,18 +20,29 @@ public class QrGenerationService {
     private final QrRepository qrRepository;
     private final ObjectMapper objectMapper;
 
-    public QrResponse createAndSave(QrRequest request, String content) throws WriterException, IOException {
+    public Qr createAndSave(QrRequest request, String content) throws WriterException, IOException {
         String base64 = qrCodeGeneratorUtil.generateBase64Png(content);
 
-        qrRepository.save(Qr.builder()
+        Qr qr = Qr.builder()
                 .userId(request.getUserId())
                 .qrName(request.getQrName())
                 .details(objectMapper.valueToTree(request.getDetails()))
                 .imgSrc(base64)
-                .build());
-
-        return QrResponse.builder()
-                .imgSrc(base64)
                 .build();
+
+        return qrRepository.save(qr);
+    }
+
+    public QrResponse toResponse(Qr qr) {
+        return QrResponse.builder()
+                .qrId(qr.getQrId())
+                .imgSrc(qr.getImgSrc())
+                .build();
+    }
+
+    public Qr updateQrContent(Qr qr, String content) throws WriterException, IOException {
+        String base64 = qrCodeGeneratorUtil.generateBase64Png(content);
+        qr.setImgSrc(base64);
+        return qrRepository.save(qr);
     }
 }
