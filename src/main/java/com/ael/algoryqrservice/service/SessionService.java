@@ -51,7 +51,7 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), sessionId, user.getId());
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), sessionId, user.getId(), user.getRole());
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
 
         return new SessionTokens(session, accessToken, refreshToken, user);
@@ -81,10 +81,10 @@ public class SessionService {
         session.setLastActivityAt(now);
         sessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), session.getId(), user.getId());
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), session.getId(), user.getId(), user.getRole());
         String newRefreshToken = formatRefreshToken(session.getId(), newRawRefreshToken);
 
-        return buildAuthResponse(user, session, accessToken, newRefreshToken);
+        return buildAuthResponse(accessToken, newRefreshToken);
     }
 
     @Transactional
@@ -171,24 +171,10 @@ public class SessionService {
         return sessionId + "." + rawToken;
     }
 
-    public AuthResponse buildAuthResponse(User user, UserSession session, String accessToken, String refreshToken) {
+    public AuthResponse buildAuthResponse(String accessToken, String refreshToken) {
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .type("Bearer")
-                .sessionId(session.getId())
-                .userId(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .loggedInAt(session.getLoggedInAt())
-                .accessExpiresAt(session.getAccessExpiresAt())
-                .refreshExpiresAt(session.getRefreshExpiresAt())
-                .revoked(session.isRevoked())
-                .ipAddress(session.getIpAddress())
-                .userAgent(session.getUserAgent())
-                .device(session.getDevice())
-                .deviceType(session.getDeviceType())
                 .build();
     }
 

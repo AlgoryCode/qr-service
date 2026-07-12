@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.JwtProperties;
+import com.ael.algoryqrservice.model.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,15 +23,17 @@ public class JwtService {
 
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String ROLES_CLAIM = "roles";
 
     private final JwtProperties jwtProperties;
 
-    public String generateAccessToken(String email, UUID sessionId, Long userId) {
+    public String generateAccessToken(String email, UUID sessionId, Long userId, UserRole role) {
         Date now = new Date();
         return Jwts.builder()
                 .id(sessionId.toString())
                 .subject(email)
                 .claim("userId", userId)
+                .claim(ROLES_CLAIM, resolveRoles(role))
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
@@ -89,6 +93,22 @@ public class JwtService {
 
     public String extractEmail(Claims claims) {
         return claims.getSubject();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> extractRoles(Claims claims) {
+        Object roles = claims.get(ROLES_CLAIM);
+        if (roles instanceof List<?> roleList) {
+            return roleList.stream().map(Object::toString).toList();
+        }
+        return List.of("ROLE_USER");
+    }
+
+    private List<String> resolveRoles(UserRole role) {
+        if (role == UserRole.ADMIN) {
+            return List.of("ROLE_USER", "ROLE_ADMIN");
+        }
+        return List.of("ROLE_USER");
     }
 
     private Claims extractAllClaims(String token) {

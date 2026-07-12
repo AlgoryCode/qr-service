@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.model.dto.QrListResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
 import com.ael.algoryqrservice.provider.QrProvider;
+import com.ael.algoryqrservice.model.enums.ProductCode;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,8 +32,12 @@ public class QrService {
     private final QrProviderFactory qrProviderFactory;
     private final QrRepository qrRepository;
     private final ObjectMapper objectMapper;
+    private final EntitlementService entitlementService;
 
-    public <T extends QrRequest> QrResponse createQR(T req) throws IOException, WriterException {
+    public <T extends QrRequest> QrResponse createQR(T req, Long userId) throws IOException, WriterException {
+        entitlementService.consume(userId, ProductCode.QR_CREATE, 1);
+        req.setUserId(userId);
+
         Type qrType = Type.from(req.getType());
         QrProvider<T> provider = qrProviderFactory.get(qrType,(Class<T>) req.getClass());
         return provider.createQr(req);
@@ -60,7 +65,7 @@ public class QrService {
         existingQr.setDeleted(true);
         qrRepository.save(existingQr);
 
-        return createQR(req);
+        return createQR(req, existingQr.getUserId());
     }
 
     public List<QrListResponse> getUserQrs(Long userId) {

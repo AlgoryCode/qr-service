@@ -1,8 +1,10 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
+import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
@@ -71,19 +73,33 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
+        User user = authenticate(request);
+        return createAuthResponse(user, clientInfo);
+    }
+
+    @Transactional
+    public AuthResponse adminLogin(LoginRequest request, ClientInfo clientInfo) {
+        User user = authenticate(request);
+        if (user.getRole() != UserRole.ADMIN) {
+            throw new ForbiddenException("Admin paneline erişim yetkiniz yok");
+        }
+        return createAuthResponse(user, clientInfo);
+    }
+
+    private User authenticate(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
 
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(email, request.getPassword())
         );
 
-        User user = userRepository.findByEmail(email)
+        return userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadRequestException("Kullanıcı bulunamadı"));
+    }
 
+    private AuthResponse createAuthResponse(User user, ClientInfo clientInfo) {
         SessionService.SessionTokens tokens = sessionService.createSession(user, clientInfo);
         return sessionService.buildAuthResponse(
-                user,
-                tokens.session(),
                 tokens.accessToken(),
                 tokens.refreshToken()
         );

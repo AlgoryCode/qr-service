@@ -5,9 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,18 +13,4 @@ public class AuthResponse {
 
     private String accessToken;
     private String refreshToken;
-    private String type;
-    private UUID sessionId;
-    private Long userId;
-    private String email;
-    private String firstName;
-    private String lastName;
-    private LocalDateTime loggedInAt;
-    private LocalDateTime accessExpiresAt;
-    private LocalDateTime refreshExpiresAt;
-    private boolean revoked;
-    private String ipAddress;
-    private String userAgent;
-    private String device;
-    private String deviceType;
 }
