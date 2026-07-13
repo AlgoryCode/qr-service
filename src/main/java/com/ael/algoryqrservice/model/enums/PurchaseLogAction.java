@@ -2,7 +2,9 @@ package com.ael.algoryqrservice.model.enums;
 
 public enum PurchaseLogAction {
     PURCHASE_STARTED,
+    PURCHASE_PAYMENT_PENDING,
     PURCHASE_COMPLETED,
+    PURCHASE_PAYMENT_FAILED,
     PURCHASE_EXPIRED,
     PURCHASE_CANCELLED,
     ENTITLEMENT_GRANTED,

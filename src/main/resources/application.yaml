@@ -14,14 +14,17 @@ spring:
       minimum-idle: 2
       maximum-pool-size: 10
       validation-timeout: 3000
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 management:
   endpoints:
@@ -49,6 +52,19 @@ server:
 
 app:
   url: ${APP_URL:http://localhost:3000}
+  service-name: ${APP_SERVICE_NAME:qr-service}
+
+payment:
+  service:
+    url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
+    pending-timeout-minutes: ${PAYMENT_PENDING_TIMEOUT_MINUTES:30}
+  rabbitmq:
+    exchange: ${PAYMENT_EVENTS_EXCHANGE:payment.events}
+    service-name: ${APP_SERVICE_NAME:qr-service}
+    success-queue: ${PAYMENT_SUCCESS_QUEUE:qr-service.payment.success}
+    failed-queue: ${PAYMENT_FAILED_QUEUE:qr-service.payment.failed}
+    success-routing-key: ${PAYMENT_SUCCESS_ROUTING_KEY:qr-service.payment.success}
+    failed-routing-key: ${PAYMENT_FAILED_ROUTING_KEY:qr-service.payment.failed}
 
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}

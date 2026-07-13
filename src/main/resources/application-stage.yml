@@ -1,25 +1,52 @@
 spring:
+  application:
+    name: algoryqr-service
   datasource:
-    url: jdbc:h2:mem:algoryqr-stage;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: ${DB_URL:jdbc:postgresql://185.184.210.52:5432/algoryqrdb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:AdHqvxNc8MLBsMjOi82TjDzSMSuUDptBNjFVwpsvtVoaf6YOciJxqT84KgmBgc39}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      keepalive-time: 30000
+      connection-timeout: 8000
+      idle-timeout: 300000
+      max-lifetime: 600000
+      minimum-idle: 2
+      maximum-pool-size: 10
+      validation-timeout: 3000
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    shutdown:
+      access: unrestricted
+    health:
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
 
 server:
-  port: 8055
+  port: ${SERVER_PORT:8055}
+
+app:
+  url: ${APP_URL:http://localhost:3000}
 
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}

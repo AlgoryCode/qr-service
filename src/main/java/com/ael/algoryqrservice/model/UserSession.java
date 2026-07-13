@@ -22,7 +22,7 @@ public class UserSession {
     @Column(columnDefinition = "uuid")
     private UUID id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
 
     @Column(name = "refresh_token_hash", nullable = false)

@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.service.PurchaseService;
 import com.ael.algoryqrservice.util.SecurityUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,9 +25,14 @@ public class PurchaseController {
     private final SecurityUtils securityUtils;
 
     @PostMapping
-    public ResponseEntity<PurchaseResponse> purchase(@Valid @RequestBody PurchaseRequest request) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.status(HttpStatus.CREATED).body(purchaseService.purchase(userId, request));
+    public ResponseEntity<PurchaseInitiateResponse> purchase(
+            @Valid @RequestBody PurchaseRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        String clientIp = resolveClientIp(httpServletRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                purchaseService.purchase(securityUtils.getCurrentUser(), request, clientIp)
+        );
     }
 
     @GetMapping("/my")
@@ -58,5 +64,13 @@ public class PurchaseController {
     public ResponseEntity<List<UserEntitlementResponse>> getMyEntitlements() {
         Long userId = securityUtils.getCurrentUser().getId();
         return ResponseEntity.ok(entitlementService.getUserEntitlements(userId));
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

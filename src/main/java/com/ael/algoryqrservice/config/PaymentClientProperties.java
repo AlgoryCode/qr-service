@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 @Configuration
-@ConfigurationProperties(prefix = "app")
-public class AppProperties {
+@ConfigurationProperties(prefix = "payment.service")
+public class PaymentClientProperties {
 
-    private String url = "http://localhost:3000";
-    private String serviceName = "qr-service";
+    private String url = "http://payment-service:8080";
+    private int pendingTimeoutMinutes = 30;
 }

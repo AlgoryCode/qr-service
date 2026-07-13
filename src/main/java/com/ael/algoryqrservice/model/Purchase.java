@@ -47,10 +47,16 @@ public class Purchase {
     @Column(nullable = false)
     private PurchaseStatus status;
 
-    @Column(name = "starts_at", nullable = false)
+    @Column(name = "payment_conversation_id", length = 128)
+    private String paymentConversationId;
+
+    @Column(name = "payment_id", length = 64)
+    private String paymentId;
+
+    @Column(name = "starts_at")
     private LocalDateTime startsAt;
 
-    @Column(name = "expires_at", nullable = false)
+    @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
     @CreationTimestamp

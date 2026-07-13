@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.model.enums.ProductCode;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -25,7 +26,7 @@ public class UserEntitlement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
 
     @Column(name = "product_id", nullable = false)
@@ -45,6 +46,7 @@ public class UserEntitlement {
     private Integer remainingQuantity;
 
     @Column(name = "used_quantity", nullable = false)
+    @ColumnDefault("0")
     @Builder.Default
     private Integer usedQuantity = 0;
 

@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.model;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -41,6 +42,7 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 32)
+    @ColumnDefault("'USER'")
     @Builder.Default
     private UserRole role = UserRole.USER;
 
