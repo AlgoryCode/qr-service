@@ -63,4 +63,34 @@ public class User {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Column(name = "two_factor_enabled", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean twoFactorEnabled = false;
+
+    @Column(name = "notify_email_important", nullable = false)
+    @ColumnDefault("true")
+    @Builder.Default
+    private boolean notifyEmailImportant = true;
+
+    @Column(name = "notify_scan_alerts", nullable = false)
+    @ColumnDefault("true")
+    @Builder.Default
+    private boolean notifyScanAlerts = true;
+
+    @Column(name = "notify_weekly_report", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean notifyWeeklyReport = false;
+
+    @Column(name = "notify_marketing_emails", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean notifyMarketingEmails = false;
+
+    @Column(name = "notify_push_browser", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean notifyPushBrowser = false;
 }

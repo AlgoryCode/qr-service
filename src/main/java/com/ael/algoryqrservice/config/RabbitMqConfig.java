@@ -70,4 +70,9 @@ public class RabbitMqConfig {
     public MessageConverter jackson2JsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
+
+    @Bean
+    public TopicExchange pushNotificationExchange(PushNotificationProperties properties) {
+        return new TopicExchange(properties.getMessaging().getExchange(), true, false);
+    }
 }

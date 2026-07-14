@@ -96,6 +96,19 @@ public class SessionService {
     }
 
     @Transactional
+    public void revokeAllActiveSessions(Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<UserSession> sessions = sessionRepository.findByUserIdOrderByLoggedInAtDesc(userId);
+        for (UserSession session : sessions) {
+            if (!session.isRevoked()) {
+                session.setRevoked(true);
+                session.setRevokedAt(now);
+                sessionRepository.save(session);
+            }
+        }
+    }
+
+    @Transactional
     public void revokeByRefreshToken(String refreshToken) {
         RefreshTokenParts parts = parseRefreshToken(refreshToken);
 

@@ -14,6 +14,10 @@
 | `PAYMENT_SUCCESS_QUEUE` | `qr-service.payment.success` | Success consumer queue |
 | `PAYMENT_FAILED_QUEUE` | `qr-service.payment.failed` | Failed consumer queue |
 | `PAYMENT_PENDING_TIMEOUT_MINUTES` | `30` | PENDING purchase timeout |
+| `PUSH_NOTIFICATION_EXCHANGE` | `push-notification-exchange` | Password-change email notifications |
+| `PUSH_NOTIFICATION_ROUTING_KEY` | `push-notification.request` | Inbound routing key |
+| `PASSWORD_CHANGE_CODE_VALIDITY_MINUTES` | `5` | OTP validity |
+| `EMAIL_CHANGE_CODE_VALIDITY_MINUTES` | `5` | Email change OTP validity |
 
 ## payment-service
 
