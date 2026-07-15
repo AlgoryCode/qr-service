@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.EmailChangeChallenge;
 import com.ael.algoryqrservice.model.EmailChangeCode;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AccountDtos;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.EmailChangeChallengeStatus;
 import com.ael.algoryqrservice.model.enums.EmailChangeCodePurpose;
 import com.ael.algoryqrservice.model.enums.EmailChangeCodeStatus;
@@ -48,6 +49,7 @@ public class EmailChangeService {
     @Transactional
     public AccountDtos.EmailChangeCodeResponse requestCurrentCode() {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user);
         LocalDateTime now = LocalDateTime.now();
 
         codeRepository.expireAllTimedOut(now);
@@ -77,6 +79,7 @@ public class EmailChangeService {
     @Transactional
     public AccountDtos.EmailChangeCodeResponse verifyCurrent(AccountDtos.EmailChangeVerifyCurrentRequest request) {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user);
         LocalDateTime now = LocalDateTime.now();
         codeRepository.expireAllTimedOut(now);
 
@@ -103,6 +106,7 @@ public class EmailChangeService {
     @Transactional
     public AccountDtos.EmailChangeCodeResponse requestNewCode(AccountDtos.EmailChangeRequestNewCodeRequest request) {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user);
         LocalDateTime now = LocalDateTime.now();
         codeRepository.expireAllTimedOut(now);
 
@@ -133,6 +137,7 @@ public class EmailChangeService {
     @Transactional
     public void confirm(AccountDtos.EmailChangeConfirmRequest request) {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user);
         LocalDateTime now = LocalDateTime.now();
         codeRepository.expireAllTimedOut(now);
 
@@ -257,5 +262,11 @@ public class EmailChangeService {
             return "*".repeat(Math.max(local.length(), 1)) + domain;
         }
         return local.charAt(0) + "***" + local.charAt(local.length() - 1) + domain;
+    }
+
+    private void requireBasicProvider(User user) {
+        if (user.getProvider() != AuthProvider.BASIC) {
+            throw new BadRequestException("Google hesabının e-posta adresi uygulama içinden değiştirilemez");
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.model.enums.ProductCode;
+import com.ael.algoryqrservice.model.enums.ProductScope;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.ProductRepository;
@@ -30,7 +31,10 @@ public class EntitlementService {
     private final PurchaseLogService purchaseLogService;
 
     @Transactional
-    public void grant(Purchase purchase, Long productId, ProductCode productCode, int quantity) {
+    public void grant(Purchase purchase, Long productId, ProductCode productCode, int quantity, boolean unlimited) {
+        if (entitlementRepository.findByPurchaseIdAndProductId(purchase.getId(), productId).isPresent()) {
+            return;
+        }
         UserEntitlement entitlement = UserEntitlement.builder()
                 .userId(purchase.getUserId())
                 .productId(productId)
@@ -39,6 +43,7 @@ public class EntitlementService {
                 .totalQuantity(quantity)
                 .remainingQuantity(quantity)
                 .usedQuantity(0)
+                .unlimited(unlimited)
                 .startsAt(purchase.getStartsAt())
                 .expiresAt(purchase.getExpiresAt())
                 .build();
@@ -48,9 +53,20 @@ public class EntitlementService {
                 purchase.getId(),
                 purchase.getUserId(),
                 PurchaseLogAction.ENTITLEMENT_GRANTED,
-                quantity + " adet " + productCode + " hakkı tanımlandı ("
+                (unlimited ? "Sınırsız " : quantity + " adet ") + productCode + " hakkı tanımlandı ("
                         + purchase.getStartsAt() + " - " + purchase.getExpiresAt() + ")"
         );
+    }
+
+    @Transactional
+    public void synchronizePeriod(Purchase purchase) {
+        List<UserEntitlement> entitlements = entitlementRepository
+                .findByPurchaseIdOrderByProductCodeAsc(purchase.getId());
+        for (UserEntitlement entitlement : entitlements) {
+            entitlement.setStartsAt(purchase.getStartsAt());
+            entitlement.setExpiresAt(purchase.getExpiresAt());
+        }
+        entitlementRepository.saveAll(entitlements);
     }
 
     @Transactional
@@ -79,6 +95,12 @@ public class EntitlementService {
                 break;
             }
 
+            if (entitlement.isUnlimited()) {
+                remainingToConsume = 0;
+                purchaseIdForLog = entitlement.getPurchaseId();
+                break;
+            }
+
             int consumed = Math.min(entitlement.getRemainingQuantity(), remainingToConsume);
             entitlement.setRemainingQuantity(entitlement.getRemainingQuantity() - consumed);
             entitlement.setUsedQuantity(entitlement.getUsedQuantity() + consumed);
@@ -99,6 +121,25 @@ public class EntitlementService {
                     PurchaseLogAction.ENTITLEMENT_CONSUMED,
                     amount + " adet " + productCode + " hakkı kullanıldı"
             );
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasScope(Long userId, ProductScope scope) {
+        List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        return entitlements.stream()
+                .filter(entitlement -> entitlement.getProductCode() == scope.getProductCode())
+                .anyMatch(entitlement -> {
+                    Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
+                    return purchase != null && entitlement.isUsable(purchase.getStatus());
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public void requireScope(Long userId, ProductScope scope) {
+        if (!hasScope(userId, scope)) {
+            throw new ForbiddenException(scope + " yetkisi için uygun paket gerekli");
         }
     }
 
@@ -183,6 +224,7 @@ public class EntitlementService {
                 .totalQuantity(entitlement.getTotalQuantity())
                 .remainingQuantity(entitlement.getRemainingQuantity())
                 .usedQuantity(entitlement.getUsedQuantity())
+                .unlimited(entitlement.isUnlimited())
                 .startsAt(entitlement.getStartsAt())
                 .expiresAt(entitlement.getExpiresAt())
                 .purchaseStatus(purchaseStatus)

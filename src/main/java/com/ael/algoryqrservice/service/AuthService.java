@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.repository.UserRepository;
@@ -11,6 +12,7 @@ import com.ael.algoryqrservice.util.ClientInfo;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +31,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final SessionService sessionService;
     private final JwtService jwtService;
+    private final UserPackageService userPackageService;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request, ClientInfo clientInfo) {
@@ -50,6 +53,7 @@ public class AuthService {
                 .email(request.getEmail().trim().toLowerCase())
                 .phone(request.getPhone().trim())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .provider(AuthProvider.BASIC)
                 .registrationIpAddress(clientInfo.ipAddress())
                 .registrationUserAgent(clientInfo.userAgent())
                 .registrationDevice(clientInfo.device())
@@ -57,6 +61,7 @@ public class AuthService {
                 .build();
 
         User saved = userRepository.save(user);
+        userPackageService.ensureFreePackage(saved.getId());
 
         return RegisterResponse.builder()
                 .message("Kayıt başarılı")
@@ -74,6 +79,7 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
         User user = authenticate(request);
+        userPackageService.ensureFreePackage(user.getId());
         return createAuthResponse(user, clientInfo);
     }
 
@@ -83,18 +89,23 @@ public class AuthService {
         if (user.getRole() != UserRole.ADMIN) {
             throw new ForbiddenException("Admin paneline erişim yetkiniz yok");
         }
+        userPackageService.ensureFreePackage(user.getId());
         return createAuthResponse(user, clientInfo);
     }
 
     private User authenticate(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
+        if (user.getProvider() != AuthProvider.BASIC) {
+            throw new BadCredentialsException("Geçersiz kimlik bilgileri");
+        }
 
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(email, request.getPassword())
         );
 
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadRequestException("Kullanıcı bulunamadı"));
+        return user;
     }
 
     private AuthResponse createAuthResponse(User user, ClientInfo clientInfo) {
@@ -147,4 +158,5 @@ public class AuthService {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
     }
+
 }

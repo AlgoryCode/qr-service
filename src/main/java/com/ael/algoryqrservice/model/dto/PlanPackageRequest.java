@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.PackageCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,8 +15,8 @@ import java.util.List;
 @Data
 public class PlanPackageRequest {
 
-    @NotBlank(message = "Paket kodu zorunludur")
-    private String code;
+    @NotNull(message = "Paket kodu zorunludur")
+    private PackageCode code;
 
     @NotBlank(message = "Paket adı zorunludur")
     private String name;

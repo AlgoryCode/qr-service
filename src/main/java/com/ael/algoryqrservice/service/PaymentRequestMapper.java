@@ -11,6 +11,7 @@ import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,19 +30,37 @@ public class PaymentRequestMapper {
         AddressDto shippingAddress = request.getShippingAddress() != null
                 ? request.getShippingAddress()
                 : request.getBillingAddress();
+        BigDecimal chargeAmount = planPackage.getPrice().divide(
+                BigDecimal.valueOf(request.getInstallmentCount()),
+                2,
+                RoundingMode.DOWN
+        );
 
         return PaymentThreeDsRequest.builder()
                 .serviceName(appProperties.getServiceName())
                 .sourceReferenceId(String.valueOf(purchase.getId()))
                 .sourceMetadata(Map.of(
                         "userId", user.getId(),
-                        "packageId", planPackage.getId()
+                        "packageId", planPackage.getId(),
+                        "packageCode", planPackage.getCode().name(),
+                        "purchaseConversationId", purchase.getPaymentConversationId(),
+                        "installmentCount", request.getInstallmentCount(),
+                        "validityDays", planPackage.getValidityDays(),
+                        "totalAmount", planPackage.getPrice()
                 ))
                 .conversationId(purchase.getPaymentConversationId())
                 .locale("tr")
-                .price(planPackage.getPrice())
-                .paidPrice(planPackage.getPrice())
+                .price(chargeAmount)
+                .paidPrice(chargeAmount)
                 .currency(planPackage.getCurrency())
+                .paymentMode(request.getPaymentMode().name())
+                .installmentCount(request.getInstallmentCount())
+                .planInstallmentCount(
+                        request.getInstallmentCount() > 1 ? request.getInstallmentCount() : null
+                )
+                .installmentIntervalMonths(
+                        request.getInstallmentCount() > 1 ? 1 : null
+                )
                 .installment(1)
                 .basketId("qr-purchase-" + purchase.getId())
                 .paymentChannel("WEB")
@@ -50,7 +69,7 @@ public class PaymentRequestMapper {
                 .buyer(toBuyer(user, request, clientIp))
                 .shippingAddress(toAddress(shippingAddress))
                 .billingAddress(toAddress(request.getBillingAddress()))
-                .basketItems(List.of(toBasketItem(planPackage)))
+                .basketItems(List.of(toBasketItem(planPackage, chargeAmount)))
                 .build();
     }
 
@@ -95,14 +114,17 @@ public class PaymentRequestMapper {
                 .build();
     }
 
-    private PaymentThreeDsRequest.BasketItemPayload toBasketItem(PlanPackage planPackage) {
+    private PaymentThreeDsRequest.BasketItemPayload toBasketItem(
+            PlanPackage planPackage,
+            BigDecimal chargeAmount
+    ) {
         return PaymentThreeDsRequest.BasketItemPayload.builder()
                 .id(String.valueOf(planPackage.getId()))
                 .name(planPackage.getName())
                 .category1("Digital")
                 .category2("Package")
                 .itemType("VIRTUAL")
-                .price(planPackage.getPrice())
+                .price(chargeAmount)
                 .build();
     }
 }

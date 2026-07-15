@@ -19,6 +19,10 @@ public class PaymentThreeDsRequest {
     private BigDecimal price;
     private BigDecimal paidPrice;
     private String currency;
+    private String paymentMode;
+    private Integer installmentCount;
+    private Integer planInstallmentCount;
+    private Integer installmentIntervalMonths;
     private Integer installment;
     private String basketId;
     private String paymentChannel;

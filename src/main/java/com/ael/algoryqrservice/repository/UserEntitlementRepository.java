@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface UserEntitlementRepository extends JpaRepository<UserEntitlement, Long> {
@@ -18,4 +19,6 @@ public interface UserEntitlementRepository extends JpaRepository<UserEntitlement
     List<UserEntitlement> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     List<UserEntitlement> findByPurchaseIdOrderByProductCodeAsc(Long purchaseId);
+
+    Optional<UserEntitlement> findByPurchaseIdAndProductId(Long purchaseId, Long productId);
 }

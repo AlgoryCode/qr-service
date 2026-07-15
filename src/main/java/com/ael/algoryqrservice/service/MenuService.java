@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
+import com.ael.algoryqrservice.util.SecurityUtils;
 import com.ael.algoryqrservice.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ public class MenuService {
     private final QrRepository qrRepository;
     private final QrGenerationService qrGenerationService;
     private final AppProperties appProperties;
+    private final SecurityUtils securityUtils;
 
     @Transactional
     public Menu createMenuForQr(Qr qr, QrRequest request) {
@@ -105,7 +107,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.MenuProductResponse> listProducts(Long menuId) {
-        ensureMenuExists(menuId);
+        ensureOwnedMenu(menuId);
         return menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId)
                 .stream()
                 .map(this::toProductResponse)
@@ -114,7 +116,7 @@ public class MenuService {
 
     @Transactional
     public MenuDtos.MenuProductResponse createProduct(Long menuId, MenuDtos.MenuProductRequest request) {
-        Menu menu = ensureMenuExists(menuId);
+        Menu menu = ensureOwnedMenu(menuId);
         validateProductRequest(request);
 
         MenuProduct product = MenuProduct.builder()
@@ -136,6 +138,7 @@ public class MenuService {
     public MenuDtos.MenuProductResponse updateProduct(Long productId, MenuDtos.MenuProductRequest request) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        ensureOwnedMenu(product.getMenuId());
         validateProductRequest(request);
 
         product.setName(request.getName().trim());
@@ -160,13 +163,14 @@ public class MenuService {
     public void deleteProduct(Long productId) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        ensureOwnedMenu(product.getMenuId());
         product.setDeleted(true);
         menuProductRepository.save(product);
     }
 
     @Transactional
     public MenuDtos.MenuProfileResponse updateMenu(Long menuId, MenuDtos.MenuUpdateRequest request) throws Exception {
-        Menu menu = ensureMenuExists(menuId);
+        Menu menu = ensureOwnedMenu(menuId);
         Qr qr = qrRepository.findById(menu.getQrId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
 
@@ -202,19 +206,36 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuProfileResponse getMenuProfile(Long menuId) {
-        Menu menu = ensureMenuExists(menuId);
+        Menu menu = ensureOwnedMenu(menuId);
         return toMenuProfile(menu, buildPublicUrl(menu));
     }
 
     @Transactional(readOnly = true)
     public Menu findByQrId(Long qrId) {
-        return menuRepository.findByQrIdAndDeletedFalse(qrId).orElse(null);
+        Menu menu = menuRepository.findByQrIdAndDeletedFalse(qrId).orElse(null);
+        if (menu != null) {
+            requireOwnership(menu);
+        }
+        return menu;
     }
 
     private Menu ensureMenuExists(Long menuId) {
         return menuRepository.findById(menuId)
                 .filter(menu -> !menu.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+    }
+
+    private Menu ensureOwnedMenu(Long menuId) {
+        Menu menu = ensureMenuExists(menuId);
+        requireOwnership(menu);
+        return menu;
+    }
+
+    private void requireOwnership(Menu menu) {
+        Long currentUserId = securityUtils.getCurrentUser().getId();
+        if (!currentUserId.equals(menu.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
+        }
     }
 
     private int nextSortOrder(Long menuId) {

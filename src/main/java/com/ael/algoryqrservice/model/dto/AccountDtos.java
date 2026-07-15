@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,6 +20,7 @@ public final class AccountDtos {
         private String lastName;
         private String email;
         private String phoneNumber;
+        private AuthProvider provider;
         private boolean twoFactorEnabled;
         private String memberSince;
         private boolean notifyEmailImportant;

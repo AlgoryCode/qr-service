@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.PackageCode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -25,8 +26,9 @@ public class PlanPackage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String code;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, unique = true, length = 32)
+    private PackageCode code;
 
     @Column(nullable = false)
     private String name;

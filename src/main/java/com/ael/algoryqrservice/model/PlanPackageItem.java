@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "tbl_plan_package_item", uniqueConstraints = {
@@ -28,4 +29,9 @@ public class PlanPackageItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean unlimited = false;
 }

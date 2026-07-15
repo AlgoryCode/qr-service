@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PasswordChangeCode;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AccountDtos;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.PasswordChangeCodeStatus;
 import com.ael.algoryqrservice.repository.PasswordChangeCodeRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
@@ -38,6 +39,7 @@ public class PasswordChangeService {
     @Transactional
     public AccountDtos.PasswordChangeCodeResponse requestCode() {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user);
         LocalDateTime now = LocalDateTime.now();
 
         passwordChangeCodeRepository.expireAllTimedOut(now);
@@ -78,6 +80,7 @@ public class PasswordChangeService {
     @Transactional
     public void confirm(AccountDtos.ConfirmPasswordChangeRequest request) {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user);
         LocalDateTime now = LocalDateTime.now();
 
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
@@ -132,5 +135,11 @@ public class PasswordChangeService {
             return "*".repeat(Math.max(local.length(), 1)) + domain;
         }
         return local.charAt(0) + "***" + local.charAt(local.length() - 1) + domain;
+    }
+
+    private void requireBasicProvider(User user) {
+        if (user.getProvider() != AuthProvider.BASIC) {
+            throw new BadRequestException("Google hesabı için parola işlemi yapılamaz");
+        }
     }
 }

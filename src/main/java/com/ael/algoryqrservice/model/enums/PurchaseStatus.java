@@ -5,5 +5,6 @@ public enum PurchaseStatus {
     ACTIVE,
     FAILED,
     EXPIRED,
-    CANCELLED
+    CANCELLED,
+    SUPERSEDED
 }

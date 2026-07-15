@@ -19,6 +19,7 @@ public class UserEntitlementResponse {
     private Integer totalQuantity;
     private Integer remainingQuantity;
     private Integer usedQuantity;
+    private boolean unlimited;
     private LocalDateTime startsAt;
     private LocalDateTime expiresAt;
     private PurchaseStatus purchaseStatus;

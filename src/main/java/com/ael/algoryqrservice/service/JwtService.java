@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.JwtProperties;
+import com.ael.algoryqrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -27,13 +28,25 @@ public class JwtService {
 
     private final JwtProperties jwtProperties;
 
-    public String generateAccessToken(String email, UUID sessionId, Long userId, UserRole role) {
+    public String generateAccessToken(
+            String email,
+            UUID sessionId,
+            Long userId,
+            UserRole role,
+            UserAccessProfile accessProfile
+    ) {
         Date now = new Date();
         return Jwts.builder()
                 .id(sessionId.toString())
                 .subject(email)
                 .claim("userId", userId)
                 .claim(ROLES_CLAIM, resolveRoles(role))
+                .claim(
+                        "activePackage",
+                        accessProfile.activePackage() == null ? null : accessProfile.activePackage().name()
+                )
+                .claim("products", accessProfile.products().stream().map(Enum::name).toList())
+                .claim("scopes", accessProfile.scopes().stream().map(Enum::name).toList())
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))

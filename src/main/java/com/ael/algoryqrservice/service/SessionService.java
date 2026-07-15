@@ -27,6 +27,8 @@ public class SessionService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final JwtPropertiesHelper jwtPropertiesHelper;
+    private final UserPackageService userPackageService;
+    private final UserAccessProfileService userAccessProfileService;
 
     @Transactional
     public SessionTokens createSession(User user, ClientInfo clientInfo) {
@@ -51,7 +53,15 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), sessionId, user.getId(), user.getRole());
+        userPackageService.ensureFreePackage(user.getId());
+        var accessProfile = userAccessProfileService.resolve(user.getId());
+        String accessToken = jwtService.generateAccessToken(
+                user.getEmail(),
+                sessionId,
+                user.getId(),
+                user.getRole(),
+                accessProfile
+        );
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
 
         return new SessionTokens(session, accessToken, refreshToken, user);
@@ -72,6 +82,7 @@ public class SessionService {
 
         User user = userRepository.findById(session.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
+        userPackageService.ensureFreePackage(user.getId());
 
         String newRawRefreshToken = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
@@ -81,7 +92,14 @@ public class SessionService {
         session.setLastActivityAt(now);
         sessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), session.getId(), user.getId(), user.getRole());
+        var accessProfile = userAccessProfileService.resolve(user.getId());
+        String accessToken = jwtService.generateAccessToken(
+                user.getEmail(),
+                session.getId(),
+                user.getId(),
+                user.getRole(),
+                accessProfile
+        );
         String newRefreshToken = formatRefreshToken(session.getId(), newRawRefreshToken);
 
         return buildAuthResponse(accessToken, newRefreshToken);

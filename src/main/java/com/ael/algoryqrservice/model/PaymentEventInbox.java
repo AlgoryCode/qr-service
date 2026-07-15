@@ -16,20 +16,23 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_processed_payment_event")
+@Table(name = "tbl_payment_event_inbox")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProcessedPaymentEvent {
+public class PaymentEventInbox {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "event_id", nullable = false, unique = true, length = 64)
+    @Column(name = "event_id", nullable = false, unique = true, length = 128)
     private String eventId;
+
+    @Column(name = "event_type", nullable = false, length = 64)
+    private String eventType;
 
     @Column(name = "purchase_id")
     private Long purchaseId;

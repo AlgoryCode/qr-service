@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AccountDtos;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class AccountService {
         }
 
         if (request.getEmail() != null) {
+            requireBasicProvider(user, "Google hesabının e-posta adresi uygulama içinden değiştirilemez");
             String email = request.getEmail().trim().toLowerCase();
             if (email.isBlank()) {
                 throw new BadRequestException("E-posta boş olamaz");
@@ -90,6 +92,7 @@ public class AccountService {
     @Transactional
     public void changePassword(AccountDtos.ChangePasswordRequest request) {
         User user = securityUtils.getCurrentUser();
+        requireBasicProvider(user, "Google hesabı için parola değiştirilemez");
 
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(user.getEmail(), request.getCurrentPassword())
@@ -110,6 +113,7 @@ public class AccountService {
                 .lastName(user.getLastName())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhone())
+                .provider(user.getProvider())
                 .twoFactorEnabled(user.isTwoFactorEnabled())
                 .memberSince(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
                 .notifyEmailImportant(user.isNotifyEmailImportant())
@@ -118,5 +122,11 @@ public class AccountService {
                 .notifyMarketingEmails(user.isNotifyMarketingEmails())
                 .notifyPushBrowser(user.isNotifyPushBrowser())
                 .build();
+    }
+
+    private void requireBasicProvider(User user, String message) {
+        if (user.getProvider() != AuthProvider.BASIC) {
+            throw new BadRequestException(message);
+        }
     }
 }

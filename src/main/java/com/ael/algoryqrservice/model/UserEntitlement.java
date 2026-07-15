@@ -50,6 +50,11 @@ public class UserEntitlement {
     @Builder.Default
     private Integer usedQuantity = 0;
 
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean unlimited = false;
+
     @Column(name = "starts_at", nullable = false)
     private LocalDateTime startsAt;
 
@@ -67,7 +72,7 @@ public class UserEntitlement {
     }
 
     public boolean hasRemaining() {
-        return remainingQuantity != null && remainingQuantity > 0;
+        return unlimited || remainingQuantity != null && remainingQuantity > 0;
     }
 
     public boolean isUsable(PurchaseStatus purchaseStatus) {

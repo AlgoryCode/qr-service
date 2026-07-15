@@ -13,4 +13,5 @@ public class PlanPackageItemResponse {
     private ProductCode productCode;
     private String productName;
     private Integer quantity;
+    private boolean unlimited;
 }

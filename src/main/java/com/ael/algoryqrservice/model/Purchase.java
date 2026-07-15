@@ -1,8 +1,12 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.PackageCode;
+import com.ael.algoryqrservice.model.enums.PaymentMode;
+import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
@@ -31,8 +35,9 @@ public class Purchase {
     @Column(name = "package_id", nullable = false)
     private Long packageId;
 
-    @Column(name = "package_code", nullable = false)
-    private String packageCode;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "package_code", nullable = false, length = 32)
+    private PackageCode packageCode;
 
     @Column(name = "package_name", nullable = false)
     private String packageName;
@@ -52,6 +57,21 @@ public class Purchase {
 
     @Column(name = "payment_id", length = 64)
     private String paymentId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_mode", nullable = false, length = 24)
+    @ColumnDefault("'THREE_DS'")
+    @Builder.Default
+    private PaymentMode paymentMode = PaymentMode.THREE_DS;
+
+    @Column(name = "installment_count", nullable = false)
+    @ColumnDefault("1")
+    @Builder.Default
+    private Integer installmentCount = 1;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason", length = 32)
+    private PurchaseCancellationReason cancellationReason;
 
     @Column(name = "starts_at")
     private LocalDateTime startsAt;

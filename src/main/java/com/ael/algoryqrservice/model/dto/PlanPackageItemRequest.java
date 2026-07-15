@@ -13,4 +13,6 @@ public class PlanPackageItemRequest {
     @NotNull(message = "Miktar zorunludur")
     @Min(value = 1, message = "Miktar en az 1 olmalıdır")
     private Integer quantity;
+
+    private Boolean unlimited = false;
 }

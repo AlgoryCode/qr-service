@@ -14,6 +14,19 @@ spring:
       minimum-idle: 2
       maximum-pool-size: 10
       validation-timeout: 3000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            authorization-grant-type: authorization_code
+            redirect-uri: ${GOOGLE_CALLBACK_URL:{baseUrl}/google-auth/callback}
+            scope:
+              - openid
+              - profile
+              - email
 
   jpa:
     open-in-view: false
@@ -44,6 +57,7 @@ management:
 
 server:
   port: ${SERVER_PORT:8055}
+  forward-headers-strategy: framework
 
 app:
   url: ${APP_URL:http://localhost:3000}
@@ -52,3 +66,8 @@ jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
+google:
+  oauth:
+    frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
+    handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}

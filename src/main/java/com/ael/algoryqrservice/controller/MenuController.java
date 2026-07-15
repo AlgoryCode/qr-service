@@ -2,6 +2,8 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.model.enums.ProductScope;
+import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.MenuService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +37,7 @@ public class MenuController {
     }
 
     @GetMapping("/by-qr/{qrId}")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenuByQrId(@PathVariable Long qrId) {
         Menu menu = menuService.findByQrId(qrId);
         if (menu == null) {
@@ -44,11 +47,13 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenu(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuService.getMenuProfile(menuId));
     }
 
     @PatchMapping("/{menuId}")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> updateMenu(
             @PathVariable Long menuId,
             @RequestBody MenuDtos.MenuUpdateRequest request
@@ -57,11 +62,13 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/products")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<List<MenuDtos.MenuProductResponse>> listProducts(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuService.listProducts(menuId));
     }
 
     @PostMapping("/{menuId}/products")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> createProduct(
             @PathVariable Long menuId,
             @RequestBody MenuDtos.MenuProductRequest request
@@ -70,6 +77,7 @@ public class MenuController {
     }
 
     @PutMapping("/products/{productId}")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> updateProduct(
             @PathVariable Long productId,
             @RequestBody MenuDtos.MenuProductRequest request
@@ -78,6 +86,7 @@ public class MenuController {
     }
 
     @DeleteMapping("/products/{productId}")
+    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
     public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
         menuService.deleteProduct(productId);
         return ResponseEntity.noContent().build();

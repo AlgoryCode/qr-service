@@ -16,6 +16,16 @@ public class PaymentCompletedEventDto {
     private String serviceName;
     private String sourceReferenceId;
     private Map<String, Object> sourceMetadata;
+    private String purchaseId;
+    private String userId;
+    private String packageId;
+    private String packageCode;
+    private String installmentId;
+    private Integer installmentNumber;
+    private Integer installmentCount;
+    private String periodStart;
+    private String periodEnd;
     private BigDecimal amount;
     private String currency;
+    private String failureReason;
 }

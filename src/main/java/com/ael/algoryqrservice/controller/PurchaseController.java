@@ -53,6 +53,12 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getPurchaseSummary(purchaseId, userId));
     }
 
+    @GetMapping("/{purchaseId}/installments")
+    public ResponseEntity<List<PurchaseFulfillmentResponse>> getPurchaseInstallments(@PathVariable Long purchaseId) {
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.getPurchaseInstallments(purchaseId, userId));
+    }
+
     @GetMapping("/{purchaseId}/logs")
     public ResponseEntity<List<PurchaseLogResponse>> getPurchaseLogs(@PathVariable Long purchaseId) {
         Long userId = securityUtils.getCurrentUser().getId();

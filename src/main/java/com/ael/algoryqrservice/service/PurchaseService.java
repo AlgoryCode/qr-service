@@ -5,21 +5,27 @@ import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.PlanPackage;
-import com.ael.algoryqrservice.model.PlanPackageItem;
-import com.ael.algoryqrservice.model.ProcessedPaymentEvent;
+import com.ael.algoryqrservice.model.PaymentEventInbox;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
+import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.dto.PurchaseInitiateResponse;
+import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseSummaryResponse;
+import com.ael.algoryqrservice.model.enums.PackageCode;
+import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
+import com.ael.algoryqrservice.model.enums.PaymentMode;
+import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.repository.ProcessedPaymentEventRepository;
+import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,8 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.math.RoundingMode;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -42,11 +48,24 @@ public class PurchaseService {
     private final PaymentServiceClient paymentServiceClient;
     private final PaymentRequestMapper paymentRequestMapper;
     private final AppProperties appProperties;
-    private final ProcessedPaymentEventRepository processedPaymentEventRepository;
+    private final PaymentEventInboxRepository paymentEventInboxRepository;
+    private final UserPackageService userPackageService;
+    private final PurchaseFulfillmentService purchaseFulfillmentService;
 
     @Transactional
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
         PlanPackage planPackage = planPackageService.findActivePackage(request.getPackageId());
+        if (planPackage.getCode() == PackageCode.FREE_PACKAGE) {
+            throw new BadRequestException("FREE_PACKAGE satın alınamaz");
+        }
+        if (!request.isPaymentPlanValid()) {
+            throw new BadRequestException("Geçersiz ödeme planı");
+        }
+        if (planPackage.getPrice().movePointRight(2)
+                .remainder(java.math.BigDecimal.valueOf(request.getInstallmentCount()))
+                .signum() != 0) {
+            throw new BadRequestException("Paket fiyatı seçilen taksit sayısına eşit bölünemiyor");
+        }
 
         purchaseLogService.log(
                 null,
@@ -62,11 +81,16 @@ public class PurchaseService {
                 .packageName(planPackage.getName())
                 .price(planPackage.getPrice())
                 .currency(planPackage.getCurrency())
+                .paymentMode(request.getPaymentMode())
+                .installmentCount(request.getInstallmentCount())
                 .status(PurchaseStatus.PENDING)
                 .build());
 
         purchase.setPaymentConversationId(paymentRequestMapper.buildConversationId(purchase.getId()));
         purchaseRepository.save(purchase);
+        if (request.getInstallmentCount() > 1) {
+            purchaseFulfillmentService.initializeSchedule(purchase, appProperties.getServiceName());
+        }
 
         purchaseLogService.log(
                 purchase.getId(),
@@ -84,7 +108,9 @@ public class PurchaseService {
                     clientIp,
                     appProperties
             );
-            PaymentThreeDsResponse paymentResponse = paymentServiceClient.initializeThreeDsPayment(paymentRequest);
+            PaymentThreeDsResponse paymentResponse = request.getPaymentMode() == PaymentMode.DIRECT
+                    ? paymentServiceClient.createDirectPayment(paymentRequest)
+                    : paymentServiceClient.initializeThreeDsPayment(paymentRequest);
 
             return PurchaseInitiateResponse.builder()
                     .purchaseId(purchase.getId())
@@ -107,64 +133,48 @@ public class PurchaseService {
 
     @Transactional
     public void handlePaymentSuccess(PaymentCompletedEventDto event) {
-        if (processedPaymentEventRepository.existsByEventId(event.getEventId())) {
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
             return;
         }
 
-        Long purchaseId = parsePurchaseId(event);
-        Purchase purchase = purchaseRepository.findById(purchaseId)
-                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
-
-        if (purchase.getStatus() == PurchaseStatus.ACTIVE) {
-            markEventProcessed(event.getEventId(), purchaseId);
+        PaymentEventMetadata metadata = PaymentEventMetadata.from(event);
+        Purchase purchase = purchaseRepository.findByIdForUpdate(metadata.purchaseId())
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + metadata.purchaseId()));
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
             return;
         }
+        validatePaidEvent(event, metadata, purchase);
 
-        if (purchase.getStatus() != PurchaseStatus.PENDING) {
-            log.warn("Payment success ignored for purchaseId={} status={}", purchaseId, purchase.getStatus());
-            markEventProcessed(event.getEventId(), purchaseId);
-            return;
+        if (purchase.getStatus() == PurchaseStatus.CANCELLED
+                && purchase.getCancellationReason() != PurchaseCancellationReason.PAYMENT_TIMEOUT) {
+            throw new InvalidPaymentEventException("Manually cancelled purchase cannot be fulfilled");
         }
-
-        PlanPackage planPackage = planPackageService.findActivePackage(purchase.getPackageId());
-        LocalDateTime startsAt = LocalDateTime.now();
-        LocalDateTime expiresAt = startsAt.plusDays(planPackage.getValidityDays());
-
-        purchase.setStatus(PurchaseStatus.ACTIVE);
-        purchase.setPaymentId(event.getPaymentId());
-        purchase.setStartsAt(startsAt);
-        purchase.setExpiresAt(expiresAt);
-        purchaseRepository.save(purchase);
-
-        for (PlanPackageItem item : planPackage.getItems()) {
-            entitlementService.grant(
-                    purchase,
-                    item.getProduct().getId(),
-                    item.getProduct().getCode(),
-                    item.getQuantity()
-            );
-        }
+        PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
+        purchaseFulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
 
         purchaseLogService.log(
                 purchase.getId(),
                 purchase.getUserId(),
                 PurchaseLogAction.PURCHASE_COMPLETED,
-                purchase.getPackageName() + " paketi satın alma tamamlandı ("
-                        + startsAt + " - " + expiresAt + ")"
+                purchase.getPackageName() + " paketi " + metadata.installmentNumber()
+                        + "/" + metadata.installmentCount() + " taksiti işlendi"
         );
-
-        markEventProcessed(event.getEventId(), purchaseId);
+        markEventProcessed(event, purchase.getId());
     }
 
     @Transactional
     public void handlePaymentFailed(PaymentCompletedEventDto event) {
-        if (processedPaymentEventRepository.existsByEventId(event.getEventId())) {
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
             return;
         }
 
-        Long purchaseId = parsePurchaseId(event);
-        Purchase purchase = purchaseRepository.findById(purchaseId)
-                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
+        PaymentEventMetadata metadata = PaymentEventMetadata.from(event);
+        Purchase purchase = purchaseRepository.findByIdForUpdate(metadata.purchaseId())
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + metadata.purchaseId()));
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        validateIdentity(event, metadata, purchase);
 
         if (purchase.getStatus() == PurchaseStatus.PENDING) {
             purchase.setStatus(PurchaseStatus.FAILED);
@@ -179,8 +189,50 @@ public class PurchaseService {
                     purchase.getPackageName() + " paketi ödemesi başarısız"
             );
         }
+        purchaseFulfillmentService.recordUnpaidInstallment(
+                purchase,
+                event,
+                metadata,
+                FulfillmentStatus.FAILED
+        );
+        markEventProcessed(event, purchase.getId());
+    }
 
-        markEventProcessed(event.getEventId(), purchaseId);
+    @Transactional
+    public void handlePaymentOverdue(PaymentCompletedEventDto event) {
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        PaymentEventMetadata metadata = PaymentEventMetadata.from(event);
+        Purchase purchase = purchaseRepository.findByIdForUpdate(metadata.purchaseId())
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + metadata.purchaseId()));
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        validateIdentity(event, metadata, purchase);
+        purchaseFulfillmentService.recordUnpaidInstallment(
+                purchase,
+                event,
+                metadata,
+                FulfillmentStatus.OVERDUE
+        );
+        markEventProcessed(event, purchase.getId());
+    }
+
+    @Transactional
+    public void handlePaymentRefunded(PaymentCompletedEventDto event) {
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        PaymentEventMetadata metadata = PaymentEventMetadata.from(event);
+        Purchase purchase = purchaseRepository.findByIdForUpdate(metadata.purchaseId())
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + metadata.purchaseId()));
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        validateIdentity(event, metadata, purchase);
+        purchaseFulfillmentService.revokeInstallment(purchase, event, metadata);
+        markEventProcessed(event, purchase.getId());
     }
 
     @Transactional
@@ -193,6 +245,7 @@ public class PurchaseService {
 
         for (Purchase purchase : pendingPurchases) {
             purchase.setStatus(PurchaseStatus.CANCELLED);
+            purchase.setCancellationReason(PurchaseCancellationReason.PAYMENT_TIMEOUT);
             purchaseRepository.save(purchase);
             purchaseLogService.log(
                     purchase.getId(),
@@ -214,6 +267,12 @@ public class PurchaseService {
     public PurchaseSummaryResponse getPurchaseSummary(Long purchaseId, Long userId) {
         Purchase purchase = findUserPurchase(purchaseId, userId);
         return toSummary(purchase);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseFulfillmentResponse> getPurchaseInstallments(Long purchaseId, Long userId) {
+        findUserPurchase(purchaseId, userId);
+        return purchaseFulfillmentService.getFulfillments(purchaseId);
     }
 
     @Transactional(readOnly = true)
@@ -242,6 +301,7 @@ public class PurchaseService {
         }
 
         entitlementService.expirePurchase(purchase);
+        userPackageService.ensureFreePackage(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
 
@@ -257,20 +317,69 @@ public class PurchaseService {
         return purchase;
     }
 
-    private Long parsePurchaseId(PaymentCompletedEventDto event) {
-        if (event.getSourceReferenceId() != null && !event.getSourceReferenceId().isBlank()) {
-            return Long.parseLong(event.getSourceReferenceId());
+    private void validatePaidEvent(
+            PaymentCompletedEventDto event,
+            PaymentEventMetadata metadata,
+            Purchase purchase
+    ) {
+        validateIdentity(event, metadata, purchase);
+        if (event.getAmount() == null) {
+            throw new InvalidPaymentEventException("Payment amount is missing");
         }
-        Map<String, Object> metadata = event.getSourceMetadata();
-        if (metadata != null && metadata.get("purchaseId") != null) {
-            return Long.parseLong(String.valueOf(metadata.get("purchaseId")));
+        int installmentCount = purchase.getInstallmentCount();
+        int installmentNumber = metadata.installmentNumber();
+        if (installmentNumber < 1
+                || installmentNumber > installmentCount
+                || !metadata.installmentCount().equals(installmentCount)) {
+            throw new InvalidPaymentEventException("Installment metadata does not match purchase");
         }
-        throw new BadRequestException("Ödeme event'inde purchaseId bulunamadı");
+        var standardAmount = purchase.getPrice().divide(
+                java.math.BigDecimal.valueOf(installmentCount),
+                2,
+                RoundingMode.DOWN
+        );
+        var expectedAmount = installmentNumber == installmentCount
+                ? purchase.getPrice().subtract(standardAmount.multiply(
+                        java.math.BigDecimal.valueOf(installmentCount - 1L)
+                ))
+                : standardAmount;
+        if (expectedAmount.compareTo(event.getAmount()) != 0) {
+            throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
+        }
+        if (!metadata.periodEnd().isAfter(metadata.periodStart())) {
+            throw new InvalidPaymentEventException("Payment period is invalid");
+        }
     }
 
-    private void markEventProcessed(String eventId, Long purchaseId) {
-        processedPaymentEventRepository.save(ProcessedPaymentEvent.builder()
-                .eventId(eventId)
+    private void validateIdentity(
+            PaymentCompletedEventDto event,
+            PaymentEventMetadata metadata,
+            Purchase purchase
+    ) {
+        if (event.getEventId() == null || event.getEventId().isBlank()) {
+            throw new InvalidPaymentEventException("Payment event id is missing");
+        }
+        if (!appProperties.getServiceName().equals(event.getServiceName())) {
+            throw new InvalidPaymentEventException("Payment serviceName does not match purchase owner");
+        }
+        if (!purchase.getPaymentConversationId().equals(metadata.purchaseConversationId())) {
+            throw new InvalidPaymentEventException("Payment conversationId does not match purchase");
+        }
+        if (!purchase.getCurrency().equalsIgnoreCase(event.getCurrency())) {
+            throw new InvalidPaymentEventException("Payment currency does not match purchase");
+        }
+        if (!purchase.getUserId().equals(metadata.userId())
+                || !purchase.getPackageId().equals(metadata.packageId())
+                || purchase.getPackageCode() != metadata.packageCode()
+                || !purchase.getId().equals(metadata.purchaseId())) {
+            throw new InvalidPaymentEventException("Payment metadata does not match purchase");
+        }
+    }
+
+    private void markEventProcessed(PaymentCompletedEventDto event, Long purchaseId) {
+        paymentEventInboxRepository.save(PaymentEventInbox.builder()
+                .eventId(event.getEventId())
+                .eventType(event.getEventType())
                 .purchaseId(purchaseId)
                 .build());
     }
@@ -285,12 +394,15 @@ public class PurchaseService {
                 .price(purchase.getPrice())
                 .currency(purchase.getCurrency())
                 .status(purchase.getStatus())
+                .paymentMode(purchase.getPaymentMode())
+                .installmentCount(purchase.getInstallmentCount())
                 .startsAt(purchase.getStartsAt())
                 .expiresAt(purchase.getExpiresAt())
                 .purchasedAt(purchase.getPurchasedAt())
                 .expired(!purchase.isUsable())
                 .usable(purchase.isUsable())
                 .products(entitlementService.getPurchaseEntitlements(purchase))
+                .installments(purchaseFulfillmentService.getFulfillments(purchase.getId()))
                 .build();
     }
 
@@ -304,6 +416,8 @@ public class PurchaseService {
                 .price(purchase.getPrice())
                 .currency(purchase.getCurrency())
                 .status(purchase.getStatus())
+                .paymentMode(purchase.getPaymentMode())
+                .installmentCount(purchase.getInstallmentCount())
                 .startsAt(purchase.getStartsAt())
                 .expiresAt(purchase.getExpiresAt())
                 .purchasedAt(purchase.getPurchasedAt())

@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "tbl_user", uniqueConstraints = {
         @UniqueConstraint(columnNames = "email"),
-        @UniqueConstraint(columnNames = "phone")
+        @UniqueConstraint(columnNames = "phone"),
+        @UniqueConstraint(columnNames = "provider_subject")
 })
 @Getter
 @Setter
@@ -34,11 +36,20 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String phone;
 
-    @Column(nullable = false)
+    @Column
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false, length = 16)
+    @ColumnDefault("'BASIC'")
+    @Builder.Default
+    private AuthProvider provider = AuthProvider.BASIC;
+
+    @Column(name = "provider_subject", unique = true, length = 128)
+    private String providerSubject;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 32)

@@ -23,9 +23,17 @@ public class PaymentServiceClient {
     }
 
     public PaymentThreeDsResponse initializeThreeDsPayment(PaymentThreeDsRequest request) {
+        return createPayment(request, "/payments/three-ds");
+    }
+
+    public PaymentThreeDsResponse createDirectPayment(PaymentThreeDsRequest request) {
+        return createPayment(request, "/payments");
+    }
+
+    private PaymentThreeDsResponse createPayment(PaymentThreeDsRequest request, String path) {
         try {
             return restClient.post()
-                    .uri("/payments/three-ds")
+                    .uri(path)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
