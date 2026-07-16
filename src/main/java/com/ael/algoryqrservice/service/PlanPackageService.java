@@ -118,13 +118,20 @@ public class PlanPackageService {
         if (request.getCode() != PackageCode.PRO_PACKAGE) {
             return;
         }
-        Set<ProductCode> required = Set.of(ProductCode.QR_CREATE, ProductCode.QR_MENU);
+        Set<ProductCode> required = Set.of(
+                ProductCode.QR_CREATE,
+                ProductCode.QR_MENU,
+                ProductCode.QR_AGENT,
+                ProductCode.QR_ANALYTICS
+        );
         Set<ProductCode> actual = request.getItems().stream()
                 .map(item -> productService.findActiveProduct(item.getProductId()).getCode())
                 .collect(java.util.stream.Collectors.toSet());
         boolean allUnlimited = request.getItems().stream().allMatch(item -> Boolean.TRUE.equals(item.getUnlimited()));
         if (!actual.equals(required) || !allUnlimited) {
-            throw new BadRequestException("PRO_PACKAGE sınırsız QR_CREATE ve QR_MENU ürünlerini içermelidir");
+            throw new BadRequestException(
+                    "PRO_PACKAGE sınırsız QR_CREATE, QR_MENU, QR_AGENT ve QR_ANALYTICS ürünlerini içermelidir"
+            );
         }
     }
 

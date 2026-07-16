@@ -60,6 +60,7 @@ public class SessionService {
                 sessionId,
                 user.getId(),
                 user.getRole(),
+                user.getProvider(),
                 accessProfile
         );
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
@@ -98,6 +99,7 @@ public class SessionService {
                 session.getId(),
                 user.getId(),
                 user.getRole(),
+                user.getProvider(),
                 accessProfile
         );
         String newRefreshToken = formatRefreshToken(session.getId(), newRawRefreshToken);

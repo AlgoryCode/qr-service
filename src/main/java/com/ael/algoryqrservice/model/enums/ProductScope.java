@@ -2,7 +2,8 @@ package com.ael.algoryqrservice.model.enums;
 
 public enum ProductScope {
     QR_CREATE_OWNER(ProductCode.QR_CREATE),
-    QR_MENU_OWNER(ProductCode.QR_MENU);
+    QR_MENU_OWNER(ProductCode.QR_MENU),
+    QR_ANALYTICS_OWNER(ProductCode.QR_ANALYTICS);
 
     private final ProductCode productCode;
 

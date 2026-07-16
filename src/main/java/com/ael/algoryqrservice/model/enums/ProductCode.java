@@ -3,5 +3,6 @@ package com.ael.algoryqrservice.model.enums;
 public enum ProductCode {
     QR_CREATE,
     QR_MENU,
-    QR_AGENT
+    QR_AGENT,
+    QR_ANALYTICS
 }

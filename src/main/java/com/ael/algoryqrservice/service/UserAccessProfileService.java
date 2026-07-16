@@ -70,6 +70,7 @@ public class UserAccessProfileService {
         return switch (productCode) {
             case QR_CREATE -> ProductScope.QR_CREATE_OWNER;
             case QR_MENU -> ProductScope.QR_MENU_OWNER;
+            case QR_ANALYTICS -> ProductScope.QR_ANALYTICS_OWNER;
             case QR_AGENT -> null;
         };
     }

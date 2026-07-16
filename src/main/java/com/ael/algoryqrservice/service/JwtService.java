@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.JwtProperties;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -25,6 +26,7 @@ public class JwtService {
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String ROLES_CLAIM = "roles";
+    private static final String PROVIDER_CLAIM = "provider";
 
     private final JwtProperties jwtProperties;
 
@@ -33,6 +35,7 @@ public class JwtService {
             UUID sessionId,
             Long userId,
             UserRole role,
+            AuthProvider provider,
             UserAccessProfile accessProfile
     ) {
         Date now = new Date();
@@ -41,6 +44,7 @@ public class JwtService {
                 .subject(email)
                 .claim("userId", userId)
                 .claim(ROLES_CLAIM, resolveRoles(role))
+                .claim(PROVIDER_CLAIM, resolveProvider(provider))
                 .claim(
                         "activePackage",
                         accessProfile.activePackage() == null ? null : accessProfile.activePackage().name()
@@ -115,6 +119,10 @@ public class JwtService {
             return roleList.stream().map(Object::toString).toList();
         }
         return List.of("ROLE_USER");
+    }
+
+    private String resolveProvider(AuthProvider provider) {
+        return provider == null ? AuthProvider.BASIC.name() : provider.name();
     }
 
     private List<String> resolveRoles(UserRole role) {
