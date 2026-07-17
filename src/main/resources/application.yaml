@@ -36,7 +36,7 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID:977637390906-8uhh6hohv1o71gasg27tq5i4rpad54ef.apps.googleusercontent.com}
             client-secret: ${GOOGLE_CLIENT_SECRET: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}
             authorization-grant-type: authorization_code
-            redirect-uri: ${GOOGLE_CALLBACK_URL:{baseUrl}/google-auth/callback}
+            redirect-uri: ${GOOGLE_CALLBACK_URL:http://localhost:8055/google-auth/callback}
             scope:
               - openid
               - profile
@@ -45,8 +45,13 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: create
+      ddl-auto: validate
     show-sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
 
 management:
   endpoints:
@@ -76,18 +81,20 @@ server:
 app:
   url: ${APP_URL:http://localhost:3000}
   service-name: ${APP_SERVICE_NAME:qr-service}
+  menu:
+    category-max-depth: ${MENU_CATEGORY_MAX_DEPTH:10}
 
 payment:
   service:
-    url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
+    url: ${PAYMENT_SERVICE_URL:http://localhost:8080}
     pending-timeout-minutes: ${PAYMENT_PENDING_TIMEOUT_MINUTES:30}
+    auth-token: ${PAYMENT_SERVICE_AUTH_TOKEN:}
+    auth-header: ${PAYMENT_SERVICE_AUTH_HEADER:X-Service-Token}
   rabbitmq:
     exchange: ${PAYMENT_EVENTS_EXCHANGE:payment.events}
     service-name: ${APP_SERVICE_NAME:qr-service}
-    success-queue: ${PAYMENT_SUCCESS_QUEUE:qr-service.payment.success}
-    failed-queue: ${PAYMENT_FAILED_QUEUE:qr-service.payment.failed}
-    success-routing-key: ${PAYMENT_SUCCESS_ROUTING_KEY:qr-service.payment.success}
-    failed-routing-key: ${PAYMENT_FAILED_ROUTING_KEY:qr-service.payment.failed}
+    events-queue: ${PAYMENT_EVENTS_QUEUE:qr-service.payment.events}
+    events-routing-key: ${PAYMENT_EVENTS_ROUTING_KEY:qr-service.payment.events}
 
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}

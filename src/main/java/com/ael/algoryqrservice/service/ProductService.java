@@ -19,15 +19,18 @@ public class ProductService {
 
     @Transactional
     public ProductResponse create(ProductRequest request) {
-        if (productRepository.existsByCode(request.getCode())) {
-            throw new BadRequestException("Bu ürün kodu zaten mevcut: " + request.getCode());
+        String code = normalizeCode(request.getCode());
+        if (productRepository.existsByCode(code)) {
+            throw new BadRequestException("Bu ürün kodu zaten mevcut: " + code);
         }
 
         Product product = Product.builder()
-                .code(request.getCode())
+                .code(code)
                 .name(request.getName().trim())
                 .description(request.getDescription())
-                .active(request.getActive())
+                .scopeCode(normalizeCode(request.getScopeCode()))
+                .consumable(Boolean.TRUE.equals(request.getConsumable()))
+                .active(Boolean.TRUE.equals(request.getActive()))
                 .build();
 
         return toResponse(productRepository.save(product));
@@ -46,15 +49,18 @@ public class ProductService {
     @Transactional
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = findProduct(id);
+        String code = normalizeCode(request.getCode());
 
-        if (!product.getCode().equals(request.getCode()) && productRepository.existsByCode(request.getCode())) {
-            throw new BadRequestException("Bu ürün kodu zaten mevcut: " + request.getCode());
+        if (!product.getCode().equals(code) && productRepository.existsByCode(code)) {
+            throw new BadRequestException("Bu ürün kodu zaten mevcut: " + code);
         }
 
-        product.setCode(request.getCode());
+        product.setCode(code);
         product.setName(request.getName().trim());
         product.setDescription(request.getDescription());
-        product.setActive(request.getActive());
+        product.setScopeCode(normalizeCode(request.getScopeCode()));
+        product.setConsumable(Boolean.TRUE.equals(request.getConsumable()));
+        product.setActive(Boolean.TRUE.equals(request.getActive()));
 
         return toResponse(productRepository.save(product));
     }
@@ -72,12 +78,18 @@ public class ProductService {
         return product;
     }
 
+    private String normalizeCode(String code) {
+        return code == null ? null : code.trim().toUpperCase();
+    }
+
     private ProductResponse toResponse(Product product) {
         return ProductResponse.builder()
                 .id(product.getId())
                 .code(product.getCode())
                 .name(product.getName())
                 .description(product.getDescription())
+                .scopeCode(product.getScopeCode())
+                .consumable(product.isConsumable())
                 .active(product.isActive())
                 .createdAt(product.getCreatedAt())
                 .build();

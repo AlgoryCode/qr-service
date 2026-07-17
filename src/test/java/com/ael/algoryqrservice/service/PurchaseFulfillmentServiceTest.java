@@ -6,7 +6,7 @@ import com.ael.algoryqrservice.model.PurchaseFulfillment;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
-import com.ael.algoryqrservice.model.enums.PackageCode;
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
@@ -37,7 +37,7 @@ class PurchaseFulfillmentServiceTest {
     @Mock
     private EntitlementService entitlementService;
     @Mock
-    private UserPackageService userPackageService;
+    private PackageActivationService packageActivationService;
 
     @InjectMocks
     private PurchaseFulfillmentService fulfillmentService;
@@ -53,13 +53,13 @@ class PurchaseFulfillmentServiceTest {
                 .id(1L)
                 .userId(2L)
                 .packageId(3L)
-                .packageCode(PackageCode.PRO_PACKAGE)
+                .packageCode(CatalogPackages.PRO_PACKAGE)
                 .packageName("PRO")
                 .status(PurchaseStatus.PENDING)
                 .build();
         planPackage = PlanPackage.builder()
                 .id(3L)
-                .code(PackageCode.PRO_PACKAGE)
+                .code(CatalogPackages.PRO_PACKAGE)
                 .name("PRO")
                 .items(List.of())
                 .build();
@@ -70,7 +70,7 @@ class PurchaseFulfillmentServiceTest {
                 1L,
                 2L,
                 3L,
-                PackageCode.PRO_PACKAGE,
+                CatalogPackages.PRO_PACKAGE,
                 "conversation-1",
                 "installment-1",
                 1,
@@ -112,7 +112,7 @@ class PurchaseFulfillmentServiceTest {
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         assertThat(purchase.getStartsAt()).isAfterOrEqualTo(before);
         assertThat(purchase.getExpiresAt()).isEqualTo(purchase.getStartsAt().plusDays(31));
-        verify(userPackageService).activateProPackage(purchase);
+        verify(packageActivationService).activatePurchasedPackage(purchase);
         verify(entitlementService).synchronizePeriod(purchase);
     }
 
@@ -153,6 +153,6 @@ class PurchaseFulfillmentServiceTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(entitlementService).synchronizePeriod(purchase);
-        verify(userPackageService).ensureFreePackage(2L);
+        verify(packageActivationService).ensureFreePackage(2L);
     }
 }

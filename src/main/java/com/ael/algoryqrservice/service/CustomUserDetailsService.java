@@ -2,7 +2,6 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
-import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -30,17 +29,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
-                resolveAuthorities(user.getRole())
+                List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
-    }
-
-    private List<SimpleGrantedAuthority> resolveAuthorities(UserRole role) {
-        if (role == UserRole.ADMIN) {
-            return List.of(
-                    new SimpleGrantedAuthority("ROLE_USER"),
-                    new SimpleGrantedAuthority("ROLE_ADMIN")
-            );
-        }
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 }

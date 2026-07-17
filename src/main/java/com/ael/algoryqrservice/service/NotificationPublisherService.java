@@ -20,6 +20,7 @@ import java.util.UUID;
 public class NotificationPublisherService {
 
     private static final String MESSAGE_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
+    private static final String MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER = "PRO_TRIAL_EXPIRY_REMINDER";
 
     private final RabbitTemplate rabbitTemplate;
     private final PushNotificationProperties pushNotificationProperties;
@@ -47,6 +48,39 @@ public class NotificationPublisherService {
                 pushNotificationProperties.getEmailChangeSubject()
         );
         log.info("Email change code notification queued. email={}", maskEmail(email));
+    }
+
+    public void publishTrialExpiryReminder(
+            UUID eventId,
+            String email,
+            String userName,
+            String packageName,
+            String expiresAt,
+            String upgradeUrl
+    ) {
+        Map<String, Object> templateData = Map.of(
+                "userName", userName,
+                "packageName", packageName,
+                "expiresAt", expiresAt,
+                "daysRemaining", 3,
+                "upgradeUrl", upgradeUrl
+        );
+        NotificationRequestMessage message = new NotificationRequestMessage(
+                eventId,
+                pushNotificationProperties.getChannels(),
+                serviceName,
+                MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER,
+                new NotificationRecipientsMessage(email, List.of(), List.of()),
+                null,
+                templateData,
+                false
+        );
+        rabbitTemplate.convertAndSend(
+                pushNotificationProperties.getMessaging().getExchange(),
+                pushNotificationProperties.getMessaging().getRoutingKey(),
+                message
+        );
+        log.info("Trial expiry reminder queued. eventId={}, email={}", eventId, maskEmail(email));
     }
 
     private void publishVerificationCode(

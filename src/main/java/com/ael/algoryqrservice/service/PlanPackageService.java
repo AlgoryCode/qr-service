@@ -1,22 +1,25 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
-import com.ael.algoryqrservice.model.dto.*;
-import com.ael.algoryqrservice.model.enums.PackageCode;
+import com.ael.algoryqrservice.model.dto.InstallmentOptionResponse;
+import com.ael.algoryqrservice.model.dto.PlanPackageItemRequest;
+import com.ael.algoryqrservice.model.dto.PlanPackageItemResponse;
+import com.ael.algoryqrservice.model.dto.PlanPackageRequest;
+import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
-import com.ael.algoryqrservice.model.enums.ProductCode;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.RoundingMode;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
@@ -27,18 +30,23 @@ public class PlanPackageService {
 
     @Transactional
     public PlanPackageResponse create(PlanPackageRequest request) {
-        rejectFreePackageMutation(request.getCode());
-        validateUniqueCode(request.getCode());
-        validatePackageDefinition(request);
+        String code = normalizeCode(request.getCode());
+        rejectSystemManagedMutation(code);
+        validateUniqueCode(code);
+        validatePackageItems(request.getItems());
 
         PlanPackage planPackage = PlanPackage.builder()
-                .code(request.getCode())
+                .code(code)
                 .name(request.getName().trim())
                 .description(request.getDescription())
                 .price(request.getPrice())
                 .currency(resolveCurrency(request.getCurrency()))
-                .active(request.getActive())
+                .active(Boolean.TRUE.equals(request.getActive()))
                 .validityDays(request.getValidityDays())
+                .priority(request.getPriority())
+                .purchasable(Boolean.TRUE.equals(request.getPurchasable()))
+                .systemManaged(false)
+                .trialEligible(Boolean.TRUE.equals(request.getTrialEligible()))
                 .build();
 
         planPackage.setItems(buildItems(planPackage, request.getItems()));
@@ -65,24 +73,37 @@ public class PlanPackageService {
     @Transactional
     public PlanPackageResponse update(Long id, PlanPackageRequest request) {
         PlanPackage planPackage = findPackage(id);
-        rejectFreePackageMutation(planPackage.getCode());
+        rejectSystemManagedMutation(planPackage);
+        String code = normalizeCode(request.getCode());
+        rejectSystemManagedMutation(code);
 
-        if (planPackage.getCode() != request.getCode()) {
-            validateUniqueCode(request.getCode());
+        if (!planPackage.getCode().equals(code)) {
+            validateUniqueCode(code);
         }
-        validatePackageDefinition(request);
+        validatePackageItems(request.getItems());
 
-        planPackage.setCode(request.getCode());
+        planPackage.setCode(code);
         planPackage.setName(request.getName().trim());
         planPackage.setDescription(request.getDescription());
         planPackage.setPrice(request.getPrice());
         planPackage.setCurrency(resolveCurrency(request.getCurrency()));
-        planPackage.setActive(request.getActive());
+        planPackage.setActive(Boolean.TRUE.equals(request.getActive()));
         planPackage.setValidityDays(request.getValidityDays());
+        planPackage.setPriority(request.getPriority());
+        planPackage.setPurchasable(Boolean.TRUE.equals(request.getPurchasable()));
+        planPackage.setTrialEligible(Boolean.TRUE.equals(request.getTrialEligible()));
 
         planPackage.getItems().clear();
         planPackage.getItems().addAll(buildItems(planPackage, request.getItems()));
 
+        return toResponse(planPackageRepository.save(planPackage));
+    }
+
+    @Transactional
+    public PlanPackageResponse updateActiveStatus(Long id, boolean active) {
+        PlanPackage planPackage = findPackage(id);
+        rejectSystemManagedMutation(planPackage);
+        planPackage.setActive(active);
         return toResponse(planPackageRepository.save(planPackage));
     }
 
@@ -102,36 +123,30 @@ public class PlanPackageService {
                 .orElseThrow(() -> new BadRequestException("Paket bulunamadı: " + id));
     }
 
-    private void validateUniqueCode(PackageCode code) {
+    private void validateUniqueCode(String code) {
         if (planPackageRepository.existsByCode(code)) {
             throw new BadRequestException("Bu paket kodu zaten mevcut: " + code);
         }
     }
 
-    private void rejectFreePackageMutation(PackageCode code) {
-        if (code == PackageCode.FREE_PACKAGE) {
+    private void rejectSystemManagedMutation(PlanPackage planPackage) {
+        if (planPackage.isSystemManaged() || CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
+            throw new BadRequestException("Sistem paketi yönetilemez: " + planPackage.getCode());
+        }
+    }
+
+    private void rejectSystemManagedMutation(String code) {
+        if (CatalogPackages.FREE_PACKAGE.equals(code)) {
             throw new BadRequestException("FREE_PACKAGE sistem tarafından yönetilir");
         }
     }
 
-    private void validatePackageDefinition(PlanPackageRequest request) {
-        if (request.getCode() != PackageCode.PRO_PACKAGE) {
-            return;
-        }
-        Set<ProductCode> required = Set.of(
-                ProductCode.QR_CREATE,
-                ProductCode.QR_MENU,
-                ProductCode.QR_AGENT,
-                ProductCode.QR_ANALYTICS
-        );
-        Set<ProductCode> actual = request.getItems().stream()
-                .map(item -> productService.findActiveProduct(item.getProductId()).getCode())
-                .collect(java.util.stream.Collectors.toSet());
-        boolean allUnlimited = request.getItems().stream().allMatch(item -> Boolean.TRUE.equals(item.getUnlimited()));
-        if (!actual.equals(required) || !allUnlimited) {
-            throw new BadRequestException(
-                    "PRO_PACKAGE sınırsız QR_CREATE, QR_MENU, QR_AGENT ve QR_ANALYTICS ürünlerini içermelidir"
-            );
+    private void validatePackageItems(List<PlanPackageItemRequest> items) {
+        for (PlanPackageItemRequest item : items) {
+            boolean unlimited = Boolean.TRUE.equals(item.getUnlimited());
+            if (!unlimited && (item.getQuantity() == null || item.getQuantity() < 1)) {
+                throw new BadRequestException("Sınırsız olmayan ürün için miktar en az 1 olmalıdır");
+            }
         }
     }
 
@@ -143,14 +158,19 @@ public class PlanPackageService {
                         throw new BadRequestException("Aynı ürün pakete birden fazla kez eklenemez: " + itemRequest.getProductId());
                     }
                     Product product = productService.findActiveProduct(itemRequest.getProductId());
+                    boolean unlimited = Boolean.TRUE.equals(itemRequest.getUnlimited());
                     return PlanPackageItem.builder()
                             .planPackage(planPackage)
                             .product(product)
-                            .quantity(itemRequest.getQuantity())
-                            .unlimited(Boolean.TRUE.equals(itemRequest.getUnlimited()))
+                            .quantity(unlimited ? 0 : itemRequest.getQuantity())
+                            .unlimited(unlimited)
                             .build();
                 })
                 .toList();
+    }
+
+    private String normalizeCode(String code) {
+        return code == null ? null : code.trim().toUpperCase();
     }
 
     private String resolveCurrency(String currency) {
@@ -167,6 +187,10 @@ public class PlanPackageService {
                 .currency(planPackage.getCurrency())
                 .active(planPackage.isActive())
                 .validityDays(planPackage.getValidityDays())
+                .priority(planPackage.getPriority())
+                .purchasable(planPackage.isPurchasable())
+                .systemManaged(planPackage.isSystemManaged())
+                .trialEligible(planPackage.isTrialEligible())
                 .allowedPaymentModes(List.of(PaymentMode.DIRECT, PaymentMode.THREE_DS))
                 .allowedInstallments(allowedInstallments(planPackage))
                 .installmentOptions(installmentOptions(planPackage))
@@ -176,7 +200,7 @@ public class PlanPackageService {
     }
 
     private List<Integer> allowedInstallments(PlanPackage planPackage) {
-        if (planPackage.getCode() == PackageCode.FREE_PACKAGE) {
+        if (!planPackage.isPurchasable() || CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
             return List.of(1);
         }
         return List.of(1, 2, 3, 6, 9, 12).stream()

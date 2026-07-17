@@ -23,6 +23,10 @@ public class PaymentCompletedEventDto {
     private String installmentId;
     private Integer installmentNumber;
     private Integer installmentCount;
+    private String paymentStyle;
+    private Integer bankInstallmentCount;
+    private String subscriptionId;
+    private String subscriptionStatus;
     private String periodStart;
     private String periodEnd;
     private BigDecimal amount;

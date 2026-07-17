@@ -1,7 +1,6 @@
 package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.PlanPackage;
-import com.ael.algoryqrservice.model.enums.PackageCode;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,9 +10,11 @@ import java.util.Optional;
 @Repository
 public interface PlanPackageRepository extends JpaRepository<PlanPackage, Long> {
 
-    Optional<PlanPackage> findByCode(PackageCode code);
+    Optional<PlanPackage> findByCode(String code);
 
-    boolean existsByCode(PackageCode code);
+    boolean existsByCode(String code);
 
     List<PlanPackage> findByActiveTrueOrderByPriceAsc();
+
+    Optional<PlanPackage> findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc();
 }

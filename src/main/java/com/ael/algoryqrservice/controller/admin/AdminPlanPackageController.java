@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/packages")
@@ -38,5 +39,17 @@ public class AdminPlanPackageController {
     @PutMapping("/{id}")
     public ResponseEntity<PlanPackageResponse> update(@PathVariable Long id, @Valid @RequestBody PlanPackageRequest request) {
         return ResponseEntity.ok(planPackageService.update(id, request));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<PlanPackageResponse> updateStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> body
+    ) {
+        Boolean active = body.get("active");
+        if (active == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(planPackageService.updateActiveStatus(id, active));
     }
 }

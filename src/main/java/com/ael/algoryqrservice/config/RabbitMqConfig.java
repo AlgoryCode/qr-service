@@ -19,51 +19,27 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Queue paymentSuccessQueue(PaymentRabbitMqProperties properties) {
-        return QueueBuilder.durable(properties.getSuccessQueue())
+    public Queue paymentEventsQueue(PaymentRabbitMqProperties properties) {
+        return QueueBuilder.durable(properties.getEventsQueue())
                 .deadLetterExchange("")
-                .deadLetterRoutingKey(properties.getSuccessQueue() + ".dlq")
+                .deadLetterRoutingKey(properties.getEventsQueue() + ".dlq")
                 .build();
     }
 
     @Bean
-    public Queue paymentSuccessDlq(PaymentRabbitMqProperties properties) {
-        return QueueBuilder.durable(properties.getSuccessQueue() + ".dlq").build();
+    public Queue paymentEventsDlq(PaymentRabbitMqProperties properties) {
+        return QueueBuilder.durable(properties.getEventsQueue() + ".dlq").build();
     }
 
     @Bean
-    public Queue paymentFailedQueue(PaymentRabbitMqProperties properties) {
-        return QueueBuilder.durable(properties.getFailedQueue())
-                .deadLetterExchange("")
-                .deadLetterRoutingKey(properties.getFailedQueue() + ".dlq")
-                .build();
-    }
-
-    @Bean
-    public Queue paymentFailedDlq(PaymentRabbitMqProperties properties) {
-        return QueueBuilder.durable(properties.getFailedQueue() + ".dlq").build();
-    }
-
-    @Bean
-    public Binding paymentSuccessBinding(
-            Queue paymentSuccessQueue,
+    public Binding paymentEventsBinding(
+            Queue paymentEventsQueue,
             TopicExchange paymentEventsExchange,
             PaymentRabbitMqProperties properties
     ) {
-        return BindingBuilder.bind(paymentSuccessQueue)
+        return BindingBuilder.bind(paymentEventsQueue)
                 .to(paymentEventsExchange)
-                .with(properties.getSuccessRoutingKey());
-    }
-
-    @Bean
-    public Binding paymentFailedBinding(
-            Queue paymentFailedQueue,
-            TopicExchange paymentEventsExchange,
-            PaymentRabbitMqProperties properties
-    ) {
-        return BindingBuilder.bind(paymentFailedQueue)
-                .to(paymentEventsExchange)
-                .with(properties.getFailedRoutingKey());
+                .with(properties.getEventsRoutingKey());
     }
 
     @Bean

@@ -13,8 +13,6 @@ public class PaymentRabbitMqProperties {
 
     private String exchange = "payment.events";
     private String serviceName = "qr-service";
-    private String successQueue = "qr-service.payment.success";
-    private String failedQueue = "qr-service.payment.failed";
-    private String successRoutingKey = "qr-service.payment.success";
-    private String failedRoutingKey = "qr-service.payment.failed";
+    private String eventsQueue = "qr-service.payment.events";
+    private String eventsRoutingKey = "qr-service.payment.events";
 }

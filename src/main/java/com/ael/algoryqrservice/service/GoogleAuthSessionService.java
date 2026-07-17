@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 public class GoogleAuthSessionService {
 
@@ -16,16 +18,22 @@ public class GoogleAuthSessionService {
         request.getSession(true).setAttribute(AUTH_INTENT_ATTRIBUTE, intent);
     }
 
-    public GoogleAuthIntent requireIntent(HttpServletRequest request) {
+    public Optional<GoogleAuthIntent> findIntent(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session == null) {
-            throw new UnauthorizedException("Google kimlik doğrulama oturumu bulunamadı");
+            return Optional.empty();
         }
         Object intent = session.getAttribute(AUTH_INTENT_ATTRIBUTE);
         if (intent instanceof GoogleAuthIntent googleAuthIntent) {
-            return googleAuthIntent;
+            return Optional.of(googleAuthIntent);
         }
-        throw new UnauthorizedException("Google kimlik doğrulama amacı bulunamadı");
+        return Optional.empty();
+    }
+
+    public GoogleAuthIntent requireIntent(HttpServletRequest request) {
+        return findIntent(request).orElseThrow(() ->
+                new UnauthorizedException("Google kimlik doğrulama oturumu bulunamadı")
+        );
     }
 
     public void clear(HttpServletRequest request) {

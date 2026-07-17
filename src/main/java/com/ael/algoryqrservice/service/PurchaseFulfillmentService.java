@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,7 @@ public class PurchaseFulfillmentService {
     private final PurchaseFulfillmentRepository fulfillmentRepository;
     private final PurchaseRepository purchaseRepository;
     private final EntitlementService entitlementService;
-    private final UserPackageService userPackageService;
+    private final PackageActivationService packageActivationService;
 
     @Transactional
     public void initializeSchedule(Purchase purchase, String serviceName) {
@@ -102,11 +103,17 @@ public class PurchaseFulfillmentService {
         if (firstPaidInstallment) {
             purchase.setStartsAt(periodStart);
             purchase.setStatus(PurchaseStatus.ACTIVE);
-            userPackageService.activateProPackage(purchase);
+            packageActivationService.activatePurchasedPackage(purchase);
             grantEntitlements(purchase, planPackage);
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
         purchase.setPaymentId(event.getPaymentId());
+        if (event.getSubscriptionId() != null && !event.getSubscriptionId().isBlank()) {
+            purchase.setSubscriptionId(event.getSubscriptionId());
+        }
+        if (event.getSubscriptionStatus() != null && !event.getSubscriptionStatus().isBlank()) {
+            purchase.setSubscriptionStatus(SubscriptionStatus.valueOf(event.getSubscriptionStatus()));
+        }
         purchase.setCancellationReason(null);
         purchaseRepository.save(purchase);
         entitlementService.synchronizePeriod(purchase);
@@ -192,7 +199,7 @@ public class PurchaseFulfillmentService {
             purchase.setExpiresAt(LocalDateTime.now());
             purchaseRepository.save(purchase);
             entitlementService.synchronizePeriod(purchase);
-            userPackageService.ensureFreePackage(purchase.getUserId());
+            packageActivationService.ensureFreePackage(purchase.getUserId());
             return;
         }
 
@@ -210,7 +217,7 @@ public class PurchaseFulfillmentService {
         purchaseRepository.save(purchase);
         entitlementService.synchronizePeriod(purchase);
         if (purchase.getStatus() == PurchaseStatus.EXPIRED) {
-            userPackageService.ensureFreePackage(purchase.getUserId());
+            packageActivationService.ensureFreePackage(purchase.getUserId());
         }
     }
 

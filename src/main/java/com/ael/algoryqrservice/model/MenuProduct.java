@@ -38,6 +38,9 @@ public class MenuProduct extends QrBaseModel {
 
     private String category;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Column(nullable = false)
     private int sortOrder;
 

@@ -13,4 +13,11 @@ public class AppProperties {
 
     private String url = "http://localhost:3000";
     private String serviceName = "qr-service";
+    private MenuSettings menu = new MenuSettings();
+
+    @Getter
+    @Setter
+    public static class MenuSettings {
+        private int categoryMaxDepth = 10;
+    }
 }

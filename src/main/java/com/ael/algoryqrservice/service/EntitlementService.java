@@ -1,11 +1,10 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.UserEntitlementResponse;
-import com.ael.algoryqrservice.model.enums.ProductCode;
-import com.ael.algoryqrservice.model.enums.ProductScope;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.ProductRepository;
@@ -18,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -31,7 +31,7 @@ public class EntitlementService {
     private final PurchaseLogService purchaseLogService;
 
     @Transactional
-    public void grant(Purchase purchase, Long productId, ProductCode productCode, int quantity, boolean unlimited) {
+    public void grant(Purchase purchase, Long productId, String productCode, int quantity, boolean unlimited) {
         if (entitlementRepository.findByPurchaseIdAndProductId(purchase.getId(), productId).isPresent()) {
             return;
         }
@@ -70,11 +70,17 @@ public class EntitlementService {
     }
 
     @Transactional
-    public void consume(Long userId, ProductCode productCode, int amount) {
+    public void consume(Long userId, String productCode, int amount) {
         expireDuePurchases();
 
+        Product product = productRepository.findByCode(productCode).orElse(null);
+        if (product != null && !product.isConsumable()) {
+            requireScope(userId, product.getScopeCode());
+            return;
+        }
+
         List<UserEntitlement> entitlements = entitlementRepository
-                .findByUserIdAndRemainingQuantityGreaterThanOrderByCreatedAtAsc(userId, 0);
+                .findUsableByUserIdOrderByCreatedAtAsc(userId, 0);
 
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
 
@@ -82,7 +88,7 @@ public class EntitlementService {
         Long purchaseIdForLog = null;
 
         for (UserEntitlement entitlement : entitlements) {
-            if (!entitlement.getProductCode().equals(productCode)) {
+            if (!Objects.equals(entitlement.getProductCode(), productCode)) {
                 continue;
             }
 
@@ -125,21 +131,28 @@ public class EntitlementService {
     }
 
     @Transactional(readOnly = true)
-    public boolean hasScope(Long userId, ProductScope scope) {
+    public boolean hasScope(Long userId, String scopeCode) {
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        Map<String, Product> productsByCode = productRepository.findByCodeIn(
+                entitlements.stream().map(UserEntitlement::getProductCode).distinct().toList()
+        ).stream().collect(Collectors.toMap(Product::getCode, Function.identity(), (left, right) -> left));
+
         return entitlements.stream()
-                .filter(entitlement -> entitlement.getProductCode() == scope.getProductCode())
                 .anyMatch(entitlement -> {
+                    Product product = productsByCode.get(entitlement.getProductCode());
+                    if (product == null || !Objects.equals(product.getScopeCode(), scopeCode)) {
+                        return false;
+                    }
                     Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
                     return purchase != null && entitlement.isUsable(purchase.getStatus());
                 });
     }
 
     @Transactional(readOnly = true)
-    public void requireScope(Long userId, ProductScope scope) {
-        if (!hasScope(userId, scope)) {
-            throw new ForbiddenException(scope + " yetkisi için uygun paket gerekli");
+    public void requireScope(Long userId, String scopeCode) {
+        if (!hasScope(userId, scopeCode)) {
+            throw new ForbiddenException(scopeCode + " yetkisi için uygun paket gerekli");
         }
     }
 
@@ -204,8 +217,8 @@ public class EntitlementService {
 
     UserEntitlementResponse toResponse(UserEntitlement entitlement, Purchase purchase) {
         String productName = productRepository.findById(entitlement.getProductId())
-                .map(product -> product.getName())
-                .orElse(entitlement.getProductCode().name());
+                .map(Product::getName)
+                .orElse(entitlement.getProductCode());
 
         PurchaseStatus purchaseStatus = purchase != null ? purchase.getStatus() : PurchaseStatus.EXPIRED;
         boolean expired = purchase == null

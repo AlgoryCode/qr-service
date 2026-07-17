@@ -1,17 +1,16 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
-import com.ael.algoryqrservice.model.enums.PackageCode;
 
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 public record PaymentEventMetadata(
         Long purchaseId,
         Long userId,
         Long packageId,
-        PackageCode packageCode,
+        String packageCode,
         String purchaseConversationId,
         String installmentId,
         Integer installmentNumber,
@@ -31,12 +30,34 @@ public record PaymentEventMetadata(
                 longValue(metadata, "packageId", event.getPackageId()),
                 packageCodeValue(metadata, event.getPackageCode()),
                 value(metadata, "purchaseConversationId", event.getConversationId()),
-                value(metadata, "installmentId", first(event.getInstallmentId(), event.getPaymentId())),
-                integerValue(metadata, "installmentNumber", event.getInstallmentNumber()),
-                integerValue(metadata, "installmentCount", event.getInstallmentCount()),
+                value(metadata, "installmentId", defaultInstallmentId(event)),
+                integerValue(metadata, "installmentNumber", defaultInstallmentNumber(event, metadata)),
+                integerValue(metadata, "installmentCount", defaultInstallmentCount(event, metadata)),
                 dateTimeValue(metadata, "periodStart", event.getPeriodStart(), false),
                 dateTimeValue(metadata, "periodEnd", event.getPeriodEnd(), true)
         );
+    }
+
+    private static String defaultInstallmentId(PaymentCompletedEventDto event) {
+        String installmentId = first(event.getInstallmentId(), event.getPaymentId());
+        if (installmentId != null && !installmentId.isBlank()) {
+            return installmentId;
+        }
+        return first(event.getConversationId(), "unknown");
+    }
+
+    private static Integer defaultInstallmentCount(
+            PaymentCompletedEventDto event,
+            Map<String, Object> metadata
+    ) {
+        if (event.getInstallmentCount() != null) {
+            return event.getInstallmentCount();
+        }
+        Object metadataValue = metadata.get("installmentCount");
+        if (metadataValue != null && !String.valueOf(metadataValue).isBlank()) {
+            return Integer.valueOf(String.valueOf(metadataValue));
+        }
+        return 1;
     }
 
     private static String value(Map<String, Object> metadata, String key, Object fallback) {
@@ -93,11 +114,25 @@ public record PaymentEventMetadata(
         return first == null || first.isBlank() ? second : first;
     }
 
-    private static PackageCode packageCodeValue(Map<String, Object> metadata, String fallback) {
-        try {
-            return PackageCode.valueOf(value(metadata, "packageCode", fallback));
-        } catch (IllegalArgumentException exception) {
+    private static Integer defaultInstallmentNumber(
+            PaymentCompletedEventDto event,
+            Map<String, Object> metadata
+    ) {
+        if (event.getInstallmentNumber() != null) {
+            return event.getInstallmentNumber();
+        }
+        Object metadataValue = metadata.get("installmentNumber");
+        if (metadataValue != null && !String.valueOf(metadataValue).isBlank()) {
+            return Integer.valueOf(String.valueOf(metadataValue));
+        }
+        return 1;
+    }
+
+    private static String packageCodeValue(Map<String, Object> metadata, String fallback) {
+        String packageCode = value(metadata, "packageCode", fallback);
+        if (!packageCode.matches("^[A-Z][A-Z0-9_]*$")) {
             throw new InvalidPaymentEventException("Payment event metadata is invalid: packageCode");
         }
+        return packageCode;
     }
 }

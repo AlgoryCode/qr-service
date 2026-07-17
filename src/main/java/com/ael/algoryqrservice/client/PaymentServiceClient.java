@@ -1,22 +1,33 @@
 package com.ael.algoryqrservice.client;
 
+import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+
+import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 @Component
 @Slf4j
 public class PaymentServiceClient {
 
     private final RestClient restClient;
+    private final PaymentClientProperties properties;
 
     public PaymentServiceClient(RestClient.Builder restClientBuilder, PaymentClientProperties properties) {
+        this.properties = properties;
         this.restClient = restClientBuilder
                 .baseUrl(properties.getUrl())
                 .build();
@@ -30,20 +41,216 @@ public class PaymentServiceClient {
         return createPayment(request, "/payments");
     }
 
+    public List<BillingPaymentDtos.PaymentMethod> getPaymentMethods(Long userId) {
+        try {
+            Map<String, Object> page = restClient.get()
+                    .uri("/api/v1/payment-methods")
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            if (page == null || !(page.get("content") instanceof List<?> content)) {
+                return List.of();
+            }
+            return content.stream()
+                    .filter(Map.class::isInstance)
+                    .map(item -> (Map<?, ?>) item)
+                    .map(this::toPaymentMethod)
+                    .toList();
+        } catch (RestClientResponseException exception) {
+            log.error("Payment methods list failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Ödeme yöntemleri alınamadı: " + exception.getStatusCode());
+        }
+    }
+
+    public BillingPaymentDtos.PaymentMethod createPaymentMethod(
+            Long userId,
+            String email,
+            String alias,
+            String cardHolderName,
+            String cardNumber,
+            String expireMonth,
+            String expireYear
+    ) {
+        try {
+            Map<String, Object> body = Map.of(
+                    "alias", alias == null || alias.isBlank() ? "Kartım" : alias.trim(),
+                    "email", email,
+                    "cardHolderName", cardHolderName,
+                    "cardNumber", cardNumber.replaceAll("\\D", ""),
+                    "expireMonth", expireMonth,
+                    "expireYear", expireYear
+            );
+            Map<?, ?> response = restClient.post()
+                    .uri("/api/v1/payment-methods")
+                    .headers(authHeaders(userId))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            if (response == null) {
+                throw new PaymentServiceException("Ödeme yöntemi kaydedilemedi");
+            }
+            return toPaymentMethod(response);
+        } catch (RestClientResponseException exception) {
+            log.error("Payment method create failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Kart kaydedilemedi: " + exception.getStatusCode());
+        }
+    }
+
+    public void deletePaymentMethod(Long userId, String paymentMethodId) {
+        try {
+            restClient.delete()
+                    .uri("/api/v1/payment-methods/{id}", paymentMethodId)
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException exception) {
+            log.error("Payment method delete failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Ödeme yöntemi silinemedi: " + exception.getStatusCode());
+        }
+    }
+
+    public BillingPaymentDtos.InstallmentOptions getInstallmentOptions(
+            BigDecimal amount,
+            String currency,
+            String binNumber
+    ) {
+        try {
+            List<Map<String, Object>> providers = restClient.get()
+                    .uri(uri -> uri.path("/api/v1/payment-options/installments")
+                            .queryParam("binNumber", binNumber)
+                            .queryParam("price", amount)
+                            .queryParam("currency", currency)
+                            .build())
+                    .headers(authHeaders(null))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            if (providers == null) {
+                return new BillingPaymentDtos.InstallmentOptions(List.of());
+            }
+            List<BillingPaymentDtos.InstallmentOption> options = providers.stream()
+                    .map(provider -> provider.get("options"))
+                    .filter(List.class::isInstance)
+                    .map(list -> (List<?>) list)
+                    .flatMap(List::stream)
+                    .filter(Map.class::isInstance)
+                    .map(item -> (Map<?, ?>) item)
+                    .map(this::toInstallmentOption)
+                    .toList();
+            return new BillingPaymentDtos.InstallmentOptions(options);
+        } catch (RestClientResponseException exception) {
+            log.error("Installment options failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Taksit seçenekleri alınamadı: " + exception.getStatusCode());
+        }
+    }
+
+    public List<BillingPaymentDtos.Subscription> getSubscriptions(Long userId) {
+        return Collections.emptyList();
+    }
+
+    public BillingPaymentDtos.Subscription cancelSubscription(Long userId, String subscriptionId) {
+        try {
+            return restClient.post()
+                    .uri("/api/v1/subscriptions/{id}/cancel", subscriptionId)
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .body(BillingPaymentDtos.Subscription.class);
+        } catch (RestClientResponseException exception) {
+            log.error("Subscription cancel failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Abonelik iptal edilemedi: " + exception.getStatusCode());
+        }
+    }
+
     private PaymentThreeDsResponse createPayment(PaymentThreeDsRequest request, String path) {
         try {
+            Long userId = extractUserId(request);
             return restClient.post()
                     .uri(path)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .headers(authHeaders(userId))
                     .body(request)
                     .retrieve()
                     .body(PaymentThreeDsResponse.class);
         } catch (RestClientResponseException exception) {
-            log.error("Payment service error. status={} body={}", exception.getStatusCode(), exception.getResponseBodyAsString());
+            log.error("Payment service error. status={}", exception.getStatusCode());
             throw new PaymentServiceException("Ödeme servisi hatası: " + exception.getStatusCode());
         } catch (Exception exception) {
             log.error("Payment service unreachable", exception);
             throw new PaymentServiceException("Ödeme servisine ulaşılamadı");
         }
+    }
+
+    private Long extractUserId(PaymentThreeDsRequest request) {
+        if (request == null || request.getSourceMetadata() == null) {
+            return null;
+        }
+        Object raw = request.getSourceMetadata().get("userId");
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        if (raw instanceof String text && !text.isBlank()) {
+            return Long.valueOf(text);
+        }
+        return null;
+    }
+
+    private Consumer<HttpHeaders> authHeaders(Long userId) {
+        return headers -> {
+            if (properties.getAuthToken() != null && !properties.getAuthToken().isBlank()) {
+                headers.set(properties.getAuthHeader(), properties.getAuthToken());
+            }
+            if (userId != null) {
+                headers.set("X-Account-Id", String.valueOf(userId));
+            }
+        };
+    }
+
+    private BillingPaymentDtos.PaymentMethod toPaymentMethod(Map<?, ?> item) {
+        return new BillingPaymentDtos.PaymentMethod(
+                stringValue(item.get("id")),
+                stringValue(item.get("alias") != null ? item.get("alias") : item.get("cardAlias")),
+                stringValue(item.get("brand") != null ? item.get("brand") : item.get("cardAssociation")),
+                stringValue(item.get("last4") != null ? item.get("last4") : item.get("lastFourDigits")),
+                intValue(item.get("expiryMonth")),
+                intValue(item.get("expiryYear"))
+        );
+    }
+
+    private BillingPaymentDtos.InstallmentOption toInstallmentOption(Map<?, ?> item) {
+        return new BillingPaymentDtos.InstallmentOption(
+                intValue(item.get("installmentNumber") != null ? item.get("installmentNumber") : item.get("count")),
+                decimalValue(item.get("totalPrice") != null ? item.get("totalPrice") : item.get("totalAmount")),
+                decimalValue(item.get("installmentPrice") != null ? item.get("installmentPrice") : item.get("installmentAmount"))
+        );
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private Integer intValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            return null;
+        }
+        return Integer.valueOf(String.valueOf(value));
+    }
+
+    private BigDecimal decimalValue(Object value) {
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        if (value == null) {
+            return null;
+        }
+        return new BigDecimal(String.valueOf(value));
     }
 }

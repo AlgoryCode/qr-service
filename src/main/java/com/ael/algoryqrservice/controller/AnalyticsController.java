@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
-import com.ael.algoryqrservice.model.enums.ProductScope;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.AnalyticsService;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -45,7 +45,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}")
-    @RequiresProductScope(ProductScope.QR_ANALYTICS_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_ANALYTICS_OWNER)
     public ResponseEntity<AnalyticsDtos.VisitPageResponse> getMenuAnalytics(
             @PathVariable Long menuId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -58,7 +58,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}/product/{productId}")
-    @RequiresProductScope(ProductScope.QR_ANALYTICS_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_ANALYTICS_OWNER)
     public ResponseEntity<AnalyticsDtos.VisitPageResponse> getProductAnalytics(
             @PathVariable Long menuId,
             @PathVariable Long productId,

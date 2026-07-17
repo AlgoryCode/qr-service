@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.UrlMode;
@@ -27,6 +28,7 @@ public class MenuService {
 
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
+    private final MenuCategoryService menuCategoryService;
     private final QrRepository qrRepository;
     private final QrGenerationService qrGenerationService;
     private final AppProperties appProperties;
@@ -45,6 +47,7 @@ public class MenuService {
                 .userId(qr.getUserId())
                 .themeId(themeId)
                 .businessName(businessName)
+                .slogan(trimToNull(stringValue(details.get("slogan"))))
                 .phone(stringValue(details.get("phone")))
                 .email(stringValue(details.get("email")))
                 .address(stringValue(details.get("address")))
@@ -53,7 +56,96 @@ public class MenuService {
                 .active(true)
                 .build();
 
-        return menuRepository.save(menu);
+        menu = menuRepository.save(menu);
+        createProductsFromDetails(menu, details.get("products"));
+        return menu;
+    }
+
+    private void createProductsFromDetails(Menu menu, Object productsRaw) {
+        if (!(productsRaw instanceof List<?> products) || products.isEmpty()) {
+            return;
+        }
+        int index = 0;
+        for (Object item : products) {
+            if (!(item instanceof Map<?, ?> map)) {
+                continue;
+            }
+            String name = stringValue(map.get("name"));
+            if (name == null || name.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
+            }
+            Long categoryId = longValue(map.get("categoryId"));
+            String categoryName = trimToNull(stringValue(map.get("category")));
+            if (categoryId != null) {
+                menuCategoryService.requireCategoryForMenu(menu.getMenuId(), categoryId);
+            } else if (categoryName != null) {
+                categoryId = resolveOrCreateRootCategory(menu.getMenuId(), categoryName);
+            }
+            MenuProduct product = MenuProduct.builder()
+                    .menuId(menu.getMenuId())
+                    .name(name.trim())
+                    .description(trimToNull(stringValue(map.get("description"))))
+                    .price(decimalValue(map.get("price")))
+                    .currency(currencyValue(map.get("currency")))
+                    .category(categoryName)
+                    .categoryId(categoryId)
+                    .sortOrder(integerValue(map.get("sortOrder"), index))
+                    .imageUrl(trimToNull(stringValue(map.get("imageUrl"))))
+                    .available(booleanValue(map.get("available"), true))
+                    .build();
+            menuProductRepository.save(product);
+            index++;
+        }
+    }
+
+    private java.math.BigDecimal decimalValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof java.math.BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return java.math.BigDecimal.valueOf(number.doubleValue());
+        }
+        String text = value.toString().trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        try {
+            return new java.math.BigDecimal(text);
+        } catch (NumberFormatException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçersiz ürün fiyatı");
+        }
+    }
+
+    private String currencyValue(Object value) {
+        String currency = trimToNull(stringValue(value));
+        return currency == null ? "TRY" : currency;
+    }
+
+    private int integerValue(Object value, int fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString().trim());
+        } catch (NumberFormatException exception) {
+            return fallback;
+        }
+    }
+
+    private boolean booleanValue(Object value, boolean fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return Boolean.parseBoolean(value.toString());
     }
 
     public String buildPublicUrl(Menu menu) {
@@ -74,7 +166,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public MenuDtos.PublicMenuResponse getPublicMenuByQrId(Long qrId) {
-        Menu menu = menuRepository.findByQrIdAndDeletedFalse(qrId)
+        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
         return buildPublicResponse(menu);
     }
@@ -82,7 +174,7 @@ public class MenuService {
     @Transactional(readOnly = true)
     public MenuDtos.PublicMenuResponse getPublicMenuBySlug(String slug) {
         String normalized = SlugUtils.normalize(slug);
-        Menu menu = menuRepository.findByPublicSlugIgnoreCaseAndDeletedFalse(normalized)
+        Menu menu = menuRepository.findByPublicSlugIgnoreCaseAndActiveTrueAndDeletedFalse(normalized)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
         return buildPublicResponse(menu);
     }
@@ -118,6 +210,7 @@ public class MenuService {
     public MenuDtos.MenuProductResponse createProduct(Long menuId, MenuDtos.MenuProductRequest request) {
         Menu menu = ensureOwnedMenu(menuId);
         validateProductRequest(request);
+        Long categoryId = resolveCategoryId(menu.getMenuId(), request);
 
         MenuProduct product = MenuProduct.builder()
                 .menuId(menu.getMenuId())
@@ -125,7 +218,8 @@ public class MenuService {
                 .description(trimToNull(request.getDescription()))
                 .price(request.getPrice())
                 .currency(request.getCurrency() != null && !request.getCurrency().isBlank() ? request.getCurrency().trim() : "TRY")
-                .category(trimToNull(request.getCategory()))
+                .category(resolveCategoryLabel(menu.getMenuId(), categoryId, request.getCategory()))
+                .categoryId(categoryId)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextSortOrder(menuId))
                 .imageUrl(trimToNull(request.getImageUrl()))
                 .available(request.getAvailable() == null || request.getAvailable())
@@ -140,6 +234,7 @@ public class MenuService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
         ensureOwnedMenu(product.getMenuId());
         validateProductRequest(request);
+        Long categoryId = resolveCategoryId(product.getMenuId(), request);
 
         product.setName(request.getName().trim());
         product.setDescription(trimToNull(request.getDescription()));
@@ -147,7 +242,8 @@ public class MenuService {
         if (request.getCurrency() != null && !request.getCurrency().isBlank()) {
             product.setCurrency(request.getCurrency().trim());
         }
-        product.setCategory(trimToNull(request.getCategory()));
+        product.setCategory(resolveCategoryLabel(product.getMenuId(), categoryId, request.getCategory()));
+        product.setCategoryId(categoryId);
         if (request.getSortOrder() != null) {
             product.setSortOrder(request.getSortOrder());
         }
@@ -179,6 +275,9 @@ public class MenuService {
         }
         if (request.getBusinessName() != null && !request.getBusinessName().isBlank()) {
             menu.setBusinessName(request.getBusinessName().trim());
+        }
+        if (request.getSlogan() != null) {
+            menu.setSlogan(trimToNull(request.getSlogan()));
         }
         if (request.getPhone() != null) menu.setPhone(trimToNull(request.getPhone()));
         if (request.getEmail() != null) menu.setEmail(trimToNull(request.getEmail()));
@@ -212,7 +311,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public Menu findByQrId(Long qrId) {
-        Menu menu = menuRepository.findByQrIdAndDeletedFalse(qrId).orElse(null);
+        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId).orElse(null);
         if (menu != null) {
             requireOwnership(menu);
         }
@@ -250,14 +349,83 @@ public class MenuService {
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menu.getMenuId())
                 .stream()
                 .filter(MenuProduct::isAvailable)
-                .map(this::toProductResponse)
+                .map(product -> toProductResponse(product, menu.getMenuId()))
                 .toList();
+        List<MenuDtos.MenuCategoryResponse> categories = menuCategoryService.listPublicCategoryTree(menu.getMenuId());
 
         return MenuDtos.PublicMenuResponse.builder()
                 .menu(toMenuProfile(menu, buildPublicUrl(menu)))
                 .products(products)
+                .categories(categories)
                 .themeId(menu.getThemeId())
                 .build();
+    }
+
+    private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
+        return toProductResponse(product, product.getMenuId());
+    }
+
+    private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product, Long menuId) {
+        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menuId);
+        Long categoryId = product.getCategoryId();
+        String categoryName = menuCategoryService.resolveCategoryName(categoryId, categoryMap);
+        String categoryPath = menuCategoryService.resolveCategoryPath(categoryId, categoryMap);
+        String legacyCategory = categoryName != null ? categoryName : product.getCategory();
+
+        return MenuDtos.MenuProductResponse.builder()
+                .productId(product.getProductId())
+                .menuId(product.getMenuId())
+                .name(product.getName())
+                .description(product.getDescription())
+                .price(product.getPrice())
+                .currency(product.getCurrency())
+                .category(legacyCategory)
+                .categoryId(categoryId)
+                .categoryName(categoryName)
+                .categoryPath(categoryPath)
+                .sortOrder(product.getSortOrder())
+                .imageUrl(product.getImageUrl())
+                .available(product.isAvailable())
+                .build();
+    }
+
+    private Long resolveCategoryId(Long menuId, MenuDtos.MenuProductRequest request) {
+        if (request.getCategoryId() != null) {
+            menuCategoryService.requireCategoryForMenu(menuId, request.getCategoryId());
+            return request.getCategoryId();
+        }
+        String categoryName = trimToNull(request.getCategory());
+        if (categoryName != null) {
+            return resolveOrCreateRootCategory(menuId, categoryName);
+        }
+        return null;
+    }
+
+    private String resolveCategoryLabel(Long menuId, Long categoryId, String fallbackCategory) {
+        if (categoryId == null) {
+            return trimToNull(fallbackCategory);
+        }
+        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menuId);
+        String categoryName = menuCategoryService.resolveCategoryName(categoryId, categoryMap);
+        return categoryName != null ? categoryName : trimToNull(fallbackCategory);
+    }
+
+    private Long resolveOrCreateRootCategory(Long menuId, String categoryName) {
+        return menuCategoryService.findOrCreateRootCategory(menuId, categoryName);
+    }
+
+    private Long longValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(value.toString().trim());
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private MenuDtos.MenuProfileResponse toMenuProfile(Menu menu, String publicUrl) {
@@ -267,6 +435,7 @@ public class MenuService {
                 .userId(menu.getUserId())
                 .themeId(menu.getThemeId())
                 .businessName(menu.getBusinessName())
+                .slogan(menu.getSlogan())
                 .phone(menu.getPhone())
                 .email(menu.getEmail())
                 .address(menu.getAddress())
@@ -274,21 +443,6 @@ public class MenuService {
                 .urlMode(menu.getUrlMode().name())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
-                .build();
-    }
-
-    private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
-        return MenuDtos.MenuProductResponse.builder()
-                .productId(product.getProductId())
-                .menuId(product.getMenuId())
-                .name(product.getName())
-                .description(product.getDescription())
-                .price(product.getPrice())
-                .currency(product.getCurrency())
-                .category(product.getCategory())
-                .sortOrder(product.getSortOrder())
-                .imageUrl(product.getImageUrl())
-                .available(product.isAvailable())
                 .build();
     }
 

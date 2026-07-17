@@ -32,6 +32,9 @@ public class Menu extends QrBaseModel {
     @Column(nullable = false)
     private String businessName;
 
+    @Column(length = 255)
+    private String slogan;
+
     private String phone;
     private String email;
     private String address;

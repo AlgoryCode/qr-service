@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.model;
 
-import com.ael.algoryqrservice.model.enums.ProductCode;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,9 +31,8 @@ public class UserEntitlement {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "product_code", nullable = false)
-    private ProductCode productCode;
+    @Column(name = "product_code", nullable = false, length = 64)
+    private String productCode;
 
     @Column(name = "purchase_id", nullable = false)
     private Long purchaseId;

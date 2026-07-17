@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.model;
 
-import com.ael.algoryqrservice.model.enums.PackageCode;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -26,9 +26,8 @@ public class PlanPackage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, unique = true, length = 32)
-    private PackageCode code;
+    @Column(nullable = false, unique = true, length = 64)
+    private String code;
 
     @Column(nullable = false)
     private String name;
@@ -48,6 +47,26 @@ public class PlanPackage {
 
     @Column(name = "validity_days", nullable = false)
     private Integer validityDays;
+
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private Integer priority = 0;
+
+    @Column(nullable = false)
+    @ColumnDefault("true")
+    @Builder.Default
+    private boolean purchasable = true;
+
+    @Column(name = "system_managed", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean systemManaged = false;
+
+    @Column(name = "trial_eligible", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean trialEligible = false;
 
     @OneToMany(mappedBy = "planPackage", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

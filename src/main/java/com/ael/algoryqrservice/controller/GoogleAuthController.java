@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.model.dto.GoogleAuthRedeemRequest;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
+import com.ael.algoryqrservice.security.GoogleOAuthPaths;
 import com.ael.algoryqrservice.service.GoogleAuthHandoffService;
 import com.ael.algoryqrservice.service.GoogleAuthSessionService;
 import com.ael.algoryqrservice.util.ClientInfo;
@@ -23,8 +24,6 @@ import org.springframework.web.servlet.view.RedirectView;
 @RequiredArgsConstructor
 public class GoogleAuthController {
 
-    private static final String GOOGLE_AUTHORIZATION_URI = "/oauth2/authorization/google";
-
     private final GoogleAuthSessionService authSessionService;
     private final GoogleAuthHandoffService handoffService;
 
@@ -34,7 +33,10 @@ public class GoogleAuthController {
             HttpServletRequest request
     ) {
         authSessionService.storeIntent(request, GoogleAuthIntent.from(intent));
-        return new RedirectView(GOOGLE_AUTHORIZATION_URI);
+        RedirectView redirectView = new RedirectView(GoogleOAuthPaths.AUTHORIZATION);
+        redirectView.setContextRelative(false);
+        redirectView.setPropagateQueryParams(false);
+        return redirectView;
     }
 
     @PostMapping("/redeem")

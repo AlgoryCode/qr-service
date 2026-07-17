@@ -1,9 +1,11 @@
 package com.ael.algoryqrservice.model;
 
-import com.ael.algoryqrservice.model.enums.PackageCode;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
+import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -35,9 +37,8 @@ public class Purchase {
     @Column(name = "package_id", nullable = false)
     private Long packageId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "package_code", nullable = false, length = 32)
-    private PackageCode packageCode;
+    @Column(name = "package_code", nullable = false, length = 64)
+    private String packageCode;
 
     @Column(name = "package_name", nullable = false)
     private String packageName;
@@ -68,6 +69,26 @@ public class Purchase {
     @ColumnDefault("1")
     @Builder.Default
     private Integer installmentCount = 1;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purchase_type", nullable = true, length = 16)
+    @Builder.Default
+    private PurchaseType purchaseType = PurchaseType.PAID;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_style", nullable = true, length = 24)
+    @Builder.Default
+    private PaymentStyle paymentStyle = PaymentStyle.ONE_TIME;
+
+    @Column(name = "subscription_id", length = 128)
+    private String subscriptionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_status", length = 24)
+    private SubscriptionStatus subscriptionStatus;
+
+    @Embedded
+    private BillingSnapshot billingSnapshot;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cancellation_reason", length = 32)

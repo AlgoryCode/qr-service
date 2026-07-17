@@ -1,11 +1,12 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.config.JwtProperties;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
-import com.ael.algoryqrservice.model.enums.PackageCode;
-import com.ael.algoryqrservice.model.enums.ProductCode;
-import com.ael.algoryqrservice.model.enums.ProductScope;
+import com.ael.algoryqrservice.model.enums.DashboardRole;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
@@ -23,9 +24,9 @@ class JwtServiceTest {
         properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
         JwtService jwtService = new JwtService(properties);
         UserAccessProfile profile = new UserAccessProfile(
-                PackageCode.PRO_PACKAGE,
-                List.of(ProductCode.QR_CREATE, ProductCode.QR_MENU),
-                List.of(ProductScope.QR_CREATE_OWNER, ProductScope.QR_MENU_OWNER)
+                CatalogPackages.PRO_PACKAGE,
+                List.of(CatalogProducts.QR_CREATE, CatalogProducts.QR_MENU),
+                List.of(CatalogScopes.QR_CREATE_OWNER, CatalogScopes.QR_MENU_OWNER)
         );
 
         String token = jwtService.generateAccessToken(
@@ -42,6 +43,28 @@ class JwtServiceTest {
         assertThat(claims.get("products", List.class)).containsExactly("QR_CREATE", "QR_MENU");
         assertThat(claims.get("scopes", List.class)).containsExactly("QR_CREATE_OWNER", "QR_MENU_OWNER");
         assertThat(claims.get("provider")).isEqualTo("GOOGLE");
+        assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_APP);
+        assertThat(jwtService.isDashboardPrincipal(claims)).isFalse();
+    }
+
+    @Test
+    void generateDashboardAccessToken_whenAdmin_thenIncludeAdminRoleAndDashboardPrincipal() {
+        JwtProperties properties = new JwtProperties();
+        properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
+        JwtService jwtService = new JwtService(properties);
+
+        String token = jwtService.generateDashboardAccessToken(
+                "admin@example.com",
+                UUID.randomUUID(),
+                7L,
+                DashboardRole.ADMIN
+        );
+
+        Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
+        assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_DASHBOARD);
+        assertThat(jwtService.isDashboardPrincipal(claims)).isTrue();
+        assertThat(claims.get("roles", List.class)).containsExactly("ROLE_ADMIN");
+        assertThat(claims.get("userId")).isEqualTo(7);
     }
 
     @Test
@@ -50,9 +73,9 @@ class JwtServiceTest {
         properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
         JwtService jwtService = new JwtService(properties);
         UserAccessProfile profile = new UserAccessProfile(
-                PackageCode.FREE_PACKAGE,
-                List.of(ProductCode.QR_CREATE),
-                List.of(ProductScope.QR_CREATE_OWNER)
+                CatalogPackages.FREE_PACKAGE,
+                List.of(CatalogProducts.QR_CREATE),
+                List.of(CatalogScopes.QR_CREATE_OWNER)
         );
 
         String token = jwtService.generateAccessToken(

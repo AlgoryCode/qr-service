@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.model.dto;
 
-import com.ael.algoryqrservice.model.enums.ProductCode;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,9 +10,11 @@ import java.time.LocalDateTime;
 public class ProductResponse {
 
     private Long id;
-    private ProductCode code;
+    private String code;
     private String name;
     private String description;
+    private String scopeCode;
+    private boolean consumable;
     private boolean active;
     private LocalDateTime createdAt;
 }

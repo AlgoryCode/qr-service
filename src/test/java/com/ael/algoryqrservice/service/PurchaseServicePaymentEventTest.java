@@ -6,7 +6,7 @@ import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
-import com.ael.algoryqrservice.model.enums.PackageCode;
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
@@ -52,7 +52,7 @@ class PurchaseServicePaymentEventTest {
     @Mock
     private PaymentEventInboxRepository paymentEventInboxRepository;
     @Mock
-    private UserPackageService userPackageService;
+    private PackageActivationService packageActivationService;
     @Mock
     private PurchaseFulfillmentService purchaseFulfillmentService;
 
@@ -68,7 +68,7 @@ class PurchaseServicePaymentEventTest {
                 .id(10L)
                 .userId(20L)
                 .packageId(30L)
-                .packageCode(PackageCode.PRO_PACKAGE)
+                .packageCode(CatalogPackages.PRO_PACKAGE)
                 .packageName("PRO")
                 .price(new BigDecimal("100.00"))
                 .currency("TRY")
@@ -79,7 +79,7 @@ class PurchaseServicePaymentEventTest {
                 .build();
         planPackage = PlanPackage.builder()
                 .id(30L)
-                .code(PackageCode.PRO_PACKAGE)
+                .code(CatalogPackages.PRO_PACKAGE)
                 .name("PRO")
                 .price(new BigDecimal("100.00"))
                 .currency("TRY")
@@ -158,6 +158,108 @@ class PurchaseServicePaymentEventTest {
                 .hasMessageContaining("cancelled");
 
         verify(purchaseFulfillmentService, never()).fulfillPaidInstallment(any(), any(), any(), any());
+    }
+
+    @Test
+    void handlePaymentSuccess_whenOneTimeEventMissingInstallmentNumber_thenFulfill() {
+        PaymentCompletedEventDto event = oneTimePaidEvent();
+        purchase.setInstallmentCount(1);
+        purchase.setPaymentStyle(com.ael.algoryqrservice.model.enums.PaymentStyle.ONE_TIME);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(planPackageService.findPackage(30L)).thenReturn(planPackage);
+
+        purchaseService.handlePaymentSuccess(event);
+
+        verify(purchaseFulfillmentService).fulfillPaidInstallment(
+                org.mockito.ArgumentMatchers.eq(purchase),
+                org.mockito.ArgumentMatchers.eq(planPackage),
+                org.mockito.ArgumentMatchers.eq(event),
+                any()
+        );
+        verify(paymentEventInboxRepository).save(any());
+    }
+
+    @Test
+    void handlePaymentFailed_whenPending_thenMarkFailed() {
+        PaymentCompletedEventDto event = failedEvent();
+        purchase.setInstallmentCount(1);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        purchaseService.handlePaymentFailed(event);
+
+        verify(purchaseRepository).save(purchase);
+        verify(purchaseFulfillmentService).recordUnpaidInstallment(
+                org.mockito.ArgumentMatchers.eq(purchase),
+                org.mockito.ArgumentMatchers.eq(event),
+                any(),
+                org.mockito.ArgumentMatchers.eq(com.ael.algoryqrservice.model.enums.FulfillmentStatus.FAILED)
+        );
+        verify(paymentEventInboxRepository).save(any());
+        org.assertj.core.api.Assertions.assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.FAILED);
+    }
+
+    @Test
+    void handlePaymentFailed_whenActive_thenIgnoreWithoutDowngrade() {
+        PaymentCompletedEventDto event = failedEvent();
+        purchase.setInstallmentCount(1);
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        purchaseService.handlePaymentFailed(event);
+
+        verify(purchaseRepository, never()).save(purchase);
+        verify(purchaseFulfillmentService, never()).recordUnpaidInstallment(any(), any(), any(), any());
+        verify(paymentEventInboxRepository).save(any());
+        org.assertj.core.api.Assertions.assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+    }
+
+    private PaymentCompletedEventDto failedEvent() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("purchaseId", 10L);
+        metadata.put("userId", 20L);
+        metadata.put("packageId", 30L);
+        metadata.put("packageCode", "PRO_PACKAGE");
+        metadata.put("installmentCount", 1);
+        metadata.put("purchaseConversationId", "conversation-10");
+
+        PaymentCompletedEventDto event = new PaymentCompletedEventDto();
+        event.setEventId("event-failed");
+        event.setEventType("payment.failed");
+        event.setPaymentId("payment-fail");
+        event.setConversationId("conversation-10");
+        event.setServiceName("qr-service");
+        event.setSourceReferenceId("10");
+        event.setSourceMetadata(metadata);
+        event.setAmount(new BigDecimal("100.00"));
+        event.setCurrency("TRY");
+        event.setPeriodStart("2026-07-16");
+        event.setPeriodEnd("2026-08-14");
+        event.setFailureReason("MD_STATUS_FAILED");
+        return event;
+    }
+
+    private PaymentCompletedEventDto oneTimePaidEvent() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("purchaseId", 10L);
+        metadata.put("userId", 20L);
+        metadata.put("packageId", 30L);
+        metadata.put("packageCode", "PRO_PACKAGE");
+        metadata.put("installmentCount", 1);
+        metadata.put("purchaseConversationId", "conversation-10");
+
+        PaymentCompletedEventDto event = new PaymentCompletedEventDto();
+        event.setEventId("event-one-time");
+        event.setEventType("payment.success");
+        event.setPaymentId("payment-19");
+        event.setConversationId("conversation-10");
+        event.setServiceName("qr-service");
+        event.setSourceReferenceId("10");
+        event.setSourceMetadata(metadata);
+        event.setAmount(new BigDecimal("100.00"));
+        event.setCurrency("TRY");
+        event.setPeriodStart("2026-07-16");
+        event.setPeriodEnd("2026-08-14");
+        return event;
     }
 
     private PaymentCompletedEventDto paidEvent() {

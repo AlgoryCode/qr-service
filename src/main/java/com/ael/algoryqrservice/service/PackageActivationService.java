@@ -1,10 +1,13 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.enums.PackageCode;
+import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,13 +15,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class UserPackageService {
+public class PackageActivationService {
 
     private final PackageCatalogService packageCatalogService;
+    private final PlanPackageRepository planPackageRepository;
     private final PurchaseRepository purchaseRepository;
     private final EntitlementService entitlementService;
 
@@ -35,10 +43,12 @@ public class UserPackageService {
         Purchase purchase = purchaseRepository.save(Purchase.builder()
                 .userId(userId)
                 .packageId(freePackage.getId())
-                .packageCode(PackageCode.FREE_PACKAGE)
+                .packageCode(CatalogPackages.FREE_PACKAGE)
                 .packageName(freePackage.getName())
                 .price(BigDecimal.ZERO)
                 .currency(freePackage.getCurrency())
+                .purchaseType(PurchaseType.FREE)
+                .paymentStyle(PaymentStyle.ONE_TIME)
                 .status(PurchaseStatus.ACTIVE)
                 .startsAt(startsAt)
                 .expiresAt(expiresAt)
@@ -57,13 +67,13 @@ public class UserPackageService {
     }
 
     @Transactional
-    public void activateProPackage(Purchase proPurchase) {
+    public void activatePurchasedPackage(Purchase purchasedPackage) {
         List<Purchase> active = purchaseRepository.findByUserIdAndStatus(
-                proPurchase.getUserId(),
+                purchasedPackage.getUserId(),
                 PurchaseStatus.ACTIVE
         );
         for (Purchase purchase : active) {
-            if (!purchase.getId().equals(proPurchase.getId())) {
+            if (!purchase.getId().equals(purchasedPackage.getId())) {
                 purchase.setStatus(PurchaseStatus.SUPERSEDED);
                 purchaseRepository.save(purchase);
             }
@@ -71,11 +81,8 @@ public class UserPackageService {
     }
 
     @Transactional
-    public void restoreFreePackagesAfterProExpiry() {
-        List<Long> userIds = purchaseRepository.findDistinctUserIdsByPackageCodeAndStatus(
-                PackageCode.PRO_PACKAGE,
-                PurchaseStatus.EXPIRED
-        );
+    public void restoreFreePackagesAfterPaidExpiry() {
+        List<Long> userIds = purchaseRepository.findDistinctUserIdsWithExpiredPaidPurchases(PurchaseStatus.EXPIRED);
         for (Long userId : userIds) {
             if (!purchaseRepository.existsByUserIdAndStatus(userId, PurchaseStatus.ACTIVE)) {
                 ensureFreePackage(userId);
@@ -84,9 +91,18 @@ public class UserPackageService {
     }
 
     private Purchase selectHighestPackage(List<Purchase> purchases) {
+        Map<Long, PlanPackage> packagesById = planPackageRepository.findAllById(
+                purchases.stream().map(Purchase::getPackageId).distinct().toList()
+        ).stream().collect(Collectors.toMap(PlanPackage::getId, Function.identity()));
+
         return purchases.stream()
-                .filter(purchase -> purchase.getPackageCode() == PackageCode.PRO_PACKAGE)
-                .findFirst()
+                .max(Comparator.comparingInt(purchase -> {
+                    PlanPackage planPackage = packagesById.get(purchase.getPackageId());
+                    if (planPackage != null && planPackage.getPriority() != null) {
+                        return planPackage.getPriority();
+                    }
+                    return CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()) ? 1 : 0;
+                }))
                 .orElse(purchases.getFirst());
     }
 }

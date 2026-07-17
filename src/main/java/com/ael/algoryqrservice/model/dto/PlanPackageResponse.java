@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.model.dto;
 
-import com.ael.algoryqrservice.model.enums.PackageCode;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import lombok.Builder;
 import lombok.Data;
@@ -14,13 +13,17 @@ import java.util.List;
 public class PlanPackageResponse {
 
     private Long id;
-    private PackageCode code;
+    private String code;
     private String name;
     private String description;
     private BigDecimal price;
     private String currency;
     private boolean active;
     private Integer validityDays;
+    private Integer priority;
+    private boolean purchasable;
+    private boolean systemManaged;
+    private boolean trialEligible;
     private List<PaymentMode> allowedPaymentModes;
     private List<Integer> allowedInstallments;
     private List<InstallmentOptionResponse> installmentOptions;

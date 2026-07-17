@@ -10,4 +10,6 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long> 
     List<MenuProduct> findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(Long menuId);
 
     Optional<MenuProduct> findByProductIdAndDeletedFalse(Long productId);
+
+    long countByCategoryIdAndDeletedFalse(Long categoryId);
 }

@@ -1,11 +1,11 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.PaymentMode;
+import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -23,31 +23,78 @@ public class PurchaseRequest {
     @Max(value = 12, message = "Taksit sayısı en fazla 12 olabilir")
     private Integer installmentCount = 1;
 
-    @NotBlank(message = "TC kimlik numarası zorunludur")
     private String identityNumber;
 
-    @NotNull(message = "Kart bilgileri zorunludur")
+    private PaymentStyle paymentStyle;
+
+    private Long billingAddressId;
+
+    private Long paymentMethodId;
+
+    private Integer bankInstallmentCount;
+
+    @Valid
+    private BillingAddressDtos.Request inlineBillingAddress;
+
     @Valid
     private PaymentCardDto paymentCard;
 
-    @NotNull(message = "Fatura adresi zorunludur")
     @Valid
     private AddressDto billingAddress;
 
     @Valid
     private AddressDto shippingAddress;
 
-    @AssertTrue(message = "Taksitli tahsilat DIRECT ödeme tipiyle ve 2, 3, 6, 9 veya 12 taksitle yapılmalıdır")
+    @AssertTrue(message = "Kart veya kayıtlı ödeme yöntemi zorunludur")
+    public boolean isPaymentInstrumentValid() {
+        return paymentMethodId != null || paymentCard != null;
+    }
+
+    @AssertTrue(message = "Ödeme planı geçersiz")
     public boolean isPaymentPlanValid() {
-        if (installmentCount == null) {
+        Integer count = resolvedInstallmentCount();
+        if (count == null) {
             return true;
         }
-        boolean allowedCount = installmentCount == 1
-                || installmentCount == 2
-                || installmentCount == 3
-                || installmentCount == 6
-                || installmentCount == 9
-                || installmentCount == 12;
-        return allowedCount && (installmentCount == 1 || paymentMode == PaymentMode.DIRECT);
+        boolean allowedCount = count == 1
+                || count == 2
+                || count == 3
+                || count == 6
+                || count == 9
+                || count == 12;
+        if (!allowedCount) {
+            return false;
+        }
+        PaymentStyle style = resolvedPaymentStyle();
+        return switch (style) {
+            case ONE_TIME -> count == 1;
+            case BANK_INSTALLMENT -> count > 1;
+            case SUBSCRIPTION -> true;
+        };
+    }
+
+    @AssertTrue(message = "Fatura adresi seçimi geçersiz")
+    public boolean isBillingSelectionValid() {
+        int selections = billingAddressId != null ? 1 : 0;
+        selections += inlineBillingAddress != null ? 1 : 0;
+        selections += billingAddress != null ? 1 : 0;
+        return selections == 1;
+    }
+
+    public PaymentStyle resolvedPaymentStyle() {
+        if (paymentStyle != null) {
+            return paymentStyle;
+        }
+        Integer count = resolvedInstallmentCount();
+        return count != null && count > 1
+                ? PaymentStyle.BANK_INSTALLMENT
+                : PaymentStyle.ONE_TIME;
+    }
+
+    public Integer resolvedInstallmentCount() {
+        if (bankInstallmentCount != null) {
+            return bankInstallmentCount;
+        }
+        return installmentCount;
     }
 }

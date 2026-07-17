@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.config.JwtProperties;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
+import com.ael.algoryqrservice.model.enums.DashboardRole;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -22,6 +23,10 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class JwtService {
+
+    public static final String PRINCIPAL_TYPE_CLAIM = "principalType";
+    public static final String PRINCIPAL_APP = "APP";
+    public static final String PRINCIPAL_DASHBOARD = "DASHBOARD";
 
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ACCESS_TOKEN_TYPE = "access";
@@ -43,14 +48,33 @@ public class JwtService {
                 .id(sessionId.toString())
                 .subject(email)
                 .claim("userId", userId)
-                .claim(ROLES_CLAIM, resolveRoles(role))
+                .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_APP)
+                .claim(ROLES_CLAIM, List.of("ROLE_USER"))
                 .claim(PROVIDER_CLAIM, resolveProvider(provider))
-                .claim(
-                        "activePackage",
-                        accessProfile.activePackage() == null ? null : accessProfile.activePackage().name()
-                )
-                .claim("products", accessProfile.products().stream().map(Enum::name).toList())
-                .claim("scopes", accessProfile.scopes().stream().map(Enum::name).toList())
+                .claim("activePackage", accessProfile.activePackage())
+                .claim("products", accessProfile.products())
+                .claim("scopes", accessProfile.scopes())
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateDashboardAccessToken(
+            String email,
+            UUID sessionId,
+            Long dashboardUserId,
+            DashboardRole role
+    ) {
+        Date now = new Date();
+        return Jwts.builder()
+                .id(sessionId.toString())
+                .subject(email)
+                .claim("userId", dashboardUserId)
+                .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_DASHBOARD)
+                .claim(ROLES_CLAIM, resolveDashboardRoles(role))
+                .claim(PROVIDER_CLAIM, AuthProvider.BASIC.name())
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
@@ -90,6 +114,15 @@ public class JwtService {
         }
     }
 
+    public String extractPrincipalType(Claims claims) {
+        String type = claims.get(PRINCIPAL_TYPE_CLAIM, String.class);
+        return type == null || type.isBlank() ? PRINCIPAL_APP : type;
+    }
+
+    public boolean isDashboardPrincipal(Claims claims) {
+        return PRINCIPAL_DASHBOARD.equals(extractPrincipalType(claims));
+    }
+
     private Optional<UUID> extractSessionIdFromClaimsOptional(Claims claims) {
         try {
             return Optional.of(extractSessionIdFromClaims(claims));
@@ -125,11 +158,11 @@ public class JwtService {
         return provider == null ? AuthProvider.BASIC.name() : provider.name();
     }
 
-    private List<String> resolveRoles(UserRole role) {
-        if (role == UserRole.ADMIN) {
-            return List.of("ROLE_USER", "ROLE_ADMIN");
+    private List<String> resolveDashboardRoles(DashboardRole role) {
+        if (role == DashboardRole.ADMIN) {
+            return List.of("ROLE_ADMIN");
         }
-        return List.of("ROLE_USER");
+        return List.of("ROLE_ADMIN");
     }
 
     private Claims extractAllClaims(String token) {

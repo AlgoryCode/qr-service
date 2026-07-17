@@ -11,7 +11,7 @@ public class PlanPackageItemRequest {
     private Long productId;
 
     @NotNull(message = "Miktar zorunludur")
-    @Min(value = 1, message = "Miktar en az 1 olmalıdır")
+    @Min(value = 0, message = "Miktar 0 veya daha büyük olmalıdır")
     private Integer quantity;
 
     private Boolean unlimited = false;

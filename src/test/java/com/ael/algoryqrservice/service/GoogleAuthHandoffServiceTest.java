@@ -57,7 +57,7 @@ class GoogleAuthHandoffServiceTest {
                 userRepository,
                 sessionService,
                 new GoogleOAuthProperties(
-                        "http://localhost:3000/google-auth/callback",
+                        "http://localhost:3000/api/auth/google/callback",
                         Duration.ofMinutes(2)
                 ),
                 secureRandom

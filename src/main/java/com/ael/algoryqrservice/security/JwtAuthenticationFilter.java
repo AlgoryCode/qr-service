@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.security;
 
+import com.ael.algoryqrservice.service.DashboardSessionService;
 import com.ael.algoryqrservice.service.JwtService;
 import com.ael.algoryqrservice.service.SessionService;
 import io.jsonwebtoken.Claims;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -26,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final SessionService sessionService;
+    private final DashboardSessionService dashboardSessionService;
 
     @Override
     protected void doFilterInternal(
@@ -53,6 +54,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean isSessionActive(Claims claims) {
         UUID sessionId = jwtService.extractSessionId(claims);
+        if (jwtService.isDashboardPrincipal(claims)) {
+            return dashboardSessionService.isSessionActive(sessionId);
+        }
         return sessionService.isSessionActive(sessionId);
     }
 

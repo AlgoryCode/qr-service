@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.GoogleOidcIdentity;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
+import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,146 +29,144 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GoogleOAuthUserServiceTest {
 
-    private static final ClientInfo CLIENT_INFO = new ClientInfo(
-            "127.0.0.1",
-            "test-agent",
-            "test-device",
-            "browser"
-    );
+    private static final AtomicLong NEXT_ID = new AtomicLong(1L);
 
     @Mock
     private UserRepository userRepository;
+
     @Mock
-    private UserPackageService userPackageService;
+    private PackageActivationService packageActivationService;
+
     @InjectMocks
-    private GoogleOAuthUserService service;
+    private GoogleOAuthUserService googleOAuthUserService;
 
     @Test
-    void resolve_whenRegisterIntentIsValid_thenCreateGoogleUserAndFreePackage() {
-        GoogleOidcIdentity identity = identity();
-        when(userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        )).thenReturn(Optional.empty());
-        when(userRepository.existsByEmail(identity.email())).thenReturn(false);
+    void resolve_whenLoginAndGoogleUserExists_thenReturnUser() {
+        User existing = googleUser("sub-1", "user@example.com");
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.of(existing));
+
+        User result = googleOAuthUserService.resolve(
+                GoogleAuthIntent.LOGIN,
+                identity("sub-1", "user@example.com", true),
+                clientInfo()
+        );
+
+        assertThat(result).isSameAs(existing);
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void resolve_whenLoginAndNoGoogleUser_thenThrowUnauthorized() {
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> googleOAuthUserService.resolve(
+                GoogleAuthIntent.LOGIN,
+                identity("sub-1", "user@example.com", true),
+                clientInfo()
+        ))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("Google hesabı kayıtlı değil");
+    }
+
+    @Test
+    void resolve_whenLoginAndBasicEmailExists_thenThrowProviderConflict() {
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(basicUser("user@example.com")));
+
+        assertThatThrownBy(() -> googleOAuthUserService.resolve(
+                GoogleAuthIntent.LOGIN,
+                identity("sub-1", "user@example.com", true),
+                clientInfo()
+        ))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("farklı bir giriş yöntemiyle");
+    }
+
+    @Test
+    void resolve_whenRegisterAndEmailFree_thenCreateGoogleUser() {
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.empty());
         when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
-            user.setId(10L);
+            user.setId(NEXT_ID.incrementAndGet());
             return user;
         });
 
-        User result = service.resolve(GoogleAuthIntent.REGISTER, identity, CLIENT_INFO);
-
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).saveAndFlush(userCaptor.capture());
-        assertThat(userCaptor.getValue().getProvider()).isEqualTo(AuthProvider.GOOGLE);
-        assertThat(userCaptor.getValue().getProviderSubject()).isEqualTo(identity.subject());
-        assertThat(userCaptor.getValue().getPassword()).isNull();
-        assertThat(result.getId()).isEqualTo(10L);
-        verify(userPackageService).ensureFreePackage(10L);
-    }
-
-    @Test
-    void resolve_whenLoginIntentMatchesGoogleUser_thenReturnExistingUser() {
-        GoogleOidcIdentity identity = identity();
-        User user = googleUser(identity);
-        when(userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        )).thenReturn(Optional.of(user));
-
-        User result = service.resolve(GoogleAuthIntent.LOGIN, identity, CLIENT_INFO);
-
-        assertThat(result).isSameAs(user);
-        verify(userRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    void resolve_whenLoginIntentHasNoGoogleUser_thenReject() {
-        GoogleOidcIdentity identity = identity();
-        when(userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        )).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.resolve(
-                GoogleAuthIntent.LOGIN,
-                identity,
-                CLIENT_INFO
-        )).isInstanceOf(UnauthorizedException.class);
-    }
-
-    @Test
-    void resolve_whenRegisterIntentAndGoogleUserExists_thenReturnExistingUser() {
-        GoogleOidcIdentity identity = identity();
-        User user = googleUser(identity);
-        when(userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        )).thenReturn(Optional.of(user));
-
-        User result = service.resolve(GoogleAuthIntent.REGISTER, identity, CLIENT_INFO);
-
-        assertThat(result).isSameAs(user);
-        verify(userRepository, never()).saveAndFlush(any());
-        verify(userPackageService, never()).ensureFreePackage(any());
-    }
-
-    @Test
-    void resolve_whenRegisterEmailBelongsToBasicUser_thenReject() {
-        GoogleOidcIdentity identity = identity();
-        when(userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        )).thenReturn(Optional.empty());
-        when(userRepository.existsByEmail(identity.email())).thenReturn(true);
-
-        assertThatThrownBy(() -> service.resolve(
+        User result = googleOAuthUserService.resolve(
                 GoogleAuthIntent.REGISTER,
-                identity,
-                CLIENT_INFO
-        )).isInstanceOf(BadRequestException.class);
+                identity("sub-1", "user@example.com", true),
+                clientInfo()
+        );
 
-        verify(userRepository, never()).saveAndFlush(any());
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getProvider()).isEqualTo(AuthProvider.GOOGLE);
+        assertThat(captor.getValue().getProviderSubject()).isEqualTo("sub-1");
+        assertThat(captor.getValue().getPassword()).isNull();
+        assertThat(result.getId()).isNotNull();
+        verify(packageActivationService).ensureFreePackage(result.getId());
     }
 
     @Test
-    void resolve_whenEmailIsNotVerified_thenReject() {
-        GoogleOidcIdentity identity = new GoogleOidcIdentity(
-                "google-subject",
-                "user@example.com",
-                "Tarik",
-                "Test",
-                false
-        );
+    void resolve_whenRegisterAndBasicEmailExists_thenThrowProviderConflict() {
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(basicUser("user@example.com")));
 
-        assertThatThrownBy(() -> service.resolve(
+        assertThatThrownBy(() -> googleOAuthUserService.resolve(
+                GoogleAuthIntent.REGISTER,
+                identity("sub-1", "user@example.com", true),
+                clientInfo()
+        ))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("farklı bir giriş yöntemiyle");
+    }
+
+    @Test
+    void resolve_whenEmailNotVerified_thenThrowUnauthorized() {
+        assertThatThrownBy(() -> googleOAuthUserService.resolve(
                 GoogleAuthIntent.LOGIN,
-                identity,
-                CLIENT_INFO
-        )).isInstanceOf(UnauthorizedException.class);
-
-        verify(userRepository, never()).findByProviderAndProviderSubject(any(), any());
+                identity("sub-1", "user@example.com", false),
+                clientInfo()
+        ))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("Doğrulanmış Google e-posta");
     }
 
-    private GoogleOidcIdentity identity() {
-        return new GoogleOidcIdentity(
-                "google-subject",
-                "user@example.com",
-                "Tarik",
-                "Test",
-                true
-        );
+    private static GoogleOidcIdentity identity(String subject, String email, boolean verified) {
+        return new GoogleOidcIdentity(subject, email, "Ada", "Lovelace", verified);
     }
 
-    private User googleUser(GoogleOidcIdentity identity) {
+    private static ClientInfo clientInfo() {
+        return new ClientInfo("127.0.0.1", "Mozilla", "Chrome", "DESKTOP");
+    }
+
+    private static User googleUser(String subject, String email) {
         return User.builder()
-                .id(10L)
-                .firstName(identity.firstName())
-                .lastName(identity.lastName())
-                .email(identity.email())
+                .id(NEXT_ID.incrementAndGet())
+                .firstName("Ada")
+                .lastName("Lovelace")
+                .email(email)
+                .role(UserRole.USER)
                 .provider(AuthProvider.GOOGLE)
-                .providerSubject(identity.subject())
+                .providerSubject(subject)
+                .build();
+    }
+
+    private static User basicUser(String email) {
+        return User.builder()
+                .id(NEXT_ID.incrementAndGet())
+                .firstName("Ada")
+                .lastName("Lovelace")
+                .email(email)
+                .password("hash")
+                .role(UserRole.USER)
+                .provider(AuthProvider.BASIC)
                 .build();
     }
 }

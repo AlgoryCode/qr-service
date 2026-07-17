@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.factory.QrProviderFactory;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.Type;
@@ -9,11 +11,11 @@ import com.ael.algoryqrservice.model.dto.QrListResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
 import com.ael.algoryqrservice.provider.QrProvider;
-import com.ael.algoryqrservice.model.enums.ProductCode;
-import com.ael.algoryqrservice.model.enums.ProductScope;
+import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.zxing.WriterException;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,6 +27,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,17 +37,19 @@ public class QrService {
 
     private final QrProviderFactory qrProviderFactory;
     private final QrRepository qrRepository;
+    private final MenuRepository menuRepository;
     private final ObjectMapper objectMapper;
     private final EntitlementService entitlementService;
     private final SecurityUtils securityUtils;
 
     public <T extends QrRequest> QrResponse createQR(T req, Long userId) throws IOException, WriterException {
-        entitlementService.requireScope(userId, ProductScope.QR_CREATE_OWNER);
+        entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         Type qrType = Type.from(req.getType());
         if (qrType == Type.MENU) {
-            entitlementService.requireScope(userId, ProductScope.QR_MENU_OWNER);
+            entitlementService.requireScope(userId, CatalogScopes.QR_MENU_OWNER);
+            entitlementService.consume(userId, CatalogProducts.QR_MENU, 1);
         }
-        entitlementService.consume(userId, ProductCode.QR_CREATE, 1);
+        entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
         req.setUserId(userId);
 
         QrProvider<T> provider = qrProviderFactory.get(qrType,(Class<T>) req.getClass());
@@ -63,7 +69,6 @@ public class QrService {
             throw new IllegalArgumentException("type alanı zorunludur");
         }
 
-        // Keep ownership unchanged unless the same user id is sent.
         if (req.getUserId() != null && !req.getUserId().equals(existingQr.getUserId())) {
             throw new IllegalArgumentException("QR başka bir kullanıcıya ait, userId değiştirilemez");
         }
@@ -81,10 +86,41 @@ public class QrService {
         if (!currentUserId.equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Başka kullanıcının QR kayıtlarına erişilemez");
         }
-        return qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId)
+        List<Qr> qrs = qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId);
+        Set<Long> activeMenuQrIds = loadActiveMenuQrIds(userId, qrs);
+
+        return qrs
                 .stream()
+                .filter(qr -> shouldShowQr(qr, activeMenuQrIds))
                 .map(this::mapToListResponse)
                 .toList();
+    }
+
+    private Set<Long> loadActiveMenuQrIds(Long userId, List<Qr> qrs) {
+        Set<Long> menuQrIds = qrs.stream()
+                .filter(this::isMenuQr)
+                .map(Qr::getQrId)
+                .collect(Collectors.toSet());
+        if (menuQrIds.isEmpty()) {
+            return Set.of();
+        }
+        return menuRepository.findActiveQrIdsByUserIdAndQrIdIn(userId, menuQrIds);
+    }
+
+    private boolean shouldShowQr(Qr qr, Set<Long> activeMenuQrIds) {
+        return !isMenuQr(qr) || activeMenuQrIds.contains(qr.getQrId());
+    }
+
+    private boolean isMenuQr(Qr qr) {
+        if (qr.getQrType() != null
+                && Type.MENU.getValue().equalsIgnoreCase(qr.getQrType().getTypeName())) {
+            return true;
+        }
+        JsonNode details = qr.getDetails();
+        return details != null
+                && ((details.has("themeId") && details.has("businessName"))
+                || (details.has("menuId") && !details.get("menuId").isNull())
+                || (details.has("type") && Type.MENU.getValue().equalsIgnoreCase(details.get("type").asText())));
     }
 
     public QrNameResponse updateQrName(Long qrId, QrNameRequest req) {

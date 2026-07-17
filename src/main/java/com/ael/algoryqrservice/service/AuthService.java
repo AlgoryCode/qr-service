@@ -1,12 +1,11 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
-import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.model.dto.*;
+import com.ael.algoryqrservice.repository.DashboardUserRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import io.jsonwebtoken.Claims;
@@ -27,11 +26,12 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final DashboardUserRepository dashboardUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final SessionService sessionService;
     private final JwtService jwtService;
-    private final UserPackageService userPackageService;
+    private final PackageActivationService packageActivationService;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request, ClientInfo clientInfo) {
@@ -61,7 +61,7 @@ public class AuthService {
                 .build();
 
         User saved = userRepository.save(user);
-        userPackageService.ensureFreePackage(saved.getId());
+        packageActivationService.ensureFreePackage(saved.getId());
 
         return RegisterResponse.builder()
                 .message("Kayıt başarılı")
@@ -79,22 +79,15 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
         User user = authenticate(request);
-        userPackageService.ensureFreePackage(user.getId());
-        return createAuthResponse(user, clientInfo);
-    }
-
-    @Transactional
-    public AuthResponse adminLogin(LoginRequest request, ClientInfo clientInfo) {
-        User user = authenticate(request);
-        if (user.getRole() != UserRole.ADMIN) {
-            throw new ForbiddenException("Admin paneline erişim yetkiniz yok");
-        }
-        userPackageService.ensureFreePackage(user.getId());
+        packageActivationService.ensureFreePackage(user.getId());
         return createAuthResponse(user, clientInfo);
     }
 
     private User authenticate(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
+        if (dashboardUserRepository.existsByEmailIgnoreCase(email)) {
+            throw new BadRequestException("Bu hesap dashboard girisi icindir. /dashboard/auth/login kullanin");
+        }
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
         if (user.getProvider() != AuthProvider.BASIC) {

@@ -10,7 +10,6 @@ import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,16 +19,15 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class GoogleOAuthUserService {
 
+    private static final String PROVIDER_CONFLICT_MESSAGE =
+            "Bu hesap farklı bir giriş yöntemiyle oluşturulmuş";
+
     private final UserRepository userRepository;
-    private final UserPackageService userPackageService;
+    private final PackageActivationService packageActivationService;
 
     @Transactional
-    public User resolve(
-            GoogleAuthIntent intent,
-            GoogleOidcIdentity identity,
-            ClientInfo clientInfo
-    ) {
-        validate(identity);
+    public User resolve(GoogleAuthIntent intent, GoogleOidcIdentity identity, ClientInfo clientInfo) {
+        requireVerifiedEmail(identity);
         return switch (intent) {
             case LOGIN -> login(identity);
             case REGISTER -> register(identity, clientInfo);
@@ -37,14 +35,20 @@ public class GoogleOAuthUserService {
     }
 
     private User login(GoogleOidcIdentity identity) {
-        return userRepository.findByProviderAndProviderSubject(
-                        AuthProvider.GOOGLE,
-                        identity.subject()
-                )
-                .filter(user -> user.getEmail().equalsIgnoreCase(identity.email()))
-                .orElseThrow(() -> new UnauthorizedException(
-                        "Google hesabı kayıtlı değil. Önce Google ile kayıt olun."
-                ));
+        Optional<User> googleUser = userRepository.findByProviderAndProviderSubject(
+                AuthProvider.GOOGLE,
+                identity.subject()
+        );
+        if (googleUser.isPresent()) {
+            return googleUser.get();
+        }
+
+        Optional<User> existingByEmail = userRepository.findByEmail(identity.email());
+        if (existingByEmail.isPresent() && existingByEmail.get().getProvider() != AuthProvider.GOOGLE) {
+            throw new BadRequestException(PROVIDER_CONFLICT_MESSAGE);
+        }
+
+        throw new UnauthorizedException("Bu e-posta adresi ile Google hesabı kayıtlı değil");
     }
 
     private User register(GoogleOidcIdentity identity, ClientInfo clientInfo) {
@@ -55,49 +59,35 @@ public class GoogleOAuthUserService {
         if (existingGoogleUser.isPresent()) {
             return existingGoogleUser.get();
         }
-        if (userRepository.existsByEmail(identity.email())) {
+
+        Optional<User> existingByEmail = userRepository.findByEmail(identity.email());
+        if (existingByEmail.isPresent()) {
+            if (existingByEmail.get().getProvider() != AuthProvider.GOOGLE) {
+                throw new BadRequestException(PROVIDER_CONFLICT_MESSAGE);
+            }
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
 
-        User user = User.builder()
-                .firstName(defaultFirstName(identity.firstName(), identity.email()))
-                .lastName(defaultLastName(identity.lastName()))
-                .email(identity.email().trim().toLowerCase())
+        User user = userRepository.saveAndFlush(User.builder()
+                .firstName(identity.firstName())
+                .lastName(identity.lastName())
+                .email(identity.email())
+                .password(null)
+                .role(UserRole.USER)
                 .provider(AuthProvider.GOOGLE)
                 .providerSubject(identity.subject())
-                .role(UserRole.USER)
                 .registrationIpAddress(clientInfo.ipAddress())
                 .registrationUserAgent(clientInfo.userAgent())
                 .registrationDevice(clientInfo.device())
                 .registrationDeviceType(clientInfo.deviceType())
-                .build();
-        try {
-            User saved = userRepository.saveAndFlush(user);
-            userPackageService.ensureFreePackage(saved.getId());
-            return saved;
-        } catch (DataIntegrityViolationException exception) {
-            return userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, identity.subject())
-                    .orElseThrow(() -> new BadRequestException("Bu e-posta adresi zaten kayıtlı"));
-        }
+                .build());
+        packageActivationService.ensureFreePackage(user.getId());
+        return user;
     }
 
-    private void validate(GoogleOidcIdentity identity) {
-        if (identity.subject() == null || identity.subject().isBlank()) {
-            throw new UnauthorizedException("Google kullanıcı bilgisi doğrulanamadı");
+    private void requireVerifiedEmail(GoogleOidcIdentity identity) {
+        if (!identity.emailVerified()) {
+            throw new UnauthorizedException("Doğrulanmış Google e-posta adresi zorunludur");
         }
-        if (identity.email() == null || identity.email().isBlank() || !identity.emailVerified()) {
-            throw new UnauthorizedException("Doğrulanmış Google e-posta adresi gerekli");
-        }
-    }
-
-    private String defaultFirstName(String firstName, String email) {
-        if (firstName != null && !firstName.isBlank()) {
-            return firstName.trim();
-        }
-        return email.substring(0, email.indexOf('@'));
-    }
-
-    private String defaultLastName(String lastName) {
-        return lastName == null ? "" : lastName.trim();
     }
 }

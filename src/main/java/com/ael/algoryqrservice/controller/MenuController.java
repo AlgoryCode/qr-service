@@ -2,8 +2,9 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.model.enums.ProductScope;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.service.MenuCategoryService;
 import com.ael.algoryqrservice.service.MenuService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.List;
 public class MenuController {
 
     private final MenuService menuService;
+    private final MenuCategoryService menuCategoryService;
 
     @GetMapping("/public/id/{qrId}")
     public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuByQrId(@PathVariable Long qrId) {
@@ -37,7 +39,7 @@ public class MenuController {
     }
 
     @GetMapping("/by-qr/{qrId}")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenuByQrId(@PathVariable Long qrId) {
         Menu menu = menuService.findByQrId(qrId);
         if (menu == null) {
@@ -47,13 +49,13 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenu(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuService.getMenuProfile(menuId));
     }
 
     @PatchMapping("/{menuId}")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> updateMenu(
             @PathVariable Long menuId,
             @RequestBody MenuDtos.MenuUpdateRequest request
@@ -62,13 +64,13 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/products")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<List<MenuDtos.MenuProductResponse>> listProducts(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuService.listProducts(menuId));
     }
 
     @PostMapping("/{menuId}/products")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> createProduct(
             @PathVariable Long menuId,
             @RequestBody MenuDtos.MenuProductRequest request
@@ -77,7 +79,7 @@ public class MenuController {
     }
 
     @PutMapping("/products/{productId}")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> updateProduct(
             @PathVariable Long productId,
             @RequestBody MenuDtos.MenuProductRequest request
@@ -86,9 +88,40 @@ public class MenuController {
     }
 
     @DeleteMapping("/products/{productId}")
-    @RequiresProductScope(ProductScope.QR_MENU_OWNER)
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
         menuService.deleteProduct(productId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{menuId}/categories")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<List<MenuDtos.MenuCategoryResponse>> listCategories(@PathVariable Long menuId) {
+        return ResponseEntity.ok(menuCategoryService.listCategoryTree(menuId));
+    }
+
+    @PostMapping("/{menuId}/categories")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.MenuCategoryResponse> createCategory(
+            @PathVariable Long menuId,
+            @RequestBody MenuDtos.MenuCategoryRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuCategoryService.createCategory(menuId, request));
+    }
+
+    @PutMapping("/categories/{categoryId}")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.MenuCategoryResponse> updateCategory(
+            @PathVariable Long categoryId,
+            @RequestBody MenuDtos.MenuCategoryUpdateRequest request
+    ) {
+        return ResponseEntity.ok(menuCategoryService.updateCategory(categoryId, request));
+    }
+
+    @DeleteMapping("/categories/{categoryId}")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long categoryId) {
+        menuCategoryService.deleteCategory(categoryId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -54,7 +54,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/dashboard/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/dashboard/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/dashboard/auth/logout").permitAll()
+                        .requestMatchers("/dashboard/auth/me").hasRole("ADMIN")
                         .requestMatchers("/google-auth/**").permitAll()
+                        .requestMatchers(GoogleOAuthPaths.LEGACY_CALLBACK).permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/menu/public/**").permitAll()
                         .requestMatchers("/menu/slug-available").permitAll()
@@ -69,7 +74,7 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .redirectionEndpoint(redirection -> redirection
-                                .baseUri("/google-auth/callback")
+                                .baseUri(GoogleOAuthPaths.CALLBACK)
                         )
                         .successHandler(googleSuccessHandler)
                         .failureHandler(googleFailureHandler)

@@ -27,7 +27,7 @@ public class SessionService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final JwtPropertiesHelper jwtPropertiesHelper;
-    private final UserPackageService userPackageService;
+    private final PackageActivationService packageActivationService;
     private final UserAccessProfileService userAccessProfileService;
 
     @Transactional
@@ -53,7 +53,7 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        userPackageService.ensureFreePackage(user.getId());
+        packageActivationService.ensureFreePackage(user.getId());
         var accessProfile = userAccessProfileService.resolve(user.getId());
         String accessToken = jwtService.generateAccessToken(
                 user.getEmail(),
@@ -83,7 +83,7 @@ public class SessionService {
 
         User user = userRepository.findById(session.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
-        userPackageService.ensureFreePackage(user.getId());
+        packageActivationService.ensureFreePackage(user.getId());
 
         String newRawRefreshToken = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();

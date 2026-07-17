@@ -38,14 +38,6 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request, ClientInfo.from(httpRequest)));
     }
 
-    @PostMapping("/admin/login")
-    public ResponseEntity<AuthResponse> adminLogin(
-            @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest
-    ) {
-        return ResponseEntity.ok(authService.adminLogin(request, ClientInfo.from(httpRequest)));
-    }
-
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(authService.refresh(request));
