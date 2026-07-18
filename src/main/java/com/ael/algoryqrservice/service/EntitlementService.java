@@ -29,6 +29,7 @@ public class EntitlementService {
     private final PurchaseRepository purchaseRepository;
     private final ProductRepository productRepository;
     private final PurchaseLogService purchaseLogService;
+    private final MenuPublicAccessService menuPublicAccessService;
 
     @Transactional
     public void grant(Purchase purchase, Long productId, String productCode, int quantity, boolean unlimited) {
@@ -203,6 +204,7 @@ public class EntitlementService {
                 PurchaseLogAction.PURCHASE_EXPIRED,
                 purchase.getPackageName() + " paketi süresi doldu (" + purchase.getExpiresAt() + ")"
         );
+        menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 
     private Map<Long, Purchase> loadPurchases(List<UserEntitlement> entitlements) {

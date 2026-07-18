@@ -119,7 +119,7 @@ public class PlanPackageService {
     }
 
     PlanPackage findPackage(Long id) {
-        return planPackageRepository.findById(id)
+        return planPackageRepository.findByIdWithItems(id)
                 .orElseThrow(() -> new BadRequestException("Paket bulunamadı: " + id));
     }
 

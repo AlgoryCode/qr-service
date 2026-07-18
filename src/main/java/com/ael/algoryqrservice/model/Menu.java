@@ -50,4 +50,11 @@ public class Menu extends QrBaseModel {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "public_access_enabled", nullable = false)
+    @lombok.Builder.Default
+    private boolean publicAccessEnabled = true;
+
+    @Column(name = "public_access_disabled_reason", length = 64)
+    private String publicAccessDisabledReason;
 }

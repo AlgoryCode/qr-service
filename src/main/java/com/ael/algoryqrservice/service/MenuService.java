@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
@@ -8,6 +9,7 @@ import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.UrlMode;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
+import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
@@ -29,6 +31,8 @@ public class MenuService {
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuCategoryService menuCategoryService;
+    private final MenuPublicAccessService menuPublicAccessService;
+    private final NutritionFactsService nutritionFactsService;
     private final QrRepository qrRepository;
     private final QrGenerationService qrGenerationService;
     private final AppProperties appProperties;
@@ -58,6 +62,7 @@ public class MenuService {
 
         menu = menuRepository.save(menu);
         createProductsFromDetails(menu, details.get("products"));
+        menuPublicAccessService.syncForUser(menu.getUserId());
         return menu;
     }
 
@@ -81,6 +86,8 @@ public class MenuService {
             } else if (categoryName != null) {
                 categoryId = resolveOrCreateRootCategory(menu.getMenuId(), categoryName);
             }
+            var nutrition = nutritionFactsService.parseFromRaw(map.get("nutrition"));
+            nutritionFactsService.validateForCreate(nutrition);
             MenuProduct product = MenuProduct.builder()
                     .menuId(menu.getMenuId())
                     .name(name.trim())
@@ -92,6 +99,7 @@ public class MenuService {
                     .sortOrder(integerValue(map.get("sortOrder"), index))
                     .imageUrl(trimToNull(stringValue(map.get("imageUrl"))))
                     .available(booleanValue(map.get("available"), true))
+                    .nutrition(nutrition)
                     .build();
             menuProductRepository.save(product);
             index++;
@@ -210,6 +218,7 @@ public class MenuService {
     public MenuDtos.MenuProductResponse createProduct(Long menuId, MenuDtos.MenuProductRequest request) {
         Menu menu = ensureOwnedMenu(menuId);
         validateProductRequest(request);
+        nutritionFactsService.validateForCreate(request.getNutrition());
         Long categoryId = resolveCategoryId(menu.getMenuId(), request);
 
         MenuProduct product = MenuProduct.builder()
@@ -223,6 +232,7 @@ public class MenuService {
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextSortOrder(menuId))
                 .imageUrl(trimToNull(request.getImageUrl()))
                 .available(request.getAvailable() == null || request.getAvailable())
+                .nutrition(request.getNutrition())
                 .build();
 
         return toProductResponse(menuProductRepository.save(product));
@@ -251,7 +261,22 @@ public class MenuService {
         if (request.getAvailable() != null) {
             product.setAvailable(request.getAvailable());
         }
+        if (request.getNutrition() != null) {
+            product.setNutrition(nutritionFactsService.merge(product.getNutrition(), request.getNutrition()));
+        }
 
+        return toProductResponse(menuProductRepository.save(product));
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductResponse patchProductNutrition(Long productId, NutritionFacts patch) {
+        MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        ensureOwnedMenu(product.getMenuId());
+        if (patch == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ögesi bilgisi zorunludur");
+        }
+        product.setNutrition(nutritionFactsService.merge(product.getNutrition(), patch));
         return toProductResponse(menuProductRepository.save(product));
     }
 
@@ -345,6 +370,12 @@ public class MenuService {
         if (!menu.isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü yayında değil");
         }
+        if (!menu.isPublicAccessEnabled()) {
+            throw new ForbiddenException(
+                    ForbiddenException.MENU_OWNER_PACKAGE_INACTIVE,
+                    "Lütfen restoran sahibiyle iletişime geçiniz."
+            );
+        }
         List<MenuDtos.MenuProductResponse> products = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menu.getMenuId())
                 .stream()
@@ -386,6 +417,7 @@ public class MenuService {
                 .sortOrder(product.getSortOrder())
                 .imageUrl(product.getImageUrl())
                 .available(product.isAvailable())
+                .nutrition(product.getNutrition())
                 .build();
     }
 

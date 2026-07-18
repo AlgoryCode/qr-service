@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,9 +36,13 @@ class PurchaseFulfillmentServiceTest {
     @Mock
     private PurchaseRepository purchaseRepository;
     @Mock
+    private PlanPackageRepository planPackageRepository;
+    @Mock
     private EntitlementService entitlementService;
     @Mock
     private PackageActivationService packageActivationService;
+    @Mock
+    private MenuPublicAccessService menuPublicAccessService;
 
     @InjectMocks
     private PurchaseFulfillmentService fulfillmentService;
@@ -114,6 +119,7 @@ class PurchaseFulfillmentServiceTest {
         assertThat(purchase.getExpiresAt()).isEqualTo(purchase.getStartsAt().plusDays(31));
         verify(packageActivationService).activatePurchasedPackage(purchase);
         verify(entitlementService).synchronizePeriod(purchase);
+        verify(menuPublicAccessService).syncForUser(2L);
     }
 
     @Test
@@ -132,6 +138,7 @@ class PurchaseFulfillmentServiceTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         verify(purchaseRepository, never()).save(any());
+        verify(menuPublicAccessService).syncForUser(2L);
     }
 
     @Test
@@ -154,5 +161,6 @@ class PurchaseFulfillmentServiceTest {
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(entitlementService).synchronizePeriod(purchase);
         verify(packageActivationService).ensureFreePackage(2L);
+        verify(menuPublicAccessService).syncForUser(2L);
     }
 }

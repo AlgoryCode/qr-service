@@ -34,6 +34,8 @@ class PackageActivationServiceTest {
     private PurchaseRepository purchaseRepository;
     @Mock
     private EntitlementService entitlementService;
+    @Mock
+    private MenuPublicAccessService menuPublicAccessService;
 
     @InjectMocks
     private PackageActivationService packageActivationService;
@@ -71,6 +73,7 @@ class PackageActivationServiceTest {
 
         assertThat(result.getPackageCode()).isEqualTo(CatalogPackages.FREE_PACKAGE);
         verify(entitlementService).grant(result, 5L, CatalogProducts.QR_CREATE, 5, false);
+        verify(menuPublicAccessService).syncForUser(20L);
     }
 
     @Test

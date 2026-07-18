@@ -29,6 +29,7 @@ public class PackageActivationService {
     private final PlanPackageRepository planPackageRepository;
     private final PurchaseRepository purchaseRepository;
     private final EntitlementService entitlementService;
+    private final MenuPublicAccessService menuPublicAccessService;
 
     @Transactional
     public Purchase ensureFreePackage(Long userId) {
@@ -63,6 +64,7 @@ public class PackageActivationService {
                     item.isUnlimited()
             );
         }
+        menuPublicAccessService.syncForUser(userId);
         return purchase;
     }
 
@@ -86,6 +88,8 @@ public class PackageActivationService {
         for (Long userId : userIds) {
             if (!purchaseRepository.existsByUserIdAndStatus(userId, PurchaseStatus.ACTIVE)) {
                 ensureFreePackage(userId);
+            } else {
+                menuPublicAccessService.syncForUser(userId);
             }
         }
     }

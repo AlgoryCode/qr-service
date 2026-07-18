@@ -55,6 +55,10 @@ class PurchaseServicePaymentEventTest {
     private PackageActivationService packageActivationService;
     @Mock
     private PurchaseFulfillmentService purchaseFulfillmentService;
+    @Mock
+    private BillingAddressService billingAddressService;
+    @Mock
+    private MenuPublicAccessService menuPublicAccessService;
 
     @InjectMocks
     private PurchaseService purchaseService;

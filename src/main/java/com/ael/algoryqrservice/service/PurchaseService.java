@@ -55,6 +55,7 @@ public class PurchaseService {
     private final PackageActivationService packageActivationService;
     private final PurchaseFulfillmentService purchaseFulfillmentService;
     private final BillingAddressService billingAddressService;
+    private final MenuPublicAccessService menuPublicAccessService;
 
     @Transactional
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -327,6 +328,7 @@ public class PurchaseService {
 
         entitlementService.expirePurchase(purchase);
         packageActivationService.ensureFreePackage(purchase.getUserId());
+        menuPublicAccessService.syncForUser(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
 

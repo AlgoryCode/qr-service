@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,6 +29,7 @@ public final class MenuDtos {
         private Integer sortOrder;
         private String imageUrl;
         private Boolean available;
+        private NutritionFacts nutrition;
     }
 
     @Data
@@ -48,6 +50,7 @@ public final class MenuDtos {
         private int sortOrder;
         private String imageUrl;
         private boolean available;
+        private NutritionFacts nutrition;
     }
 
     @Data

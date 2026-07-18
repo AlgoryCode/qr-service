@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.MenuCategoryService;
@@ -85,6 +86,15 @@ public class MenuController {
             @RequestBody MenuDtos.MenuProductRequest request
     ) {
         return ResponseEntity.ok(menuService.updateProduct(productId, request));
+    }
+
+    @PatchMapping("/products/{productId}/nutrition")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.MenuProductResponse> patchProductNutrition(
+            @PathVariable Long productId,
+            @RequestBody NutritionFacts request
+    ) {
+        return ResponseEntity.ok(menuService.patchProductNutrition(productId, request));
     }
 
     @DeleteMapping("/products/{productId}")

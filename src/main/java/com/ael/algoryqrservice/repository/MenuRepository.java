@@ -2,10 +2,12 @@ package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.Menu;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -31,4 +33,25 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.deleted = false
             """)
     Set<Long> findActiveQrIdsByUserIdAndQrIdIn(@Param("userId") Long userId, @Param("qrIds") Collection<Long> qrIds);
+
+    @Query("""
+            select distinct menu.userId
+            from Menu menu
+            where menu.deleted = false
+            """)
+    List<Long> findDistinctUserIdsByDeletedFalse();
+
+    @Modifying(clearAutomatically = false, flushAutomatically = true)
+    @Query("""
+            update Menu menu
+            set menu.publicAccessEnabled = :enabled,
+                menu.publicAccessDisabledReason = :reason
+            where menu.userId = :userId
+              and menu.deleted = false
+            """)
+    int updatePublicAccessByUserId(
+            @Param("userId") Long userId,
+            @Param("enabled") boolean enabled,
+            @Param("reason") String reason
+    );
 }

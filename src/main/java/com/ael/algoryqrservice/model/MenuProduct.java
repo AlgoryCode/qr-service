@@ -1,11 +1,14 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -48,4 +51,8 @@ public class MenuProduct extends QrBaseModel {
 
     @Column(nullable = false)
     private boolean available = true;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private NutritionFacts nutrition;
 }

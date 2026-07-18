@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,10 @@ public class PurchaseFulfillmentService {
 
     private final PurchaseFulfillmentRepository fulfillmentRepository;
     private final PurchaseRepository purchaseRepository;
+    private final PlanPackageRepository planPackageRepository;
     private final EntitlementService entitlementService;
     private final PackageActivationService packageActivationService;
+    private final MenuPublicAccessService menuPublicAccessService;
 
     @Transactional
     public void initializeSchedule(Purchase purchase, String serviceName) {
@@ -103,8 +106,8 @@ public class PurchaseFulfillmentService {
         if (firstPaidInstallment) {
             purchase.setStartsAt(periodStart);
             purchase.setStatus(PurchaseStatus.ACTIVE);
-            packageActivationService.activatePurchasedPackage(purchase);
             grantEntitlements(purchase, planPackage);
+            packageActivationService.activatePurchasedPackage(purchase);
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
         purchase.setPaymentId(event.getPaymentId());
@@ -117,6 +120,7 @@ public class PurchaseFulfillmentService {
         purchase.setCancellationReason(null);
         purchaseRepository.save(purchase);
         entitlementService.synchronizePeriod(purchase);
+        menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 
     @Transactional
@@ -136,6 +140,9 @@ public class PurchaseFulfillmentService {
         fulfillment.setStatus(status);
         fulfillment.setFailureReason(event.getFailureReason());
         fulfillmentRepository.save(fulfillment);
+        if (status == FulfillmentStatus.OVERDUE) {
+            menuPublicAccessService.syncForUser(purchase.getUserId());
+        }
     }
 
     @Transactional
@@ -180,7 +187,9 @@ public class PurchaseFulfillmentService {
     }
 
     private void grantEntitlements(Purchase purchase, PlanPackage planPackage) {
-        for (PlanPackageItem item : planPackage.getItems()) {
+        PlanPackage packageWithItems = planPackageRepository.findByIdWithItems(planPackage.getId())
+                .orElseThrow(() -> new IllegalStateException("Paket bulunamadı: " + planPackage.getId()));
+        for (PlanPackageItem item : packageWithItems.getItems()) {
             entitlementService.grant(
                     purchase,
                     item.getProduct().getId(),
@@ -200,6 +209,7 @@ public class PurchaseFulfillmentService {
             purchaseRepository.save(purchase);
             entitlementService.synchronizePeriod(purchase);
             packageActivationService.ensureFreePackage(purchase.getUserId());
+            menuPublicAccessService.syncForUser(purchase.getUserId());
             return;
         }
 
@@ -219,6 +229,7 @@ public class PurchaseFulfillmentService {
         if (purchase.getStatus() == PurchaseStatus.EXPIRED) {
             packageActivationService.ensureFreePackage(purchase.getUserId());
         }
+        menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 
     private PurchaseFulfillmentResponse toResponse(PurchaseFulfillment fulfillment) {
