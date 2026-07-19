@@ -110,6 +110,7 @@ class PurchaseFulfillmentServiceTest {
                 1L,
                 FulfillmentStatus.PAID
         )).thenReturn(List.of());
+        when(planPackageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(planPackage));
         LocalDateTime before = LocalDateTime.now();
 
         fulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);

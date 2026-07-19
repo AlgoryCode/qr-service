@@ -65,6 +65,10 @@ public class UserEntitlement {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    public boolean isStartedByDate() {
+        return startsAt == null || !startsAt.isAfter(LocalDateTime.now());
+    }
+
     public boolean isExpiredByDate() {
         return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
     }
@@ -75,6 +79,15 @@ public class UserEntitlement {
 
     public boolean isUsable(PurchaseStatus purchaseStatus) {
         return purchaseStatus == PurchaseStatus.ACTIVE
+                && isStartedByDate()
+                && !isExpiredByDate()
+                && hasRemaining();
+    }
+
+    public boolean isUsable(Purchase purchase) {
+        return purchase != null
+                && purchase.isUsable()
+                && isStartedByDate()
                 && !isExpiredByDate()
                 && hasRemaining();
     }

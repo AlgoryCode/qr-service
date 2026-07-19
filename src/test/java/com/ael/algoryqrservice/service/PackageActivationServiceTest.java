@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,8 +73,52 @@ class PackageActivationServiceTest {
         Purchase result = packageActivationService.ensureFreePackage(20L);
 
         assertThat(result.getPackageCode()).isEqualTo(CatalogPackages.FREE_PACKAGE);
+        verify(entitlementService).expireDuePurchasesForUser(20L);
         verify(entitlementService).grant(result, 5L, CatalogProducts.QR_CREATE, 5, false);
         verify(menuPublicAccessService).syncForUser(20L);
+    }
+
+    @Test
+    void ensureFreePackage_whenActiveButExpiredByDate_thenCreateFreePackage() {
+        Purchase stale = Purchase.builder()
+                .id(9L)
+                .userId(20L)
+                .packageCode(CatalogPackages.PRO_PACKAGE)
+                .status(PurchaseStatus.ACTIVE)
+                .startsAt(LocalDateTime.now().minusDays(40))
+                .expiresAt(LocalDateTime.now().minusDays(1))
+                .build();
+        Product product = Product.builder()
+                .id(5L)
+                .code(CatalogProducts.QR_CREATE)
+                .name("QR")
+                .active(true)
+                .build();
+        PlanPackage planPackage = PlanPackage.builder()
+                .id(1L)
+                .code(CatalogPackages.FREE_PACKAGE)
+                .name("Free")
+                .currency("TRY")
+                .validityDays(30)
+                .items(List.of(PlanPackageItem.builder()
+                        .product(product)
+                        .quantity(5)
+                        .unlimited(false)
+                        .build()))
+                .build();
+
+        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE)).thenReturn(List.of(stale));
+        when(packageCatalogService.ensureFreePackage()).thenReturn(planPackage);
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
+            Purchase purchase = invocation.getArgument(0);
+            purchase.setId(100L);
+            return purchase;
+        });
+
+        Purchase result = packageActivationService.ensureFreePackage(20L);
+
+        assertThat(result.getPackageCode()).isEqualTo(CatalogPackages.FREE_PACKAGE);
+        verify(entitlementService).expireDuePurchasesForUser(20L);
     }
 
     @Test

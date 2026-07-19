@@ -35,6 +35,17 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     Set<Long> findActiveQrIdsByUserIdAndQrIdIn(@Param("userId") Long userId, @Param("qrIds") Collection<Long> qrIds);
 
     @Query("""
+            select case when count(menu) > 0 then true else false end
+            from Menu menu, Qr qr
+            where menu.userId = :userId
+              and menu.qrId = qr.qrId
+              and menu.active = true
+              and menu.deleted = false
+              and qr.deleted = false
+            """)
+    boolean existsActiveLiveMenuQrForUser(@Param("userId") Long userId);
+
+    @Query("""
             select distinct menu.userId
             from Menu menu
             where menu.deleted = false
@@ -54,4 +65,14 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
             @Param("enabled") boolean enabled,
             @Param("reason") String reason
     );
+
+    @Modifying(clearAutomatically = false, flushAutomatically = true)
+    @Query("""
+            update Menu menu
+            set menu.active = false
+            where menu.userId = :userId
+              and menu.deleted = false
+              and menu.active = true
+            """)
+    int deactivateActiveMenusByUserId(@Param("userId") Long userId);
 }

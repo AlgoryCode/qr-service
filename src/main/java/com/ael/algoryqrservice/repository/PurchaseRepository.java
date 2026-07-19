@@ -21,6 +21,12 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findByStatusAndExpiresAtBefore(PurchaseStatus status, LocalDateTime expiresAt);
 
+    List<Purchase> findByUserIdAndStatusAndExpiresAtBefore(
+            Long userId,
+            PurchaseStatus status,
+            LocalDateTime expiresAt
+    );
+
     List<Purchase> findByStatusAndPurchasedAtBefore(PurchaseStatus status, LocalDateTime purchasedAt);
 
     List<Purchase> findByUserIdAndStatus(Long userId, PurchaseStatus status);

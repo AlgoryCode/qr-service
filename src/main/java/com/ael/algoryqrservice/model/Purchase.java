@@ -59,6 +59,15 @@ public class Purchase {
     @Column(name = "payment_id", length = 64)
     private String paymentId;
 
+    @Column(name = "payment_method_id")
+    private Long paymentMethodId;
+
+    @Column(name = "card_brand", length = 64)
+    private String cardBrand;
+
+    @Column(name = "card_last_four", length = 8)
+    private String cardLastFour;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_mode", nullable = false, length = 24)
     @ColumnDefault("'THREE_DS'")
@@ -104,11 +113,24 @@ public class Purchase {
     @Column(name = "purchased_at", nullable = false, updatable = false)
     private LocalDateTime purchasedAt;
 
+    public boolean isStartedByDate() {
+        return startsAt == null || !startsAt.isAfter(LocalDateTime.now());
+    }
+
     public boolean isExpiredByDate() {
         return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
     }
 
     public boolean isUsable() {
-        return status == PurchaseStatus.ACTIVE && !isExpiredByDate();
+        return status == PurchaseStatus.ACTIVE
+                && expiresAt != null
+                && isStartedByDate()
+                && !isExpiredByDate();
+    }
+
+    public boolean isEffectivelyExpired() {
+        return status == PurchaseStatus.EXPIRED
+                || status == PurchaseStatus.CANCELLED
+                || isExpiredByDate();
     }
 }

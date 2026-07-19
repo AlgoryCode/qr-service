@@ -46,6 +46,13 @@ public class QrService {
         entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         Type qrType = Type.from(req.getType());
         if (qrType == Type.MENU) {
+            if (menuRepository.existsActiveLiveMenuQrForUser(userId)
+                    && entitlementService.hasUsableQrMenuPackage(userId)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Aktif bir dijital menü QR kaydınız zaten var"
+                );
+            }
             entitlementService.requireScope(userId, CatalogScopes.QR_MENU_OWNER);
             entitlementService.consume(userId, CatalogProducts.QR_MENU, 1);
         }
@@ -75,8 +82,7 @@ public class QrService {
 
         req.setUserId(existingQr.getUserId());
 
-        existingQr.setDeleted(true);
-        qrRepository.save(existingQr);
+        softDeleteQrAndLinkedMenu(existingQr);
 
         return createQR(req, existingQr.getUserId());
     }
@@ -160,8 +166,17 @@ public class QrService {
         Qr qr = qrRepository.findById(qrId)
                 .orElseThrow(() -> new EntityNotFoundException("QR bulunamadı: " + qrId));
         requireOwnership(qr);
+        softDeleteQrAndLinkedMenu(qr);
+    }
+
+    private void softDeleteQrAndLinkedMenu(Qr qr) {
         qr.setDeleted(true);
         qrRepository.save(qr);
+        menuRepository.findByQrIdAndDeletedFalse(qr.getQrId()).ifPresent(menu -> {
+            menu.setDeleted(true);
+            menu.setActive(false);
+            menuRepository.save(menu);
+        });
     }
 
     private void requireOwnership(Qr qr) {

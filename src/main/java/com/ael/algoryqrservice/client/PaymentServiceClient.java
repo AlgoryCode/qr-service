@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -220,11 +221,43 @@ public class PaymentServiceClient {
     }
 
     private BillingPaymentDtos.InstallmentOption toInstallmentOption(Map<?, ?> item) {
-        return new BillingPaymentDtos.InstallmentOption(
-                intValue(item.get("installmentNumber") != null ? item.get("installmentNumber") : item.get("count")),
-                decimalValue(item.get("totalPrice") != null ? item.get("totalPrice") : item.get("totalAmount")),
-                decimalValue(item.get("installmentPrice") != null ? item.get("installmentPrice") : item.get("installmentAmount"))
+        BigDecimal totalAmount = decimalValue(
+                firstNonNull(item.get("totalPrice"), item.get("totalAmount"), item.get("price"))
         );
+        BigDecimal installmentAmount = decimalValue(
+                firstNonNull(item.get("installmentPrice"), item.get("installmentAmount"), item.get("monthlyAmount"))
+        );
+        Integer count = intValue(firstNonNull(
+                item.get("installmentCount"),
+                item.get("installmentNumber"),
+                item.get("count"),
+                item.get("numberOfInstallments"),
+                item.get("installments")
+        ));
+        if (count == null) {
+            count = deriveInstallmentCount(totalAmount, installmentAmount);
+        }
+        return new BillingPaymentDtos.InstallmentOption(count, totalAmount, installmentAmount);
+    }
+
+    private Integer deriveInstallmentCount(BigDecimal totalAmount, BigDecimal installmentAmount) {
+        if (totalAmount == null || installmentAmount == null
+                || installmentAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return totalAmount.divide(installmentAmount, 0, RoundingMode.HALF_UP).intValue();
+    }
+
+    private Object firstNonNull(Object... values) {
+        if (values == null) {
+            return null;
+        }
+        for (Object value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String stringValue(Object value) {

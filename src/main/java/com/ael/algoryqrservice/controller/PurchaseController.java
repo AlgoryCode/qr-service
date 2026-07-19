@@ -53,6 +53,12 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getPurchaseSummary(purchaseId, userId));
     }
 
+    @PostMapping("/{purchaseId}/cancel")
+    public ResponseEntity<PurchaseResponse> cancelMyPurchase(@PathVariable Long purchaseId) {
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.cancelMyPurchase(purchaseId, userId));
+    }
+
     @GetMapping("/{purchaseId}/installments")
     public ResponseEntity<List<PurchaseFulfillmentResponse>> getPurchaseInstallments(@PathVariable Long purchaseId) {
         Long userId = securityUtils.getCurrentUser().getId();

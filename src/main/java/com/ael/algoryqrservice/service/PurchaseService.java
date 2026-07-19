@@ -28,6 +28,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -81,6 +82,7 @@ public class PurchaseService {
                         user.getId(), request.getBillingAddressId(), request.getInlineBillingAddress());
         PaymentStyle paymentStyle = request.resolvedPaymentStyle();
         Integer installmentCount = request.resolvedInstallmentCount();
+        CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), request.getPaymentMethodId());
         Purchase purchase = purchaseRepository.save(Purchase.builder()
                 .userId(user.getId())
                 .packageId(planPackage.getId())
@@ -92,6 +94,9 @@ public class PurchaseService {
                 .paymentStyle(paymentStyle)
                 .purchaseType(PurchaseType.PAID)
                 .installmentCount(installmentCount)
+                .paymentMethodId(request.getPaymentMethodId())
+                .cardBrand(cardSnapshot.brand())
+                .cardLastFour(cardSnapshot.lastFour())
                 .billingSnapshot(billingSnapshot)
                 .status(PurchaseStatus.PENDING)
                 .build());
@@ -282,15 +287,17 @@ public class PurchaseService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<PurchaseResponse> getUserPurchases(Long userId) {
+        entitlementService.expireDuePurchasesForUser(userId);
         return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PurchaseSummaryResponse getPurchaseSummary(Long purchaseId, Long userId) {
+        entitlementService.expireDuePurchasesForUser(userId);
         Purchase purchase = findUserPurchase(purchaseId, userId);
         return toSummary(purchase);
     }
@@ -330,6 +337,80 @@ public class PurchaseService {
         packageActivationService.ensureFreePackage(purchase.getUserId());
         menuPublicAccessService.syncForUser(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
+    }
+
+    @Transactional
+    public PurchaseResponse cancelMyPurchase(Long purchaseId, Long userId) {
+        Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
+
+        if (!purchase.getUserId().equals(userId)) {
+            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+        }
+
+        validateUserCancellable(purchase);
+        cancelRemoteSubscriptionIfRequired(purchase, userId);
+
+        LocalDateTime cancelledAt = LocalDateTime.now();
+        boolean wasActive = purchase.getStatus() == PurchaseStatus.ACTIVE;
+        purchase.setStatus(PurchaseStatus.CANCELLED);
+        purchase.setCancellationReason(PurchaseCancellationReason.MANUAL);
+        purchase.setExpiresAt(cancelledAt);
+        if (purchase.getSubscriptionStatus() != null
+                && purchase.getSubscriptionStatus() != SubscriptionStatus.CANCELLED) {
+            purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
+        }
+        purchaseRepository.save(purchase);
+
+        if (wasActive) {
+            entitlementService.revokeForCancelledPurchase(purchase);
+            menuPublicAccessService.deactivateActiveMenusForUser(userId);
+        }
+        purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
+        packageActivationService.ensureFreePackage(userId);
+        menuPublicAccessService.syncForUser(userId);
+
+        purchaseLogService.log(
+                purchase.getId(),
+                userId,
+                PurchaseLogAction.PURCHASE_CANCELLED,
+                purchase.getPackageName() + " paketi kullanıcı tarafından iptal edildi"
+        );
+        return toResponse(purchase);
+    }
+
+    private void validateUserCancellable(Purchase purchase) {
+        if (CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode())
+                || purchase.getPurchaseType() == PurchaseType.FREE
+                || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT) {
+            throw new BadRequestException("Bu paket kullanıcı tarafından iptal edilemez");
+        }
+
+        switch (purchase.getStatus()) {
+            case ACTIVE, PENDING -> {
+            }
+            case CANCELLED -> throw new BadRequestException("Paket zaten iptal edilmiş");
+            case EXPIRED -> throw new BadRequestException("Süresi dolmuş paket iptal edilemez");
+            case FAILED -> throw new BadRequestException("Başarısız paket iptal edilemez");
+            case SUPERSEDED -> throw new BadRequestException("Yerine geçen paket iptal edilemez");
+        }
+    }
+
+    private void cancelRemoteSubscriptionIfRequired(Purchase purchase, Long userId) {
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            return;
+        }
+        String subscriptionId = purchase.getSubscriptionId();
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            if (purchase.getStatus() == PurchaseStatus.PENDING) {
+                return;
+            }
+            throw new BadRequestException(
+                    "Abonelik kimligi bulunamadigi icin paket guvenli sekilde iptal edilemiyor"
+            );
+        }
+        paymentServiceClient.cancelSubscription(userId, subscriptionId);
+        purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
     }
 
     @Transactional(readOnly = true)
@@ -416,6 +497,7 @@ public class PurchaseService {
     }
 
     private PurchaseSummaryResponse toSummary(Purchase purchase) {
+        LifecycleSnapshot lifecycle = resolveLifecycle(purchase);
         return PurchaseSummaryResponse.builder()
                 .purchaseId(purchase.getId())
                 .userId(purchase.getUserId())
@@ -432,17 +514,27 @@ public class PurchaseService {
                 .subscriptionStatus(purchase.getSubscriptionStatus())
                 .billingSnapshot(purchase.getBillingSnapshot())
                 .installmentCount(purchase.getInstallmentCount())
+                .paymentId(purchase.getPaymentId())
+                .paymentConversationId(purchase.getPaymentConversationId())
+                .paymentMethodId(purchase.getPaymentMethodId())
+                .cardBrand(purchase.getCardBrand())
+                .cardLastFour(purchase.getCardLastFour())
                 .startsAt(purchase.getStartsAt())
                 .expiresAt(purchase.getExpiresAt())
                 .purchasedAt(purchase.getPurchasedAt())
-                .expired(!purchase.isUsable())
-                .usable(purchase.isUsable())
+                .daysUntilExpiry(lifecycle.daysUntilExpiry())
+                .nextPaymentDueAt(lifecycle.nextPaymentDueAt())
+                .paymentApproaching(lifecycle.paymentApproaching())
+                .expiryApproaching(lifecycle.expiryApproaching())
+                .expired(lifecycle.expired())
+                .usable(lifecycle.usable())
                 .products(entitlementService.getPurchaseEntitlements(purchase))
                 .installments(purchaseFulfillmentService.getFulfillments(purchase.getId()))
                 .build();
     }
 
     private PurchaseResponse toResponse(Purchase purchase) {
+        LifecycleSnapshot lifecycle = resolveLifecycle(purchase);
         return PurchaseResponse.builder()
                 .id(purchase.getId())
                 .userId(purchase.getUserId())
@@ -459,11 +551,89 @@ public class PurchaseService {
                 .subscriptionStatus(purchase.getSubscriptionStatus())
                 .billingSnapshot(purchase.getBillingSnapshot())
                 .installmentCount(purchase.getInstallmentCount())
+                .paymentId(purchase.getPaymentId())
+                .paymentConversationId(purchase.getPaymentConversationId())
+                .paymentMethodId(purchase.getPaymentMethodId())
+                .cardBrand(purchase.getCardBrand())
+                .cardLastFour(purchase.getCardLastFour())
                 .startsAt(purchase.getStartsAt())
                 .expiresAt(purchase.getExpiresAt())
                 .purchasedAt(purchase.getPurchasedAt())
-                .expired(!purchase.isUsable())
-                .usable(purchase.isUsable())
+                .daysUntilExpiry(lifecycle.daysUntilExpiry())
+                .nextPaymentDueAt(lifecycle.nextPaymentDueAt())
+                .paymentApproaching(lifecycle.paymentApproaching())
+                .expiryApproaching(lifecycle.expiryApproaching())
+                .expired(lifecycle.expired())
+                .usable(lifecycle.usable())
                 .build();
+    }
+
+    private LifecycleSnapshot resolveLifecycle(Purchase purchase) {
+        boolean usable = purchase.isUsable();
+        boolean expired = purchase.isEffectivelyExpired();
+        Integer daysUntilExpiry = null;
+        if (purchase.getExpiresAt() != null) {
+            daysUntilExpiry = (int) java.time.temporal.ChronoUnit.DAYS.between(
+                    java.time.LocalDate.now(),
+                    purchase.getExpiresAt().toLocalDate()
+            );
+        }
+        LocalDateTime nextPaymentDueAt = purchaseFulfillmentService.findNextPaymentDueAt(purchase.getId());
+        LocalDateTime approachingDeadline = LocalDateTime.now().plusDays(APPROACHING_DAYS);
+        boolean paymentApproaching = nextPaymentDueAt != null
+                && !nextPaymentDueAt.isAfter(approachingDeadline);
+        boolean expiryApproaching = usable
+                && purchase.getExpiresAt() != null
+                && !purchase.getExpiresAt().isAfter(approachingDeadline);
+        return new LifecycleSnapshot(
+                usable,
+                expired,
+                daysUntilExpiry,
+                nextPaymentDueAt,
+                paymentApproaching,
+                expiryApproaching
+        );
+    }
+
+    private static final int APPROACHING_DAYS = 7;
+
+    private record LifecycleSnapshot(
+            boolean usable,
+            boolean expired,
+            Integer daysUntilExpiry,
+            LocalDateTime nextPaymentDueAt,
+            boolean paymentApproaching,
+            boolean expiryApproaching
+    ) {
+    }
+
+    private CardSnapshot resolveCardSnapshot(Long userId, Long paymentMethodId) {
+        if (paymentMethodId == null) {
+            return CardSnapshot.empty();
+        }
+        try {
+            return paymentServiceClient.getPaymentMethods(userId).stream()
+                    .filter(method -> String.valueOf(paymentMethodId).equals(method.id()))
+                    .findFirst()
+                    .map(method -> new CardSnapshot(trimToNull(method.brand()), trimToNull(method.lastFour())))
+                    .orElse(CardSnapshot.empty());
+        } catch (RuntimeException exception) {
+            log.warn("Kart snapshot alinamadi. userId={} paymentMethodId={}", userId, paymentMethodId, exception);
+            return CardSnapshot.empty();
+        }
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private record CardSnapshot(String brand, String lastFour) {
+        static CardSnapshot empty() {
+            return new CardSnapshot(null, null);
+        }
     }
 }

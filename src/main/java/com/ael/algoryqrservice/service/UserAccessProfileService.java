@@ -79,6 +79,6 @@ public class UserAccessProfileService {
 
     private boolean isUsable(UserEntitlement entitlement, Map<Long, Purchase> activeById) {
         Purchase purchase = activeById.get(entitlement.getPurchaseId());
-        return purchase != null && entitlement.isUsable(purchase.getStatus());
+        return purchase != null && entitlement.isUsable(purchase);
     }
 }

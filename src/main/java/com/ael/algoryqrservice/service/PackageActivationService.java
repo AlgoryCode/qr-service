@@ -33,9 +33,12 @@ public class PackageActivationService {
 
     @Transactional
     public Purchase ensureFreePackage(Long userId) {
-        List<Purchase> active = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE);
-        if (!active.isEmpty()) {
-            return selectHighestPackage(active);
+        entitlementService.expireDuePurchasesForUser(userId);
+        List<Purchase> usable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+                .filter(Purchase::isUsable)
+                .toList();
+        if (!usable.isEmpty()) {
+            return selectHighestPackage(usable);
         }
 
         PlanPackage freePackage = packageCatalogService.ensureFreePackage();
@@ -86,7 +89,10 @@ public class PackageActivationService {
     public void restoreFreePackagesAfterPaidExpiry() {
         List<Long> userIds = purchaseRepository.findDistinctUserIdsWithExpiredPaidPurchases(PurchaseStatus.EXPIRED);
         for (Long userId : userIds) {
-            if (!purchaseRepository.existsByUserIdAndStatus(userId, PurchaseStatus.ACTIVE)) {
+            entitlementService.expireDuePurchasesForUser(userId);
+            boolean hasUsable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+                    .anyMatch(Purchase::isUsable);
+            if (!hasUsable) {
                 ensureFreePackage(userId);
             } else {
                 menuPublicAccessService.syncForUser(userId);

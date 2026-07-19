@@ -69,6 +69,14 @@ public class MenuPublicAccessService {
     }
 
     @Transactional
+    public void deactivateActiveMenusForUser(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        menuRepository.deactivateActiveMenusByUserId(userId);
+    }
+
+    @Transactional
     public void syncForUser(Long userId) {
         if (userId == null) {
             return;

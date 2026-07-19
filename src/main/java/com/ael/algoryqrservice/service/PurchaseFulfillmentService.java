@@ -111,6 +111,7 @@ public class PurchaseFulfillmentService {
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
         purchase.setPaymentId(event.getPaymentId());
+        applyCardSnapshotFromEvent(purchase, event);
         if (event.getSubscriptionId() != null && !event.getSubscriptionId().isBlank()) {
             purchase.setSubscriptionId(event.getSubscriptionId());
         }
@@ -166,6 +167,34 @@ public class PurchaseFulfillmentService {
         return fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(purchaseId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public void cancelOpenFulfillments(Long purchaseId) {
+        List<PurchaseFulfillment> fulfillments = fulfillmentRepository
+                .findByPurchaseIdOrderByInstallmentNumberAsc(purchaseId);
+        boolean changed = false;
+        for (PurchaseFulfillment fulfillment : fulfillments) {
+            if (fulfillment.getStatus() == FulfillmentStatus.PENDING
+                    || fulfillment.getStatus() == FulfillmentStatus.OVERDUE) {
+                fulfillment.setStatus(FulfillmentStatus.REVOKED);
+                changed = true;
+            }
+        }
+        if (changed) {
+            fulfillmentRepository.saveAll(fulfillments);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public LocalDateTime findNextPaymentDueAt(Long purchaseId) {
+        return fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(purchaseId).stream()
+                .filter(fulfillment -> fulfillment.getStatus() == FulfillmentStatus.PENDING
+                        || fulfillment.getStatus() == FulfillmentStatus.OVERDUE)
+                .map(PurchaseFulfillment::getDueAt)
+                .filter(dueAt -> dueAt != null)
+                .min(LocalDateTime::compareTo)
+                .orElse(null);
     }
 
     private PurchaseFulfillment newFulfillment(
@@ -230,6 +259,34 @@ public class PurchaseFulfillmentService {
             packageActivationService.ensureFreePackage(purchase.getUserId());
         }
         menuPublicAccessService.syncForUser(purchase.getUserId());
+    }
+
+    private void applyCardSnapshotFromEvent(Purchase purchase, PaymentCompletedEventDto event) {
+        if (event.getSourceMetadata() == null || event.getSourceMetadata().isEmpty()) {
+            return;
+        }
+        String brand = firstMetadataString(event, "cardBrand", "brand", "cardAssociation");
+        String lastFour = firstMetadataString(event, "cardLastFour", "lastFour", "last4", "lastFourDigits");
+        if (brand != null) {
+            purchase.setCardBrand(brand);
+        }
+        if (lastFour != null) {
+            purchase.setCardLastFour(lastFour);
+        }
+    }
+
+    private String firstMetadataString(PaymentCompletedEventDto event, String... keys) {
+        for (String key : keys) {
+            Object value = event.getSourceMetadata().get(key);
+            if (value == null) {
+                continue;
+            }
+            String text = String.valueOf(value).trim();
+            if (!text.isEmpty() && !"null".equalsIgnoreCase(text)) {
+                return text;
+            }
+        }
+        return null;
     }
 
     private PurchaseFulfillmentResponse toResponse(PurchaseFulfillment fulfillment) {

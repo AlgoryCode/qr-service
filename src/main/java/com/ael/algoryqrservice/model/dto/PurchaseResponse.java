@@ -28,12 +28,21 @@ public class PurchaseResponse {
     private PaymentStyle paymentStyle;
     private PurchaseType purchaseType;
     private Integer installmentCount;
+    private String paymentId;
+    private String paymentConversationId;
+    private Long paymentMethodId;
+    private String cardBrand;
+    private String cardLastFour;
     private String subscriptionId;
     private SubscriptionStatus subscriptionStatus;
     private BillingSnapshot billingSnapshot;
     private LocalDateTime startsAt;
     private LocalDateTime expiresAt;
     private LocalDateTime purchasedAt;
+    private Integer daysUntilExpiry;
+    private LocalDateTime nextPaymentDueAt;
+    private boolean paymentApproaching;
+    private boolean expiryApproaching;
     private boolean expired;
     private boolean usable;
 }

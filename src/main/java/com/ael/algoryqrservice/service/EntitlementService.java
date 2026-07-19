@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
@@ -71,8 +72,21 @@ public class EntitlementService {
     }
 
     @Transactional
+    public void revokeForCancelledPurchase(Purchase purchase) {
+        List<UserEntitlement> entitlements = entitlementRepository
+                .findByPurchaseIdOrderByProductCodeAsc(purchase.getId());
+        for (UserEntitlement entitlement : entitlements) {
+            entitlement.setExpiresAt(purchase.getExpiresAt());
+            if (!entitlement.isUnlimited()) {
+                entitlement.setRemainingQuantity(0);
+            }
+        }
+        entitlementRepository.saveAll(entitlements);
+    }
+
+    @Transactional
     public void consume(Long userId, String productCode, int amount) {
-        expireDuePurchases();
+        expireDuePurchasesForUser(userId);
 
         Product product = productRepository.findByCode(productCode).orElse(null);
         if (product != null && !product.isConsumable()) {
@@ -94,7 +108,7 @@ public class EntitlementService {
             }
 
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
-            if (purchase == null || !entitlement.isUsable(purchase.getStatus())) {
+            if (purchase == null || !entitlement.isUsable(purchase)) {
                 continue;
             }
 
@@ -146,7 +160,7 @@ public class EntitlementService {
                         return false;
                     }
                     Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
-                    return purchase != null && entitlement.isUsable(purchase.getStatus());
+                    return purchase != null && entitlement.isUsable(purchase);
                 });
     }
 
@@ -157,8 +171,22 @@ public class EntitlementService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public boolean hasUsableQrMenuPackage(Long userId) {
+        expireDuePurchasesForUser(userId);
+        List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        return entitlements.stream()
+                .filter(entitlement -> Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU))
+                .anyMatch(entitlement -> {
+                    Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
+                    return purchase != null && purchase.isUsable();
+                });
+    }
+
+    @Transactional
     public List<UserEntitlementResponse> getUserEntitlements(Long userId) {
+        expireDuePurchasesForUser(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(
                 entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)
         );
@@ -182,6 +210,19 @@ public class EntitlementService {
                 LocalDateTime.now()
         );
 
+        duePurchases.forEach(this::expirePurchaseInternal);
+    }
+
+    @Transactional
+    public void expireDuePurchasesForUser(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        List<Purchase> duePurchases = purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(
+                userId,
+                PurchaseStatus.ACTIVE,
+                LocalDateTime.now()
+        );
         duePurchases.forEach(this::expirePurchaseInternal);
     }
 
@@ -224,11 +265,9 @@ public class EntitlementService {
 
         PurchaseStatus purchaseStatus = purchase != null ? purchase.getStatus() : PurchaseStatus.EXPIRED;
         boolean expired = purchase == null
-                || purchase.getStatus() == PurchaseStatus.EXPIRED
-                || purchase.getStatus() == PurchaseStatus.CANCELLED
-                || entitlement.isExpiredByDate()
-                || purchase.isExpiredByDate();
-        boolean usable = purchase != null && entitlement.isUsable(purchase.getStatus());
+                || purchase.isEffectivelyExpired()
+                || entitlement.isExpiredByDate();
+        boolean usable = purchase != null && entitlement.isUsable(purchase);
 
         return UserEntitlementResponse.builder()
                 .id(entitlement.getId())

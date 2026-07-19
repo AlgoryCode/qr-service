@@ -20,10 +20,10 @@ public class NutritionFactsService {
 
     public void validateForCreate(NutritionFacts nutrition) {
         if (nutrition == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ùgesi bilgisi zorunludur");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ogesi bilgisi zorunludur");
         }
         if (nutrition.getBasis() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ùgesi birimi zorunludur");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ogesi birimi zorunludur");
         }
         requireAmount(nutrition.getEnergyKj(), "energyKj");
         requireAmount(nutrition.getEnergyKcal(), "energyKcal");
@@ -99,13 +99,13 @@ public class NutritionFactsService {
         try {
             return objectMapper.convertValue(raw, NutritionFacts.class);
         } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geùersiz besin ùgesi bilgisi");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Gecersiz besin ogesi bilgisi");
         }
     }
 
     private void validateMergedState(NutritionFacts nutrition) {
         if (nutrition.getBasis() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ùgesi birimi zorunludur");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ogesi birimi zorunludur");
         }
         requireAmount(nutrition.getEnergyKj(), "energyKj");
         requireAmount(nutrition.getEnergyKcal(), "energyKcal");
@@ -126,7 +126,7 @@ public class NutritionFactsService {
         boolean hasKj = patch.getEnergyKj() != null;
         boolean hasKcal = patch.getEnergyKcal() != null;
         if (hasKj != hasKcal) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enerji de?eri hem kJ hem kcal olarak verilmelidir");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enerji degeri hem kJ hem kcal olarak verilmelidir");
         }
     }
 
@@ -151,10 +151,10 @@ public class NutritionFactsService {
         }
         for (NutritionNutrientEntry entry : entries) {
             if (entry == null || entry.getName() == null || entry.getName().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " ad? zorunludur");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " adi zorunludur");
             }
             if (entry.getValue() != null && entry.getValue().compareTo(BigDecimal.ZERO) < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " de?eri negatif olamaz");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " degeri negatif olamaz");
             }
         }
     }
