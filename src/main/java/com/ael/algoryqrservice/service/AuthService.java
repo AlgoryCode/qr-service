@@ -32,6 +32,7 @@ public class AuthService {
     private final SessionService sessionService;
     private final JwtService jwtService;
     private final PackageActivationService packageActivationService;
+    private final UserAccessProfileService userAccessProfileService;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request, ClientInfo clientInfo) {
@@ -138,6 +139,12 @@ public class AuthService {
     public List<SessionResponse> getMySessions() {
         User user = getCurrentUser();
         return sessionService.getUserSessions(user.getId());
+    }
+
+    @Transactional
+    public UserAccessProfile getAccessProfile() {
+        User user = getCurrentUser();
+        return userAccessProfileService.resolve(user.getId());
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
+import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
@@ -36,9 +37,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -57,6 +61,7 @@ public class PurchaseService {
     private final PurchaseFulfillmentService purchaseFulfillmentService;
     private final BillingAddressService billingAddressService;
     private final MenuPublicAccessService menuPublicAccessService;
+    private final PlanChangeService planChangeService;
 
     @Transactional
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -81,7 +86,9 @@ public class PurchaseService {
                 : billingAddressService.resolveSnapshot(
                         user.getId(), request.getBillingAddressId(), request.getInlineBillingAddress());
         PaymentStyle paymentStyle = request.resolvedPaymentStyle();
-        Integer installmentCount = request.resolvedInstallmentCount();
+        Integer installmentCount = paymentStyle == PaymentStyle.SUBSCRIPTION
+                ? PaymentRequestMapper.SUBSCRIPTION_CYCLE_COUNT
+                : request.resolvedInstallmentCount();
         CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), request.getPaymentMethodId());
         Purchase purchase = purchaseRepository.save(Purchase.builder()
                 .userId(user.getId())
@@ -166,6 +173,7 @@ public class PurchaseService {
         }
         PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
         purchaseFulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
+        planChangeService.onPurchaseActivated(purchase);
 
         purchaseLogService.log(
                 purchase.getId(),
@@ -219,6 +227,7 @@ public class PurchaseService {
                     PurchaseLogAction.PURCHASE_PAYMENT_FAILED,
                     purchase.getPackageName() + " paketi ödemesi başarısız: " + reason
             );
+            planChangeService.onPurchasePaymentFailed(purchase);
         }
         purchaseFulfillmentService.recordUnpaidInstallment(
                 purchase,
@@ -267,6 +276,46 @@ public class PurchaseService {
     }
 
     @Transactional
+    public boolean reconcilePaidPendingPurchase(Long purchaseId) {
+        Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId).orElse(null);
+        if (purchase == null
+                || purchase.getStatus() != PurchaseStatus.PENDING
+                || purchase.getPaymentConversationId() == null
+                || purchase.getPaymentConversationId().isBlank()) {
+            return false;
+        }
+
+        BillingPaymentDtos.RefundablePayment payment;
+        try {
+            payment = paymentServiceClient.getRefundablePayment(
+                    purchase.getUserId(),
+                    purchase.getPaymentConversationId()
+            );
+        } catch (PaymentServiceException exception) {
+            log.debug(
+                    "Pending purchase payment lookup skipped. purchaseId={} reason={}",
+                    purchaseId,
+                    exception.getMessage()
+            );
+            return false;
+        }
+
+        if (!payment.isSuccess()) {
+            return false;
+        }
+
+        PaymentCompletedEventDto event = buildReconcileSuccessEvent(purchase, payment);
+        handlePaymentSuccess(event);
+        log.info(
+                "Pending purchase activated by reconcile. purchaseId={} conversationId={} eventId={}",
+                purchase.getId(),
+                purchase.getPaymentConversationId(),
+                event.getEventId()
+        );
+        return true;
+    }
+
+    @Transactional
     public void cancelExpiredPendingPurchases(int timeoutMinutes) {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(timeoutMinutes);
         List<Purchase> pendingPurchases = purchaseRepository.findByStatusAndPurchasedAtBefore(
@@ -274,7 +323,37 @@ public class PurchaseService {
                 threshold
         );
 
-        for (Purchase purchase : pendingPurchases) {
+        for (Purchase pending : pendingPurchases) {
+            Purchase purchase = purchaseRepository.findByIdForUpdate(pending.getId()).orElse(null);
+            if (purchase == null || purchase.getStatus() != PurchaseStatus.PENDING) {
+                continue;
+            }
+
+            if (purchase.getPaymentConversationId() != null && !purchase.getPaymentConversationId().isBlank()) {
+                try {
+                    BillingPaymentDtos.RefundablePayment payment = paymentServiceClient.getRefundablePayment(
+                            purchase.getUserId(),
+                            purchase.getPaymentConversationId()
+                    );
+                    if (payment.isSuccess()) {
+                        PaymentCompletedEventDto event = buildReconcileSuccessEvent(purchase, payment);
+                        handlePaymentSuccess(event);
+                        log.info(
+                                "Expired pending purchase activated instead of cancel. purchaseId={} conversationId={}",
+                                purchase.getId(),
+                                purchase.getPaymentConversationId()
+                        );
+                        continue;
+                    }
+                } catch (PaymentServiceException exception) {
+                    log.warn(
+                            "Expired pending payment lookup failed; cancelling. purchaseId={} reason={}",
+                            purchase.getId(),
+                            exception.getMessage()
+                    );
+                }
+            }
+
             purchase.setStatus(PurchaseStatus.CANCELLED);
             purchase.setCancellationReason(PurchaseCancellationReason.PAYMENT_TIMEOUT);
             purchaseRepository.save(purchase);
@@ -285,6 +364,85 @@ public class PurchaseService {
                     purchase.getPackageName() + " paketi ödeme zaman aşımı nedeniyle iptal edildi"
             );
         }
+    }
+
+    private PaymentCompletedEventDto buildReconcileSuccessEvent(
+            Purchase purchase,
+            BillingPaymentDtos.RefundablePayment payment
+    ) {
+        PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
+        int installmentCount = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
+                ? 1
+                : purchase.getInstallmentCount();
+        int installmentNumber = 1;
+        BigDecimal amount = resolveExpectedInstallmentAmount(purchase, installmentNumber, installmentCount);
+        LocalDateTime periodStart = LocalDateTime.now();
+        int validityDays = planPackage.getValidityDays() == null || planPackage.getValidityDays() < 1
+                ? 30
+                : planPackage.getValidityDays();
+        LocalDateTime periodEnd = periodStart.plusDays(validityDays);
+        String installmentId = payment.paymentId() != null && !payment.paymentId().isBlank()
+                ? payment.paymentId()
+                : purchase.getPaymentConversationId();
+        String eventId = "reconcile:" + purchase.getPaymentConversationId() + ":" + installmentNumber;
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("purchaseId", purchase.getId());
+        metadata.put("userId", purchase.getUserId());
+        metadata.put("packageId", purchase.getPackageId());
+        metadata.put("packageCode", purchase.getPackageCode());
+        metadata.put("purchaseConversationId", purchase.getPaymentConversationId());
+        metadata.put("installmentId", installmentId);
+        metadata.put("installmentNumber", installmentNumber);
+        metadata.put("installmentCount", installmentCount);
+        metadata.put("periodStart", periodStart.toString());
+        metadata.put("periodEnd", periodEnd.toString());
+
+        PaymentCompletedEventDto event = new PaymentCompletedEventDto();
+        event.setEventId(eventId);
+        event.setEventType("payment.success");
+        event.setServiceName(appProperties.getServiceName());
+        event.setPaymentId(payment.paymentId());
+        event.setConversationId(purchase.getPaymentConversationId());
+        event.setSourceReferenceId(String.valueOf(purchase.getId()));
+        event.setSourceMetadata(metadata);
+        event.setPurchaseId(String.valueOf(purchase.getId()));
+        event.setUserId(String.valueOf(purchase.getUserId()));
+        event.setPackageId(String.valueOf(purchase.getPackageId()));
+        event.setPackageCode(purchase.getPackageCode());
+        event.setInstallmentId(installmentId);
+        event.setInstallmentNumber(installmentNumber);
+        event.setInstallmentCount(installmentCount);
+        event.setAmount(amount);
+        event.setCurrency(purchase.getCurrency());
+        event.setPeriodStart(periodStart.toString());
+        event.setPeriodEnd(periodEnd.toString());
+        return event;
+    }
+
+    private BigDecimal resolveExpectedInstallmentAmount(
+            Purchase purchase,
+            int installmentNumber,
+            int installmentCount
+    ) {
+        if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
+            return purchase.getPrice();
+        }
+        boolean legacySplit = purchase.getPaymentStyle() == PaymentStyle.ONE_TIME && installmentCount > 1;
+        if (!legacySplit) {
+            return purchase.getPrice();
+        }
+        BigDecimal standardAmount = purchase.getPrice().divide(
+                BigDecimal.valueOf(installmentCount),
+                2,
+                RoundingMode.DOWN
+        );
+        if (installmentNumber == installmentCount) {
+            return purchase.getPrice().subtract(standardAmount.multiply(
+                    BigDecimal.valueOf(installmentCount - 1L)
+            ));
+        }
+        return standardAmount;
     }
 
     @Transactional
@@ -367,6 +525,7 @@ public class PurchaseService {
             menuPublicAccessService.deactivateActiveMenusForUser(userId);
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
+        planChangeService.cancelScheduledForUser(userId);
         packageActivationService.ensureFreePackage(userId);
         menuPublicAccessService.syncForUser(userId);
 
@@ -434,27 +593,18 @@ public class PurchaseService {
         if (event.getAmount() == null) {
             throw new InvalidPaymentEventException("Payment amount is missing");
         }
-        int installmentCount = purchase.getInstallmentCount();
+        int installmentCount = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
+                ? 1
+                : purchase.getInstallmentCount();
         int installmentNumber = metadata.installmentNumber();
-        if (installmentNumber < 1
-                || installmentNumber > installmentCount
-                || !metadata.installmentCount().equals(installmentCount)) {
+        if (installmentNumber < 1 || installmentNumber > installmentCount) {
             throw new InvalidPaymentEventException("Installment metadata does not match purchase");
         }
-        var standardAmount = purchase.getPrice().divide(
-                java.math.BigDecimal.valueOf(installmentCount),
-                2,
-                RoundingMode.DOWN
-        );
-        var subscriptionAmount = installmentNumber == installmentCount
-                ? purchase.getPrice().subtract(standardAmount.multiply(
-                        java.math.BigDecimal.valueOf(installmentCount - 1L)
-                ))
-                : standardAmount;
-        boolean legacySubscription = purchase.getPaymentStyle() == PaymentStyle.ONE_TIME && installmentCount > 1;
-        var expectedAmount = purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION || legacySubscription
-                ? subscriptionAmount
-                : purchase.getPrice();
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION
+                && !metadata.installmentCount().equals(installmentCount)) {
+            throw new InvalidPaymentEventException("Installment metadata does not match purchase");
+        }
+        BigDecimal expectedAmount = resolveExpectedInstallmentAmount(purchase, installmentNumber, installmentCount);
         if (expectedAmount.compareTo(event.getAmount()) != 0) {
             throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
         }

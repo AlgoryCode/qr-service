@@ -58,6 +58,8 @@ class PurchaseServiceCancelTest {
     @Mock
     private PurchaseFulfillmentService purchaseFulfillmentService;
     @Mock
+    private PlanChangeService planChangeService;
+    @Mock
     private BillingAddressService billingAddressService;
     @Mock
     private MenuPublicAccessService menuPublicAccessService;

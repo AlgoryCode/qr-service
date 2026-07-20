@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,8 +37,23 @@ public class PlanPackage {
     @Column(length = 1000)
     private String description;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<String> features = new ArrayList<>();
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @Column(name = "vat_amount", nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal vatAmount = BigDecimal.ZERO;
 
     @Column(nullable = false, length = 3)
     @Builder.Default

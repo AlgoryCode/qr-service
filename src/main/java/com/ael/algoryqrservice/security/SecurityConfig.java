@@ -66,6 +66,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/packages/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/analytics/menu/*/events").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

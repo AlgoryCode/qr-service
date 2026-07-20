@@ -44,6 +44,41 @@ class PaymentRequestMapperTest {
         assertThat(result.getSourceMetadata().get("installmentNumber")).isEqualTo(1);
     }
 
+    @Test
+    void toThreeDsRequest_whenBuyerFieldsBlank_thenUsesFallbacks() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.THREE_DS);
+        request.setPaymentStyle(PaymentStyle.ONE_TIME);
+        request.setInstallmentCount(1);
+        PaymentCardDto card = new PaymentCardDto();
+        card.setCardHolderName("Ada Lovelace");
+        card.setCardNumber("4111111111111111");
+        card.setExpireMonth("12");
+        card.setExpireYear("2030");
+        card.setCvc("123");
+        request.setPaymentCard(card);
+        PlanPackage plan = PlanPackage.builder().id(2L).code(CatalogPackages.PRO_PACKAGE).name("PRO")
+                .price(new BigDecimal("120.00")).currency("TRY").validityDays(30).build();
+        BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
+                .country(" ").city(" ").address(" ").build();
+        Purchase purchase = Purchase.builder().id(10L).paymentConversationId("conversation")
+                .paymentStyle(PaymentStyle.ONE_TIME).billingSnapshot(snapshot).build();
+        User user = User.builder().id(7L).firstName(" ").lastName(null)
+                .email("ada@example.com").build();
+
+        PaymentThreeDsRequest result = mapper.toThreeDsRequest(
+                purchase, user, plan, request, "127.0.0.1", new AppProperties()
+        );
+
+        assertThat(result.getBuyer().getName()).isEqualTo("Musteri");
+        assertThat(result.getBuyer().getSurname()).isEqualTo("Kullanici");
+        assertThat(result.getBuyer().getRegistrationAddress()).isEqualTo("Adres bilgisi yok");
+        assertThat(result.getBuyer().getCity()).isEqualTo("Istanbul");
+        assertThat(result.getBuyer().getCountry()).isEqualTo("Turkey");
+        assertThat(result.getBillingAddress().getContactName()).isEqualTo("Musteri");
+        assertThat(result.getSourceMetadata().get("userId")).isEqualTo(7L);
+    }
+
     private PaymentThreeDsRequest map(PaymentStyle style, int count) {
         PurchaseRequest request = new PurchaseRequest();
         request.setPaymentMode(PaymentMode.DIRECT);

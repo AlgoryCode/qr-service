@@ -46,4 +46,26 @@ public final class BillingPaymentDtos {
             boolean cancelAtPeriodEnd
     ) {
     }
+
+    public record RefundResult(
+            String conversationId,
+            String paymentTransactionId,
+            BigDecimal refundedPrice,
+            String status
+    ) {
+    }
+
+    public record RefundablePayment(
+            String conversationId,
+            String paymentId,
+            String paymentTransactionId,
+            String status,
+            BigDecimal paidPrice,
+            BigDecimal refundedAmount,
+            BigDecimal remaining
+    ) {
+        public boolean isSuccess() {
+            return status != null && "SUCCESS".equalsIgnoreCase(status.trim());
+        }
+    }
 }

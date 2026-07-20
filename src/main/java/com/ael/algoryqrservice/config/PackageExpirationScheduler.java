@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.MenuPublicAccessService;
 import com.ael.algoryqrservice.service.PackageActivationService;
+import com.ael.algoryqrservice.service.PlanChangeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,15 +25,20 @@ public class PackageExpirationScheduler {
     private final PackageActivationService packageActivationService;
     private final MenuPublicAccessService menuPublicAccessService;
     private final PurchaseRepository purchaseRepository;
+    private final PlanChangeService planChangeService;
 
     @Scheduled(fixedRate = 300_000)
     @Transactional
     public void expirePackages() {
+        planChangeService.executeDueScheduled();
         List<Purchase> duePurchases = purchaseRepository.findByStatusAndExpiresAtBefore(
                 PurchaseStatus.ACTIVE,
                 LocalDateTime.now()
         );
         entitlementService.expireDuePurchases();
+        packageActivationService.ensureFreeForUsers(
+                duePurchases.stream().map(Purchase::getUserId).distinct().toList()
+        );
         packageActivationService.restoreFreePackagesAfterPaidExpiry();
         menuPublicAccessService.syncForUsers(
                 duePurchases.stream().map(Purchase::getUserId).distinct().toList()

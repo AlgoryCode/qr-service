@@ -10,4 +10,12 @@ import java.util.List;
 public interface PlanPackageItemRepository extends JpaRepository<PlanPackageItem, Long> {
 
     List<PlanPackageItem> findByPlanPackageId(Long packageId);
+
+    List<PlanPackageItem> findByProductId(Long productId);
+
+    boolean existsByProductId(Long productId);
+
+    void deleteByProductId(Long productId);
+
+    long countByProductId(Long productId);
 }

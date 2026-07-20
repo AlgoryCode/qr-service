@@ -7,12 +7,15 @@ import lombok.Data;
 @Data
 public class PlanPackageItemRequest {
 
-    @NotNull(message = "Ürün id zorunludur")
+    @NotNull(message = "Urun id zorunludur")
     private Long productId;
 
-    @NotNull(message = "Miktar zorunludur")
-    @Min(value = 0, message = "Miktar 0 veya daha büyük olmalıdır")
+    @Min(value = 0, message = "Miktar 0 veya daha buyuk olmalidir")
     private Integer quantity;
 
-    private Boolean unlimited = false;
+    private Boolean unlimited;
+
+    public boolean resolvedUnlimited() {
+        return Boolean.TRUE.equals(unlimited);
+    }
 }

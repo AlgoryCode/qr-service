@@ -53,6 +53,11 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Çıkış başarılı"));
     }
 
+    @GetMapping("/access-profile")
+    public ResponseEntity<UserAccessProfile> getAccessProfile() {
+        return ResponseEntity.ok(authService.getAccessProfile());
+    }
+
     @GetMapping("/sessions")
     public ResponseEntity<List<SessionResponse>> getMySessions() {
         return ResponseEntity.ok(authService.getMySessions());

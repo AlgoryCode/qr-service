@@ -2,7 +2,6 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.PlanPackage;
-import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
@@ -15,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,41 +34,25 @@ public class PackageActivationService {
     @Transactional
     public Purchase ensureFreePackage(Long userId) {
         entitlementService.expireDuePurchasesForUser(userId);
-        List<Purchase> usable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
-                .filter(Purchase::isUsable)
-                .toList();
-        if (!usable.isEmpty()) {
-            return selectHighestPackage(usable);
+
+        List<Purchase> usablePaidOrTrial = findUsableNonFree(userId);
+        ensureBaselineFree(userId, !usablePaidOrTrial.isEmpty());
+
+        if (!usablePaidOrTrial.isEmpty()) {
+            return selectHighestPackage(usablePaidOrTrial);
         }
 
-        PlanPackage freePackage = packageCatalogService.ensureFreePackage();
-        LocalDateTime startsAt = LocalDateTime.now();
-        LocalDateTime expiresAt = startsAt.plusDays(freePackage.getValidityDays());
-        Purchase purchase = purchaseRepository.save(Purchase.builder()
-                .userId(userId)
-                .packageId(freePackage.getId())
-                .packageCode(CatalogPackages.FREE_PACKAGE)
-                .packageName(freePackage.getName())
-                .price(BigDecimal.ZERO)
-                .currency(freePackage.getCurrency())
-                .purchaseType(PurchaseType.FREE)
-                .paymentStyle(PaymentStyle.ONE_TIME)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(startsAt)
-                .expiresAt(expiresAt)
-                .build());
-
-        for (PlanPackageItem item : freePackage.getItems()) {
-            entitlementService.grant(
-                    purchase,
-                    item.getProduct().getId(),
-                    item.getProduct().getCode(),
-                    item.getQuantity(),
-                    item.isUnlimited()
-            );
-        }
+        Purchase freePurchase = activateBaselineFree(userId);
         menuPublicAccessService.syncForUser(userId);
-        return purchase;
+        return freePurchase;
+    }
+
+    @Transactional
+    public void ensureFreeForUsers(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        userIds.stream().distinct().forEach(this::ensureFreePackage);
     }
 
     @Transactional
@@ -83,21 +67,95 @@ public class PackageActivationService {
                 purchaseRepository.save(purchase);
             }
         }
+        ensureBaselineFree(purchasedPackage.getUserId(), true);
+        menuPublicAccessService.syncForUser(purchasedPackage.getUserId());
     }
 
     @Transactional
     public void restoreFreePackagesAfterPaidExpiry() {
         List<Long> userIds = purchaseRepository.findDistinctUserIdsWithExpiredPaidPurchases(PurchaseStatus.EXPIRED);
-        for (Long userId : userIds) {
-            entitlementService.expireDuePurchasesForUser(userId);
-            boolean hasUsable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
-                    .anyMatch(Purchase::isUsable);
-            if (!hasUsable) {
-                ensureFreePackage(userId);
-            } else {
-                menuPublicAccessService.syncForUser(userId);
+        ensureFreeForUsers(userIds);
+    }
+
+    private List<Purchase> findUsableNonFree(Long userId) {
+        return purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+                .filter(Purchase::isUsable)
+                .filter(purchase -> !isFreePurchase(purchase))
+                .toList();
+    }
+
+    private void ensureBaselineFree(Long userId, boolean paidOrTrialActive) {
+        Purchase freePurchase = findBaselineFree(userId).orElse(null);
+        if (freePurchase == null) {
+            if (paidOrTrialActive) {
+                createBaselineFree(userId, PurchaseStatus.SUPERSEDED);
             }
+            return;
         }
+        if (paidOrTrialActive && freePurchase.getStatus() == PurchaseStatus.ACTIVE) {
+            freePurchase.setStatus(PurchaseStatus.SUPERSEDED);
+            purchaseRepository.save(freePurchase);
+        }
+    }
+
+    private Purchase activateBaselineFree(Long userId) {
+        PlanPackage freePackage = packageCatalogService.ensureFreePackage();
+        Purchase freePurchase = findBaselineFree(userId).orElse(null);
+        LocalDateTime startsAt = LocalDateTime.now();
+        LocalDateTime expiresAt = startsAt.plusDays(freePackage.getValidityDays());
+
+        if (freePurchase == null) {
+            freePurchase = createBaselineFree(userId, PurchaseStatus.ACTIVE);
+            return freePurchase;
+        }
+
+        freePurchase.setPackageId(freePackage.getId());
+        freePurchase.setPackageCode(CatalogPackages.FREE_PACKAGE);
+        freePurchase.setPackageName(freePackage.getName());
+        freePurchase.setPrice(BigDecimal.ZERO);
+        freePurchase.setCurrency(freePackage.getCurrency());
+        freePurchase.setPurchaseType(PurchaseType.FREE);
+        freePurchase.setPaymentStyle(PaymentStyle.ONE_TIME);
+        freePurchase.setStatus(PurchaseStatus.ACTIVE);
+        freePurchase.setStartsAt(startsAt);
+        freePurchase.setExpiresAt(expiresAt);
+        freePurchase.setCancellationReason(null);
+        Purchase saved = purchaseRepository.save(freePurchase);
+        entitlementService.refreshForPackage(saved, freePackage);
+        return saved;
+    }
+
+    private Purchase createBaselineFree(Long userId, PurchaseStatus status) {
+        PlanPackage freePackage = packageCatalogService.ensureFreePackage();
+        LocalDateTime startsAt = LocalDateTime.now();
+        LocalDateTime expiresAt = startsAt.plusDays(freePackage.getValidityDays());
+        Purchase purchase = purchaseRepository.save(Purchase.builder()
+                .userId(userId)
+                .packageId(freePackage.getId())
+                .packageCode(CatalogPackages.FREE_PACKAGE)
+                .packageName(freePackage.getName())
+                .price(BigDecimal.ZERO)
+                .currency(freePackage.getCurrency())
+                .purchaseType(PurchaseType.FREE)
+                .paymentStyle(PaymentStyle.ONE_TIME)
+                .status(status)
+                .startsAt(startsAt)
+                .expiresAt(expiresAt)
+                .build());
+        entitlementService.refreshForPackage(purchase, freePackage);
+        return purchase;
+    }
+
+    private java.util.Optional<Purchase> findBaselineFree(Long userId) {
+        return purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(
+                userId,
+                PurchaseType.FREE
+        );
+    }
+
+    private boolean isFreePurchase(Purchase purchase) {
+        return purchase.getPurchaseType() == PurchaseType.FREE
+                || CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode());
     }
 
     private Purchase selectHighestPackage(List<Purchase> purchases) {
@@ -111,7 +169,7 @@ public class PackageActivationService {
                     if (planPackage != null && planPackage.getPriority() != null) {
                         return planPackage.getPriority();
                     }
-                    return CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()) ? 1 : 0;
+                    return isFreePurchase(purchase) ? 1 : 0;
                 }))
                 .orElse(purchases.getFirst());
     }

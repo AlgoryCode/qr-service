@@ -12,12 +12,15 @@ import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @Component
 public class PaymentRequestMapper {
+
+    public static final int SUBSCRIPTION_CYCLE_COUNT = 12;
 
     public PaymentThreeDsRequest toThreeDsRequest(
             Purchase purchase,
@@ -32,22 +35,27 @@ public class PaymentRequestMapper {
         int bankInstallments = style == PaymentStyle.BANK_INSTALLMENT
                 ? request.resolvedInstallmentCount()
                 : 1;
+        int scheduleCount = style == PaymentStyle.SUBSCRIPTION
+                ? SUBSCRIPTION_CYCLE_COUNT
+                : 1;
+
+        Map<String, Object> sourceMetadata = new HashMap<>();
+        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("packageId", planPackage.getId());
+        sourceMetadata.put("packageCode", planPackage.getCode());
+        sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
+        sourceMetadata.put("purchaseId", purchase.getId());
+        sourceMetadata.put("installmentNumber", 1);
+        sourceMetadata.put("installmentCount", scheduleCount);
+        sourceMetadata.put("bankInstallmentCount", bankInstallments);
+        sourceMetadata.put("paymentStyle", style.name());
+        sourceMetadata.put("validityDays", planPackage.getValidityDays());
+        sourceMetadata.put("totalAmount", planPackage.getPrice());
 
         return PaymentThreeDsRequest.builder()
                 .serviceName(appProperties.getServiceName())
                 .sourceReferenceId(String.valueOf(purchase.getId()))
-                .sourceMetadata(Map.of(
-                        "userId", user.getId(),
-                        "packageId", planPackage.getId(),
-                        "packageCode", planPackage.getCode(),
-                        "purchaseConversationId", purchase.getPaymentConversationId(),
-                        "installmentNumber", 1,
-                        "installmentCount", 1,
-                        "bankInstallmentCount", bankInstallments,
-                        "paymentStyle", style.name(),
-                        "validityDays", planPackage.getValidityDays(),
-                        "totalAmount", planPackage.getPrice()
-                ))
+                .sourceMetadata(sourceMetadata)
                 .conversationId(purchase.getPaymentConversationId())
                 .locale("tr")
                 .price(chargeAmount)
@@ -57,7 +65,7 @@ public class PaymentRequestMapper {
                 .paymentStyle(style.name())
                 .installmentCount(1)
                 .bankInstallmentCount(style == PaymentStyle.BANK_INSTALLMENT ? bankInstallments : null)
-                .subscriptionCycleCount(style == PaymentStyle.SUBSCRIPTION ? 12 : null)
+                .subscriptionCycleCount(style == PaymentStyle.SUBSCRIPTION ? SUBSCRIPTION_CYCLE_COUNT : null)
                 .billingIntervalMonths(style == PaymentStyle.SUBSCRIPTION ? 1 : null)
                 .installment(bankInstallments)
                 .basketId("qr-purchase-" + purchase.getId())
@@ -89,35 +97,53 @@ public class PaymentRequestMapper {
 
     private PaymentThreeDsRequest.BuyerPayload toBuyer(User user, BillingSnapshot address, String clientIp) {
         String identity = address.getTckn() != null ? address.getTckn() : address.getVkn();
+        String name = firstNonBlank(user.getFirstName(), address.getName(), "Musteri");
+        String surname = firstNonBlank(user.getLastName(), address.getSurname(), "Kullanici");
+        String registrationAddress = firstNonBlank(address.getAddress(), "Adres bilgisi yok");
         return PaymentThreeDsRequest.BuyerPayload.builder()
                 .id(String.valueOf(user.getId()))
-                .name(user.getFirstName())
-                .surname(user.getLastName())
-                .gsmNumber(user.getPhone())
+                .name(name)
+                .surname(surname)
+                .gsmNumber(firstNonBlank(user.getPhone(), "5000000000"))
                 .email(user.getEmail())
-                .identityNumber(identity != null ? identity : "11111111111")
-                .registrationAddress(address.getAddress())
+                .identityNumber(firstNonBlank(identity, "11111111111"))
+                .registrationAddress(registrationAddress)
                 .ip(clientIp != null && !clientIp.isBlank() ? clientIp : "127.0.0.1")
-                .city(address.getCity())
-                .country(address.getCountry())
+                .city(firstNonBlank(address.getCity(), "Istanbul"))
+                .country(firstNonBlank(address.getCountry(), "Turkey"))
                 .zipCode(address.getPostcode())
                 .build();
     }
 
     private PaymentThreeDsRequest.AddressPayload toAddress(BillingSnapshot address) {
+        String contactName = firstNonBlank(
+                address.getLegalName(),
+                String.join(" ", value(address.getName()), value(address.getSurname())).trim(),
+                "Musteri"
+        );
         return PaymentThreeDsRequest.AddressPayload.builder()
-                .contactName(address.getLegalName() != null
-                        ? address.getLegalName()
-                        : String.join(" ", value(address.getName()), value(address.getSurname())).trim())
-                .city(address.getCity())
-                .country(address.getCountry())
-                .address(address.getAddress())
+                .contactName(contactName)
+                .city(firstNonBlank(address.getCity(), "Istanbul"))
+                .country(firstNonBlank(address.getCountry(), "Turkey"))
+                .address(firstNonBlank(address.getAddress(), "Adres bilgisi yok"))
                 .zipCode(address.getPostcode())
                 .build();
     }
 
     private String value(String value) {
         return value == null ? "" : value;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private PaymentThreeDsRequest.BasketItemPayload toBasketItem(

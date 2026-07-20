@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.PlanPackage;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +20,9 @@ public interface PlanPackageRepository extends JpaRepository<PlanPackage, Long> 
     List<PlanPackage> findByActiveTrueOrderByPriceAsc();
 
     Optional<PlanPackage> findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc();
+
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    List<PlanPackage> findByTrialEligibleTrueAndActiveTrueAndSystemManagedFalseOrderByPriorityDesc();
 
     @Query("""
             select distinct pkg

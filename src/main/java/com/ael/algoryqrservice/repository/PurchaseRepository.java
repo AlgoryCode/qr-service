@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -29,9 +31,25 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findByStatusAndPurchasedAtBefore(PurchaseStatus status, LocalDateTime purchasedAt);
 
+    @Query("""
+            select p from Purchase p
+            where p.status = com.ael.algoryqrservice.model.enums.PurchaseStatus.PENDING
+              and p.paymentConversationId is not null
+              and p.purchasedAt < :before
+            order by p.purchasedAt asc
+            """)
+    List<Purchase> findPendingWithConversationBefore(
+            @Param("before") LocalDateTime before,
+            Pageable pageable
+    );
+
     List<Purchase> findByUserIdAndStatus(Long userId, PurchaseStatus status);
 
     boolean existsByUserIdAndStatus(Long userId, PurchaseStatus status);
+
+    boolean existsByPackageIdAndStatus(Long packageId, PurchaseStatus status);
+
+    boolean existsByPackageId(Long packageId);
 
     boolean existsByUserIdAndPurchaseType(Long userId, PurchaseType purchaseType);
 

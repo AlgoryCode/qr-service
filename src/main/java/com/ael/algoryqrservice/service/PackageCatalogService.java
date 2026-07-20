@@ -39,6 +39,13 @@ public class PackageCatalogService {
         ensureProduct(CatalogProducts.QR_ANALYTICS, "Detaylı Raporlama", CatalogScopes.QR_ANALYTICS_OWNER, false);
 
         return planPackageRepository.findByCode(CatalogPackages.FREE_PACKAGE)
+                .map(existing -> {
+                    if (existing.getFeatures() == null || existing.getFeatures().isEmpty()) {
+                        existing.setFeatures(List.of("5 QR olusturma hakki", "Temel kullanim"));
+                        return planPackageRepository.save(existing);
+                    }
+                    return existing;
+                })
                 .orElseGet(() -> createFreePackage(qrCreate));
     }
 
@@ -59,8 +66,11 @@ public class PackageCatalogService {
         PlanPackage planPackage = PlanPackage.builder()
                 .code(CatalogPackages.FREE_PACKAGE)
                 .name("Free")
-                .description("5 adet QR oluşturma hakkı")
+                .description("5 adet QR olusturma hakki")
+                .features(List.of("5 QR olusturma hakki", "Temel kullanim"))
                 .price(BigDecimal.ZERO)
+                .subtotal(BigDecimal.ZERO)
+                .vatAmount(BigDecimal.ZERO)
                 .currency("TRY")
                 .active(true)
                 .validityDays(FREE_VALIDITY_DAYS)

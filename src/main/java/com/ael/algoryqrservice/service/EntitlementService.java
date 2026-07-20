@@ -1,13 +1,18 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserEntitlementRepository;
@@ -16,9 +21,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,6 +36,7 @@ public class EntitlementService {
     private final UserEntitlementRepository entitlementRepository;
     private final PurchaseRepository purchaseRepository;
     private final ProductRepository productRepository;
+    private final PlanPackageRepository planPackageRepository;
     private final PurchaseLogService purchaseLogService;
     private final MenuPublicAccessService menuPublicAccessService;
 
@@ -69,6 +77,47 @@ public class EntitlementService {
             entitlement.setExpiresAt(purchase.getExpiresAt());
         }
         entitlementRepository.saveAll(entitlements);
+    }
+
+    @Transactional
+    public void refreshForPackage(Purchase purchase, PlanPackage planPackage) {
+        Set<Long> keptProductIds = new HashSet<>();
+        for (PlanPackageItem item : planPackage.getItems()) {
+            Product product = item.getProduct();
+            keptProductIds.add(product.getId());
+            UserEntitlement entitlement = entitlementRepository
+                    .findByPurchaseIdAndProductId(purchase.getId(), product.getId())
+                    .orElse(null);
+            if (entitlement == null) {
+                grant(purchase, product.getId(), product.getCode(), item.getQuantity(), item.isUnlimited());
+                continue;
+            }
+            entitlement.setProductCode(product.getCode());
+            entitlement.setTotalQuantity(item.getQuantity());
+            entitlement.setRemainingQuantity(item.isUnlimited() ? item.getQuantity() : item.getQuantity());
+            entitlement.setUsedQuantity(0);
+            entitlement.setUnlimited(item.isUnlimited());
+            entitlement.setStartsAt(purchase.getStartsAt());
+            entitlement.setExpiresAt(purchase.getExpiresAt());
+            entitlementRepository.save(entitlement);
+            purchaseLogService.log(
+                    purchase.getId(),
+                    purchase.getUserId(),
+                    PurchaseLogAction.ENTITLEMENT_GRANTED,
+                    (item.isUnlimited() ? "Sınırsız " : item.getQuantity() + " adet ")
+                            + product.getCode() + " hakkı yenilendi ("
+                            + purchase.getStartsAt() + " - " + purchase.getExpiresAt() + ")"
+            );
+        }
+        List<UserEntitlement> existing = entitlementRepository
+                .findByPurchaseIdOrderByProductCodeAsc(purchase.getId());
+        for (UserEntitlement entitlement : existing) {
+            if (!keptProductIds.contains(entitlement.getProductId())) {
+                entitlement.setRemainingQuantity(0);
+                entitlement.setExpiresAt(purchase.getExpiresAt());
+                entitlementRepository.save(entitlement);
+            }
+        }
     }
 
     @Transactional
@@ -145,8 +194,10 @@ public class EntitlementService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public boolean hasScope(Long userId, String scopeCode) {
+        expireDuePurchasesForUser(userId);
+        repairUsablePackageEntitlements(userId);
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
         Map<String, Product> productsByCode = productRepository.findByCodeIn(
@@ -164,7 +215,7 @@ public class EntitlementService {
                 });
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public void requireScope(Long userId, String scopeCode) {
         if (!hasScope(userId, scopeCode)) {
             throw new ForbiddenException(scopeCode + " yetkisi için uygun paket gerekli");
@@ -187,6 +238,7 @@ public class EntitlementService {
     @Transactional
     public List<UserEntitlementResponse> getUserEntitlements(Long userId) {
         expireDuePurchasesForUser(userId);
+        repairUsablePackageEntitlements(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(
                 entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)
         );
@@ -194,6 +246,22 @@ public class EntitlementService {
         return entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(entitlement -> toResponse(entitlement, purchasesById.get(entitlement.getPurchaseId())))
                 .toList();
+    }
+
+    @Transactional
+    public void repairUsablePackageEntitlements(Long userId) {
+        List<Purchase> usablePurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+                .filter(Purchase::isUsable)
+                .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
+                .filter(purchase -> !CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()))
+                .toList();
+        for (Purchase purchase : usablePurchases) {
+            if (purchase.getPackageId() == null) {
+                continue;
+            }
+            planPackageRepository.findByIdWithItems(purchase.getPackageId())
+                    .ifPresent(planPackage -> refreshForPackage(purchase, planPackage));
+        }
     }
 
     @Transactional(readOnly = true)

@@ -1,0 +1,116 @@
+{
+  "products": [
+    {
+      "code": "QR_CREATE",
+      "name": "QR Olusturma",
+      "description": "QR kod olusturma hakki",
+      "scopeCode": "QR_CREATE_OWNER",
+      "unitPrice": 4.00,
+      "vatRate": 20.00,
+      "countable": true,
+      "active": true
+    },
+    {
+      "code": "QR_MENU",
+      "name": "QR Menu",
+      "description": "Dijital menu QR hakki",
+      "scopeCode": "QR_MENU_OWNER",
+      "unitPrice": 30.00,
+      "vatRate": 20.00,
+      "countable": true,
+      "active": true
+    },
+    {
+      "code": "QR_AGENT",
+      "name": "QR Agent",
+      "description": "QR Agent hakki",
+      "scopeCode": "QR_AGENT_OWNER",
+      "unitPrice": 15.83,
+      "vatRate": 20.00,
+      "countable": true,
+      "active": true
+    },
+    {
+      "code": "QR_ANALYTICS",
+      "name": "Detayli Raporlama",
+      "description": "Detayli raporlama erisimi",
+      "scopeCode": "QR_ANALYTICS_OWNER",
+      "unitPrice": 40.00,
+      "vatRate": 20.00,
+      "countable": false,
+      "active": true
+    }
+  ],
+  "packages": [
+    {
+      "code": "FREE_PACKAGE",
+      "name": "Free",
+      "description": "5 adet QR olusturma hakki",
+      "features": [
+        "5 QR olusturma hakki",
+        "Temel kullanim"
+      ],
+      "currency": "TRY",
+      "validityDays": 36500,
+      "priority": 1,
+      "purchasable": false,
+      "systemManaged": true,
+      "trialEligible": false,
+      "active": true,
+      "lockPrice": 0,
+      "items": [
+        { "productCode": "QR_CREATE", "quantity": 5, "unlimited": false }
+      ]
+    },
+    {
+      "code": "PRO_PACKAGE",
+      "name": "Pro",
+      "description": "30 QR olusturma, 1 menu ve 1 agent hakki",
+      "features": [
+        "30 QR olusturma hakki",
+        "1 Dijital menu QR",
+        "1 QR Agent hakki",
+        "30 gun gecerlilik"
+      ],
+      "currency": "TRY",
+      "validityDays": 30,
+      "priority": 100,
+      "purchasable": true,
+      "systemManaged": false,
+      "trialEligible": true,
+      "active": true,
+      "lockPrice": 199.00,
+      "items": [
+        { "productCode": "QR_CREATE", "quantity": 30, "unlimited": false },
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
+        { "productCode": "QR_AGENT", "quantity": 1, "unlimited": false }
+      ]
+    },
+    {
+      "code": "ULTIMATE_PACKAGE",
+      "name": "Ultimate",
+      "description": "100 QR, 5 menu, 3 agent ve detayli raporlama",
+      "features": [
+        "100 QR olusturma hakki",
+        "5 Dijital menu QR",
+        "3 QR Agent hakki",
+        "Detayli raporlama",
+        "30 gun gecerlilik"
+      ],
+      "currency": "TRY",
+      "validityDays": 30,
+      "priority": 200,
+      "purchasable": true,
+      "systemManaged": false,
+      "trialEligible": true,
+      "active": true,
+      "lockPrice": 499.00,
+      "items": [
+        { "productCode": "QR_CREATE", "quantity": 100, "unlimited": false },
+        { "productCode": "QR_MENU", "quantity": 5, "unlimited": false },
+        { "productCode": "QR_AGENT", "quantity": 3, "unlimited": false },
+        { "productCode": "QR_ANALYTICS", "quantity": 1, "unlimited": true }
+      ]
+    }
+  ]
+}

@@ -15,7 +15,18 @@ class TrialControllerTest {
         TrialService service = mock(TrialService.class);
         SecurityUtils securityUtils = mock(SecurityUtils.class);
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
-        TrialDtos.Status expected = new TrialDtos.Status(TrialDtos.Lifecycle.TRIAL_EXPIRED, 4L, null, null);
+        TrialDtos.Status expected = new TrialDtos.Status(
+                TrialDtos.Lifecycle.TRIAL_EXPIRED,
+                4L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
         when(service.status(7L)).thenReturn(expected);
         TrialController controller = new TrialController(service, securityUtils);
 

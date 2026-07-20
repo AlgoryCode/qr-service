@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public final class TrialDtos {
@@ -16,7 +17,13 @@ public final class TrialDtos {
             Lifecycle lifecycle,
             Long purchaseId,
             LocalDateTime startsAt,
-            LocalDateTime expiresAt
+            LocalDateTime expiresAt,
+            Long packageId,
+            String packageCode,
+            String packageName,
+            Integer daysUntilExpiry,
+            BigDecimal price,
+            String currency
     ) {
     }
 }

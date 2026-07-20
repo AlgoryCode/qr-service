@@ -3,8 +3,6 @@ package com.ael.algoryqrservice.model.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
@@ -15,39 +13,52 @@ import java.util.List;
 @Data
 public class PlanPackageRequest {
 
-    @NotBlank(message = "Paket kodu zorunludur")
-    @Pattern(regexp = "^[A-Z][A-Z0-9_]*$", message = "Paket kodu uppercase snake_case olmalıdır")
+    @Pattern(regexp = "^[A-Z][A-Z0-9_]*$", message = "Paket kodu uppercase snake_case olmalidir")
     private String code;
 
-    @NotBlank(message = "Paket adı zorunludur")
+    @NotBlank(message = "Paket adi zorunludur")
     private String name;
 
     private String description;
 
-    @NotNull(message = "Fiyat zorunludur")
-    @PositiveOrZero(message = "Fiyat 0 veya daha büyük olmalıdır")
+    private List<String> features;
+
+    @PositiveOrZero(message = "Fiyat 0 veya daha buyuk olmalidir")
     private BigDecimal price;
 
     private String currency;
 
-    @NotNull(message = "Aktiflik durumu zorunludur")
     private Boolean active;
 
-    @NotNull(message = "Geçerlilik süresi (gün) zorunludur")
-    @Min(value = 1, message = "Geçerlilik süresi en az 1 gün olmalıdır")
+    @Min(value = 1, message = "Gecerlilik suresi en az 1 gun olmalidir")
     private Integer validityDays;
 
-    @NotNull(message = "Öncelik zorunludur")
-    @Min(value = 0, message = "Öncelik 0 veya daha büyük olmalıdır")
     private Integer priority;
 
-    @NotNull(message = "Satın alınabilirlik zorunludur")
     private Boolean purchasable;
 
-    @NotNull(message = "Deneme uygunluğu zorunludur")
     private Boolean trialEligible;
 
-    @NotEmpty(message = "Paket en az bir ürün içermelidir")
     @Valid
     private List<PlanPackageItemRequest> items;
+
+    public boolean resolvedActive() {
+        return active == null || Boolean.TRUE.equals(active);
+    }
+
+    public boolean resolvedPurchasable() {
+        return Boolean.TRUE.equals(purchasable);
+    }
+
+    public boolean resolvedTrialEligible() {
+        return Boolean.TRUE.equals(trialEligible);
+    }
+
+    public int resolvedPriority() {
+        return priority == null ? 0 : priority;
+    }
+
+    public int resolvedValidityDays() {
+        return validityDays == null ? 30 : validityDays;
+    }
 }

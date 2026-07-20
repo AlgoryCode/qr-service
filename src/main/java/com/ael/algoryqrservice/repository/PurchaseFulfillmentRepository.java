@@ -14,6 +14,8 @@ public interface PurchaseFulfillmentRepository extends JpaRepository<PurchaseFul
 
     Optional<PurchaseFulfillment> findByPurchaseIdAndInstallmentId(Long purchaseId, String installmentId);
 
+    Optional<PurchaseFulfillment> findByPurchaseIdAndInstallmentNumber(Long purchaseId, Integer installmentNumber);
+
     List<PurchaseFulfillment> findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(
             Long purchaseId,
             FulfillmentStatus status

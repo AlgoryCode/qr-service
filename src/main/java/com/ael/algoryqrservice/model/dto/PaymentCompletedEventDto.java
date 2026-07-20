@@ -23,6 +23,7 @@ public class PaymentCompletedEventDto {
     private String installmentId;
     private Integer installmentNumber;
     private Integer installmentCount;
+    private Integer billingCycleNumber;
     private String paymentStyle;
     private Integer bankInstallmentCount;
     private String subscriptionId;

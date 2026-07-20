@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
+import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -41,21 +43,28 @@ public class PurchaseFulfillmentService {
         if (!fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(purchase.getId()).isEmpty()) {
             return;
         }
-        int installmentCount = purchase.getInstallmentCount();
-        BigDecimal standardAmount = purchase.getPrice().divide(
-                BigDecimal.valueOf(installmentCount),
-                2,
-                RoundingMode.DOWN
-        );
+        int installmentCount = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
+                ? 1
+                : purchase.getInstallmentCount();
+        boolean subscription = purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION;
+        BigDecimal standardAmount = subscription
+                ? purchase.getPrice()
+                : purchase.getPrice().divide(
+                        BigDecimal.valueOf(installmentCount),
+                        2,
+                        RoundingMode.DOWN
+                );
         String seed = serviceName + ":" + purchase.getPaymentConversationId();
         String planId = UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime anchor = purchase.getPurchasedAt() != null ? purchase.getPurchasedAt() : LocalDateTime.now();
         for (int number = 1; number <= installmentCount; number++) {
-            BigDecimal amount = number == installmentCount
-                    ? purchase.getPrice().subtract(standardAmount.multiply(
-                            BigDecimal.valueOf(installmentCount - 1L)
-                    ))
-                    : standardAmount;
+            BigDecimal amount = subscription
+                    ? purchase.getPrice()
+                    : (number == installmentCount
+                            ? purchase.getPrice().subtract(standardAmount.multiply(
+                                    BigDecimal.valueOf(installmentCount - 1L)
+                            ))
+                            : standardAmount);
             String installmentId = planId + ":" + number;
             fulfillmentRepository.save(PurchaseFulfillment.builder()
                     .purchaseId(purchase.getId())
@@ -63,7 +72,7 @@ public class PurchaseFulfillmentService {
                     .installmentNumber(number)
                     .installmentCount(installmentCount)
                     .status(FulfillmentStatus.PENDING)
-                    .dueAt(now.plusMonths(number - 1L))
+                    .dueAt(anchor.plusMonths(number - 1L))
                     .amount(amount)
                     .currency(purchase.getCurrency())
                     .eventId("pending:" + installmentId)
@@ -78,9 +87,7 @@ public class PurchaseFulfillmentService {
             PaymentCompletedEventDto event,
             PaymentEventMetadata metadata
     ) {
-        PurchaseFulfillment fulfillment = fulfillmentRepository
-                .findByPurchaseIdAndInstallmentId(purchase.getId(), metadata.installmentId())
-                .orElseGet(() -> newFulfillment(purchase, event, metadata));
+        PurchaseFulfillment fulfillment = resolveFulfillment(purchase, event, metadata);
         if (fulfillment.getStatus() == FulfillmentStatus.PAID) {
             return;
         }
@@ -131,9 +138,7 @@ public class PurchaseFulfillmentService {
             PaymentEventMetadata metadata,
             FulfillmentStatus status
     ) {
-        PurchaseFulfillment fulfillment = fulfillmentRepository
-                .findByPurchaseIdAndInstallmentId(purchase.getId(), metadata.installmentId())
-                .orElseGet(() -> newFulfillment(purchase, event, metadata));
+        PurchaseFulfillment fulfillment = resolveFulfillment(purchase, event, metadata);
         if (fulfillment.getStatus() == FulfillmentStatus.PAID) {
             return;
         }
@@ -195,6 +200,23 @@ public class PurchaseFulfillmentService {
                 .filter(dueAt -> dueAt != null)
                 .min(LocalDateTime::compareTo)
                 .orElse(null);
+    }
+
+    private PurchaseFulfillment resolveFulfillment(
+            Purchase purchase,
+            PaymentCompletedEventDto event,
+            PaymentEventMetadata metadata
+    ) {
+        if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
+            Optional<PurchaseFulfillment> byNumber = fulfillmentRepository
+                    .findByPurchaseIdAndInstallmentNumber(purchase.getId(), metadata.installmentNumber());
+            if (byNumber.isPresent()) {
+                return byNumber.get();
+            }
+        }
+        return fulfillmentRepository
+                .findByPurchaseIdAndInstallmentId(purchase.getId(), metadata.installmentId())
+                .orElseGet(() -> newFulfillment(purchase, event, metadata));
     }
 
     private PurchaseFulfillment newFulfillment(

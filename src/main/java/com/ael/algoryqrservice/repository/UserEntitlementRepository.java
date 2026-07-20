@@ -29,4 +29,6 @@ public interface UserEntitlementRepository extends JpaRepository<UserEntitlement
     List<UserEntitlement> findByPurchaseIdOrderByProductCodeAsc(Long purchaseId);
 
     Optional<UserEntitlement> findByPurchaseIdAndProductId(Long purchaseId, Long productId);
+
+    boolean existsByProductId(Long productId);
 }

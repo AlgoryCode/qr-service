@@ -16,6 +16,9 @@ public class PlanPackageResponse {
     private String code;
     private String name;
     private String description;
+    private List<String> features;
+    private BigDecimal subtotal;
+    private BigDecimal vatAmount;
     private BigDecimal price;
     private String currency;
     private boolean active;

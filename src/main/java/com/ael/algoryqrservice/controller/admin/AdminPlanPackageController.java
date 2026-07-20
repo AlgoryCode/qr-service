@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.controller.admin;
 
+import com.ael.algoryqrservice.model.dto.PlanPackageItemRequest;
 import com.ael.algoryqrservice.model.dto.PlanPackageRequest;
 import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
+import com.ael.algoryqrservice.model.dto.PublishPackageRequest;
 import com.ael.algoryqrservice.service.PlanPackageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,8 +39,36 @@ public class AdminPlanPackageController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PlanPackageResponse> update(@PathVariable Long id, @Valid @RequestBody PlanPackageRequest request) {
+    public ResponseEntity<PlanPackageResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody PlanPackageRequest request
+    ) {
         return ResponseEntity.ok(planPackageService.update(id, request));
+    }
+
+    @PostMapping("/{id}/items")
+    public ResponseEntity<PlanPackageResponse> addItem(
+            @PathVariable Long id,
+            @Valid @RequestBody PlanPackageItemRequest request
+    ) {
+        return ResponseEntity.ok(planPackageService.addItem(id, request));
+    }
+
+    @DeleteMapping("/{id}/items/{productId}")
+    public ResponseEntity<PlanPackageResponse> removeItem(
+            @PathVariable Long id,
+            @PathVariable Long productId
+    ) {
+        return ResponseEntity.ok(planPackageService.removeItem(id, productId));
+    }
+
+    @PostMapping("/{id}/publish")
+    public ResponseEntity<PlanPackageResponse> publish(
+            @PathVariable Long id,
+            @RequestBody(required = false) PublishPackageRequest request
+    ) {
+        PublishPackageRequest body = request == null ? new PublishPackageRequest() : request;
+        return ResponseEntity.ok(planPackageService.publish(id, body));
     }
 
     @PatchMapping("/{id}/status")
@@ -51,5 +81,11 @@ public class AdminPlanPackageController {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(planPackageService.updateActiveStatus(id, active));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        planPackageService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

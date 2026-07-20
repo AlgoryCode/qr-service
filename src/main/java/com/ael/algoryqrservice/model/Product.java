@@ -6,6 +6,7 @@ import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,6 +35,16 @@ public class Product {
 
     @Column(name = "scope_code", nullable = false, length = 64)
     private String scopeCode;
+
+    @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal unitPrice = BigDecimal.ZERO;
+
+    @Column(name = "vat_rate", nullable = false, precision = 5, scale = 2)
+    @ColumnDefault("20.00")
+    @Builder.Default
+    private BigDecimal vatRate = new BigDecimal("20.00");
 
     @Column(nullable = false)
     @ColumnDefault("true")

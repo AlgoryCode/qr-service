@@ -118,12 +118,19 @@ public record PaymentEventMetadata(
             PaymentCompletedEventDto event,
             Map<String, Object> metadata
     ) {
+        if (event.getBillingCycleNumber() != null && event.getBillingCycleNumber() > 0) {
+            return event.getBillingCycleNumber();
+        }
         if (event.getInstallmentNumber() != null) {
             return event.getInstallmentNumber();
         }
         Object metadataValue = metadata.get("installmentNumber");
         if (metadataValue != null && !String.valueOf(metadataValue).isBlank()) {
             return Integer.valueOf(String.valueOf(metadataValue));
+        }
+        Object cycleValue = metadata.get("billingCycleNumber");
+        if (cycleValue != null && !String.valueOf(cycleValue).isBlank()) {
+            return Integer.valueOf(String.valueOf(cycleValue));
         }
         return 1;
     }
