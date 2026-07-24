@@ -45,6 +45,19 @@ public class PlanPackage {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
+    @Column(name = "monthly_discount", nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal monthlyDiscount = BigDecimal.ZERO;
+
+    @Column(name = "yearly_price", precision = 12, scale = 2)
+    private BigDecimal yearlyPrice;
+
+    @Column(name = "yearly_discount", nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal yearlyDiscount = BigDecimal.ZERO;
+
     @Column(nullable = false, precision = 12, scale = 2)
     @ColumnDefault("0")
     @Builder.Default
@@ -94,4 +107,21 @@ public class PlanPackage {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public BigDecimal effectiveMonthlyPrice() {
+        return subtractDiscount(price, monthlyDiscount);
+    }
+
+    public BigDecimal effectiveYearlyPrice() {
+        if (yearlyPrice == null) {
+            return null;
+        }
+        return subtractDiscount(yearlyPrice, yearlyDiscount);
+    }
+
+    private static BigDecimal subtractDiscount(BigDecimal listPrice, BigDecimal discount) {
+        BigDecimal list = listPrice == null ? BigDecimal.ZERO : listPrice;
+        BigDecimal off = discount == null ? BigDecimal.ZERO : discount;
+        return list.subtract(off);
+    }
 }

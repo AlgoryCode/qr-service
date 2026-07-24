@@ -59,6 +59,31 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.cancelMyPurchase(purchaseId, userId));
     }
 
+    @PostMapping("/{purchaseId}/cancel-at-period-end")
+    public ResponseEntity<PurchaseResponse> cancelAtPeriodEnd(@PathVariable Long purchaseId) {
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.cancelAtPeriodEnd(purchaseId, userId));
+    }
+
+    @PostMapping("/{purchaseId}/resume-renewal")
+    public ResponseEntity<PurchaseResponse> resumeRenewal(@PathVariable Long purchaseId) {
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.resumeRenewal(purchaseId, userId));
+    }
+
+    @PostMapping("/{purchaseId}/cancel-with-refund")
+    public ResponseEntity<PurchaseResponse> cancelWithRefund(
+            @PathVariable Long purchaseId,
+            HttpServletRequest httpServletRequest
+    ) {
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.cancelWithRefund(
+                purchaseId,
+                userId,
+                resolveClientIp(httpServletRequest)
+        ));
+    }
+
     @GetMapping("/{purchaseId}/installments")
     public ResponseEntity<List<PurchaseFulfillmentResponse>> getPurchaseInstallments(@PathVariable Long purchaseId) {
         Long userId = securityUtils.getCurrentUser().getId();

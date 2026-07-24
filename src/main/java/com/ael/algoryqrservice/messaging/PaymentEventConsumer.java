@@ -41,6 +41,7 @@ public class PaymentEventConsumer {
                         -> purchaseService.handlePaymentFailed(event);
                 case "payment.installment.overdue" -> purchaseService.handlePaymentOverdue(event);
                 case "payment.refunded", "payment.chargeback" -> purchaseService.handlePaymentRefunded(event);
+                case "subscription.cancelled_at_period_end" -> purchaseService.handleSubscriptionCancelledAtPeriodEnd(event);
                 default -> throw new InvalidPaymentEventException("Unsupported payment event type");
             }
             log.info(

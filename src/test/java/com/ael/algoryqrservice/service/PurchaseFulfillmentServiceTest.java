@@ -90,11 +90,11 @@ class PurchaseFulfillmentServiceTest {
     }
 
     @Test
-    void initializeSchedule_whenSubscription_thenCreatesTwelveFullPriceRows() {
+    void initializeSchedule_whenSubscription_thenCreatesFirstPendingRowOnly() {
         purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
         purchase.setPrice(new BigDecimal("100.00"));
         purchase.setCurrency("TRY");
-        purchase.setInstallmentCount(12);
+        purchase.setInstallmentCount(1);
         purchase.setPaymentConversationId("conv-sub");
         purchase.setPurchasedAt(LocalDateTime.of(2026, 7, 20, 10, 0));
         when(fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(1L)).thenReturn(List.of());
@@ -103,20 +103,19 @@ class PurchaseFulfillmentServiceTest {
 
         ArgumentCaptor<PurchaseFulfillment> captor = ArgumentCaptor.forClass(PurchaseFulfillment.class);
         verify(fulfillmentRepository, atLeastOnce()).save(captor.capture());
-        assertThat(captor.getAllValues()).hasSize(12);
+        assertThat(captor.getAllValues()).hasSize(1);
         assertThat(captor.getAllValues().get(0).getDueAt()).isEqualTo(LocalDateTime.of(2026, 7, 20, 10, 0));
-        assertThat(captor.getAllValues().get(1).getDueAt()).isEqualTo(LocalDateTime.of(2026, 8, 20, 10, 0));
-        assertThat(captor.getAllValues()).allMatch(row ->
-                row.getAmount().compareTo(new BigDecimal("100.00")) == 0
-                        && row.getStatus() == FulfillmentStatus.PENDING
-                        && row.getInstallmentCount() == 12
-        );
+        assertThat(captor.getAllValues().get(0).getAmount()).isEqualByComparingTo("100.00");
+        assertThat(captor.getAllValues().get(0).getStatus()).isEqualTo(FulfillmentStatus.PENDING);
+        assertThat(captor.getAllValues().get(0).getInstallmentNumber()).isEqualTo(1);
     }
 
     @Test
     void fulfillPaidInstallment_whenSubscriptionCycle_thenResolvesByInstallmentNumber() {
         purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
         purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentConversationId("conv-sub");
+        event.setConversationId("sub-1-cycle-2");
         PurchaseFulfillment cycleTwo = PurchaseFulfillment.builder()
                 .purchaseId(1L)
                 .installmentId("plan:2")
@@ -128,7 +127,7 @@ class PurchaseFulfillmentServiceTest {
                 .currency("TRY")
                 .build();
         PaymentEventMetadata cycleMeta = new PaymentEventMetadata(
-                1L, 2L, 3L, CatalogPackages.PRO_PACKAGE, "conversation-1",
+                1L, 2L, 3L, CatalogPackages.PRO_PACKAGE, "conv-sub",
                 "payment-cycle-2", 2, 12,
                 LocalDateTime.of(2026, 8, 20, 0, 0),
                 LocalDateTime.of(2026, 9, 20, 0, 0)
@@ -142,6 +141,8 @@ class PurchaseFulfillmentServiceTest {
         fulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, cycleMeta);
 
         assertThat(cycleTwo.getStatus()).isEqualTo(FulfillmentStatus.PAID);
+        assertThat(purchase.getPaymentConversationId()).isEqualTo("conv-sub");
+        assertThat(purchase.getCurrentPeriodConversationId()).isEqualTo("sub-1-cycle-2");
         verify(fulfillmentRepository).save(cycleTwo);
     }
 

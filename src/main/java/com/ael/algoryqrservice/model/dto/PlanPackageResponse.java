@@ -20,6 +20,11 @@ public class PlanPackageResponse {
     private BigDecimal subtotal;
     private BigDecimal vatAmount;
     private BigDecimal price;
+    private BigDecimal monthlyDiscount;
+    private BigDecimal yearlyPrice;
+    private BigDecimal yearlyDiscount;
+    private BigDecimal effectiveMonthlyPrice;
+    private BigDecimal effectiveYearlyPrice;
     private String currency;
     private boolean active;
     private Integer validityDays;

@@ -26,6 +26,15 @@ public class PlanPackageRequest {
     @PositiveOrZero(message = "Fiyat 0 veya daha buyuk olmalidir")
     private BigDecimal price;
 
+    @PositiveOrZero(message = "Aylik indirim 0 veya daha buyuk olmalidir")
+    private BigDecimal monthlyDiscount;
+
+    @PositiveOrZero(message = "Yillik fiyat 0 veya daha buyuk olmalidir")
+    private BigDecimal yearlyPrice;
+
+    @PositiveOrZero(message = "Yillik indirim 0 veya daha buyuk olmalidir")
+    private BigDecimal yearlyDiscount;
+
     private String currency;
 
     private Boolean active;

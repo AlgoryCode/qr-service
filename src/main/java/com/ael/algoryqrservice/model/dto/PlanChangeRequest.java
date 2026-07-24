@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PlanChangeTiming;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -13,6 +14,8 @@ public class PlanChangeRequest {
 
     @NotNull(message = "Gecis zamani zorunludur")
     private PlanChangeTiming timing;
+
+    private BillingPeriod billingPeriod;
 
     private Long paymentMethodId;
 

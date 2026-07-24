@@ -17,7 +17,9 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -157,7 +159,53 @@ public class PaymentServiceClient {
     }
 
     public List<BillingPaymentDtos.Subscription> getSubscriptions(Long userId) {
-        return Collections.emptyList();
+        try {
+            List<BillingPaymentDtos.Subscription> response = restClient.get()
+                    .uri("/api/v1/subscriptions")
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            return response == null ? Collections.emptyList() : response;
+        } catch (RestClientResponseException exception) {
+            log.error("Subscription list failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Abonelikler alinamadi: " + exception.getStatusCode());
+        }
+    }
+
+    public BillingPaymentDtos.Subscription bootstrapSubscription(
+            Long userId,
+            String serviceName,
+            String sourceReferenceId,
+            String conversationId,
+            BigDecimal amount,
+            String currency,
+            Integer billingIntervalMonths,
+            Long paymentMethodId,
+            LocalDateTime nextChargeAt,
+            Map<String, Object> sourceMetadata
+    ) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("serviceName", serviceName);
+            body.put("sourceReferenceId", sourceReferenceId);
+            body.put("conversationId", conversationId);
+            body.put("amount", amount);
+            body.put("currency", currency);
+            body.put("billingIntervalMonths", billingIntervalMonths);
+            body.put("paymentMethodId", paymentMethodId);
+            body.put("nextChargeAt", nextChargeAt);
+            body.put("sourceMetadata", sourceMetadata);
+            return restClient.post()
+                    .uri("/api/v1/subscriptions/bootstrap")
+                    .headers(authHeaders(userId))
+                    .body(body)
+                    .retrieve()
+                    .body(BillingPaymentDtos.Subscription.class);
+        } catch (RestClientResponseException exception) {
+            log.error("Subscription bootstrap failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Abonelik baslatilamadi: " + exception.getStatusCode());
+        }
     }
 
     public BillingPaymentDtos.Subscription cancelSubscription(Long userId, String subscriptionId) {
@@ -170,6 +218,34 @@ public class PaymentServiceClient {
         } catch (RestClientResponseException exception) {
             log.error("Subscription cancel failed. status={}", exception.getStatusCode());
             throw new PaymentServiceException("Abonelik iptal edilemedi: " + exception.getStatusCode());
+        }
+    }
+
+    public BillingPaymentDtos.Subscription cancelSubscriptionAtPeriodEnd(Long userId, String subscriptionId) {
+        try {
+            return restClient.post()
+                    .uri("/api/v1/subscriptions/{id}/cancel-at-period-end", subscriptionId)
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .body(BillingPaymentDtos.Subscription.class);
+        } catch (RestClientResponseException exception) {
+            log.error("Subscription cancel-at-period-end failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException(
+                    "Abonelik donem sonu iptali basarisiz: " + exception.getStatusCode()
+            );
+        }
+    }
+
+    public BillingPaymentDtos.Subscription resumeSubscription(Long userId, String subscriptionId) {
+        try {
+            return restClient.post()
+                    .uri("/api/v1/subscriptions/{id}/resume", subscriptionId)
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .body(BillingPaymentDtos.Subscription.class);
+        } catch (RestClientResponseException exception) {
+            log.error("Subscription resume failed. status={}", exception.getStatusCode());
+            throw new PaymentServiceException("Abonelik yenileme geri alma basarisiz: " + exception.getStatusCode());
         }
     }
 

@@ -20,8 +20,6 @@ import java.util.UUID;
 @Component
 public class PaymentRequestMapper {
 
-    public static final int SUBSCRIPTION_CYCLE_COUNT = 12;
-
     public PaymentThreeDsRequest toThreeDsRequest(
             Purchase purchase,
             User user,
@@ -31,13 +29,8 @@ public class PaymentRequestMapper {
             AppProperties appProperties
     ) {
         PaymentStyle style = purchase.getPaymentStyle();
-        BigDecimal chargeAmount = planPackage.getPrice();
-        int bankInstallments = style == PaymentStyle.BANK_INSTALLMENT
-                ? request.resolvedInstallmentCount()
-                : 1;
-        int scheduleCount = style == PaymentStyle.SUBSCRIPTION
-                ? SUBSCRIPTION_CYCLE_COUNT
-                : 1;
+        BigDecimal chargeAmount = purchase.getPrice();
+        int intervalMonths = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
 
         Map<String, Object> sourceMetadata = new HashMap<>();
         sourceMetadata.put("userId", user.getId());
@@ -46,11 +39,12 @@ public class PaymentRequestMapper {
         sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
         sourceMetadata.put("purchaseId", purchase.getId());
         sourceMetadata.put("installmentNumber", 1);
-        sourceMetadata.put("installmentCount", scheduleCount);
-        sourceMetadata.put("bankInstallmentCount", bankInstallments);
+        sourceMetadata.put("billingCycleNumber", 1);
+        sourceMetadata.put("billingPeriod", purchase.getBillingPeriod() == null ? null : purchase.getBillingPeriod().name());
+        sourceMetadata.put("billingIntervalMonths", intervalMonths);
         sourceMetadata.put("paymentStyle", style.name());
         sourceMetadata.put("validityDays", planPackage.getValidityDays());
-        sourceMetadata.put("totalAmount", planPackage.getPrice());
+        sourceMetadata.put("totalAmount", chargeAmount);
 
         return PaymentThreeDsRequest.builder()
                 .serviceName(appProperties.getServiceName())
@@ -64,10 +58,10 @@ public class PaymentRequestMapper {
                 .paymentMode(request.getPaymentMode().name())
                 .paymentStyle(style.name())
                 .installmentCount(1)
-                .bankInstallmentCount(style == PaymentStyle.BANK_INSTALLMENT ? bankInstallments : null)
-                .subscriptionCycleCount(style == PaymentStyle.SUBSCRIPTION ? SUBSCRIPTION_CYCLE_COUNT : null)
-                .billingIntervalMonths(style == PaymentStyle.SUBSCRIPTION ? 1 : null)
-                .installment(bankInstallments)
+                .bankInstallmentCount(null)
+                .subscriptionCycleCount(null)
+                .billingIntervalMonths(style == PaymentStyle.SUBSCRIPTION ? intervalMonths : null)
+                .installment(1)
                 .basketId("qr-purchase-" + purchase.getId())
                 .paymentChannel("WEB")
                 .paymentGroup(style == PaymentStyle.SUBSCRIPTION ? "SUBSCRIPTION" : "PRODUCT")

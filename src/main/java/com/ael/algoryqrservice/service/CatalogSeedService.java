@@ -142,10 +142,30 @@ public class CatalogSeedService {
             planPackage.setPrice(BigDecimal.ZERO);
             planPackage.setSubtotal(BigDecimal.ZERO);
             planPackage.setVatAmount(BigDecimal.ZERO);
+            planPackage.setMonthlyDiscount(BigDecimal.ZERO);
+            planPackage.setYearlyPrice(null);
+            planPackage.setYearlyDiscount(BigDecimal.ZERO);
             planPackage.setPurchasable(false);
             planPackage.setTrialEligible(false);
         } else if (seed.getLockPrice() != null) {
             planPackage.setPrice(seed.getLockPrice());
+        }
+        if (!planPackage.isSystemManaged() && !CatalogPackages.FREE_PACKAGE.equals(code)) {
+            if (seed.getMonthlyDiscount() != null) {
+                planPackage.setMonthlyDiscount(seed.getMonthlyDiscount());
+            } else if (planPackage.getMonthlyDiscount() == null) {
+                planPackage.setMonthlyDiscount(BigDecimal.ZERO);
+            }
+            if (seed.getYearlyPrice() != null) {
+                planPackage.setYearlyPrice(seed.getYearlyPrice());
+            } else if (planPackage.getYearlyPrice() == null && planPackage.getPrice() != null) {
+                planPackage.setYearlyPrice(planPackage.getPrice().multiply(BigDecimal.valueOf(12)));
+            }
+            if (seed.getYearlyDiscount() != null) {
+                planPackage.setYearlyDiscount(seed.getYearlyDiscount());
+            } else if (planPackage.getYearlyDiscount() == null) {
+                planPackage.setYearlyDiscount(BigDecimal.ZERO);
+            }
         }
 
         return planPackageRepository.save(planPackage);

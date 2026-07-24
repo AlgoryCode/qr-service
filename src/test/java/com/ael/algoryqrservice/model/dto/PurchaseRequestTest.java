@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -18,29 +19,29 @@ class PurchaseRequestTest {
     }
 
     @Test
-    void isPaymentPlanValid_whenUnsupportedInstallmentCount_thenReject() {
+    void isPaymentPlanValid_whenBillingPeriodMissing_thenReject() {
         PurchaseRequest request = new PurchaseRequest();
         request.setPaymentMode(PaymentMode.THREE_DS);
-        request.setInstallmentCount(4);
-
-        assertThat(validator.validateProperty(request, "paymentPlanValid")).isNotEmpty();
-    }
-
-    @Test
-    void isPaymentPlanValid_whenDirectInstallmentCountAllowed_thenAccept() {
-        PurchaseRequest request = new PurchaseRequest();
-        request.setPaymentMode(PaymentMode.DIRECT);
-        request.setInstallmentCount(6);
-
-        assertThat(request.isPaymentPlanValid()).isTrue();
-    }
-
-    @Test
-    void isPaymentPlanValid_whenInstallmentCountUnsupported_thenReject() {
-        PurchaseRequest request = new PurchaseRequest();
-        request.setPaymentMode(PaymentMode.THREE_DS);
-        request.setInstallmentCount(5);
 
         assertThat(request.isPaymentPlanValid()).isFalse();
+    }
+
+    @Test
+    void isPaymentPlanValid_whenMonthly_thenAccept() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.THREE_DS);
+        request.setBillingPeriod(BillingPeriod.MONTHLY);
+
+        assertThat(request.isPaymentPlanValid()).isTrue();
+        assertThat(request.resolvedPaymentStyle().name()).isEqualTo("SUBSCRIPTION");
+    }
+
+    @Test
+    void isPaymentPlanValid_whenYearly_thenAccept() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.THREE_DS);
+        request.setBillingPeriod(BillingPeriod.YEARLY);
+
+        assertThat(request.isPaymentPlanValid()).isTrue();
     }
 }

@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.CreateSavedCardRequest;
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -71,7 +72,9 @@ public class BillingPaymentController {
 
     @PostMapping("/subscriptions/{subscriptionId}/cancel")
     public BillingPaymentDtos.Subscription cancelSubscription(@PathVariable String subscriptionId) {
-        return paymentServiceClient.cancelSubscription(userId(), subscriptionId);
+        throw new BadRequestException(
+                "Use POST /purchases/{id}/cancel-at-period-end or /purchases/{id}/cancel-with-refund"
+        );
     }
 
     private Long userId() {

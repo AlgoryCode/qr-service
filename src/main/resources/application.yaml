@@ -96,6 +96,11 @@ payment:
     events-queue: ${PAYMENT_EVENTS_QUEUE:qr-service.payment.events}
     events-routing-key: ${PAYMENT_EVENTS_ROUTING_KEY:qr-service.payment.events}
 
+billing:
+  refund:
+    monthly-cooling-days: ${BILLING_REFUND_MONTHLY_COOLING_DAYS:7}
+    yearly-cooling-days: ${BILLING_REFUND_YEARLY_COOLING_DAYS:14}
+
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}

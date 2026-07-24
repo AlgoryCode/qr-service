@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,6 +57,9 @@ public class Purchase {
     @Column(name = "payment_conversation_id", length = 128)
     private String paymentConversationId;
 
+    @Column(name = "current_period_conversation_id", length = 128)
+    private String currentPeriodConversationId;
+
     @Column(name = "payment_id", length = 64)
     private String paymentId;
 
@@ -89,6 +93,13 @@ public class Purchase {
     @Builder.Default
     private PaymentStyle paymentStyle = PaymentStyle.ONE_TIME;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_period", length = 16)
+    private com.ael.algoryqrservice.model.enums.BillingPeriod billingPeriod;
+
+    @Column(name = "billing_interval_months")
+    private Integer billingIntervalMonths;
+
     @Column(name = "subscription_id", length = 128)
     private String subscriptionId;
 
@@ -112,6 +123,23 @@ public class Purchase {
     @CreationTimestamp
     @Column(name = "purchased_at", nullable = false, updatable = false)
     private LocalDateTime purchasedAt;
+
+    @Column(name = "cancel_at_period_end", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean cancelAtPeriodEnd = false;
+
+    @Column(name = "current_period_paid_at")
+    private LocalDateTime currentPeriodPaidAt;
+
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "refund_status", nullable = false, length = 24)
+    @ColumnDefault("'NONE'")
+    @Builder.Default
+    private RefundStatus refundStatus = RefundStatus.NONE;
 
     public boolean isStartedByDate() {
         return startsAt == null || !startsAt.isAfter(LocalDateTime.now());

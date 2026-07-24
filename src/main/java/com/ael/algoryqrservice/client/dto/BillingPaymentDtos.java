@@ -39,11 +39,14 @@ public final class BillingPaymentDtos {
 
     public record Subscription(
             String id,
+            Long paymentMethodId,
             String status,
-            String planId,
-            LocalDateTime currentPeriodStart,
-            LocalDateTime currentPeriodEnd,
-            boolean cancelAtPeriodEnd
+            BigDecimal amount,
+            String currency,
+            Integer completedCycleCount,
+            Integer totalCycleCount,
+            LocalDateTime nextChargeAt,
+            Boolean cancelAtPeriodEnd
     ) {
     }
 

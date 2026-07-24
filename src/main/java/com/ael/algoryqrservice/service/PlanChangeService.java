@@ -18,6 +18,7 @@ import com.ael.algoryqrservice.model.dto.PlanChangePackageSummary;
 import com.ael.algoryqrservice.model.dto.PlanChangePreviewResponse;
 import com.ael.algoryqrservice.model.dto.PlanChangeRequest;
 import com.ael.algoryqrservice.model.dto.PlanChangeResponse;
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PlanChangeDirection;
@@ -37,7 +38,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,40 +71,48 @@ public class PlanChangeService {
     private final PurchaseLogService purchaseLogService;
     private final AppProperties appProperties;
 
+    private static final String DOWNGRADE_NEXT_PERIOD_ONLY =
+            "Paket dusurme yalnizca donem sonunda yapilabilir.";
+
     @Transactional(readOnly = true)
     public PlanChangePreviewResponse preview(Long userId, Long toPackageId) {
         Purchase current = requireUsablePaidPurchase(userId);
         PlanPackage fromPackage = planPackageService.findPackage(current.getPackageId());
         PlanPackage toPackage = requireTargetPackage(toPackageId, current.getPackageId());
-        PlanChangeDirection direction = resolveDirection(fromPackage.getPrice(), toPackage.getPrice());
+        BillingPeriod currentPeriod = resolveBillingPeriod(current);
+        BigDecimal fromPeriodPrice = periodPrice(fromPackage, currentPeriod);
+        BigDecimal toPeriodPrice = periodPrice(toPackage, currentPeriod);
+        PlanChangeDirection direction = resolveDirection(fromPeriodPrice, toPeriodPrice);
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime periodEnd = current.getExpiresAt();
+        double fraction = remainingFraction(current, now);
 
-        MoneyDelta catalogDelta = resolveMoneyDelta(current.getPrice(), toPackage.getPrice());
-        MoneyDelta immediateDelta = resolveImmediateMoneyDelta(userId, current, toPackage);
+        MoneyDelta immediateDelta = resolveProratedUpgradeDelta(fromPeriodPrice, toPeriodPrice, fraction);
         List<String> warnings = new ArrayList<>();
         warnings.add(NO_CARRYOVER_WARNING);
-        if (catalogDelta.refundAmount().compareTo(immediateDelta.refundAmount()) > 0) {
-            warnings.add(REFUND_CLAMPED_WARNING);
+        if (direction == PlanChangeDirection.DOWNGRADE) {
+            warnings.add(DOWNGRADE_NEXT_PERIOD_ONLY);
         }
-        List<PlanChangeOptionResponse> options = List.of(
-                PlanChangeOptionResponse.builder()
-                        .timing(PlanChangeTiming.IMMEDIATE)
-                        .chargeNow(immediateDelta.chargeAmount())
-                        .refundNow(immediateDelta.refundAmount())
-                        .chargeAtEffective(BigDecimal.ZERO)
-                        .effectiveAt(now)
-                        .entitlementsPolicy(ENTITLEMENTS_POLICY)
-                        .build(),
-                PlanChangeOptionResponse.builder()
-                        .timing(PlanChangeTiming.NEXT_PERIOD)
-                        .chargeNow(BigDecimal.ZERO)
-                        .refundNow(BigDecimal.ZERO)
-                        .chargeAtEffective(toPackage.getPrice())
-                        .effectiveAt(periodEnd)
-                        .entitlementsPolicy(ENTITLEMENTS_POLICY)
-                        .build()
-        );
+
+        List<PlanChangeOptionResponse> options = new ArrayList<>();
+        if (direction != PlanChangeDirection.DOWNGRADE) {
+            options.add(PlanChangeOptionResponse.builder()
+                    .timing(PlanChangeTiming.IMMEDIATE)
+                    .chargeNow(immediateDelta.chargeAmount())
+                    .refundNow(BigDecimal.ZERO)
+                    .chargeAtEffective(BigDecimal.ZERO)
+                    .effectiveAt(now)
+                    .entitlementsPolicy(ENTITLEMENTS_POLICY)
+                    .build());
+        }
+        options.add(PlanChangeOptionResponse.builder()
+                .timing(PlanChangeTiming.NEXT_PERIOD)
+                .chargeNow(BigDecimal.ZERO)
+                .refundNow(BigDecimal.ZERO)
+                .chargeAtEffective(toPeriodPrice)
+                .effectiveAt(periodEnd)
+                .entitlementsPolicy(ENTITLEMENTS_POLICY)
+                .build());
 
         return PlanChangePreviewResponse.builder()
                 .fromPurchaseId(current.getId())
@@ -109,7 +120,7 @@ public class PlanChangeService {
                 .toPackage(toSummary(toPackage))
                 .direction(direction)
                 .currentExpiresAt(periodEnd)
-                .options(options)
+                .options(List.copyOf(options))
                 .warnings(List.copyOf(warnings))
                 .hasScheduledChange(planChangeRepository.existsByUserIdAndStatus(userId, PlanChangeStatus.SCHEDULED))
                 .build();
@@ -123,7 +134,16 @@ public class PlanChangeService {
         Purchase current = requireUsablePaidPurchase(user.getId());
         PlanPackage fromPackage = planPackageService.findPackage(current.getPackageId());
         PlanPackage toPackage = requireTargetPackage(request.getToPackageId(), current.getPackageId());
-        PlanChangeDirection direction = resolveDirection(fromPackage.getPrice(), toPackage.getPrice());
+        BillingPeriod fromPeriod = resolveBillingPeriod(current);
+        BillingPeriod toPeriod = request.getBillingPeriod() != null ? request.getBillingPeriod() : fromPeriod;
+        if (fromPeriod == BillingPeriod.YEARLY && toPeriod == BillingPeriod.MONTHLY
+                && request.getTiming() == PlanChangeTiming.IMMEDIATE) {
+            throw new BadRequestException("Yilliktan ayliga gecis yalnizca donem sonunda yapilabilir");
+        }
+
+        BigDecimal fromPeriodPrice = periodPrice(fromPackage, fromPeriod);
+        BigDecimal toPeriodPrice = periodPrice(toPackage, toPeriod);
+        PlanChangeDirection direction = resolveDirection(fromPeriodPrice, toPeriodPrice);
 
         if (planChangeRepository.existsByUserIdAndStatus(user.getId(), PlanChangeStatus.SCHEDULED)) {
             throw new BadRequestException("Zaten planlanmis bir paket gecisi var; once iptal edin");
@@ -140,10 +160,26 @@ public class PlanChangeService {
                         + " -> " + toPackage.getCode()
         );
 
-        if (request.getTiming() == PlanChangeTiming.NEXT_PERIOD) {
-            return scheduleNextPeriod(user, current, fromPackage, toPackage, direction, request);
+        if (request.getTiming() == PlanChangeTiming.IMMEDIATE && direction == PlanChangeDirection.DOWNGRADE) {
+            throw new BadRequestException(DOWNGRADE_NEXT_PERIOD_ONLY);
         }
-        return executeImmediate(user, current, fromPackage, toPackage, direction, request, clientIp);
+
+        if (request.getTiming() == PlanChangeTiming.NEXT_PERIOD) {
+            return scheduleNextPeriod(user, current, fromPackage, toPackage, direction, request, toPeriod, toPeriodPrice);
+        }
+        return executeImmediate(
+                user,
+                current,
+                fromPackage,
+                toPackage,
+                direction,
+                request,
+                clientIp,
+                fromPeriod,
+                toPeriod,
+                fromPeriodPrice,
+                toPeriodPrice
+        );
     }
 
     @Transactional
@@ -217,28 +253,34 @@ public class PlanChangeService {
         planChangeRepository.save(planChange);
 
         try {
+            BillingPeriod toPeriod = current != null ? resolveBillingPeriod(current) : BillingPeriod.MONTHLY;
+            BigDecimal toPeriodPrice = periodPrice(toPackage, toPeriod);
             Purchase newPurchase = createPendingPurchase(
                     user,
                     current,
                     toPackage,
-                    planChange.getPaymentMethodId()
+                    planChange.getPaymentMethodId(),
+                    toPeriod,
+                    toPeriodPrice
             );
             planChange.setResultingPurchaseId(newPurchase.getId());
             planChange.setPaymentConversationId(newPurchase.getPaymentConversationId());
-            planChange.setChargeAmount(toPackage.getPrice());
+            planChange.setChargeAmount(toPeriodPrice);
             planChangeRepository.save(planChange);
 
             chargeDirect(
                     user,
                     newPurchase,
                     toPackage,
-                    toPackage.getPrice(),
+                    toPeriodPrice,
                     planChange.getPaymentMethodId(),
                     "127.0.0.1"
             );
-            activatePurchaseNow(newPurchase, toPackage);
+            activatePurchaseNow(newPurchase, toPackage, current, true);
+            bootstrapSubscriptionAfterPlanChange(user, newPurchase, toPackage, planChange.getPaymentMethodId());
             completePlanChange(planChange, newPurchase, current);
         } catch (RuntimeException exception) {
+            compensateFailedPlanChange(planChange, user, "127.0.0.1");
             failPlanChange(planChange, exception.getMessage());
             throw exception;
         }
@@ -286,7 +328,9 @@ public class PlanChangeService {
             PlanPackage fromPackage,
             PlanPackage toPackage,
             PlanChangeDirection direction,
-            PlanChangeRequest request
+            PlanChangeRequest request,
+            BillingPeriod toPeriod,
+            BigDecimal toPeriodPrice
     ) {
         if (current.getExpiresAt() == null) {
             throw new BadRequestException("Mevcut paketin bitis tarihi yok");
@@ -307,7 +351,7 @@ public class PlanChangeService {
                 .direction(direction)
                 .timing(PlanChangeTiming.NEXT_PERIOD)
                 .status(PlanChangeStatus.SCHEDULED)
-                .chargeAmount(toPackage.getPrice())
+                .chargeAmount(toPeriodPrice)
                 .refundAmount(BigDecimal.ZERO)
                 .currency(toPackage.getCurrency())
                 .paymentMethodId(paymentMethodId)
@@ -320,6 +364,7 @@ public class PlanChangeService {
                 user.getId(),
                 PurchaseLogAction.PLAN_CHANGE_SCHEDULED,
                 toPackage.getCode() + " paketine gecis planlandi: " + planChange.getEffectiveAt()
+                        + " (" + toPeriod.name() + ")"
         );
         return toResponse(planChange);
     }
@@ -331,14 +376,34 @@ public class PlanChangeService {
             PlanPackage toPackage,
             PlanChangeDirection direction,
             PlanChangeRequest request,
-            String clientIp
+            String clientIp,
+            BillingPeriod fromPeriod,
+            BillingPeriod toPeriod,
+            BigDecimal fromPeriodPrice,
+            BigDecimal toPeriodPrice
     ) {
-        MoneyDelta delta = resolveImmediateMoneyDelta(user.getId(), current, toPackage);
+        double fraction = remainingFraction(current, LocalDateTime.now());
+        MoneyDelta delta;
+        boolean resetAnchor = fromPeriod == BillingPeriod.MONTHLY && toPeriod == BillingPeriod.YEARLY;
+        if (resetAnchor) {
+            BigDecimal credit = fromPeriodPrice.multiply(BigDecimal.valueOf(fraction))
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal chargeNow = toPeriodPrice.subtract(credit).max(BigDecimal.ZERO);
+            delta = new MoneyDelta(chargeNow, BigDecimal.ZERO);
+        } else {
+            delta = resolveProratedUpgradeDelta(fromPeriodPrice, toPeriodPrice, fraction);
+        }
         if (delta.chargeAmount().signum() > 0) {
             if (request.getPaymentMethodId() == null) {
                 throw new BadRequestException("Fark odemesi icin kayitli kart zorunludur");
             }
             ensurePaymentMethodExists(user.getId(), request.getPaymentMethodId());
+        }
+        Long paymentMethodId = request.getPaymentMethodId() != null
+                ? request.getPaymentMethodId()
+                : current.getPaymentMethodId();
+        if (paymentMethodId == null) {
+            throw new BadRequestException("Abonelik icin kayitli kart zorunludur");
         }
 
         PlanChange planChange = planChangeRepository.save(PlanChange.builder()
@@ -350,23 +415,21 @@ public class PlanChangeService {
                 .timing(PlanChangeTiming.IMMEDIATE)
                 .status(PlanChangeStatus.PENDING_PAYMENT)
                 .chargeAmount(delta.chargeAmount())
-                .refundAmount(delta.refundAmount())
+                .refundAmount(BigDecimal.ZERO)
                 .currency(toPackage.getCurrency())
-                .paymentMethodId(request.getPaymentMethodId())
+                .paymentMethodId(paymentMethodId)
                 .effectiveAt(LocalDateTime.now())
                 .warningAck(true)
                 .build());
 
         try {
-            if (delta.refundAmount().signum() > 0) {
-                refundDifference(user, current, planChange, delta.refundAmount(), clientIp);
-            }
-
             Purchase newPurchase = createPendingPurchase(
                     user,
                     current,
                     toPackage,
-                    request.getPaymentMethodId()
+                    paymentMethodId,
+                    toPeriod,
+                    toPeriodPrice
             );
             planChange.setResultingPurchaseId(newPurchase.getId());
             planChange.setPaymentConversationId(newPurchase.getPaymentConversationId());
@@ -385,17 +448,62 @@ public class PlanChangeService {
                         newPurchase,
                         toPackage,
                         delta.chargeAmount(),
-                        request.getPaymentMethodId(),
+                        paymentMethodId,
                         clientIp
                 );
             }
 
-            activatePurchaseNow(newPurchase, toPackage);
+            activatePurchaseNow(newPurchase, toPackage, current, resetAnchor);
+            bootstrapSubscriptionAfterPlanChange(user, newPurchase, toPackage, paymentMethodId);
             completePlanChange(planChange, newPurchase, current);
             return toResponse(planChangeRepository.findById(planChange.getId()).orElseThrow());
         } catch (RuntimeException exception) {
+            compensateFailedPlanChange(planChange, user, clientIp);
             failPlanChange(planChange, exception.getMessage());
             throw exception;
+        }
+    }
+
+    private void bootstrapSubscriptionAfterPlanChange(
+            User user,
+            Purchase purchase,
+            PlanPackage planPackage,
+            Long paymentMethodId
+    ) {
+        if (paymentMethodId == null) {
+            paymentMethodId = purchase.getPaymentMethodId();
+        }
+        if (paymentMethodId == null) {
+            throw new BadRequestException("Abonelik icin kayitli kart zorunludur");
+        }
+        Map<String, Object> sourceMetadata = new HashMap<>();
+        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("packageId", planPackage.getId());
+        sourceMetadata.put("packageCode", planPackage.getCode());
+        sourceMetadata.put("purchaseId", purchase.getId());
+        sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
+        sourceMetadata.put("paymentStyle", PaymentStyle.SUBSCRIPTION.name());
+        sourceMetadata.put("billingPeriod", purchase.getBillingPeriod() == null
+                ? null
+                : purchase.getBillingPeriod().name());
+        sourceMetadata.put("planChangeBootstrap", true);
+
+        var subscription = paymentServiceClient.bootstrapSubscription(
+                user.getId(),
+                appProperties.getServiceName(),
+                String.valueOf(purchase.getId()),
+                purchase.getPaymentConversationId(),
+                purchase.getPrice(),
+                purchase.getCurrency(),
+                purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths(),
+                paymentMethodId,
+                purchase.getExpiresAt(),
+                sourceMetadata
+        );
+        if (subscription != null && subscription.id() != null) {
+            purchase.setSubscriptionId(subscription.id());
+            purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+            purchaseRepository.save(purchase);
         }
     }
 
@@ -441,11 +549,10 @@ public class PlanChangeService {
             User user,
             Purchase current,
             PlanPackage toPackage,
-            Long paymentMethodId
+            Long paymentMethodId,
+            BillingPeriod billingPeriod,
+            BigDecimal periodPrice
     ) {
-        PaymentStyle paymentStyle = current != null && current.getPaymentStyle() == PaymentStyle.SUBSCRIPTION
-                ? PaymentStyle.SUBSCRIPTION
-                : PaymentStyle.ONE_TIME;
         CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), paymentMethodId);
 
         Purchase purchase = purchaseRepository.save(Purchase.builder()
@@ -453,10 +560,12 @@ public class PlanChangeService {
                 .packageId(toPackage.getId())
                 .packageCode(toPackage.getCode())
                 .packageName(toPackage.getName())
-                .price(toPackage.getPrice())
+                .price(periodPrice)
                 .currency(toPackage.getCurrency())
                 .paymentMode(PaymentMode.DIRECT)
-                .paymentStyle(paymentStyle)
+                .paymentStyle(PaymentStyle.SUBSCRIPTION)
+                .billingPeriod(billingPeriod)
+                .billingIntervalMonths(billingPeriod.intervalMonths())
                 .purchaseType(PurchaseType.PAID)
                 .installmentCount(1)
                 .paymentMethodId(paymentMethodId)
@@ -468,9 +577,7 @@ public class PlanChangeService {
 
         purchase.setPaymentConversationId(paymentRequestMapper.buildConversationId(purchase.getId()));
         purchaseRepository.save(purchase);
-        if (paymentStyle == PaymentStyle.SUBSCRIPTION) {
-            purchaseFulfillmentService.initializeSchedule(purchase, appProperties.getServiceName());
-        }
+        purchaseFulfillmentService.initializeSchedule(purchase, appProperties.getServiceName());
         return purchase;
     }
 
@@ -494,10 +601,10 @@ public class PlanChangeService {
         sourceMetadata.put("packageId", planPackage.getId());
         sourceMetadata.put("packageCode", planPackage.getCode());
         sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
+        sourceMetadata.put("purchaseId", purchase.getId());
         sourceMetadata.put("installmentNumber", 1);
         sourceMetadata.put("installmentCount", 1);
-        sourceMetadata.put("bankInstallmentCount", 1);
-        sourceMetadata.put("paymentStyle", purchase.getPaymentStyle().name());
+        sourceMetadata.put("paymentStyle", PaymentStyle.ONE_TIME.name());
         sourceMetadata.put("validityDays", planPackage.getValidityDays());
         sourceMetadata.put("totalAmount", amount);
         sourceMetadata.put("planChange", true);
@@ -513,14 +620,14 @@ public class PlanChangeService {
                 .paidPrice(amount)
                 .currency(planPackage.getCurrency())
                 .paymentMode(PaymentMode.DIRECT.name())
-                .paymentStyle(purchase.getPaymentStyle().name())
+                .paymentStyle(PaymentStyle.ONE_TIME.name())
                 .installmentCount(1)
-                .subscriptionCycleCount(purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION ? 12 : null)
-                .billingIntervalMonths(purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION ? 1 : null)
+                .subscriptionCycleCount(null)
+                .billingIntervalMonths(null)
                 .installment(1)
                 .basketId("qr-plan-change-" + purchase.getId())
                 .paymentChannel("WEB")
-                .paymentGroup(purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION ? "SUBSCRIPTION" : "PRODUCT")
+                .paymentGroup("PRODUCT")
                 .paymentMethodId(paymentMethodId)
                 .buyer(toBuyer(user, purchase, clientIp))
                 .shippingAddress(toAddress(purchase))
@@ -554,10 +661,20 @@ public class PlanChangeService {
         }
     }
 
-    private void activatePurchaseNow(Purchase purchase, PlanPackage planPackage) {
+    private void activatePurchaseNow(
+            Purchase purchase,
+            PlanPackage planPackage,
+            Purchase fromPurchase,
+            boolean resetAnchor
+    ) {
         LocalDateTime now = LocalDateTime.now();
         purchase.setStartsAt(now);
-        purchase.setExpiresAt(now.plusDays(planPackage.getValidityDays()));
+        if (!resetAnchor && fromPurchase != null && fromPurchase.getExpiresAt() != null) {
+            purchase.setExpiresAt(fromPurchase.getExpiresAt());
+        } else {
+            int months = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
+            purchase.setExpiresAt(now.plusMonths(months));
+        }
         purchase.setStatus(PurchaseStatus.ACTIVE);
         purchaseRepository.save(purchase);
 
@@ -653,6 +770,65 @@ public class PlanChangeService {
         );
     }
 
+    private void compensateFailedPlanChange(PlanChange planChange, User user, String clientIp) {
+        if (planChange.getResultingPurchaseId() == null) {
+            return;
+        }
+        Purchase newPurchase = purchaseRepository.findById(planChange.getResultingPurchaseId()).orElse(null);
+        if (newPurchase == null) {
+            return;
+        }
+
+        BigDecimal chargeAmount = planChange.getChargeAmount();
+        if (chargeAmount != null && chargeAmount.signum() > 0) {
+            String conversationId = planChange.getPaymentConversationId() != null
+                    ? planChange.getPaymentConversationId()
+                    : newPurchase.getPaymentConversationId();
+            if (conversationId != null && !conversationId.isBlank()) {
+                try {
+                    BigDecimal remaining = resolveRefundableRemaining(user.getId(), conversationId);
+                    if (remaining.signum() > 0) {
+                        paymentServiceClient.refundPayment(
+                                user.getId(),
+                                conversationId,
+                                remaining.min(chargeAmount),
+                                clientIp
+                        );
+                    }
+                } catch (RuntimeException exception) {
+                    log.error(
+                            "Plan-change compensation refund failed. planChangeId={} conversationId={}",
+                            planChange.getId(),
+                            conversationId,
+                            exception
+                    );
+                }
+            }
+        }
+
+        if (newPurchase.getStatus() == PurchaseStatus.ACTIVE
+                || newPurchase.getStatus() == PurchaseStatus.PENDING) {
+            if (newPurchase.getStatus() == PurchaseStatus.ACTIVE) {
+                entitlementService.revokeForCancelledPurchase(newPurchase);
+            }
+            newPurchase.setStatus(PurchaseStatus.FAILED);
+            newPurchase.setExpiresAt(LocalDateTime.now());
+            if (newPurchase.getSubscriptionId() != null && !newPurchase.getSubscriptionId().isBlank()) {
+                try {
+                    paymentServiceClient.cancelSubscription(user.getId(), newPurchase.getSubscriptionId());
+                    newPurchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
+                } catch (RuntimeException exception) {
+                    log.warn(
+                            "Plan-change compensation subscription cancel failed. purchaseId={}",
+                            newPurchase.getId()
+                    );
+                }
+            }
+            purchaseRepository.save(newPurchase);
+            menuPublicAccessService.syncForUser(user.getId());
+        }
+    }
+
     private Purchase requireUsablePaidPurchase(Long userId) {
         entitlementService.expireDuePurchasesForUser(userId);
         List<Purchase> usable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
@@ -680,10 +856,67 @@ public class PlanChangeService {
         if (toPackage.getId().equals(fromPackageId)) {
             throw new BadRequestException("Ayni pakete gecis yapilamaz");
         }
-        if (toPackage.getPrice() == null || toPackage.getPrice().signum() <= 0) {
+        if (toPackage.effectiveMonthlyPrice() == null || toPackage.effectiveMonthlyPrice().signum() <= 0) {
             throw new BadRequestException("Hedef paket fiyati gecersiz");
         }
         return toPackage;
+    }
+
+    private BillingPeriod resolveBillingPeriod(Purchase purchase) {
+        if (purchase.getBillingPeriod() != null) {
+            return purchase.getBillingPeriod();
+        }
+        if (purchase.getBillingIntervalMonths() != null && purchase.getBillingIntervalMonths() >= 12) {
+            return BillingPeriod.YEARLY;
+        }
+        return BillingPeriod.MONTHLY;
+    }
+
+    private BigDecimal periodPrice(PlanPackage planPackage, BillingPeriod period) {
+        BigDecimal price = period == BillingPeriod.YEARLY
+                ? planPackage.effectiveYearlyPrice()
+                : planPackage.effectiveMonthlyPrice();
+        if (price == null || price.signum() <= 0) {
+            throw new BadRequestException("Paket donem fiyati gecersiz");
+        }
+        return price;
+    }
+
+    private double remainingFraction(Purchase purchase, LocalDateTime now) {
+        LocalDateTime periodEnd = purchase.getExpiresAt();
+        LocalDateTime periodStart = purchase.getStartsAt();
+        if (periodEnd == null || periodStart == null || !periodEnd.isAfter(periodStart)) {
+            return 1.0d;
+        }
+        if (!periodEnd.isAfter(now)) {
+            return 0.0d;
+        }
+        long totalDays = Math.max(ChronoUnit.DAYS.between(periodStart, periodEnd), 1);
+        long remainingDays = Math.max(ChronoUnit.DAYS.between(now, periodEnd), 0);
+        double fraction = (double) remainingDays / (double) totalDays;
+        if (fraction < 0) {
+            return 0.0d;
+        }
+        if (fraction > 1) {
+            return 1.0d;
+        }
+        return fraction;
+    }
+
+    private MoneyDelta resolveProratedUpgradeDelta(
+            BigDecimal fromPeriodPrice,
+            BigDecimal toPeriodPrice,
+            double remainingFraction
+    ) {
+        BigDecimal from = fromPeriodPrice == null ? BigDecimal.ZERO : fromPeriodPrice;
+        BigDecimal to = toPeriodPrice == null ? BigDecimal.ZERO : toPeriodPrice;
+        BigDecimal delta = to.subtract(from);
+        if (delta.signum() <= 0) {
+            return new MoneyDelta(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        BigDecimal charge = delta.multiply(BigDecimal.valueOf(remainingFraction))
+                .setScale(2, RoundingMode.HALF_UP);
+        return new MoneyDelta(charge.max(BigDecimal.ZERO), BigDecimal.ZERO);
     }
 
     private PlanChangeDirection resolveDirection(BigDecimal fromPrice, BigDecimal toPrice) {
@@ -755,6 +988,11 @@ public class PlanChangeService {
                 .code(planPackage.getCode())
                 .name(planPackage.getName())
                 .price(planPackage.getPrice())
+                .monthlyDiscount(planPackage.getMonthlyDiscount())
+                .yearlyPrice(planPackage.getYearlyPrice())
+                .yearlyDiscount(planPackage.getYearlyDiscount())
+                .effectiveMonthlyPrice(planPackage.effectiveMonthlyPrice())
+                .effectiveYearlyPrice(planPackage.effectiveYearlyPrice())
                 .currency(planPackage.getCurrency())
                 .validityDays(planPackage.getValidityDays())
                 .features(planPackage.getFeatures() == null ? List.of() : List.copyOf(planPackage.getFeatures()))

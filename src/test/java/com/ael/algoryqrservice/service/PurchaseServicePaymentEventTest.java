@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,10 @@ class PurchaseServicePaymentEventTest {
     private MenuPublicAccessService menuPublicAccessService;
     @Mock
     private PlanChangeService planChangeService;
+    @Mock
+    private SubscriptionRefundPolicy subscriptionRefundPolicy;
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private PurchaseService purchaseService;
@@ -211,18 +216,22 @@ class PurchaseServicePaymentEventTest {
     }
 
     @Test
-    void handlePaymentFailed_whenActive_thenIgnoreWithoutDowngrade() {
+    void handlePaymentFailed_whenActiveSubscription_thenMarkPastDue() {
         PaymentCompletedEventDto event = failedEvent();
         purchase.setInstallmentCount(1);
         purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
         when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(purchase)).thenReturn(purchase);
 
         purchaseService.handlePaymentFailed(event);
 
-        verify(purchaseRepository, never()).save(purchase);
+        verify(purchaseRepository).save(purchase);
         verify(purchaseFulfillmentService, never()).recordUnpaidInstallment(any(), any(), any(), any());
         verify(paymentEventInboxRepository).save(any());
         org.assertj.core.api.Assertions.assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+        org.assertj.core.api.Assertions.assertThat(purchase.getSubscriptionStatus())
+                .isEqualTo(SubscriptionStatus.PAST_DUE);
     }
 
     @Test

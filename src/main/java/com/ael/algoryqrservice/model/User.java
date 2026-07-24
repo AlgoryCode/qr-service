@@ -104,4 +104,9 @@ public class User {
     @ColumnDefault("false")
     @Builder.Default
     private boolean notifyPushBrowser = false;
+
+    @Column(name = "trial_used", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean trialUsed = false;
 }

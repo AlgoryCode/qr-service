@@ -6,7 +6,6 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
-import com.ael.algoryqrservice.model.dto.InstallmentOptionResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemRequest;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageRequest;
@@ -75,6 +74,7 @@ public class PlanPackageService {
 
         planPackage.getItems().addAll(buildItems(planPackage, items));
         packagePricingService.applyTo(planPackage);
+        applySubscriptionPricing(planPackage, request);
         return toResponse(planPackageRepository.save(planPackage));
     }
 
@@ -86,7 +86,6 @@ public class PlanPackageService {
     @Transactional(readOnly = true)
     public List<PlanPackageResponse> getActivePackages() {
         return planPackageRepository.findByActiveTrueOrderByPriceAsc().stream()
-                .filter(PlanPackage::isPurchasable)
                 .map(this::toResponse)
                 .toList();
     }
@@ -99,7 +98,6 @@ public class PlanPackageService {
     @Transactional
     public PlanPackageResponse update(Long id, PlanPackageRequest request) {
         PlanPackage planPackage = findPackage(id);
-        rejectSystemManagedMutation(planPackage);
 
         List<PlanPackageItemRequest> items = request.getItems() == null ? List.of() : request.getItems();
         boolean purchasable = request.resolvedPurchasable();
@@ -120,6 +118,7 @@ public class PlanPackageService {
 
         syncItems(planPackage, items);
         packagePricingService.applyTo(planPackage);
+        applySubscriptionPricing(planPackage, request);
 
         return toResponse(planPackageRepository.save(planPackage));
     }
@@ -127,7 +126,6 @@ public class PlanPackageService {
     @Transactional
     public PlanPackageResponse addItem(Long packageId, PlanPackageItemRequest itemRequest) {
         PlanPackage planPackage = findPackage(packageId);
-        rejectSystemManagedMutation(planPackage);
         validatePackageItems(List.of(itemRequest));
 
         boolean exists = planPackage.getItems().stream()
@@ -144,7 +142,6 @@ public class PlanPackageService {
     @Transactional
     public PlanPackageResponse removeItem(Long packageId, Long productId) {
         PlanPackage planPackage = findPackage(packageId);
-        rejectSystemManagedMutation(planPackage);
 
         boolean removed = planPackage.getItems().removeIf(item -> item.getProduct().getId().equals(productId));
         if (!removed) {
@@ -160,14 +157,14 @@ public class PlanPackageService {
     @Transactional
     public PlanPackageResponse publish(Long id, PublishPackageRequest request) {
         PlanPackage planPackage = findPackage(id);
-        rejectSystemManagedMutation(planPackage);
         if (planPackage.getItems().isEmpty()) {
             throw new BadRequestException("Yayinlamak icin pakete en az bir urun ekleyin");
         }
         packagePricingService.applyTo(planPackage);
-        if (planPackage.getPrice() == null || planPackage.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Satilabilir paket fiyati 0'dan buyuk olmalidir; urun birim fiyatlarini kontrol edin");
+        if (planPackage.getPrice() == null || planPackage.effectiveMonthlyPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Satilabilir paket fiyati 0'dan buyuk olmalidir; urun birim fiyatlarini veya aylik fiyati kontrol edin");
         }
+        validatePurchasableSubscriptionPricing(planPackage);
 
         boolean purchasable = request.getPurchasable() == null || Boolean.TRUE.equals(request.getPurchasable());
         boolean active = request.getActive() == null || Boolean.TRUE.equals(request.getActive());
@@ -182,7 +179,6 @@ public class PlanPackageService {
     @Transactional
     public PlanPackageResponse updateActiveStatus(Long id, boolean active) {
         PlanPackage planPackage = findPackage(id);
-        rejectSystemManagedMutation(planPackage);
         planPackage.setActive(active);
         return toResponse(planPackageRepository.save(planPackage));
     }
@@ -190,7 +186,6 @@ public class PlanPackageService {
     @Transactional
     public void delete(Long id) {
         PlanPackage planPackage = findPackage(id);
-        rejectSystemManagedMutation(planPackage);
         if (purchaseRepository.existsByPackageIdAndStatus(id, PurchaseStatus.ACTIVE)
                 || purchaseRepository.existsByPackageIdAndStatus(id, PurchaseStatus.PENDING)) {
             throw new BadRequestException(
@@ -217,15 +212,9 @@ public class PlanPackageService {
                 .orElseThrow(() -> new BadRequestException("Paket bulunamadi: " + id));
     }
 
-    private void rejectSystemManagedMutation(PlanPackage planPackage) {
-        if (planPackage.isSystemManaged() || CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
-            throw new BadRequestException("Sistem paketi yonetilemez: " + planPackage.getCode());
-        }
-    }
-
     private void rejectSystemManagedMutation(String code) {
         if (CatalogPackages.FREE_PACKAGE.equals(code)) {
-            throw new BadRequestException("FREE_PACKAGE sistem tarafindan yonetilir");
+            throw new BadRequestException("FREE_PACKAGE kodu yalnizca startup seed ile olusturulabilir");
         }
     }
 
@@ -293,6 +282,64 @@ public class PlanPackageService {
         return currency == null || currency.isBlank() ? "TRY" : currency.trim().toUpperCase();
     }
 
+    private void applySubscriptionPricing(PlanPackage planPackage, PlanPackageRequest request) {
+        if (request.getPrice() != null) {
+            planPackage.setPrice(request.getPrice().setScale(2, RoundingMode.HALF_UP));
+        }
+        if (request.getMonthlyDiscount() != null) {
+            planPackage.setMonthlyDiscount(normalizeMoney(request.getMonthlyDiscount()));
+        } else if (planPackage.getMonthlyDiscount() == null) {
+            planPackage.setMonthlyDiscount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        }
+        if (request.getYearlyPrice() != null) {
+            planPackage.setYearlyPrice(request.getYearlyPrice().setScale(2, RoundingMode.HALF_UP));
+        } else if (planPackage.isPurchasable()
+                && !CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())
+                && planPackage.getYearlyPrice() == null
+                && planPackage.getPrice() != null
+                && planPackage.getPrice().signum() > 0) {
+            planPackage.setYearlyPrice(planPackage.getPrice().multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP));
+        }
+        if (request.getYearlyDiscount() != null) {
+            planPackage.setYearlyDiscount(normalizeMoney(request.getYearlyDiscount()));
+        } else if (planPackage.getYearlyDiscount() == null) {
+            planPackage.setYearlyDiscount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        }
+        if (planPackage.isPurchasable() && !CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
+            validatePurchasableSubscriptionPricing(planPackage);
+        }
+    }
+
+    private void validatePurchasableSubscriptionPricing(PlanPackage planPackage) {
+        BigDecimal monthly = planPackage.effectiveMonthlyPrice();
+        if (monthly == null || monthly.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Aylik satis fiyati 0'dan buyuk olmalidir");
+        }
+        if (planPackage.getMonthlyDiscount() != null
+                && planPackage.getPrice() != null
+                && planPackage.getMonthlyDiscount().compareTo(planPackage.getPrice()) >= 0) {
+            throw new BadRequestException("Aylik indirim aylik fiyattan kucuk olmalidir");
+        }
+        if (planPackage.getYearlyPrice() == null || planPackage.getYearlyPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Yillik fiyat zorunludur ve 0'dan buyuk olmalidir");
+        }
+        BigDecimal yearly = planPackage.effectiveYearlyPrice();
+        if (yearly == null || yearly.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Yillik satis fiyati 0'dan buyuk olmalidir");
+        }
+        if (planPackage.getYearlyDiscount() != null
+                && planPackage.getYearlyDiscount().compareTo(planPackage.getYearlyPrice()) >= 0) {
+            throw new BadRequestException("Yillik indirim yillik fiyattan kucuk olmalidir");
+        }
+    }
+
+    private BigDecimal normalizeMoney(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
     private String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -336,9 +383,18 @@ public class PlanPackageService {
                 .name(planPackage.getName())
                 .description(planPackage.getDescription())
                 .features(planPackage.getFeatures() == null ? List.of() : List.copyOf(planPackage.getFeatures()))
-                .subtotal(breakdown.subtotal())
-                .vatAmount(breakdown.vatAmount())
-                .price(breakdown.total())
+                .subtotal(planPackage.getSubtotal() != null ? planPackage.getSubtotal() : breakdown.subtotal())
+                .vatAmount(planPackage.getVatAmount() != null ? planPackage.getVatAmount() : breakdown.vatAmount())
+                .price(planPackage.getPrice())
+                .monthlyDiscount(planPackage.getMonthlyDiscount() == null
+                        ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                        : planPackage.getMonthlyDiscount())
+                .yearlyPrice(planPackage.getYearlyPrice())
+                .yearlyDiscount(planPackage.getYearlyDiscount() == null
+                        ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                        : planPackage.getYearlyDiscount())
+                .effectiveMonthlyPrice(planPackage.effectiveMonthlyPrice())
+                .effectiveYearlyPrice(planPackage.effectiveYearlyPrice())
                 .currency(planPackage.getCurrency())
                 .active(planPackage.isActive())
                 .validityDays(planPackage.getValidityDays())
@@ -347,37 +403,13 @@ public class PlanPackageService {
                 .systemManaged(planPackage.isSystemManaged())
                 .trialEligible(planPackage.isTrialEligible())
                 .allowedPaymentModes(List.of(PaymentMode.DIRECT, PaymentMode.THREE_DS))
-                .allowedInstallments(allowedInstallments(breakdown.total(), planPackage))
-                .installmentOptions(installmentOptions(breakdown.total(), planPackage))
+                .allowedInstallments(List.of())
+                .installmentOptions(List.of())
                 .items(planPackage.getItems().stream()
                         .map(item -> toItemResponse(item, lineByProductId.get(item.getProduct().getId())))
                         .toList())
                 .createdAt(planPackage.getCreatedAt())
                 .build();
-    }
-
-    private List<Integer> allowedInstallments(BigDecimal total, PlanPackage planPackage) {
-        if (!planPackage.isPurchasable() || CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
-            return List.of(1);
-        }
-        if (total == null || total.compareTo(BigDecimal.ZERO) <= 0) {
-            return List.of(1);
-        }
-        return List.of(1, 2, 3, 6, 9, 12).stream()
-                .filter(count -> total.movePointRight(2)
-                        .remainder(BigDecimal.valueOf(count))
-                        .signum() == 0)
-                .toList();
-    }
-
-    private List<InstallmentOptionResponse> installmentOptions(BigDecimal total, PlanPackage planPackage) {
-        return allowedInstallments(total, planPackage).stream()
-                .map(count -> InstallmentOptionResponse.builder()
-                        .installmentCount(count)
-                        .monthlyAmount(total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP))
-                        .totalAmount(total)
-                        .build())
-                .toList();
     }
 
     private PlanPackageItemResponse toItemResponse(PlanPackageItem item, PackagePricingService.LinePrice line) {

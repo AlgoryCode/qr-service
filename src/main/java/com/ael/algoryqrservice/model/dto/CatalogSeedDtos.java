@@ -42,6 +42,9 @@ public final class CatalogSeedDtos {
         private Boolean trialEligible;
         private Boolean active;
         private BigDecimal lockPrice;
+        private BigDecimal monthlyDiscount;
+        private BigDecimal yearlyPrice;
+        private BigDecimal yearlyDiscount;
         private List<ItemSeed> items = new ArrayList<>();
     }
 

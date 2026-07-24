@@ -45,11 +45,15 @@ public class CatalogWorkflowService {
         packageRequest.setActive(true);
         packageRequest.setPurchasable(true);
         packageRequest.setTrialEligible(Boolean.TRUE.equals(request.getTrialEligible()));
+        packageRequest.setPrice(request.getMonthlyPrice());
+        packageRequest.setMonthlyDiscount(request.getMonthlyDiscount());
+        packageRequest.setYearlyPrice(request.getYearlyPrice());
+        packageRequest.setYearlyDiscount(request.getYearlyDiscount());
         packageRequest.setItems(packageItems);
 
         PlanPackageResponse response = planPackageService.create(packageRequest);
-        if (response.getPrice() == null || response.getPrice().signum() <= 0) {
-            throw new BadRequestException("Paket toplami 0; urun birim fiyatlarini girin");
+        if (response.getEffectiveMonthlyPrice() == null || response.getEffectiveMonthlyPrice().signum() <= 0) {
+            throw new BadRequestException("Paket aylik fiyati 0; aylik fiyat veya urun birim fiyatlarini girin");
         }
         return response;
     }

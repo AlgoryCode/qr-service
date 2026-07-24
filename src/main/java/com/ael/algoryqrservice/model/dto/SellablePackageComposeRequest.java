@@ -33,6 +33,18 @@ public class SellablePackageComposeRequest {
 
     private Boolean trialEligible;
 
+    @PositiveOrZero(message = "Aylik fiyat 0 veya daha buyuk olmalidir")
+    private BigDecimal monthlyPrice;
+
+    @PositiveOrZero(message = "Aylik indirim 0 veya daha buyuk olmalidir")
+    private BigDecimal monthlyDiscount;
+
+    @PositiveOrZero(message = "Yillik fiyat 0 veya daha buyuk olmalidir")
+    private BigDecimal yearlyPrice;
+
+    @PositiveOrZero(message = "Yillik indirim 0 veya daha buyuk olmalidir")
+    private BigDecimal yearlyDiscount;
+
     @NotEmpty(message = "En az bir urun gerekli")
     @Valid
     private List<ComposeItemRequest> items;

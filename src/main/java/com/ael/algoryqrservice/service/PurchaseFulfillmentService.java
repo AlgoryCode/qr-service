@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -43,41 +42,21 @@ public class PurchaseFulfillmentService {
         if (!fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(purchase.getId()).isEmpty()) {
             return;
         }
-        int installmentCount = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
-                ? 1
-                : purchase.getInstallmentCount();
-        boolean subscription = purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION;
-        BigDecimal standardAmount = subscription
-                ? purchase.getPrice()
-                : purchase.getPrice().divide(
-                        BigDecimal.valueOf(installmentCount),
-                        2,
-                        RoundingMode.DOWN
-                );
         String seed = serviceName + ":" + purchase.getPaymentConversationId();
         String planId = UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
         LocalDateTime anchor = purchase.getPurchasedAt() != null ? purchase.getPurchasedAt() : LocalDateTime.now();
-        for (int number = 1; number <= installmentCount; number++) {
-            BigDecimal amount = subscription
-                    ? purchase.getPrice()
-                    : (number == installmentCount
-                            ? purchase.getPrice().subtract(standardAmount.multiply(
-                                    BigDecimal.valueOf(installmentCount - 1L)
-                            ))
-                            : standardAmount);
-            String installmentId = planId + ":" + number;
-            fulfillmentRepository.save(PurchaseFulfillment.builder()
-                    .purchaseId(purchase.getId())
-                    .installmentId(installmentId)
-                    .installmentNumber(number)
-                    .installmentCount(installmentCount)
-                    .status(FulfillmentStatus.PENDING)
-                    .dueAt(anchor.plusMonths(number - 1L))
-                    .amount(amount)
-                    .currency(purchase.getCurrency())
-                    .eventId("pending:" + installmentId)
-                    .build());
-        }
+        String installmentId = planId + ":1";
+        fulfillmentRepository.save(PurchaseFulfillment.builder()
+                .purchaseId(purchase.getId())
+                .installmentId(installmentId)
+                .installmentNumber(1)
+                .installmentCount(1)
+                .status(FulfillmentStatus.PENDING)
+                .dueAt(anchor)
+                .amount(purchase.getPrice())
+                .currency(purchase.getCurrency())
+                .eventId("pending:" + installmentId)
+                .build());
     }
 
     @Transactional
@@ -110,6 +89,13 @@ public class PurchaseFulfillmentService {
         fulfillmentRepository.save(fulfillment);
 
         purchase.setExpiresAt(periodEnd);
+        purchase.setCurrentPeriodPaidAt(resolveOccurredAt(event));
+        if (event.getConversationId() != null && !event.getConversationId().isBlank()) {
+            purchase.setCurrentPeriodConversationId(event.getConversationId());
+            if (purchase.getPaymentConversationId() == null || purchase.getPaymentConversationId().isBlank()) {
+                purchase.setPaymentConversationId(event.getConversationId());
+            }
+        }
         if (firstPaidInstallment) {
             purchase.setStartsAt(periodStart);
             purchase.setStatus(PurchaseStatus.ACTIVE);
@@ -213,6 +199,17 @@ public class PurchaseFulfillmentService {
             if (byNumber.isPresent()) {
                 return byNumber.get();
             }
+            return fulfillmentRepository.save(PurchaseFulfillment.builder()
+                    .purchaseId(purchase.getId())
+                    .installmentId(metadata.installmentId())
+                    .installmentNumber(metadata.installmentNumber())
+                    .installmentCount(metadata.installmentNumber())
+                    .status(FulfillmentStatus.PENDING)
+                    .dueAt(metadata.periodStart())
+                    .amount(purchase.getPrice())
+                    .currency(purchase.getCurrency())
+                    .eventId("pending:" + metadata.installmentId())
+                    .build());
         }
         return fulfillmentRepository
                 .findByPurchaseIdAndInstallmentId(purchase.getId(), metadata.installmentId())
@@ -252,6 +249,9 @@ public class PurchaseFulfillmentService {
     }
 
     private void recalculatePaidPeriod(Purchase purchase) {
+        if (purchase.getStatus() == PurchaseStatus.CANCELLED) {
+            return;
+        }
         List<PurchaseFulfillment> paid = fulfillmentRepository
                 .findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(purchase.getId(), FulfillmentStatus.PAID);
         if (paid.isEmpty()) {
@@ -309,6 +309,27 @@ public class PurchaseFulfillmentService {
             }
         }
         return null;
+    }
+
+    private LocalDateTime resolveOccurredAt(PaymentCompletedEventDto event) {
+        if (event.getOccurredAt() == null || event.getOccurredAt().isBlank()) {
+            return LocalDateTime.now();
+        }
+        try {
+            return LocalDateTime.parse(event.getOccurredAt());
+        } catch (RuntimeException ignored) {
+            try {
+                return java.time.OffsetDateTime.parse(event.getOccurredAt()).toLocalDateTime();
+            } catch (RuntimeException ignoredAgain) {
+                try {
+                    return java.time.Instant.parse(event.getOccurredAt())
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDateTime();
+                } catch (RuntimeException ignoredThird) {
+                    return LocalDateTime.now();
+                }
+            }
+        }
     }
 
     private PurchaseFulfillmentResponse toResponse(PurchaseFulfillment fulfillment) {

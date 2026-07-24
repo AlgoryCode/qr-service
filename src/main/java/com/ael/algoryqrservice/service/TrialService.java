@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
 import com.ael.algoryqrservice.model.dto.TrialDtos;
@@ -13,6 +14,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -29,12 +31,15 @@ public class TrialService {
 
     private final PurchaseRepository purchaseRepository;
     private final PlanPackageRepository packageRepository;
+    private final UserRepository userRepository;
     private final EntitlementService entitlementService;
     private final PackageActivationService packageActivationService;
 
     @Transactional
     public TrialDtos.Status start(Long userId, Long packageId) {
-        if (purchaseRepository.existsByUserIdAndPurchaseType(userId, PurchaseType.TRIAL)) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Kullanici bulunamadi"));
+        if (user.isTrialUsed() || purchaseRepository.existsByUserIdAndPurchaseType(userId, PurchaseType.TRIAL)) {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         rejectIfHasUsablePaidPackage(userId);
@@ -59,6 +64,8 @@ public class TrialService {
         } catch (DataIntegrityViolationException exception) {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
+        user.setTrialUsed(true);
+        userRepository.save(user);
         packageActivationService.activatePurchasedPackage(purchase);
         for (PlanPackageItem item : planPackage.getItems()) {
             entitlementService.grant(
@@ -81,10 +88,14 @@ public class TrialService {
 
     @Transactional
     public TrialDtos.Status status(Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
         Purchase purchase = purchaseRepository
                 .findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(userId, PurchaseType.TRIAL)
                 .orElse(null);
         if (purchase == null) {
+            if (user != null && user.isTrialUsed()) {
+                return usedUnavailableStatus();
+            }
             return availableStatus();
         }
         if (purchase.getStatus() == PurchaseStatus.ACTIVE && purchase.isExpiredByDate()) {
@@ -143,6 +154,21 @@ public class TrialService {
         );
     }
 
+    private TrialDtos.Status usedUnavailableStatus() {
+        return new TrialDtos.Status(
+                TrialDtos.Lifecycle.TRIAL_EXPIRED,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
     private TrialDtos.Status statusOf(Purchase purchase) {
         TrialDtos.Lifecycle lifecycle = purchase.getStatus() == PurchaseStatus.ACTIVE && !purchase.isExpiredByDate()
                 ? TrialDtos.Lifecycle.ACTIVE
@@ -189,6 +215,11 @@ public class TrialService {
                 .description(planPackage.getDescription())
                 .features(planPackage.getFeatures() == null ? List.of() : List.copyOf(planPackage.getFeatures()))
                 .price(planPackage.getPrice())
+                .monthlyDiscount(planPackage.getMonthlyDiscount())
+                .yearlyPrice(planPackage.getYearlyPrice())
+                .yearlyDiscount(planPackage.getYearlyDiscount())
+                .effectiveMonthlyPrice(planPackage.effectiveMonthlyPrice())
+                .effectiveYearlyPrice(planPackage.effectiveYearlyPrice())
                 .currency(planPackage.getCurrency())
                 .active(planPackage.isActive())
                 .validityDays(planPackage.getValidityDays())
