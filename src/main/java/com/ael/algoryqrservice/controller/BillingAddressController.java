@@ -23,6 +23,11 @@ public class BillingAddressController {
         return service.list(userId());
     }
 
+    @GetMapping("/{id}")
+    public BillingAddressDtos.Response get(@PathVariable Long id) {
+        return service.get(userId(), id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public BillingAddressDtos.Response create(@Valid @RequestBody BillingAddressDtos.Request request) {

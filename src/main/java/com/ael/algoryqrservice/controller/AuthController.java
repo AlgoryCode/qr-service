@@ -59,8 +59,10 @@ public class AuthController {
     }
 
     @GetMapping("/sessions")
-    public ResponseEntity<List<SessionResponse>> getMySessions() {
-        return ResponseEntity.ok(authService.getMySessions());
+    public ResponseEntity<List<SessionResponse>> getMySessions(
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        return ResponseEntity.ok(authService.getMySessions(extractBearerToken(authorization)));
     }
 
     @DeleteMapping("/sessions/{sessionId}")

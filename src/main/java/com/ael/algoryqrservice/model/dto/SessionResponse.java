@@ -23,6 +23,7 @@ public class SessionResponse {
     private LocalDateTime revokedAt;
     private boolean expired;
     private boolean active;
+    private boolean current;
     private String ipAddress;
     private String userAgent;
     private String device;

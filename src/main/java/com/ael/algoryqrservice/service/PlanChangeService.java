@@ -590,7 +590,7 @@ public class PlanChangeService {
             String clientIp
     ) {
         if (purchase.getBillingSnapshot() == null) {
-            throw new BadRequestException("Fatura bilgisi bulunamadi; once fatura adresi tanimlayin");
+            throw new BadRequestException("Fatura bilgisi bulunamadı; önce fatura adresi tanımlayın");
         }
         BigDecimal amount = chargeAmount == null ? BigDecimal.ZERO : chargeAmount;
         if (amount.signum() <= 0) {

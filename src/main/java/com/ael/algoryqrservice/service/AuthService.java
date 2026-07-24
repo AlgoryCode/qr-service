@@ -136,9 +136,12 @@ public class AuthService {
         throw new BadRequestException("Çıkış için geçerli access token veya refresh token gerekli");
     }
 
-    public List<SessionResponse> getMySessions() {
+    public List<SessionResponse> getMySessions(String accessToken) {
         User user = getCurrentUser();
-        return sessionService.getUserSessions(user.getId());
+        UUID currentSessionId = accessToken == null || accessToken.isBlank()
+                ? null
+                : jwtService.extractSessionIdIfSignatureValid(accessToken).orElse(null);
+        return sessionService.getUserSessions(user.getId(), currentSessionId);
     }
 
     @Transactional

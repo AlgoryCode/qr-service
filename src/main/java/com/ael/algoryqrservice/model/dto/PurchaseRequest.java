@@ -55,7 +55,7 @@ public class PurchaseRequest {
                 && (billingPeriod == BillingPeriod.MONTHLY || billingPeriod == BillingPeriod.YEARLY);
     }
 
-    @AssertTrue(message = "Fatura adresi seçimi geçersiz")
+    @AssertTrue(message = "Fatura adresi seçimi geçersiz; billingAddressId gönderilmelidir")
     public boolean isBillingSelectionValid() {
         int selections = billingAddressId != null ? 1 : 0;
         selections += inlineBillingAddress != null ? 1 : 0;

@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.UserSession;
@@ -110,7 +111,7 @@ public class SessionService {
     @Transactional
     public void revokeSession(UUID sessionId, Long userId) {
         UserSession session = sessionRepository.findByIdAndUserId(sessionId, userId)
-                .orElseThrow(() -> new BadRequestException("Oturum bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Oturum bulunamadı"));
 
         revoke(session);
     }
@@ -159,8 +160,13 @@ public class SessionService {
 
     @Transactional(readOnly = true)
     public List<SessionResponse> getUserSessions(Long userId) {
+        return getUserSessions(userId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getUserSessions(Long userId, UUID currentSessionId) {
         return sessionRepository.findByUserIdOrderByLoggedInAtDesc(userId).stream()
-                .map(this::toSessionResponse)
+                .map(session -> toSessionResponse(session, currentSessionId))
                 .toList();
     }
 
@@ -212,6 +218,10 @@ public class SessionService {
     }
 
     private SessionResponse toSessionResponse(UserSession session) {
+        return toSessionResponse(session, null);
+    }
+
+    private SessionResponse toSessionResponse(UserSession session, UUID currentSessionId) {
         return SessionResponse.builder()
                 .sessionId(session.getId())
                 .loggedInAt(session.getLoggedInAt())
@@ -222,6 +232,7 @@ public class SessionService {
                 .revokedAt(session.getRevokedAt())
                 .expired(session.isRefreshExpired())
                 .active(session.isActive())
+                .current(currentSessionId != null && currentSessionId.equals(session.getId()))
                 .ipAddress(session.getIpAddress())
                 .userAgent(session.getUserAgent())
                 .device(session.getDevice())

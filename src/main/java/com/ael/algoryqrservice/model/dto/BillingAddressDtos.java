@@ -14,25 +14,25 @@ public final class BillingAddressDtos {
     }
 
     public record Request(
-            @NotNull BillingAddressType type,
+            @NotNull(message = "Fatura tipi zorunludur") BillingAddressType type,
             String name,
             String surname,
             String legalName,
-            @Pattern(regexp = "\\d{11}") String tckn,
-            @Pattern(regexp = "\\d{10}") String vkn,
+            @Pattern(regexp = "\\d{11}", message = "TCKN 11 haneli olmalıdır") String tckn,
+            @Pattern(regexp = "\\d{10}", message = "VKN 10 haneli olmalıdır") String vkn,
             String taxOffice,
             String mersis,
-            @NotBlank String country,
-            @NotBlank String city,
-            @NotBlank String district,
-            @NotBlank String address,
-            @NotBlank String postcode,
-            @NotBlank @Email String email,
-            @NotBlank String phone,
+            @NotBlank(message = "Ülke zorunludur") String country,
+            @NotBlank(message = "Şehir zorunludur") String city,
+            @NotBlank(message = "İlçe zorunludur") String district,
+            @NotBlank(message = "Adres zorunludur") String address,
+            @NotBlank(message = "Posta kodu zorunludur") String postcode,
+            @NotBlank(message = "E-posta zorunludur") @Email(message = "Geçerli bir e-posta girin") String email,
+            @NotBlank(message = "Telefon zorunludur") String phone,
             boolean taxpayerInvoice,
             boolean defaultAddress
     ) {
-        @AssertTrue(message = "Bireysel fatura bilgileri eksik veya geçersiz")
+        @AssertTrue(message = "Bireysel fatura için ad, soyad ve (vergi mükellefi ise) TCKN zorunludur")
         public boolean isIndividualValid() {
             if (type != BillingAddressType.INDIVIDUAL) {
                 return true;
@@ -40,7 +40,7 @@ public final class BillingAddressDtos {
             return present(name) && present(surname) && (!taxpayerInvoice || tckn != null);
         }
 
-        @AssertTrue(message = "Kurumsal fatura bilgileri eksik veya geçersiz")
+        @AssertTrue(message = "Kurumsal fatura için unvan, VKN ve vergi dairesi zorunludur")
         public boolean isCorporateValid() {
             if (type != BillingAddressType.CORPORATE) {
                 return true;

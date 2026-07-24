@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillingAddress;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.dto.BillingAddressDtos;
@@ -22,6 +23,11 @@ public class BillingAddressService {
         return repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public BillingAddressDtos.Response get(Long userId, Long id) {
+        return toResponse(owned(userId, id));
     }
 
     @Transactional
@@ -75,7 +81,7 @@ public class BillingAddressService {
     @Transactional
     public BillingSnapshot resolveSnapshot(Long userId, Long id, BillingAddressDtos.Request inline) {
         if ((id == null) == (inline == null)) {
-            throw new BadRequestException("billingAddressId veya inlineBillingAddress alanlarından yalnızca biri gönderilmelidir");
+            throw new BadRequestException("Fatura adresi seçimi geçersiz; billingAddressId veya inlineBillingAddress alanlarından yalnızca biri gönderilmelidir");
         }
         BillingAddress address = id != null ? owned(userId, id) : createEntity(userId, inline);
         if (id == null) {
@@ -130,7 +136,7 @@ public class BillingAddressService {
 
     private BillingAddress owned(Long userId, Long id) {
         return repository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new BadRequestException("Fatura adresi bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Fatura adresi bulunamadı"));
     }
 
     private BillingSnapshot toSnapshot(BillingAddress address) {
