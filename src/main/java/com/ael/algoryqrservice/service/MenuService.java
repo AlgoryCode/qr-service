@@ -16,6 +16,9 @@ import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.ael.algoryqrservice.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,9 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MenuService {
+
+    public static final int DEFAULT_PRODUCT_PAGE_SIZE = 20;
+    public static final int MAX_PRODUCT_PAGE_SIZE = 50;
 
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
@@ -206,12 +212,18 @@ public class MenuService {
     }
 
     @Transactional(readOnly = true)
-    public List<MenuDtos.MenuProductResponse> listProducts(Long menuId) {
+    public MenuDtos.MenuProductPageResponse listProducts(Long menuId, int page, int size) {
         ensureOwnedMenu(menuId);
-        return menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId)
-                .stream()
-                .map(this::toProductResponse)
-                .toList();
+        Pageable pageable = productPageable(page, size);
+        Page<MenuProduct> productPage = menuProductRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId, pageable);
+        return toProductPageResponse(productPage, menuId);
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.MenuProductPageResponse listPublicProducts(Long menuId, int page, int size) {
+        Menu menu = ensureMenuExists(menuId);
+        return listAvailableProductsPage(menu, page, size);
     }
 
     @Transactional
@@ -325,13 +337,104 @@ public class MenuService {
         String publicUrl = buildPublicUrl(menu);
         qrGenerationService.updateQrContent(qr, publicUrl);
 
-        return toMenuProfile(menu, publicUrl);
+        return toMenuProfile(menu, publicUrl, null);
     }
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuProfileResponse getMenuProfile(Long menuId) {
         Menu menu = ensureOwnedMenu(menuId);
-        return toMenuProfile(menu, buildPublicUrl(menu));
+        return toMenuProfile(menu, buildPublicUrl(menu), null);
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.MenuProfileResponse getMenuProfileByQrId(Long qrId) {
+        List<Object[]> rows = menuRepository.findActiveMenuWithQrByQrId(qrId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Object[] row = rows.getFirst();
+        Menu menu = (Menu) row[0];
+        Qr qr = (Qr) row[1];
+        requireOwnership(menu);
+        return toMenuProfile(
+                menu,
+                buildPublicUrl(menu),
+                MenuDtos.QrBrief.builder()
+                        .id(qr.getQrId())
+                        .name(qr.getQrName())
+                        .imgSrc(qr.getImgSrc())
+                        .build()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<MenuDtos.ActiveMenuSummary> listActiveMenusForCurrentUser() {
+        Long userId = securityUtils.getCurrentUserId();
+        return menuRepository.findActiveMenusWithQrByUserId(userId).stream()
+                .map(row -> {
+                    Menu menu = (Menu) row[0];
+                    Qr qr = (Qr) row[1];
+                    return MenuDtos.ActiveMenuSummary.builder()
+                            .menuId(menu.getMenuId())
+                            .qrId(menu.getQrId())
+                            .businessName(menu.getBusinessName())
+                            .themeId(menu.getThemeId())
+                            .publicUrl(buildPublicUrl(menu))
+                            .active(menu.isActive())
+                            .qr(MenuDtos.QrNameBrief.builder()
+                                    .id(qr.getQrId())
+                                    .name(qr.getQrName())
+                                    .build())
+                            .build();
+                })
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.MenuProductsByQrResponse listProductsByQrId(Long qrId) {
+        Long userId = securityUtils.getCurrentUserId();
+        List<Object[]> rows = menuProductRepository.findMenuWithProductsByQrIdAndUserId(qrId, userId);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
+        }
+        Menu menu = (Menu) rows.getFirst()[0];
+        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menu.getMenuId());
+        List<MenuDtos.MenuProductResponse> products = rows.stream()
+                .map(row -> (MenuProduct) row[1])
+                .filter(product -> product != null)
+                .map(product -> toProductResponse(product, categoryMap))
+                .toList();
+        return MenuDtos.MenuProductsByQrResponse.builder()
+                .menuId(menu.getMenuId())
+                .qrId(menu.getQrId())
+                .businessName(menu.getBusinessName())
+                .content(products)
+                .page(0)
+                .size(products.size())
+                .totalElements(products.size())
+                .totalPages(1)
+                .hasNext(false)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.MenuCategoriesByQrResponse listCategoriesByQrId(Long qrId) {
+        Long userId = securityUtils.getCurrentUserId();
+        List<Object[]> rows = menuCategoryRepository.findMenuWithCategoriesByQrIdAndUserId(qrId, userId);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
+        }
+        Menu menu = (Menu) rows.getFirst()[0];
+        List<MenuCategory> categories = rows.stream()
+                .map(row -> (MenuCategory) row[1])
+                .filter(category -> category != null)
+                .toList();
+        return MenuDtos.MenuCategoriesByQrResponse.builder()
+                .menuId(menu.getMenuId())
+                .qrId(menu.getQrId())
+                .businessName(menu.getBusinessName())
+                .categories(menuCategoryService.buildTreeFromList(categories))
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -356,7 +459,7 @@ public class MenuService {
     }
 
     private void requireOwnership(Menu menu) {
-        Long currentUserId = securityUtils.getCurrentUser().getId();
+        Long currentUserId = securityUtils.getCurrentUserId();
         if (!currentUserId.equals(menu.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
@@ -366,7 +469,7 @@ public class MenuService {
         return menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).size();
     }
 
-    private MenuDtos.PublicMenuResponse buildPublicResponse(Menu menu) {
+    private void ensurePublicAccess(Menu menu) {
         if (!menu.isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü yayında değil");
         }
@@ -376,28 +479,65 @@ public class MenuService {
                     "Lütfen restoran sahibiyle iletişime geçiniz."
             );
         }
-        List<MenuDtos.MenuProductResponse> products = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menu.getMenuId())
-                .stream()
-                .filter(MenuProduct::isAvailable)
-                .map(product -> toProductResponse(product, menu.getMenuId()))
-                .toList();
+    }
+
+    private MenuDtos.MenuProductPageResponse listAvailableProductsPage(Menu menu, int page, int size) {
+        ensurePublicAccess(menu);
+        Pageable pageable = productPageable(page, size);
+        Page<MenuProduct> productPage = menuProductRepository
+                .findByMenuIdAndDeletedFalseAndAvailableTrueOrderBySortOrderAscProductIdAsc(
+                        menu.getMenuId(),
+                        pageable
+                );
+        return toProductPageResponse(productPage, menu.getMenuId());
+    }
+
+    private MenuDtos.PublicMenuResponse buildPublicResponse(Menu menu) {
+        MenuDtos.MenuProductPageResponse productPage = listAvailableProductsPage(
+                menu,
+                0,
+                DEFAULT_PRODUCT_PAGE_SIZE
+        );
         List<MenuDtos.MenuCategoryResponse> categories = menuCategoryService.listPublicCategoryTree(menu.getMenuId());
 
         return MenuDtos.PublicMenuResponse.builder()
-                .menu(toMenuProfile(menu, buildPublicUrl(menu)))
-                .products(products)
+                .menu(toMenuProfile(menu, buildPublicUrl(menu), null))
+                .products(productPage.getContent())
                 .categories(categories)
                 .themeId(menu.getThemeId())
+                .productPage(productPage.getPage())
+                .productSize(productPage.getSize())
+                .productTotalElements(productPage.getTotalElements())
+                .productHasNext(productPage.isHasNext())
+                .build();
+    }
+
+    private Pageable productPageable(int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? DEFAULT_PRODUCT_PAGE_SIZE : Math.min(size, MAX_PRODUCT_PAGE_SIZE);
+        return PageRequest.of(safePage, safeSize);
+    }
+
+    private MenuDtos.MenuProductPageResponse toProductPageResponse(Page<MenuProduct> productPage, Long menuId) {
+        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menuId);
+        List<MenuDtos.MenuProductResponse> content = productPage.getContent().stream()
+                .map(product -> toProductResponse(product, categoryMap))
+                .toList();
+        return MenuDtos.MenuProductPageResponse.builder()
+                .content(content)
+                .page(productPage.getNumber())
+                .size(productPage.getSize())
+                .totalElements(productPage.getTotalElements())
+                .totalPages(productPage.getTotalPages())
+                .hasNext(productPage.hasNext())
                 .build();
     }
 
     private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
-        return toProductResponse(product, product.getMenuId());
+        return toProductResponse(product, menuCategoryService.loadCategoryMap(product.getMenuId()));
     }
 
-    private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product, Long menuId) {
-        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menuId);
+    private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product, Map<Long, MenuCategory> categoryMap) {
         Long categoryId = product.getCategoryId();
         String categoryName = menuCategoryService.resolveCategoryName(categoryId, categoryMap);
         String categoryPath = menuCategoryService.resolveCategoryPath(categoryId, categoryMap);
@@ -460,7 +600,11 @@ public class MenuService {
         }
     }
 
-    private MenuDtos.MenuProfileResponse toMenuProfile(Menu menu, String publicUrl) {
+    private MenuDtos.MenuProfileResponse toMenuProfile(
+            Menu menu,
+            String publicUrl,
+            MenuDtos.QrBrief qrBrief
+    ) {
         return MenuDtos.MenuProfileResponse.builder()
                 .menuId(menu.getMenuId())
                 .qrId(menu.getQrId())
@@ -475,6 +619,7 @@ public class MenuService {
                 .urlMode(menu.getUrlMode().name())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
+                .qr(qrBrief)
                 .build();
     }
 

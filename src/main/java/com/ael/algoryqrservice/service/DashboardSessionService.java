@@ -55,10 +55,7 @@ public class DashboardSessionService {
                 user.getId(),
                 user.getRole()
         );
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(formatRefreshToken(sessionId, rawRefreshToken))
-                .build();
+        return buildAuthResponse(accessToken, formatRefreshToken(sessionId, rawRefreshToken));
     }
 
     @Transactional
@@ -90,10 +87,7 @@ public class DashboardSessionService {
                 user.getId(),
                 user.getRole()
         );
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(formatRefreshToken(session.getId(), newRawRefreshToken))
-                .build();
+        return buildAuthResponse(accessToken, formatRefreshToken(session.getId(), newRawRefreshToken));
     }
 
     @Transactional(readOnly = true)
@@ -157,6 +151,13 @@ public class DashboardSessionService {
 
     private String formatRefreshToken(UUID sessionId, String rawToken) {
         return sessionId + "." + rawToken;
+    }
+
+    private AuthResponse buildAuthResponse(String accessToken, String refreshToken) {
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
     }
 
     private record RefreshTokenParts(UUID sessionId, String rawToken) {

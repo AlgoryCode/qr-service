@@ -87,7 +87,7 @@ public class QrService {
         return createQR(req, existingQr.getUserId());
     }
 
-    public List<QrListResponse> getUserQrs(Long userId) {
+    public List<QrListResponse> getUserQrs(Long userId, boolean includeImage) {
         Long currentUserId = securityUtils.getCurrentUser().getId();
         if (!currentUserId.equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Başka kullanıcının QR kayıtlarına erişilemez");
@@ -98,7 +98,7 @@ public class QrService {
         return qrs
                 .stream()
                 .filter(qr -> shouldShowQr(qr, activeMenuQrIds))
-                .map(this::mapToListResponse)
+                .map(qr -> mapToListResponse(qr, includeImage))
                 .toList();
     }
 
@@ -151,12 +151,12 @@ public class QrService {
                 .build();
     }
 
-    private QrListResponse mapToListResponse(Qr qr) {
+    private QrListResponse mapToListResponse(Qr qr, boolean includeImage) {
         return QrListResponse.builder()
                 .qrId(qr.getQrId())
                 .userId(qr.getUserId())
                 .qrName(qr.getQrName())
-                .imgSrc(qr.getImgSrc())
+                .imgSrc(includeImage ? qr.getImgSrc() : null)
                 .details(objectMapper.convertValue(qr.getDetails(), new TypeReference<Map<String, Object>>() {}))
                 .createdAt(qr.getCreatedAt())
                 .build();

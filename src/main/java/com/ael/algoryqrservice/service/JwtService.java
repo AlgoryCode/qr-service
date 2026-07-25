@@ -145,6 +145,44 @@ public class JwtService {
         return claims.getSubject();
     }
 
+    public Long extractUserId(Claims claims) {
+        Object value = claims.get("userId");
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> extractScopes(Claims claims) {
+        Object scopes = claims.get("scopes");
+        if (scopes instanceof List<?> scopeList) {
+            return scopeList.stream().map(Object::toString).toList();
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> extractProducts(Claims claims) {
+        Object products = claims.get("products");
+        if (products instanceof List<?> productList) {
+            return productList.stream().map(Object::toString).toList();
+        }
+        return List.of();
+    }
+
+    public String extractActivePackage(Claims claims) {
+        Object value = claims.get("activePackage");
+        return value == null ? null : value.toString();
+    }
+
     @SuppressWarnings("unchecked")
     public List<String> extractRoles(Claims claims) {
         Object roles = claims.get(ROLES_CLAIM);

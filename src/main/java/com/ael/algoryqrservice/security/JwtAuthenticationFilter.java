@@ -13,7 +13,6 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -73,7 +72,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .map(SimpleGrantedAuthority::new)
                         .toList()
         );
-        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        authToken.setDetails(new JwtAccessPrincipal(
+                jwtService.extractUserId(claims),
+                jwtService.extractScopes(claims),
+                jwtService.extractProducts(claims),
+                jwtService.extractActivePackage(claims)
+        ));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }
 }

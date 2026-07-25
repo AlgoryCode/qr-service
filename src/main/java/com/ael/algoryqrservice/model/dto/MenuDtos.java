@@ -57,6 +57,46 @@ public final class MenuDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class MenuProductPageResponse {
+        private List<MenuProductResponse> content;
+        private int page;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean hasNext;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductsByQrResponse {
+        private Long menuId;
+        private Long qrId;
+        private String businessName;
+        private List<MenuProductResponse> content;
+        private int page;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean hasNext;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuCategoriesByQrResponse {
+        private Long menuId;
+        private Long qrId;
+        private String businessName;
+        private List<MenuCategoryResponse> categories;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class MenuCategoryRequest {
         private String name;
         private Long parentId;
@@ -105,6 +145,40 @@ public final class MenuDtos {
         private String urlMode;
         private String publicUrl;
         private boolean active;
+        private QrBrief qr;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class QrBrief {
+        private Long id;
+        private String name;
+        private String imgSrc;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ActiveMenuSummary {
+        private Long menuId;
+        private Long qrId;
+        private String businessName;
+        private String themeId;
+        private String publicUrl;
+        private boolean active;
+        private QrNameBrief qr;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class QrNameBrief {
+        private Long id;
+        private String name;
     }
 
     @Data
@@ -116,6 +190,10 @@ public final class MenuDtos {
         private List<MenuProductResponse> products;
         private List<MenuCategoryResponse> categories;
         private String themeId;
+        private int productPage;
+        private int productSize;
+        private long productTotalElements;
+        private boolean productHasNext;
     }
 
     @Data

@@ -22,6 +22,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -29,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -228,14 +232,124 @@ class MenuServiceTest {
                 .build();
         when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(10L))
-                .thenReturn(List.of());
+        when(menuProductRepository.findByMenuIdAndDeletedFalseAndAvailableTrueOrderBySortOrderAscProductIdAsc(
+                eq(10L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
         when(menuCategoryService.listPublicCategoryTree(10L)).thenReturn(List.of());
+        when(menuCategoryService.loadCategoryMap(10L)).thenReturn(Map.of());
 
         MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByQrId(2L);
 
         assertThat(response.getThemeId()).isEqualTo("classic");
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
         assertThat(response.getProducts()).isEmpty();
+        assertThat(response.getProductPage()).isZero();
+        assertThat(response.getProductSize()).isEqualTo(20);
+        assertThat(response.getProductTotalElements()).isZero();
+        assertThat(response.isProductHasNext()).isFalse();
+    }
+
+    @Test
+    void listProducts_whenMoreThanPageSize_thenReturnHasNext() {
+        Menu menu = Menu.builder().menuId(10L).userId(7L).active(true).build();
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
+        when(menuCategoryService.loadCategoryMap(10L)).thenReturn(Map.of());
+
+        List<MenuProduct> pageContent = IntStream.rangeClosed(1, 20)
+                .mapToObj(i -> MenuProduct.builder()
+                        .productId((long) i)
+                        .menuId(10L)
+                        .name("Urun " + i)
+                        .currency("TRY")
+                        .sortOrder(i)
+                        .available(true)
+                        .build())
+                .toList();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(eq(10L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(pageContent, pageable, 25));
+
+        MenuDtos.MenuProductPageResponse response = menuService.listProducts(10L, 0, 20);
+
+        assertThat(response.getContent()).hasSize(20);
+        assertThat(response.getPage()).isZero();
+        assertThat(response.getSize()).isEqualTo(20);
+        assertThat(response.getTotalElements()).isEqualTo(25);
+        assertThat(response.getTotalPages()).isEqualTo(2);
+        assertThat(response.isHasNext()).isTrue();
+    }
+
+    @Test
+    void listPublicProducts_whenUnavailablePresent_thenOnlyAvailableReturned() {
+        Menu menu = Menu.builder()
+                .menuId(10L)
+                .userId(7L)
+                .active(true)
+                .publicAccessEnabled(true)
+                .build();
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+        when(menuCategoryService.loadCategoryMap(10L)).thenReturn(Map.of());
+
+        MenuProduct available = MenuProduct.builder()
+                .productId(1L)
+                .menuId(10L)
+                .name("Cay")
+                .currency("TRY")
+                .sortOrder(0)
+                .available(true)
+                .build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(menuProductRepository.findByMenuIdAndDeletedFalseAndAvailableTrueOrderBySortOrderAscProductIdAsc(
+                eq(10L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(available), pageable, 1));
+
+        MenuDtos.MenuProductPageResponse response = menuService.listPublicProducts(10L, 0, 20);
+
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().getFirst().getName()).isEqualTo("Cay");
+        assertThat(response.isHasNext()).isFalse();
+        verify(menuProductRepository).findByMenuIdAndDeletedFalseAndAvailableTrueOrderBySortOrderAscProductIdAsc(
+                eq(10L), any(Pageable.class));
+    }
+
+    @Test
+    void getPublicMenuByQrId_whenManyProducts_thenReturnFirstPageOnly() {
+        Menu menu = Menu.builder()
+                .menuId(10L)
+                .qrId(2L)
+                .userId(7L)
+                .themeId("classic")
+                .businessName("Kafe")
+                .urlMode(UrlMode.ID)
+                .active(true)
+                .publicAccessEnabled(true)
+                .build();
+        when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
+        when(appProperties.getUrl()).thenReturn("https://example.com");
+        when(menuCategoryService.listPublicCategoryTree(10L)).thenReturn(List.of());
+        when(menuCategoryService.loadCategoryMap(10L)).thenReturn(Map.of());
+
+        List<MenuProduct> firstPage = IntStream.rangeClosed(1, 20)
+                .mapToObj(i -> MenuProduct.builder()
+                        .productId((long) i)
+                        .menuId(10L)
+                        .name("Urun " + i)
+                        .currency("TRY")
+                        .sortOrder(i)
+                        .available(true)
+                        .build())
+                .toList();
+        when(menuProductRepository.findByMenuIdAndDeletedFalseAndAvailableTrueOrderBySortOrderAscProductIdAsc(
+                eq(10L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(firstPage, PageRequest.of(0, 20), 45));
+
+        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByQrId(2L);
+
+        assertThat(response.getProducts()).hasSize(20);
+        assertThat(response.getProductTotalElements()).isEqualTo(45);
+        assertThat(response.isProductHasNext()).isTrue();
+        assertThat(response.getProductPage()).isZero();
+        assertThat(response.getProductSize()).isEqualTo(20);
     }
 }

@@ -20,8 +20,11 @@ public class QrController {
     private final SecurityUtils securityUtils;
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserQrs(@PathVariable Long userId) {
-        return ResponseEntity.ok(qrService.getUserQrs(userId));
+    public ResponseEntity<?> getUserQrs(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "false") boolean includeImage
+    ) {
+        return ResponseEntity.ok(qrService.getUserQrs(userId, includeImage));
     }
 
     @PostMapping("/create")

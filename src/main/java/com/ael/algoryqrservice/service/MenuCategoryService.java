@@ -296,6 +296,10 @@ public class MenuCategoryService {
         return buildTree(menuCategoryRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscCategoryIdAsc(menuId));
     }
 
+    public List<MenuDtos.MenuCategoryResponse> buildTreeFromList(List<MenuCategory> categories) {
+        return buildTree(categories);
+    }
+
     private List<MenuDtos.MenuCategoryResponse> buildTree(List<MenuCategory> categories) {
         Map<Long, MenuDtos.MenuCategoryResponse> nodes = new HashMap<>();
         for (MenuCategory category : categories) {

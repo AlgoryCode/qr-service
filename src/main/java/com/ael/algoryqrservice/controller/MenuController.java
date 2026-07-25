@@ -31,6 +31,15 @@ public class MenuController {
         return ResponseEntity.ok(menuService.getPublicMenuBySlug(slug));
     }
 
+    @GetMapping("/public/{menuId}/products")
+    public ResponseEntity<MenuDtos.MenuProductPageResponse> listPublicProducts(
+            @PathVariable Long menuId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(menuService.listPublicProducts(menuId, page, size));
+    }
+
     @GetMapping("/slug-available")
     public ResponseEntity<MenuDtos.SlugAvailabilityResponse> checkSlugAvailability(
             @RequestParam String slug,
@@ -39,14 +48,32 @@ public class MenuController {
         return ResponseEntity.ok(menuService.checkSlugAvailability(slug, excludeMenuId));
     }
 
+    @GetMapping("/my/active")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<List<MenuDtos.ActiveMenuSummary>> listMyActiveMenus() {
+        return ResponseEntity.ok(menuService.listActiveMenusForCurrentUser());
+    }
+
     @GetMapping("/by-qr/{qrId}")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenuByQrId(@PathVariable Long qrId) {
-        Menu menu = menuService.findByQrId(qrId);
-        if (menu == null) {
+        MenuDtos.MenuProfileResponse profile = menuService.getMenuProfileByQrId(qrId);
+        if (profile == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(menuService.getMenuProfile(menu.getMenuId()));
+        return ResponseEntity.ok(profile);
+    }
+
+    @GetMapping("/by-qr/{qrId}/products")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.MenuProductsByQrResponse> listProductsByQrId(@PathVariable Long qrId) {
+        return ResponseEntity.ok(menuService.listProductsByQrId(qrId));
+    }
+
+    @GetMapping("/by-qr/{qrId}/categories")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.MenuCategoriesByQrResponse> listCategoriesByQrId(@PathVariable Long qrId) {
+        return ResponseEntity.ok(menuService.listCategoriesByQrId(qrId));
     }
 
     @GetMapping("/{menuId}")
@@ -66,8 +93,12 @@ public class MenuController {
 
     @GetMapping("/{menuId}/products")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
-    public ResponseEntity<List<MenuDtos.MenuProductResponse>> listProducts(@PathVariable Long menuId) {
-        return ResponseEntity.ok(menuService.listProducts(menuId));
+    public ResponseEntity<MenuDtos.MenuProductPageResponse> listProducts(
+            @PathVariable Long menuId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(menuService.listProducts(menuId, page, size));
     }
 
     @PostMapping("/{menuId}/products")

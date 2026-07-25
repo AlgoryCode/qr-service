@@ -74,7 +74,7 @@ class QrServiceTest {
         when(menuRepository.findActiveQrIdsByUserIdAndQrIdIn(eq(userId), anyCollection()))
                 .thenReturn(Set.of(activeMenuQr.getQrId()));
 
-        List<QrListResponse> response = qrService.getUserQrs(userId);
+        List<QrListResponse> response = qrService.getUserQrs(userId, false);
 
         assertThat(response)
                 .extracting(QrListResponse::getQrId)
