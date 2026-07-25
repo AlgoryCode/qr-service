@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.UrlMode;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
@@ -36,6 +37,7 @@ public class MenuService {
 
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
+    private final MenuCategoryRepository menuCategoryRepository;
     private final MenuCategoryService menuCategoryService;
     private final MenuPublicAccessService menuPublicAccessService;
     private final NutritionFactsService nutritionFactsService;

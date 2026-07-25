@@ -2,9 +2,9 @@ spring:
   application:
     name: algoryqr-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/algoryqrdb}
+    url: ${DB_URL:jdbc:postgresql://185.184.210.52:5432/algoryqrdb}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:AdHqvxNc8MLBsMjOi82TjDzSMSuUDptBNjFVwpsvtVoaf6YOciJxqT84KgmBgc39}
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 30000

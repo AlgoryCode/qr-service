@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.model.nutrition.NutritionNutrientEntry;
 import com.ael.algoryqrservice.model.User;
+import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
@@ -49,6 +50,8 @@ class MenuServiceTest {
     private MenuRepository menuRepository;
     @Mock
     private MenuProductRepository menuProductRepository;
+    @Mock
+    private MenuCategoryRepository menuCategoryRepository;
     @Mock
     private MenuCategoryService menuCategoryService;
     @Mock
