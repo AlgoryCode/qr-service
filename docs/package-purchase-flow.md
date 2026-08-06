@@ -252,17 +252,19 @@ Durum sorgusu: `GET /trials/status` / `GET /trials/digital-menu-pro/status` → 
 
 ---
 
-## 7. ?deme event?leri (RabbitMQ)
+## 7. Odeme eventleri (RabbitMQ)
 
-HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
+HTTP webhook yok. Tamamlama kuyruk uzerinden gelir.
+
+Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment-events-contract.md).
 
 ### Consumer
 
-- S?n?f: `PaymentEventConsumer`
-- Metot: `onPaymentEvent(PaymentCompletedEventDto)` ? `consume(event)`
-- Queue: `payment.rabbitmq.events-queue` (property: `PaymentRabbitMqProperties.eventsQueue`)
+- Sinif: `com.ael.algoryqrservice.messaging.payment.PaymentEventConsumer`
+- Metot: `onPaymentEvent(Message)` → schema-first JSON → `PaymentCompletedEventDto` → handler registry
+- Queue: `payment.rabbitmq.events-queue` (`PaymentRabbitMqProperties.eventsQueue`)
 
-### Event ? handler tablosu
+### Event → handler tablosu
 
 | `eventType` | Handler |
 |-------------|---------|
@@ -276,13 +278,14 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 | `payment.installment.overdue` | `handlePaymentOverdue` |
 | `payment.refunded` | `handlePaymentRefunded` |
 | `payment.chargeback` | `handlePaymentRefunded` |
-| di?er | `InvalidPaymentEventException` ? reject, requeue yok |
+| `subscription.cancelled_at_period_end` | `handleSubscriptionCancelledAtPeriodEnd` |
+| diger | `InvalidPaymentEventException` → reject, requeue yok |
 
-### Ortak do?rulamalar (`PurchaseService`)
+### Ortak dogrulamalar (`PurchaseService`)
 
 - Inbox idempotency: `PaymentEventInbox` / `eventId`
 - `validateIdentity(...)`: serviceName, conversationId, currency, userId/packageId/packageCode/purchaseId
-- Success i?in `validatePaidEvent(...)`: taksit no/count, tutar, periodStart/periodEnd
+- Success icin `validatePaidEvent(...)`: taksit no/count, tutar, periodStart/periodEnd
 
 ---
 

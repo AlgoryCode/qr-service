@@ -111,6 +111,8 @@ See [`docs/product-image-upload.md`](docs/product-image-upload.md) for API and f
 - iyzico calls payment-service via public URL only
 - payment-service publishes to `payment.events` with routing key `{serviceName}.payment.events`
 - qr-service binds `qr-service.payment.events` and branches on `eventType`
+- Wire contract (JSON body + required headers): [`docs/payment-events-contract.md`](docs/payment-events-contract.md)
+- Failed payment events → `qr-service.payment.events.dlq`; after consumer fix, republish DLQ or reconcile purchase (e.g. purchase `46`)
 - qr-service publishes smart report jobs to `smart_report.generate`; AI consumes
 - AI publishes status to `smart_report.events` with routing key `smart_report.status`; qr-service consumes `qr-service.smart_report.events`
 - Scale payment-service replicas: Docker internal LB handles HTTP; shared DB required

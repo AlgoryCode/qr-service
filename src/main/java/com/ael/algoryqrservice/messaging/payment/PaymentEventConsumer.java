@@ -1,12 +1,14 @@
-package com.ael.algoryqrservice.messaging;
+package com.ael.algoryqrservice.messaging.payment;
 
-import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
-import com.ael.algoryqrservice.service.PurchaseService;
+import com.ael.algoryqrservice.messaging.payment.conversion.PaymentEventPayloadConverter;
+import com.ael.algoryqrservice.messaging.payment.handler.PaymentEventHandlerRegistry;
+import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,10 +16,19 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class PaymentEventConsumer {
 
-    private final PurchaseService purchaseService;
+    private final PaymentEventPayloadConverter payloadConverter;
+    private final PaymentEventHandlerRegistry handlerRegistry;
 
     @RabbitListener(queues = "#{paymentRabbitMqProperties.eventsQueue}")
-    public void onPaymentEvent(PaymentCompletedEventDto event) {
+    public void onPaymentEvent(Message message) {
+        PaymentCompletedEventDto event;
+        try {
+            event = payloadConverter.convert(message);
+        } catch (InvalidPaymentEventException exception) {
+            log.error("Payment event rejected during conversion. reason={}", exception.getMessage(), exception);
+            throw new AmqpRejectAndDontRequeueException(exception.getMessage(), exception);
+        }
+
         log.info(
                 "Payment event consumed. eventId={} eventType={} purchaseId={} conversationId={} amount={} currency={} failureReason={}",
                 event.getEventId(),
@@ -33,17 +44,7 @@ public class PaymentEventConsumer {
 
     private void consume(PaymentCompletedEventDto event) {
         try {
-            switch (event.getEventType()) {
-                case "payment.installment.paid", "payment.success", "payment.subscription.paid"
-                        -> purchaseService.handlePaymentSuccess(event);
-                case "payment.installment.failed", "payment.failed",
-                     "payment.subscription.failed", "payment.subscription.past_due"
-                        -> purchaseService.handlePaymentFailed(event);
-                case "payment.installment.overdue" -> purchaseService.handlePaymentOverdue(event);
-                case "payment.refunded", "payment.chargeback" -> purchaseService.handlePaymentRefunded(event);
-                case "subscription.cancelled_at_period_end" -> purchaseService.handleSubscriptionCancelledAtPeriodEnd(event);
-                default -> throw new InvalidPaymentEventException("Unsupported payment event type");
-            }
+            handlerRegistry.dispatch(event);
             log.info(
                     "Payment event processed. eventId={} eventType={} purchaseId={}",
                     event.getEventId(),
