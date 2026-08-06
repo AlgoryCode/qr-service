@@ -71,6 +71,7 @@ public class PlanPackageService {
                 .trialEligible(request.resolvedTrialEligible())
                 .items(new ArrayList<>())
                 .build();
+        applyTrialDays(planPackage, request.resolvedTrialEligible(), request.getTrialDays(), request.resolvedValidityDays());
 
         planPackage.getItems().addAll(buildItems(planPackage, items));
         packagePricingService.applyTo(planPackage);
@@ -115,6 +116,7 @@ public class PlanPackageService {
         planPackage.setPriority(request.resolvedPriority());
         planPackage.setPurchasable(purchasable);
         planPackage.setTrialEligible(request.resolvedTrialEligible());
+        applyTrialDays(planPackage, request.resolvedTrialEligible(), request.getTrialDays(), request.resolvedValidityDays());
 
         syncItems(planPackage, items);
         packagePricingService.applyTo(planPackage);
@@ -173,6 +175,12 @@ public class PlanPackageService {
         if (request.getTrialEligible() != null) {
             planPackage.setTrialEligible(request.getTrialEligible());
         }
+        applyTrialDays(
+                planPackage,
+                planPackage.isTrialEligible(),
+                planPackage.getTrialDays(),
+                planPackage.getValidityDays()
+        );
         return toResponse(planPackageRepository.save(planPackage));
     }
 
@@ -280,6 +288,28 @@ public class PlanPackageService {
 
     private String resolveCurrency(String currency) {
         return currency == null || currency.isBlank() ? "TRY" : currency.trim().toUpperCase();
+    }
+
+    private void applyTrialDays(
+            PlanPackage planPackage,
+            boolean trialEligible,
+            Integer trialDays,
+            Integer validityDays
+    ) {
+        if (!trialEligible) {
+            planPackage.setTrialEligible(false);
+            planPackage.setTrialDays(null);
+            return;
+        }
+        if (trialDays == null) {
+            throw new BadRequestException("Deneme paketi icin trialDays zorunludur");
+        }
+        int maxTrialDays = Math.min(validityDays == null ? 30 : validityDays, 30);
+        if (trialDays < 1 || trialDays > maxTrialDays) {
+            throw new BadRequestException("trialDays 1 ile " + maxTrialDays + " arasinda olmalidir");
+        }
+        planPackage.setTrialEligible(true);
+        planPackage.setTrialDays(trialDays);
     }
 
     private void applySubscriptionPricing(PlanPackage planPackage, PlanPackageRequest request) {
@@ -398,6 +428,7 @@ public class PlanPackageService {
                 .currency(planPackage.getCurrency())
                 .active(planPackage.isActive())
                 .validityDays(planPackage.getValidityDays())
+                .trialDays(planPackage.getTrialDays())
                 .priority(planPackage.getPriority())
                 .purchasable(planPackage.isPurchasable())
                 .systemManaged(planPackage.isSystemManaged())

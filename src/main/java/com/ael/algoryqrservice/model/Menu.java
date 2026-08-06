@@ -39,13 +39,6 @@ public class Menu extends QrBaseModel {
     private String email;
     private String address;
 
-    @Column(unique = true)
-    private String publicSlug;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UrlMode urlMode;
-
     private Long packageId;
 
     @Column(nullable = false)

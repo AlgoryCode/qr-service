@@ -35,8 +35,9 @@ public class PackageCatalogService {
                 true
         );
         ensureProduct(CatalogProducts.QR_MENU, "QR Menü", CatalogScopes.QR_MENU_OWNER, true);
-        ensureProduct(CatalogProducts.QR_AGENT, "QR Agent", CatalogScopes.QR_AGENT_OWNER, true);
-        ensureProduct(CatalogProducts.QR_ANALYTICS, "Detaylı Raporlama", CatalogScopes.QR_ANALYTICS_OWNER, false);
+        ensureProduct(CatalogProducts.SMART_ASSISTANT, "Akıllı Asistan", CatalogScopes.SMART_ASSISTANT_OWNER, false);
+        ensureProduct(CatalogProducts.SMART_SUMMARY, "Akıllı Özet", CatalogScopes.SMART_SUMMARY_OWNER, false);
+        ensureProduct(CatalogProducts.SMART_REPORTING, "Akıllı Raporlama", CatalogScopes.SMART_REPORTING_OWNER, false);
 
         return planPackageRepository.findByCode(CatalogPackages.FREE_PACKAGE)
                 .map(existing -> {

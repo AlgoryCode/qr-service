@@ -16,7 +16,7 @@ import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserEntitlementRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +30,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class EntitlementService {
 
     private final UserEntitlementRepository entitlementRepository;
@@ -39,6 +38,25 @@ public class EntitlementService {
     private final PlanPackageRepository planPackageRepository;
     private final PurchaseLogService purchaseLogService;
     private final MenuPublicAccessService menuPublicAccessService;
+    private final ObjectProvider<PackageActivationService> packageActivationService;
+
+    public EntitlementService(
+            UserEntitlementRepository entitlementRepository,
+            PurchaseRepository purchaseRepository,
+            ProductRepository productRepository,
+            PlanPackageRepository planPackageRepository,
+            PurchaseLogService purchaseLogService,
+            MenuPublicAccessService menuPublicAccessService,
+            ObjectProvider<PackageActivationService> packageActivationService
+    ) {
+        this.entitlementRepository = entitlementRepository;
+        this.purchaseRepository = purchaseRepository;
+        this.productRepository = productRepository;
+        this.planPackageRepository = planPackageRepository;
+        this.purchaseLogService = purchaseLogService;
+        this.menuPublicAccessService = menuPublicAccessService;
+        this.packageActivationService = packageActivationService;
+    }
 
     @Transactional
     public void grant(Purchase purchase, Long productId, String productCode, int quantity, boolean unlimited) {
@@ -223,12 +241,12 @@ public class EntitlementService {
     }
 
     @Transactional
-    public boolean hasUsableQrMenuPackage(Long userId) {
+    public boolean hasUsableQrCreatePackage(Long userId) {
         expireDuePurchasesForUser(userId);
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
         return entitlements.stream()
-                .filter(entitlement -> Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU))
+                .filter(entitlement -> Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_CREATE))
                 .anyMatch(entitlement -> {
                     Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
                     return purchase != null && purchase.isUsable();
@@ -278,7 +296,12 @@ public class EntitlementService {
                 LocalDateTime.now()
         );
 
-        duePurchases.forEach(this::expirePurchaseInternal);
+        Set<Long> userIds = new HashSet<>();
+        for (Purchase purchase : duePurchases) {
+            expirePurchaseInternal(purchase);
+            userIds.add(purchase.getUserId());
+        }
+        restoreFreeAndSync(userIds);
     }
 
     @Transactional
@@ -292,11 +315,15 @@ public class EntitlementService {
                 LocalDateTime.now()
         );
         duePurchases.forEach(this::expirePurchaseInternal);
+        if (!duePurchases.isEmpty()) {
+            restoreFreeAndSync(Set.of(userId));
+        }
     }
 
     @Transactional
     public void expirePurchase(Purchase purchase) {
         expirePurchaseInternal(purchase);
+        restoreFreeAndSync(Set.of(purchase.getUserId()));
     }
 
     private void expirePurchaseInternal(Purchase purchase) {
@@ -313,7 +340,20 @@ public class EntitlementService {
                 PurchaseLogAction.PURCHASE_EXPIRED,
                 purchase.getPackageName() + " paketi süresi doldu (" + purchase.getExpiresAt() + ")"
         );
-        menuPublicAccessService.syncForUser(purchase.getUserId());
+    }
+
+    private void restoreFreeAndSync(Set<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        PackageActivationService activationService = packageActivationService.getObject();
+        for (Long userId : userIds) {
+            if (userId == null) {
+                continue;
+            }
+            activationService.ensureFreePackage(userId);
+            menuPublicAccessService.syncForUser(userId);
+        }
     }
 
     private Map<Long, Purchase> loadPurchases(List<UserEntitlement> entitlements) {
@@ -349,6 +389,7 @@ public class EntitlementService {
                 .unlimited(entitlement.isUnlimited())
                 .startsAt(entitlement.getStartsAt())
                 .expiresAt(entitlement.getExpiresAt())
+                .lastUsage(entitlement.getLastUsage())
                 .purchaseStatus(purchaseStatus)
                 .expired(expired)
                 .usable(usable)

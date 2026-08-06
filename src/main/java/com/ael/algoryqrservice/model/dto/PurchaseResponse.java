@@ -42,6 +42,8 @@ public class PurchaseResponse {
     private LocalDateTime currentPeriodPaidAt;
     private LocalDateTime refundEligibleUntil;
     private boolean refundEligible;
+    private BigDecimal refundableAmount;
+    private Integer refundCoolingDays;
     private LocalDateTime refundedAt;
     private com.ael.algoryqrservice.model.enums.RefundStatus refundStatus;
     private BillingSnapshot billingSnapshot;

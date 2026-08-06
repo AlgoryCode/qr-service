@@ -13,29 +13,39 @@
     {
       "code": "QR_MENU",
       "name": "QR Menu",
-      "description": "Dijital menu QR hakki",
+      "description": "QR menu olusturma hakki",
       "scopeCode": "QR_MENU_OWNER",
-      "unitPrice": 30.00,
+      "unitPrice": 29.00,
       "vatRate": 20.00,
       "countable": true,
       "active": true
     },
     {
-      "code": "QR_AGENT",
-      "name": "QR Agent",
-      "description": "QR Agent hakki",
-      "scopeCode": "QR_AGENT_OWNER",
-      "unitPrice": 15.83,
+      "code": "SMART_ASSISTANT",
+      "name": "Akilli Asistan",
+      "description": "Akilli asistan erisimi",
+      "scopeCode": "SMART_ASSISTANT_OWNER",
+      "unitPrice": 79.00,
       "vatRate": 20.00,
-      "countable": true,
+      "countable": false,
       "active": true
     },
     {
-      "code": "QR_ANALYTICS",
-      "name": "Detayli Raporlama",
-      "description": "Detayli raporlama erisimi",
-      "scopeCode": "QR_ANALYTICS_OWNER",
-      "unitPrice": 40.00,
+      "code": "SMART_SUMMARY",
+      "name": "Akilli Ozet",
+      "description": "Akilli ozet erisimi",
+      "scopeCode": "SMART_SUMMARY_OWNER",
+      "unitPrice": 99.00,
+      "vatRate": 20.00,
+      "countable": false,
+      "active": true
+    },
+    {
+      "code": "SMART_REPORTING",
+      "name": "Akilli Raporlama",
+      "description": "Akilli raporlama erisimi",
+      "scopeCode": "SMART_REPORTING_OWNER",
+      "unitPrice": 129.00,
       "vatRate": 20.00,
       "countable": false,
       "active": true
@@ -65,51 +75,55 @@
     {
       "code": "PRO_PACKAGE",
       "name": "Pro",
-      "description": "30 QR olusturma, 1 menu ve 1 agent hakki",
+      "description": "30 QR olusturma, QR Menu ve Akilli Asistan",
       "features": [
         "30 QR olusturma hakki",
-        "1 Dijital menu QR",
-        "1 QR Agent hakki",
+        "1 QR Menu",
+        "Akilli Asistan",
         "30 gun gecerlilik"
       ],
       "currency": "TRY",
       "validityDays": 30,
+      "trialDays": 7,
       "priority": 100,
       "purchasable": true,
       "systemManaged": false,
       "trialEligible": true,
       "active": true,
-      "lockPrice": 199.00,
+      "lockPrice": 249.00,
       "items": [
         { "productCode": "QR_CREATE", "quantity": 30, "unlimited": false },
         { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
-        { "productCode": "QR_AGENT", "quantity": 1, "unlimited": false }
+        { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true }
       ]
     },
     {
       "code": "ULTIMATE_PACKAGE",
       "name": "Ultimate",
-      "description": "100 QR, 5 menu, 3 agent ve detayli raporlama",
+      "description": "100 QR, QR Menu, Akilli Asistan, Akilli Ozet ve Akilli Raporlama",
       "features": [
         "100 QR olusturma hakki",
-        "5 Dijital menu QR",
-        "3 QR Agent hakki",
-        "Detayli raporlama",
+        "1 QR Menu",
+        "Akilli Asistan",
+        "Akilli Ozet",
+        "Akilli Raporlama",
         "30 gun gecerlilik"
       ],
       "currency": "TRY",
       "validityDays": 30,
+      "trialDays": null,
       "priority": 200,
       "purchasable": true,
       "systemManaged": false,
-      "trialEligible": true,
+      "trialEligible": false,
       "active": true,
-      "lockPrice": 499.00,
+      "lockPrice": 649.00,
       "items": [
         { "productCode": "QR_CREATE", "quantity": 100, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 5, "unlimited": false },
-        { "productCode": "QR_AGENT", "quantity": 3, "unlimited": false },
-        { "productCode": "QR_ANALYTICS", "quantity": 1, "unlimited": true }
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
+        { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true },
+        { "productCode": "SMART_SUMMARY", "quantity": 1, "unlimited": true },
+        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true }
       ]
     }
   ]

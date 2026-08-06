@@ -78,6 +78,9 @@ public class PlanPackage {
     @Column(name = "validity_days", nullable = false)
     private Integer validityDays;
 
+    @Column(name = "trial_days")
+    private Integer trialDays;
+
     @Column(nullable = false)
     @ColumnDefault("0")
     @Builder.Default

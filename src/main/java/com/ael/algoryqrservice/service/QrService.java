@@ -45,16 +45,13 @@ public class QrService {
     public <T extends QrRequest> QrResponse createQR(T req, Long userId) throws IOException, WriterException {
         entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         Type qrType = Type.from(req.getType());
-        if (qrType == Type.MENU) {
-            if (menuRepository.existsActiveLiveMenuQrForUser(userId)
-                    && entitlementService.hasUsableQrMenuPackage(userId)) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Aktif bir dijital menü QR kaydınız zaten var"
-                );
-            }
-            entitlementService.requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-            entitlementService.consume(userId, CatalogProducts.QR_MENU, 1);
+        if (qrType == Type.MENU
+                && menuRepository.existsActiveLiveMenuQrForUser(userId)
+                && entitlementService.hasUsableQrCreatePackage(userId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Aktif bir dijital menü QR kaydınız zaten var"
+            );
         }
         entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
         req.setUserId(userId);

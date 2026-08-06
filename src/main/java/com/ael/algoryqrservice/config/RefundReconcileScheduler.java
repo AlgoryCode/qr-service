@@ -17,6 +17,7 @@ public class RefundReconcileScheduler {
     public void reconcileRefunds() {
         try {
             purchaseService.reconcileNeedsReconcileRefunds();
+            purchaseService.reconcilePendingRefunds();
         } catch (RuntimeException exception) {
             log.warn("Refund reconcile run failed: {}", exception.getMessage());
         }

@@ -81,6 +81,40 @@ class BillingAddressServiceTest {
     }
 
     @Test
+    void resolveDefaultSnapshot_whenDefaultExists_thenUseIt() {
+        BillingAddress defaultAddress = sampleCorporate(4L, 7L, true);
+        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(defaultAddress));
+
+        BillingSnapshot snapshot = service.resolveDefaultSnapshot(7L);
+
+        assertThat(snapshot.getBillingAddressId()).isEqualTo(4L);
+        assertThat(snapshot.getVkn()).isEqualTo("1234567890");
+    }
+
+    @Test
+    void resolveDefaultSnapshot_whenNoDefaultButOtherExists_thenFallBackToFirst() {
+        BillingAddress other = sampleCorporate(2L, 7L, false);
+        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
+        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L))
+                .thenReturn(List.of(other));
+
+        BillingSnapshot snapshot = service.resolveDefaultSnapshot(7L);
+
+        assertThat(snapshot.getBillingAddressId()).isEqualTo(2L);
+    }
+
+    @Test
+    void resolveDefaultSnapshot_whenNoAddressExists_thenThrowBadRequest() {
+        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
+        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.resolveDefaultSnapshot(7L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("fatura adresi");
+    }
+
+    @Test
     void create_whenFirstAddress_thenMakeDefault() {
         BillingAddressDtos.Request request = individualRequest(false);
         when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());

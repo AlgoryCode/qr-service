@@ -3,7 +3,6 @@ package com.ael.algoryqrservice.provider;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.Type;
-import com.ael.algoryqrservice.model.UrlMode;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
 import com.ael.algoryqrservice.service.MenuService;
@@ -40,12 +39,7 @@ public class MenuProvider implements QrProvider<QrRequest> {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "details zorunludur");
             }
 
-            UrlMode urlMode = UrlMode.from(stringValue(details.get("urlMode")));
-            String initialContent = menuService.buildPublicUrlForMode(
-                    urlMode,
-                    0L,
-                    urlMode == UrlMode.SLUG ? stringValue(details.get("publicSlug")) : null
-            );
+            String initialContent = menuService.buildPublicUrlForQrId(0L);
 
             Qr qr = qrGenerationService.createAndSave(request, initialContent);
             Menu menu = menuService.createMenuForQr(qr, request);
@@ -57,16 +51,11 @@ public class MenuProvider implements QrProvider<QrRequest> {
                     .imgSrc(qr.getImgSrc())
                     .publicUrl(publicUrl)
                     .menuId(menu.getMenuId())
-                    .urlMode(menu.getUrlMode().name())
                     .build();
         } catch (ResponseStatusException ex) {
             throw ex;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate menu QR", e);
         }
-    }
-
-    private String stringValue(Object value) {
-        return value == null ? null : value.toString();
     }
 }

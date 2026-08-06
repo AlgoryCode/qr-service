@@ -2,8 +2,6 @@ package com.ael.algoryqrservice.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -13,24 +11,19 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-@Table(name = "tbl_menu_category")
+@Table(name = "tbl_menu_tag")
 @Data
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class MenuCategory extends QrBaseModel {
+public class MenuTag extends QrBaseModel {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "category_id")
-    private Long categoryId;
+    private Long id;
 
-    @Column(name = "menu_id", nullable = false)
-    private Long menuId;
-
-    @Column(name = "parent_id")
-    private Long parentId;
+    @Column(nullable = false, unique = true, length = 64)
+    private String slug;
 
     @Column(nullable = false)
     private String name;

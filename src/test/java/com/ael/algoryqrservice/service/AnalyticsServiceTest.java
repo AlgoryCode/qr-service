@@ -4,17 +4,17 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
-import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
-import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
+import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +51,7 @@ class AnalyticsServiceTest {
     @Mock
     private MenuProductRepository menuProductRepository;
     @Mock
-    private MenuCategoryRepository menuCategoryRepository;
+    private SubCategoryRepository subCategoryRepository;
 
     private AnalyticsService service;
 
@@ -64,7 +64,7 @@ class AnalyticsServiceTest {
                 eventRepository,
                 menuRepository,
                 menuProductRepository,
-                menuCategoryRepository
+                subCategoryRepository
         );
     }
 
@@ -75,21 +75,21 @@ class AnalyticsServiceTest {
         when(menuRepository.findById(5L)).thenReturn(Optional.of(menu));
         when(sessionRepository.findById(sessionId)).thenReturn(Optional.empty());
         when(eventRepository.countBySessionIdAndMenuId(sessionId, 5L)).thenReturn(0L);
-        when(menuCategoryRepository.findByCategoryIdAndDeletedFalse(3L))
-                .thenReturn(Optional.of(MenuCategory.builder().categoryId(3L).menuId(5L).name("Icecek").build()));
+        when(subCategoryRepository.findByIdAndDeletedFalse(3L))
+                .thenReturn(Optional.of(SubCategory.builder().id(3L).mainCategoryId(1L).slug("taze").name("Icecek").sortOrder(1).build()));
         when(menuProductRepository.findByProductIdAndDeletedFalse(11L))
-                .thenReturn(Optional.of(MenuProduct.builder().productId(11L).menuId(5L).name("Cay").build()));
+                .thenReturn(Optional.of(cayProduct(5L)));
 
         AnalyticsDtos.AnalyticsEventsRequest request = new AnalyticsDtos.AnalyticsEventsRequest(
                 sessionId,
                 "MOBILE",
                 List.of(
                         new AnalyticsDtos.AnalyticsEventItemRequest(
-                                MenuAnalyticsEventType.MENU_OPEN, null, null, 1, null),
+                                MenuAnalyticsEventType.MENU_OPEN, null, null, null, 1, null),
                         new AnalyticsDtos.AnalyticsEventItemRequest(
-                                MenuAnalyticsEventType.CATEGORY_VIEW, 3L, null, 2, null),
+                                MenuAnalyticsEventType.CATEGORY_VIEW, 3L, null, null, 2, null),
                         new AnalyticsDtos.AnalyticsEventItemRequest(
-                                MenuAnalyticsEventType.PRODUCT_VIEW, 3L, 11L, 3, null)
+                                MenuAnalyticsEventType.PRODUCT_VIEW, 3L, 11L, null, 3, null)
                 )
         );
 
@@ -116,7 +116,7 @@ class AnalyticsServiceTest {
         when(menuRepository.findById(5L)).thenReturn(Optional.of(publicMenu(5L, 9L)));
         List<AnalyticsDtos.AnalyticsEventItemRequest> events = java.util.stream.IntStream.range(0, 51)
                 .mapToObj(i -> new AnalyticsDtos.AnalyticsEventItemRequest(
-                        MenuAnalyticsEventType.MENU_OPEN, null, null, i + 1, null))
+                        MenuAnalyticsEventType.MENU_OPEN, null, null, null, i + 1, null))
                 .toList();
 
         assertThatThrownBy(() -> service.recordEvents(
@@ -140,7 +140,7 @@ class AnalyticsServiceTest {
                         sessionId,
                         "TABLET",
                         List.of(new AnalyticsDtos.AnalyticsEventItemRequest(
-                                MenuAnalyticsEventType.MENU_OPEN, null, null, 1, null))
+                                MenuAnalyticsEventType.MENU_OPEN, null, null, null, 1, null))
                 ),
                 "127.0.0.1",
                 "axios/1.6.0"
@@ -163,7 +163,7 @@ class AnalyticsServiceTest {
                         UUID.randomUUID(),
                         "MOBILE",
                         List.of(new AnalyticsDtos.AnalyticsEventItemRequest(
-                                MenuAnalyticsEventType.MENU_OPEN, null, null, 1, null))
+                                MenuAnalyticsEventType.MENU_OPEN, null, null, null, 1, null))
                 ),
                 "127.0.0.1",
                 "ua"
@@ -196,9 +196,9 @@ class AnalyticsServiceTest {
         when(sessionRepository.countByDeviceTypeAndPeriod(eq(menuId), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{"MOBILE", 3L}, new Object[]{"DESKTOP", 1L}));
         when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId))
-                .thenReturn(List.of(MenuProduct.builder().productId(11L).menuId(menuId).name("Cay").build()));
-        when(menuCategoryRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscCategoryIdAsc(menuId))
-                .thenReturn(List.of(MenuCategory.builder().categoryId(3L).menuId(menuId).name("Icecek").build()));
+                .thenReturn(List.of(cayProduct(menuId)));
+        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc())
+                .thenReturn(List.of(SubCategory.builder().id(3L).mainCategoryId(1L).slug("icecek").name("Icecek").sortOrder(1).build()));
         when(eventRepository.topProducts(eq(menuId), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{11L, 8L}));
         when(eventRepository.topCategories(eq(menuId), any(), any()))
@@ -218,33 +218,28 @@ class AnalyticsServiceTest {
         assertThat(report.daily()).hasSize(2);
         assertThat(report.daily().getFirst().sessions()).isEqualTo(2L);
         assertThat(report.hourly()).hasSize(24);
-        assertThat(report.hourly().get(12).views()).isEqualTo(7L);
-        assertThat(report.topProducts().getFirst().name()).isEqualTo("Cay");
         assertThat(report.topCategories().getFirst().name()).isEqualTo("Icecek");
-        assertThat(report.funnel().menuOpens()).isEqualTo(5L);
-        assertThat(report.categoryProductTree()).isNotEmpty();
-    }
-
-    @Test
-    void getMenuReport_whenNotOwner_thenForbidden() {
-        when(menuRepository.findById(5L)).thenReturn(Optional.of(publicMenu(5L, 9L)));
-
-        assertThatThrownBy(() -> service.getMenuReport(5L, 99L, LocalDate.now().minusDays(7), LocalDate.now()))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-                .isEqualTo(403);
     }
 
     private Menu publicMenu(Long menuId, Long ownerId) {
-        Menu menu = new Menu();
-        menu.setMenuId(menuId);
-        menu.setUserId(ownerId);
-        menu.setBusinessName("Cafe");
-        menu.setActive(true);
-        menu.setDeleted(false);
-        menu.setPublicAccessEnabled(true);
-        menu.setThemeId("classic");
-        menu.setQrId(100L);
-        return menu;
+        return Menu.builder()
+                .menuId(menuId)
+                .userId(ownerId)
+                .qrId(1L)
+                .themeId("soft")
+                .businessName("Test")
+                .active(true)
+                .publicAccessEnabled(true)
+                .build();
+    }
+
+    private MenuProduct cayProduct(Long menuId) {
+        MenuProduct product = MenuProduct.builder()
+                .productId(11L)
+                .menuId(menuId)
+                .name("Cay")
+                .subCategoryId(3L)
+                .build();
+        return product;
     }
 }

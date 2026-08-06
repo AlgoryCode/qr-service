@@ -42,6 +42,9 @@ public class PurchaseRequest {
 
     @AssertTrue(message = "Kart veya kayıtlı ödeme yöntemi zorunludur")
     public boolean isPaymentInstrumentValid() {
+        if (paymentMode == PaymentMode.CHECKOUT_FORM) {
+            return paymentMethodId == null && paymentCard == null;
+        }
         return paymentMethodId != null || paymentCard != null;
     }
 

@@ -1,32 +1,42 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.Menu;
-import com.ael.algoryqrservice.model.MenuCategory;
+import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.Qr;
-import com.ael.algoryqrservice.model.UrlMode;
+import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
+import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
-import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.repository.MenuProductSpecifications;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
-import com.ael.algoryqrservice.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,25 +44,31 @@ public class MenuService {
 
     public static final int DEFAULT_PRODUCT_PAGE_SIZE = 20;
     public static final int MAX_PRODUCT_PAGE_SIZE = 50;
+    public static final int DEFAULT_RECOMMENDATION_LIMIT = 6;
+    public static final int MAX_RECOMMENDATION_LIMIT = 20;
 
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
-    private final MenuCategoryRepository menuCategoryRepository;
-    private final MenuCategoryService menuCategoryService;
+    private final MenuTaxonomyService menuTaxonomyService;
     private final MenuPublicAccessService menuPublicAccessService;
     private final NutritionFactsService nutritionFactsService;
+    private final ServesPeopleSupport servesPeopleSupport;
     private final QrRepository qrRepository;
     private final QrGenerationService qrGenerationService;
     private final AppProperties appProperties;
     private final SecurityUtils securityUtils;
+    private final ProductImageStorageService productImageStorageService;
+
+    @Transactional(readOnly = true)
+    public void requireOwnedMenu(Long menuId) {
+        ensureOwnedMenu(menuId);
+    }
 
     @Transactional
     public Menu createMenuForQr(Qr qr, QrRequest request) {
         Map<String, Object> details = request.getDetails();
-        UrlMode urlMode = UrlMode.from(stringValue(details.get("urlMode")));
         String themeId = requireNonBlank(stringValue(details.get("themeId")), "themeId zorunludur");
         String businessName = requireNonBlank(stringValue(details.get("businessName")), "businessName zorunludur");
-        String publicSlug = resolveSlug(urlMode, stringValue(details.get("publicSlug")), null);
 
         Menu menu = Menu.builder()
                 .qrId(qr.getQrId())
@@ -63,8 +79,6 @@ public class MenuService {
                 .phone(stringValue(details.get("phone")))
                 .email(stringValue(details.get("email")))
                 .address(stringValue(details.get("address")))
-                .publicSlug(publicSlug)
-                .urlMode(urlMode)
                 .active(true)
                 .build();
 
@@ -87,26 +101,39 @@ public class MenuService {
             if (name == null || name.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
             }
-            Long categoryId = longValue(map.get("categoryId"));
-            String categoryName = trimToNull(stringValue(map.get("category")));
-            if (categoryId != null) {
-                menuCategoryService.requireCategoryForMenu(menu.getMenuId(), categoryId);
-            } else if (categoryName != null) {
-                categoryId = resolveOrCreateRootCategory(menu.getMenuId(), categoryName);
+            Long subCategoryId = longValue(map.get("subCategoryId"));
+            if (subCategoryId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subCategoryId zorunludur");
             }
+            menuTaxonomyService.requireSubCategory(subCategoryId);
+            Set<Long> tagIds = parseTagIds(map.get("tagIds"));
+            Set<Long> allergenIds = parseTagIds(map.get("allergenIds"));
+            Boolean chefFlag = map.get("chefRecommended") == null
+                    ? null
+                    : booleanValue(map.get("chefRecommended"), false);
+            tagIds = applyChefRecommended(tagIds, chefFlag);
+            menuTaxonomyService.requireTags(tagIds);
+            menuTaxonomyService.requireAllergens(allergenIds);
             var nutrition = nutritionFactsService.parseFromRaw(map.get("nutrition"));
             nutritionFactsService.validateForCreate(nutrition);
+            Integer servesMin = integerOrNull(map.get("servesPeopleMin"));
+            Integer servesMax = integerOrNull(map.get("servesPeopleMax"));
+            ServesPeopleSupport.Range serves = servesPeopleSupport.resolveFromSeed(servesMin, servesMax, name);
             MenuProduct product = MenuProduct.builder()
                     .menuId(menu.getMenuId())
                     .name(name.trim())
                     .description(trimToNull(stringValue(map.get("description"))))
                     .price(decimalValue(map.get("price")))
                     .currency(currencyValue(map.get("currency")))
-                    .category(categoryName)
-                    .categoryId(categoryId)
+                    .subCategoryId(subCategoryId)
+                    .tagIds(tagIds)
+                    .allergenIds(allergenIds)
+                    .chefRecommended(resolveChefRecommended(tagIds, chefFlag))
                     .sortOrder(integerValue(map.get("sortOrder"), index))
-                    .imageUrl(trimToNull(stringValue(map.get("imageUrl"))))
+                    .imageUrl(resolveProductImageUrl(trimToNull(stringValue(map.get("imageUrl")))))
                     .available(booleanValue(map.get("available"), true))
+                    .servesPeopleMin(serves.min())
+                    .servesPeopleMax(serves.max())
                     .nutrition(nutrition)
                     .build();
             menuProductRepository.save(product);
@@ -165,18 +192,11 @@ public class MenuService {
     }
 
     public String buildPublicUrl(Menu menu) {
-        String base = trimTrailingSlash(appProperties.getUrl());
-        if (menu.getUrlMode() == UrlMode.SLUG) {
-            return base + "/menu/" + menu.getPublicSlug();
-        }
-        return base + "/menu/" + menu.getQrId();
+        return buildPublicUrlForQrId(menu.getQrId());
     }
 
-    public String buildPublicUrlForMode(UrlMode urlMode, Long qrId, String publicSlug) {
+    public String buildPublicUrlForQrId(Long qrId) {
         String base = trimTrailingSlash(appProperties.getUrl());
-        if (urlMode == UrlMode.SLUG) {
-            return base + "/menu/" + SlugUtils.normalize(publicSlug);
-        }
         return base + "/menu/" + qrId;
     }
 
@@ -188,44 +208,260 @@ public class MenuService {
     }
 
     @Transactional(readOnly = true)
-    public MenuDtos.PublicMenuResponse getPublicMenuBySlug(String slug) {
-        String normalized = SlugUtils.normalize(slug);
-        Menu menu = menuRepository.findByPublicSlugIgnoreCaseAndActiveTrueAndDeletedFalse(normalized)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        return buildPublicResponse(menu);
+    public MenuDtos.MenuProductPageResponse listProducts(
+            Long menuId,
+            int page,
+            int size,
+            Boolean chefRecommended,
+            String tagSlug,
+            BigDecimal minRating,
+            Long subCategoryId,
+            Long mainCategoryId,
+            List<Long> tagIds,
+            String allergenSlug,
+            List<Long> allergenIds,
+            Integer servesPeople,
+            Integer servesPeopleMin,
+            Integer servesPeopleMax,
+            String q
+    ) {
+        ensureOwnedMenu(menuId);
+        return searchProductsPage(
+                menuId,
+                false,
+                page,
+                size,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        );
     }
 
     @Transactional(readOnly = true)
-    public MenuDtos.SlugAvailabilityResponse checkSlugAvailability(String slug, Long excludeMenuId) {
-        String normalized = SlugUtils.normalize(slug);
-        if (!SlugUtils.isValid(normalized)) {
-            return MenuDtos.SlugAvailabilityResponse.builder()
-                    .slug(normalized)
-                    .available(false)
-                    .build();
+    public MenuDtos.MenuProductPageResponse listPublicProducts(
+            Long menuId,
+            int page,
+            int size,
+            Boolean chefRecommended,
+            String tagSlug,
+            BigDecimal minRating,
+            Long subCategoryId,
+            Long mainCategoryId,
+            List<Long> tagIds,
+            String allergenSlug,
+            List<Long> allergenIds,
+            Integer servesPeople,
+            Integer servesPeopleMin,
+            Integer servesPeopleMax,
+            String q
+    ) {
+        Menu menu = ensureMenuExists(menuId);
+        ensurePublicAccess(menu);
+        return searchProductsPage(
+                menu.getMenuId(),
+                true,
+                page,
+                size,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.ProductFacetsResponse listPublicProductFacets(
+            Long menuId,
+            Boolean chefRecommended,
+            String tagSlug,
+            BigDecimal minRating,
+            Long subCategoryId,
+            Long mainCategoryId,
+            List<Long> tagIds,
+            String allergenSlug,
+            List<Long> allergenIds,
+            Integer servesPeople,
+            Integer servesPeopleMin,
+            Integer servesPeopleMax,
+            String q
+    ) {
+        Menu menu = ensureMenuExists(menuId);
+        ensurePublicAccess(menu);
+        Specification<MenuProduct> spec = buildSearchSpec(
+                menu.getMenuId(),
+                true,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        );
+        List<MenuProduct> products = menuProductRepository.findAll(spec);
+        Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
+        Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
+        Map<Long, Long> tagCounts = new HashMap<>();
+        Map<Long, Long> allergenCounts = new HashMap<>();
+        long bucket1 = 0;
+        long bucket2 = 0;
+        long bucket34 = 0;
+        long bucket5 = 0;
+        for (MenuProduct product : products) {
+            if (product.getTagIds() != null) {
+                for (Long tagId : product.getTagIds()) {
+                    tagCounts.merge(tagId, 1L, Long::sum);
+                }
+            }
+            if (product.getAllergenIds() != null) {
+                for (Long allergenId : product.getAllergenIds()) {
+                    allergenCounts.merge(allergenId, 1L, Long::sum);
+                }
+            }
+            if (servesPeopleSupport.overlapsBucket(product.getServesPeopleMin(), product.getServesPeopleMax(), 1, 1)) {
+                bucket1++;
+            }
+            if (servesPeopleSupport.overlapsBucket(product.getServesPeopleMin(), product.getServesPeopleMax(), 2, 2)) {
+                bucket2++;
+            }
+            if (servesPeopleSupport.overlapsBucket(product.getServesPeopleMin(), product.getServesPeopleMax(), 3, 4)) {
+                bucket34++;
+            }
+            if (servesPeopleSupport.overlapsBucket(product.getServesPeopleMin(), product.getServesPeopleMax(), 5, null)) {
+                bucket5++;
+            }
         }
-        boolean available = excludeMenuId == null
-                ? !menuRepository.existsByPublicSlugIgnoreCaseAndDeletedFalse(normalized)
-                : !menuRepository.existsByPublicSlugIgnoreCaseAndDeletedFalseAndMenuIdNot(normalized, excludeMenuId);
-        return MenuDtos.SlugAvailabilityResponse.builder()
-                .slug(normalized)
-                .available(available)
+        List<MenuDtos.TagFacetCount> tags = tagCounts.entrySet().stream()
+                .map(entry -> {
+                    MenuTag tag = tagMap.get(entry.getKey());
+                    if (tag == null) {
+                        return null;
+                    }
+                    return MenuDtos.TagFacetCount.builder()
+                            .tagId(tag.getId())
+                            .slug(tag.getSlug())
+                            .name(tag.getName())
+                            .count(entry.getValue())
+                            .build();
+                })
+                .filter(item -> item != null)
+                .sorted(Comparator.comparing(MenuDtos.TagFacetCount::getCount).reversed())
+                .toList();
+        List<MenuDtos.AllergenFacetCount> allergens = allergenCounts.entrySet().stream()
+                .map(entry -> {
+                    MenuAllergen allergen = allergenMap.get(entry.getKey());
+                    if (allergen == null) {
+                        return null;
+                    }
+                    return MenuDtos.AllergenFacetCount.builder()
+                            .allergenId(allergen.getId())
+                            .slug(allergen.getSlug())
+                            .name(allergen.getName())
+                            .count(entry.getValue())
+                            .build();
+                })
+                .filter(item -> item != null)
+                .sorted(Comparator.comparing(MenuDtos.AllergenFacetCount::getCount).reversed())
+                .toList();
+        List<MenuDtos.ServesBucketFacet> buckets = List.of(
+                MenuDtos.ServesBucketFacet.builder().key("1").label("1 kişilik").count(bucket1).build(),
+                MenuDtos.ServesBucketFacet.builder().key("2").label("2 kişilik").count(bucket2).build(),
+                MenuDtos.ServesBucketFacet.builder().key("3-4").label("3–4 kişilik").count(bucket34).build(),
+                MenuDtos.ServesBucketFacet.builder().key("5+").label("5+ kişilik").count(bucket5).build()
+        );
+        return MenuDtos.ProductFacetsResponse.builder()
+                .totalMatching(products.size())
+                .tags(tags)
+                .allergens(allergens)
+                .servesBuckets(buckets)
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public MenuDtos.MenuProductPageResponse listProducts(Long menuId, int page, int size) {
-        ensureOwnedMenu(menuId);
-        Pageable pageable = productPageable(page, size);
-        Page<MenuProduct> productPage = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId, pageable);
-        return toProductPageResponse(productPage, menuId);
-    }
-
-    @Transactional(readOnly = true)
-    public MenuDtos.MenuProductPageResponse listPublicProducts(Long menuId, int page, int size) {
+    public List<MenuDtos.MenuProductResponse> listPublicRecommendations(Long menuId, Long productId, int limit) {
         Menu menu = ensureMenuExists(menuId);
-        return listAvailableProductsPage(menu, page, size);
+        ensurePublicAccess(menu);
+        MenuProduct target = menuProductRepository.findByProductIdAndDeletedFalse(productId)
+                .filter(product -> product.getMenuId().equals(menuId) && product.isAvailable())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        int safeLimit = limit <= 0 ? DEFAULT_RECOMMENDATION_LIMIT : Math.min(limit, MAX_RECOMMENDATION_LIMIT);
+        Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
+        Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
+        Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
+        Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
+        SubCategory targetSub = subMap.get(target.getSubCategoryId());
+        Long targetMainId = targetSub == null ? null : targetSub.getMainCategoryId();
+        double targetMid = servesPeopleSupport.midpoint(target.getServesPeopleMin(), target.getServesPeopleMax());
+        Set<Long> targetTags = target.getTagIds() == null ? Set.of() : target.getTagIds();
+        Long popularTagId = menuTaxonomyService.findTagBySlug("populer").map(MenuTag::getId).orElse(null);
+        Long chefTagId = menuTaxonomyService.findTagBySlug(MenuTaxonomyService.CHEF_RECOMMENDED_TAG_SLUG)
+                .map(MenuTag::getId).orElse(null);
+        Long newTagId = menuTaxonomyService.findTagBySlug("yeni").map(MenuTag::getId).orElse(null);
+
+        List<MenuProduct> candidates = menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId)
+                .stream()
+                .filter(MenuProduct::isAvailable)
+                .filter(product -> !product.getProductId().equals(productId))
+                .toList();
+
+        return candidates.stream()
+                .sorted(Comparator.comparingDouble((MenuProduct candidate) -> {
+                    double score = 0;
+                    if (candidate.getSubCategoryId().equals(target.getSubCategoryId())) {
+                        score += 40;
+                    }
+                    SubCategory candidateSub = subMap.get(candidate.getSubCategoryId());
+                    if (targetMainId != null && candidateSub != null
+                            && targetMainId.equals(candidateSub.getMainCategoryId())) {
+                        score += 20;
+                    }
+                    double mid = servesPeopleSupport.midpoint(
+                            candidate.getServesPeopleMin(),
+                            candidate.getServesPeopleMax()
+                    );
+                    score += Math.max(0, 15 - Math.abs(targetMid - mid) * 5);
+                    Set<Long> candidateTags = candidate.getTagIds() == null ? Set.of() : candidate.getTagIds();
+                    long shared = targetTags.stream().filter(candidateTags::contains).count();
+                    score += shared * 8;
+                    if (popularTagId != null && candidateTags.contains(popularTagId)) {
+                        score += 6;
+                    }
+                    if (chefTagId != null && candidateTags.contains(chefTagId)) {
+                        score += 5;
+                    }
+                    if (newTagId != null && candidateTags.contains(newTagId)) {
+                        score += 3;
+                    }
+                    if (candidate.isChefRecommended()) {
+                        score += 4;
+                    }
+                    return -score;
+                }).thenComparing(MenuProduct::getSortOrder).thenComparing(MenuProduct::getProductId))
+                .limit(safeLimit)
+                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap))
+                .toList();
     }
 
     @Transactional
@@ -233,7 +469,17 @@ public class MenuService {
         Menu menu = ensureOwnedMenu(menuId);
         validateProductRequest(request);
         nutritionFactsService.validateForCreate(request.getNutrition());
-        Long categoryId = resolveCategoryId(menu.getMenuId(), request);
+        SubCategory subCategory = menuTaxonomyService.requireSubCategory(request.getSubCategoryId());
+        Set<Long> tagIds = normalizeTagIds(request.getTagIds());
+        tagIds = applyChefRecommended(tagIds, request.getChefRecommended());
+        menuTaxonomyService.requireTags(tagIds);
+        Set<Long> allergenIds = normalizeTagIds(request.getAllergenIds());
+        menuTaxonomyService.requireAllergens(allergenIds);
+        ServesPeopleSupport.Range serves = servesPeopleSupport.normalize(
+                request.getServesPeopleMin(),
+                request.getServesPeopleMax()
+        );
+        String imageUrl = resolveProductImageUrl(request.getImageUrl());
 
         MenuProduct product = MenuProduct.builder()
                 .menuId(menu.getMenuId())
@@ -241,11 +487,15 @@ public class MenuService {
                 .description(trimToNull(request.getDescription()))
                 .price(request.getPrice())
                 .currency(request.getCurrency() != null && !request.getCurrency().isBlank() ? request.getCurrency().trim() : "TRY")
-                .category(resolveCategoryLabel(menu.getMenuId(), categoryId, request.getCategory()))
-                .categoryId(categoryId)
+                .subCategoryId(subCategory.getId())
+                .tagIds(tagIds)
+                .allergenIds(allergenIds)
+                .chefRecommended(resolveChefRecommended(tagIds, request.getChefRecommended()))
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextSortOrder(menuId))
-                .imageUrl(trimToNull(request.getImageUrl()))
+                .imageUrl(imageUrl)
                 .available(request.getAvailable() == null || request.getAvailable())
+                .servesPeopleMin(serves.min())
+                .servesPeopleMax(serves.max())
                 .nutrition(request.getNutrition())
                 .build();
 
@@ -258,7 +508,16 @@ public class MenuService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
         ensureOwnedMenu(product.getMenuId());
         validateProductRequest(request);
-        Long categoryId = resolveCategoryId(product.getMenuId(), request);
+        SubCategory subCategory = menuTaxonomyService.requireSubCategory(request.getSubCategoryId());
+        Set<Long> tagIds = normalizeTagIds(request.getTagIds());
+        tagIds = applyChefRecommended(tagIds, request.getChefRecommended());
+        menuTaxonomyService.requireTags(tagIds);
+        Set<Long> allergenIds = normalizeTagIds(request.getAllergenIds());
+        menuTaxonomyService.requireAllergens(allergenIds);
+        ServesPeopleSupport.Range serves = servesPeopleSupport.normalize(
+                request.getServesPeopleMin(),
+                request.getServesPeopleMax()
+        );
 
         product.setName(request.getName().trim());
         product.setDescription(trimToNull(request.getDescription()));
@@ -266,15 +525,23 @@ public class MenuService {
         if (request.getCurrency() != null && !request.getCurrency().isBlank()) {
             product.setCurrency(request.getCurrency().trim());
         }
-        product.setCategory(resolveCategoryLabel(product.getMenuId(), categoryId, request.getCategory()));
-        product.setCategoryId(categoryId);
+        product.setSubCategoryId(subCategory.getId());
+        product.setTagIds(tagIds);
+        product.setAllergenIds(allergenIds);
+        product.setChefRecommended(resolveChefRecommended(tagIds, request.getChefRecommended()));
         if (request.getSortOrder() != null) {
             product.setSortOrder(request.getSortOrder());
         }
-        product.setImageUrl(trimToNull(request.getImageUrl()));
+        String newImageUrl = resolveProductImageUrl(request.getImageUrl());
+        if (!Objects.equals(product.getImageUrl(), newImageUrl)) {
+            productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
+            product.setImageUrl(newImageUrl);
+        }
         if (request.getAvailable() != null) {
             product.setAvailable(request.getAvailable());
         }
+        product.setServesPeopleMin(serves.min());
+        product.setServesPeopleMax(serves.max());
         if (request.getNutrition() != null) {
             product.setNutrition(nutritionFactsService.merge(product.getNutrition(), request.getNutrition()));
         }
@@ -299,6 +566,7 @@ public class MenuService {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
         ensureOwnedMenu(product.getMenuId());
+        productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
         product.setDeleted(true);
         menuProductRepository.save(product);
     }
@@ -323,17 +591,6 @@ public class MenuService {
         if (request.getAddress() != null) menu.setAddress(trimToNull(request.getAddress()));
         if (request.getActive() != null) menu.setActive(request.getActive());
 
-        UrlMode nextMode = request.getUrlMode() != null ? UrlMode.from(request.getUrlMode()) : menu.getUrlMode();
-        String nextSlug = menu.getPublicSlug();
-        if (nextMode == UrlMode.SLUG) {
-            String candidate = request.getPublicSlug() != null ? request.getPublicSlug() : menu.getPublicSlug();
-            nextSlug = resolveSlug(nextMode, candidate, menu.getMenuId());
-        } else {
-            nextSlug = null;
-        }
-
-        menu.setUrlMode(nextMode);
-        menu.setPublicSlug(nextSlug);
         menuRepository.save(menu);
 
         String publicUrl = buildPublicUrl(menu);
@@ -400,11 +657,10 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
         }
         Menu menu = (Menu) rows.getFirst()[0];
-        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menu.getMenuId());
         List<MenuDtos.MenuProductResponse> products = rows.stream()
                 .map(row -> (MenuProduct) row[1])
                 .filter(product -> product != null)
-                .map(product -> toProductResponse(product, categoryMap))
+                .map(this::toProductResponse)
                 .toList();
         return MenuDtos.MenuProductsByQrResponse.builder()
                 .menuId(menu.getMenuId())
@@ -421,21 +677,14 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuCategoriesByQrResponse listCategoriesByQrId(Long qrId) {
-        Long userId = securityUtils.getCurrentUserId();
-        List<Object[]> rows = menuCategoryRepository.findMenuWithCategoriesByQrIdAndUserId(qrId, userId);
-        if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
-        }
-        Menu menu = (Menu) rows.getFirst()[0];
-        List<MenuCategory> categories = rows.stream()
-                .map(row -> (MenuCategory) row[1])
-                .filter(category -> category != null)
-                .toList();
+        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+        requireOwnership(menu);
         return MenuDtos.MenuCategoriesByQrResponse.builder()
                 .menuId(menu.getMenuId())
                 .qrId(menu.getQrId())
                 .businessName(menu.getBusinessName())
-                .categories(menuCategoryService.buildTreeFromList(categories))
+                .categories(menuTaxonomyService.listTaxonomy())
                 .build();
     }
 
@@ -485,13 +734,99 @@ public class MenuService {
 
     private MenuDtos.MenuProductPageResponse listAvailableProductsPage(Menu menu, int page, int size) {
         ensurePublicAccess(menu);
+        return searchProductsPage(
+                menu.getMenuId(), true, page, size,
+                null, null, null, null, null, null, null, null, null, null, null, null
+        );
+    }
+
+    private MenuDtos.MenuProductPageResponse searchProductsPage(
+            Long menuId,
+            boolean availableOnly,
+            int page,
+            int size,
+            Boolean chefRecommended,
+            String tagSlug,
+            BigDecimal minRating,
+            Long subCategoryId,
+            Long mainCategoryId,
+            List<Long> tagIds,
+            String allergenSlug,
+            List<Long> allergenIds,
+            Integer servesPeople,
+            Integer servesPeopleMin,
+            Integer servesPeopleMax,
+            String q
+    ) {
+        Specification<MenuProduct> spec = buildSearchSpec(
+                menuId,
+                availableOnly,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        );
         Pageable pageable = productPageable(page, size);
-        Page<MenuProduct> productPage = menuProductRepository
-                .findByMenuIdAndDeletedFalseAndAvailableTrueOrderBySortOrderAscProductIdAsc(
-                        menu.getMenuId(),
-                        pageable
-                );
-        return toProductPageResponse(productPage, menu.getMenuId());
+        Page<MenuProduct> productPage = menuProductRepository.findAll(spec, pageable);
+        return toProductPageResponse(productPage, menuId);
+    }
+
+    private Specification<MenuProduct> buildSearchSpec(
+            Long menuId,
+            boolean availableOnly,
+            Boolean chefRecommended,
+            String tagSlug,
+            BigDecimal minRating,
+            Long subCategoryId,
+            Long mainCategoryId,
+            List<Long> tagIds,
+            String allergenSlug,
+            List<Long> allergenIds,
+            Integer servesPeople,
+            Integer servesPeopleMin,
+            Integer servesPeopleMax,
+            String q
+    ) {
+        Long tagId = null;
+        if (tagSlug != null && !tagSlug.isBlank()) {
+            tagId = menuTaxonomyService.requireTagBySlug(tagSlug).getId();
+        }
+        Set<Long> normalizedTagIds = normalizeTagIds(tagIds);
+        if (!normalizedTagIds.isEmpty()) {
+            menuTaxonomyService.requireTags(normalizedTagIds);
+        }
+        Long allergenId = null;
+        if (allergenSlug != null && !allergenSlug.isBlank()) {
+            allergenId = menuTaxonomyService.requireAllergenBySlug(allergenSlug).getId();
+        }
+        Set<Long> normalizedAllergenIds = normalizeTagIds(allergenIds);
+        if (!normalizedAllergenIds.isEmpty()) {
+            menuTaxonomyService.requireAllergens(normalizedAllergenIds);
+        }
+        return MenuProductSpecifications.forMenuSearch(
+                menuId,
+                availableOnly,
+                chefRecommended,
+                minRating,
+                tagId,
+                normalizedTagIds,
+                allergenId,
+                normalizedAllergenIds,
+                subCategoryId,
+                mainCategoryId,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        );
     }
 
     private MenuDtos.PublicMenuResponse buildPublicResponse(Menu menu) {
@@ -500,12 +835,11 @@ public class MenuService {
                 0,
                 DEFAULT_PRODUCT_PAGE_SIZE
         );
-        List<MenuDtos.MenuCategoryResponse> categories = menuCategoryService.listPublicCategoryTree(menu.getMenuId());
 
         return MenuDtos.PublicMenuResponse.builder()
                 .menu(toMenuProfile(menu, buildPublicUrl(menu), null))
                 .products(productPage.getContent())
-                .categories(categories)
+                .categories(menuTaxonomyService.listTaxonomy())
                 .themeId(menu.getThemeId())
                 .productPage(productPage.getPage())
                 .productSize(productPage.getSize())
@@ -521,9 +855,12 @@ public class MenuService {
     }
 
     private MenuDtos.MenuProductPageResponse toProductPageResponse(Page<MenuProduct> productPage, Long menuId) {
-        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menuId);
+        Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
+        Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
+        Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
+        Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
         List<MenuDtos.MenuProductResponse> content = productPage.getContent().stream()
-                .map(product -> toProductResponse(product, categoryMap))
+                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap))
                 .toList();
         return MenuDtos.MenuProductPageResponse.builder()
                 .content(content)
@@ -536,14 +873,47 @@ public class MenuService {
     }
 
     private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
-        return toProductResponse(product, menuCategoryService.loadCategoryMap(product.getMenuId()));
+        return toProductResponse(
+                product,
+                menuTaxonomyService.loadSubCategoryMap(),
+                menuTaxonomyService.loadMainCategoryMap(),
+                menuTaxonomyService.loadTagMap(),
+                menuTaxonomyService.loadAllergenMap()
+        );
     }
 
-    private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product, Map<Long, MenuCategory> categoryMap) {
-        Long categoryId = product.getCategoryId();
-        String categoryName = menuCategoryService.resolveCategoryName(categoryId, categoryMap);
-        String categoryPath = menuCategoryService.resolveCategoryPath(categoryId, categoryMap);
-        String legacyCategory = categoryName != null ? categoryName : product.getCategory();
+    private MenuDtos.MenuProductResponse toProductResponse(
+            MenuProduct product,
+            Map<Long, SubCategory> subMap,
+            Map<Long, MainCategory> mainMap,
+            Map<Long, MenuTag> tagMap,
+            Map<Long, MenuAllergen> allergenMap
+    ) {
+        SubCategory sub = subMap.get(product.getSubCategoryId());
+        MainCategory main = sub == null ? null : mainMap.get(sub.getMainCategoryId());
+        List<TaxonomyDtos.TagResponse> tags = (product.getTagIds() == null ? Set.<Long>of() : product.getTagIds())
+                .stream()
+                .map(tagMap::get)
+                .filter(tag -> tag != null)
+                .map(tag -> TaxonomyDtos.TagResponse.builder()
+                        .id(tag.getId())
+                        .slug(tag.getSlug())
+                        .name(tag.getName())
+                        .sortOrder(tag.getSortOrder())
+                        .build())
+                .toList();
+        List<TaxonomyDtos.AllergenResponse> allergens =
+                (product.getAllergenIds() == null ? Set.<Long>of() : product.getAllergenIds())
+                        .stream()
+                        .map(allergenMap::get)
+                        .filter(allergen -> allergen != null)
+                        .map(allergen -> TaxonomyDtos.AllergenResponse.builder()
+                                .id(allergen.getId())
+                                .slug(allergen.getSlug())
+                                .name(allergen.getName())
+                                .sortOrder(allergen.getSortOrder())
+                                .build())
+                        .toList();
 
         return MenuDtos.MenuProductResponse.builder()
                 .productId(product.getProductId())
@@ -552,40 +922,72 @@ public class MenuService {
                 .description(product.getDescription())
                 .price(product.getPrice())
                 .currency(product.getCurrency())
-                .category(legacyCategory)
-                .categoryId(categoryId)
-                .categoryName(categoryName)
-                .categoryPath(categoryPath)
+                .subCategoryId(product.getSubCategoryId())
+                .subCategorySlug(sub == null ? null : sub.getSlug())
+                .subCategoryName(sub == null ? null : sub.getName())
+                .mainCategoryId(main == null ? null : main.getId())
+                .mainCategorySlug(main == null ? null : main.getSlug())
+                .mainCategoryName(main == null ? null : main.getName())
+                .tags(tags)
+                .allergens(allergens)
                 .sortOrder(product.getSortOrder())
                 .imageUrl(product.getImageUrl())
                 .available(product.isAvailable())
+                .chefRecommended(product.isChefRecommended())
+                .ratingAvg(product.getRatingAvg() == null ? BigDecimal.ZERO : product.getRatingAvg())
+                .ratingCount(product.getRatingCount())
+                .servesPeopleMin(product.getServesPeopleMin())
+                .servesPeopleMax(product.getServesPeopleMax())
                 .nutrition(product.getNutrition())
                 .build();
     }
 
-    private Long resolveCategoryId(Long menuId, MenuDtos.MenuProductRequest request) {
-        if (request.getCategoryId() != null) {
-            menuCategoryService.requireCategoryForMenu(menuId, request.getCategoryId());
-            return request.getCategoryId();
+    private Set<Long> applyChefRecommended(Set<Long> tagIds, Boolean chefRecommended) {
+        Set<Long> result = tagIds == null ? new HashSet<>() : new HashSet<>(tagIds);
+        Long chefTagId = menuTaxonomyService.findTagBySlug(MenuTaxonomyService.CHEF_RECOMMENDED_TAG_SLUG)
+                .map(MenuTag::getId)
+                .orElse(null);
+        if (chefTagId == null) {
+            return result;
         }
-        String categoryName = trimToNull(request.getCategory());
-        if (categoryName != null) {
-            return resolveOrCreateRootCategory(menuId, categoryName);
+        if (Boolean.TRUE.equals(chefRecommended)) {
+            result.add(chefTagId);
+        } else if (Boolean.FALSE.equals(chefRecommended)) {
+            result.remove(chefTagId);
         }
-        return null;
+        return result;
     }
 
-    private String resolveCategoryLabel(Long menuId, Long categoryId, String fallbackCategory) {
-        if (categoryId == null) {
-            return trimToNull(fallbackCategory);
+    private boolean resolveChefRecommended(Set<Long> tagIds, Boolean chefRecommended) {
+        if (chefRecommended != null) {
+            return chefRecommended;
         }
-        Map<Long, MenuCategory> categoryMap = menuCategoryService.loadCategoryMap(menuId);
-        String categoryName = menuCategoryService.resolveCategoryName(categoryId, categoryMap);
-        return categoryName != null ? categoryName : trimToNull(fallbackCategory);
+        Long chefTagId = menuTaxonomyService.findTagBySlug(MenuTaxonomyService.CHEF_RECOMMENDED_TAG_SLUG)
+                .map(MenuTag::getId)
+                .orElse(null);
+        return chefTagId != null && tagIds != null && tagIds.contains(chefTagId);
     }
 
-    private Long resolveOrCreateRootCategory(Long menuId, String categoryName) {
-        return menuCategoryService.findOrCreateRootCategory(menuId, categoryName);
+    private Set<Long> normalizeTagIds(List<Long> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(tagIds.stream().filter(id -> id != null).toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<Long> parseTagIds(Object raw) {
+        if (!(raw instanceof List<?> list) || list.isEmpty()) {
+            return new HashSet<>();
+        }
+        Set<Long> ids = new HashSet<>();
+        for (Object item : list) {
+            Long id = longValue(item);
+            if (id != null) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 
     private Long longValue(Object value) {
@@ -617,8 +1019,6 @@ public class MenuService {
                 .phone(menu.getPhone())
                 .email(menu.getEmail())
                 .address(menu.getAddress())
-                .publicSlug(menu.getPublicSlug())
-                .urlMode(menu.getUrlMode().name())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
                 .qr(qrBrief)
@@ -629,23 +1029,30 @@ public class MenuService {
         if (request == null || request.getName() == null || request.getName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
         }
+        if (request.getSubCategoryId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subCategoryId zorunludur");
+        }
+        servesPeopleSupport.normalize(request.getServesPeopleMin(), request.getServesPeopleMax());
     }
 
-    private String resolveSlug(UrlMode urlMode, String rawSlug, Long excludeMenuId) {
-        if (urlMode != UrlMode.SLUG) {
+    private String resolveProductImageUrl(String imageUrl) {
+        String normalized = trimToNull(imageUrl);
+        productImageStorageService.validateImageUrl(normalized);
+        return normalized;
+    }
+
+    private Integer integerOrNull(Object value) {
+        if (value == null) {
             return null;
         }
-        String normalized = SlugUtils.normalize(rawSlug);
-        if (!SlugUtils.isValid(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçersiz slug formatı");
+        if (value instanceof Number number) {
+            return number.intValue();
         }
-        boolean taken = excludeMenuId == null
-                ? menuRepository.existsByPublicSlugIgnoreCaseAndDeletedFalse(normalized)
-                : menuRepository.existsByPublicSlugIgnoreCaseAndDeletedFalseAndMenuIdNot(normalized, excludeMenuId);
-        if (taken) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu slug zaten kullanılıyor");
+        try {
+            return Integer.parseInt(value.toString().trim());
+        } catch (NumberFormatException exception) {
+            return null;
         }
-        return normalized;
     }
 
     private String requireNonBlank(String value, String message) {

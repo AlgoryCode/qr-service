@@ -21,6 +21,7 @@ public class UserEntitlementResponse {
     private boolean unlimited;
     private LocalDateTime startsAt;
     private LocalDateTime expiresAt;
+    private LocalDateTime lastUsage;
     private PurchaseStatus purchaseStatus;
     private boolean expired;
     private boolean usable;

@@ -42,6 +42,9 @@ public class PlanPackageRequest {
     @Min(value = 1, message = "Gecerlilik suresi en az 1 gun olmalidir")
     private Integer validityDays;
 
+    @Min(value = 1, message = "Deneme suresi en az 1 gun olmalidir")
+    private Integer trialDays;
+
     private Integer priority;
 
     private Boolean purchasable;

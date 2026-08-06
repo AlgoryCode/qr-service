@@ -30,7 +30,7 @@ public class User {
     @Column(nullable = false)
     private String firstName;
 
-    @Column(nullable = false)
+    @Column
     private String lastName;
 
     @Column(nullable = false, unique = true)
@@ -109,4 +109,18 @@ public class User {
     @ColumnDefault("false")
     @Builder.Default
     private boolean trialUsed = false;
+
+    public String getDisplayName() {
+        StringBuilder name = new StringBuilder();
+        if (firstName != null && !firstName.isBlank()) {
+            name.append(firstName.trim());
+        }
+        if (lastName != null && !lastName.isBlank()) {
+            if (!name.isEmpty()) {
+                name.append(' ');
+            }
+            name.append(lastName.trim());
+        }
+        return name.toString();
+    }
 }

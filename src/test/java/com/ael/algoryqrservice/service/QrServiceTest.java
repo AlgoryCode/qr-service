@@ -89,7 +89,7 @@ class QrServiceTest {
 
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         when(menuRepository.existsActiveLiveMenuQrForUser(userId)).thenReturn(true);
-        when(entitlementService.hasUsableQrMenuPackage(userId)).thenReturn(true);
+        when(entitlementService.hasUsableQrCreatePackage(userId)).thenReturn(true);
 
         assertThatThrownBy(() -> qrService.createQR(request, userId))
                 .isInstanceOf(ResponseStatusException.class)
@@ -99,7 +99,6 @@ class QrServiceTest {
                     assertThat(statusException.getReason()).contains("Aktif bir dijital menü");
                 });
 
-        verify(entitlementService, never()).consume(eq(userId), eq(CatalogProducts.QR_MENU), eq(1));
         verify(entitlementService, never()).consume(eq(userId), eq(CatalogProducts.QR_CREATE), eq(1));
     }
 
@@ -111,9 +110,7 @@ class QrServiceTest {
         QrResponse expected = QrResponse.builder().qrId(11L).build();
 
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
-        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
         when(menuRepository.existsActiveLiveMenuQrForUser(userId)).thenReturn(false);
-        doNothing().when(entitlementService).consume(userId, CatalogProducts.QR_MENU, 1);
         doNothing().when(entitlementService).consume(userId, CatalogProducts.QR_CREATE, 1);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
@@ -121,7 +118,6 @@ class QrServiceTest {
         QrResponse response = qrService.createQR(request, userId);
 
         assertThat(response.getQrId()).isEqualTo(11L);
-        verify(entitlementService).consume(userId, CatalogProducts.QR_MENU, 1);
         verify(entitlementService).consume(userId, CatalogProducts.QR_CREATE, 1);
     }
 
@@ -161,9 +157,7 @@ class QrServiceTest {
         QrResponse expected = QrResponse.builder().qrId(22L).build();
 
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
-        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
         when(menuRepository.existsActiveLiveMenuQrForUser(userId)).thenReturn(false);
-        doNothing().when(entitlementService).consume(userId, CatalogProducts.QR_MENU, 1);
         doNothing().when(entitlementService).consume(userId, CatalogProducts.QR_CREATE, 1);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
@@ -172,7 +166,7 @@ class QrServiceTest {
 
         assertThat(response.getQrId()).isEqualTo(22L);
         verify(menuRepository).existsActiveLiveMenuQrForUser(userId);
-        verify(entitlementService, never()).hasUsableQrMenuPackage(userId);
+        verify(entitlementService, never()).hasUsableQrCreatePackage(userId);
     }
 
     private Qr qr(Long qrId, Long userId, String type, Map<String, Object> details) {

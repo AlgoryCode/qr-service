@@ -90,6 +90,16 @@ public class BillingAddressService {
         return toSnapshot(address);
     }
 
+    @Transactional(readOnly = true)
+    public BillingSnapshot resolveDefaultSnapshot(Long userId) {
+        BillingAddress address = repository.findByUserIdAndDefaultAddressTrue(userId)
+                .or(() -> repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(userId).stream().findFirst())
+                .orElseThrow(() -> new BadRequestException(
+                        "Kart eklemek icin once bir fatura adresi eklemelisiniz."
+                ));
+        return toSnapshot(address);
+    }
+
     public BillingSnapshot legacySnapshot(Long userId, AddressDto address, String identityNumber) {
         return BillingSnapshot.builder()
                 .type(com.ael.algoryqrservice.model.enums.BillingAddressType.INDIVIDUAL)

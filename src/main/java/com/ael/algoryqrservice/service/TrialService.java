@@ -59,7 +59,7 @@ public class TrialService {
                     .paymentStyle(PaymentStyle.ONE_TIME)
                     .status(PurchaseStatus.ACTIVE)
                     .startsAt(startsAt)
-                    .expiresAt(startsAt.plusDays(planPackage.getValidityDays()))
+                    .expiresAt(startsAt.plusDays(resolvedTrialDays(planPackage)))
                     .build());
         } catch (DataIntegrityViolationException exception) {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
@@ -81,7 +81,9 @@ public class TrialService {
 
     @Transactional
     public TrialDtos.Status startDigitalMenuPro(Long userId) {
-        PlanPackage planPackage = packageRepository.findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc()
+        PlanPackage planPackage = packageRepository.findByCode(CatalogPackages.PRO_PACKAGE)
+                .flatMap(existing -> packageRepository.findByIdWithItems(existing.getId()))
+                .filter(pkg -> pkg.isActive() && pkg.isTrialEligible() && !pkg.isSystemManaged())
                 .orElseThrow(() -> new BadRequestException("Deneme icin uygun paket bulunamadi"));
         return start(userId, planPackage.getId());
     }
@@ -97,6 +99,10 @@ public class TrialService {
                 return usedUnavailableStatus();
             }
             return availableStatus();
+        }
+        if (user != null && !user.isTrialUsed()) {
+            user.setTrialUsed(true);
+            userRepository.save(user);
         }
         if (purchase.getStatus() == PurchaseStatus.ACTIVE && purchase.isExpiredByDate()) {
             entitlementService.expirePurchase(purchase);
@@ -126,7 +132,23 @@ public class TrialService {
         if (planPackage.getItems() == null || planPackage.getItems().isEmpty()) {
             throw new BadRequestException("Deneme paketinde urun bulunamadi");
         }
+        resolvedTrialDays(planPackage);
         return planPackage;
+    }
+
+    private int resolvedTrialDays(PlanPackage planPackage) {
+        Integer trialDays = planPackage.getTrialDays();
+        if (trialDays == null || trialDays < 1) {
+            throw new BadRequestException("Deneme paketi icin trialDays zorunludur");
+        }
+        int maxTrialDays = Math.min(
+                planPackage.getValidityDays() == null ? 30 : planPackage.getValidityDays(),
+                30
+        );
+        if (trialDays > maxTrialDays) {
+            throw new BadRequestException("trialDays 1 ile " + maxTrialDays + " arasinda olmalidir");
+        }
+        return trialDays;
     }
 
     private void rejectIfHasUsablePaidPackage(Long userId) {
@@ -223,6 +245,7 @@ public class TrialService {
                 .currency(planPackage.getCurrency())
                 .active(planPackage.isActive())
                 .validityDays(planPackage.getValidityDays())
+                .trialDays(planPackage.getTrialDays())
                 .priority(planPackage.getPriority())
                 .purchasable(planPackage.isPurchasable())
                 .systemManaged(planPackage.isSystemManaged())

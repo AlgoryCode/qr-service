@@ -1,0 +1,292 @@
+{
+  "version": 2,
+  "mains": [
+    {
+      "id": 1,
+      "slug": "icecekler",
+      "name": "İçecekler",
+      "sortOrder": 1,
+      "subs": [
+        { "id": 1, "slug": "sicak_icecekler", "name": "Sıcak İçecekler", "sortOrder": 1 },
+        { "id": 2, "slug": "soguk_icecekler", "name": "Soğuk İçecekler", "sortOrder": 2 },
+        { "id": 3, "slug": "taze_sikilmis_meyve_sulari", "name": "Taze Sıkılmış Meyve Suları", "sortOrder": 3 },
+        { "id": 4, "slug": "fermente_icecekler", "name": "Fermente İçecekler", "sortOrder": 4 },
+        { "id": 5, "slug": "alkollu_icecekler", "name": "Alkollü İçecekler", "sortOrder": 5 },
+        { "id": 6, "slug": "sutlu_icecekler", "name": "Sütlü İçecekler", "sortOrder": 6 },
+        { "id": 66, "slug": "caylar", "name": "Çaylar", "sortOrder": 7 },
+        { "id": 67, "slug": "smoothie_ve_shake", "name": "Smoothie ve Shake", "sortOrder": 8 }
+      ]
+    },
+    {
+      "id": 2,
+      "slug": "corbalar",
+      "name": "Çorbalar",
+      "sortOrder": 2,
+      "subs": [
+        { "id": 7, "slug": "et_suyu_corbalar", "name": "Et Suyu Çorbalar", "sortOrder": 1 },
+        { "id": 8, "slug": "kremali_corbalar", "name": "Kremalı Çorbalar", "sortOrder": 2 },
+        { "id": 9, "slug": "deniz_urunu_corbalar", "name": "Deniz Ürünü Çorbalar", "sortOrder": 3 },
+        { "id": 68, "slug": "sebze_corbalar", "name": "Sebze Çorbalar", "sortOrder": 4 }
+      ]
+    },
+    {
+      "id": 3,
+      "slug": "baslangiclar",
+      "name": "Başlangıçlar",
+      "sortOrder": 3,
+      "subs": [
+        { "id": 10, "slug": "soguk_baslangiclar", "name": "Soğuk Başlangıçlar", "sortOrder": 1 },
+        { "id": 11, "slug": "sicak_baslangiclar", "name": "Sıcak Başlangıçlar", "sortOrder": 2 },
+        { "id": 12, "slug": "salatalar", "name": "Salatalar", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 4,
+      "slug": "mezeler",
+      "name": "Mezeler",
+      "sortOrder": 4,
+      "subs": [
+        { "id": 13, "slug": "soguk_mezeler", "name": "Soğuk Mezeler", "sortOrder": 1 },
+        { "id": 14, "slug": "sicak_mezeler", "name": "Sıcak Mezeler", "sortOrder": 2 },
+        { "id": 15, "slug": "zeytinyaglilar", "name": "Zeytinyağlılar", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 5,
+      "slug": "ana_yemekler",
+      "name": "Ana Yemekler",
+      "sortOrder": 5,
+      "subs": [
+        { "id": 16, "slug": "et_yemekleri", "name": "Et Yemekleri", "sortOrder": 1 },
+        { "id": 17, "slug": "tavuk_yemekleri", "name": "Tavuk Yemekleri", "sortOrder": 2 },
+        { "id": 18, "slug": "vejeteryan_ana_yemekler", "name": "Vejeteryan Ana Yemekler", "sortOrder": 3 },
+        { "id": 19, "slug": "vegan_ana_yemekler", "name": "Vegan Ana Yemekler", "sortOrder": 4 },
+        { "id": 20, "slug": "makarna_cesitleri", "name": "Makarna Çeşitleri", "sortOrder": 5 },
+        { "id": 21, "slug": "pilav_cesitleri", "name": "Pilav Çeşitleri", "sortOrder": 6 },
+        { "id": 69, "slug": "guvec_yemekleri", "name": "Güveç Yemekleri", "sortOrder": 7 }
+      ]
+    },
+    {
+      "id": 6,
+      "slug": "pideler",
+      "name": "Pideler",
+      "sortOrder": 6,
+      "subs": [
+        { "id": 22, "slug": "kiyma_pideler", "name": "Kıymalı Pideler", "sortOrder": 1 },
+        { "id": 23, "slug": "peynirli_pideler", "name": "Peynirli Pideler", "sortOrder": 2 },
+        { "id": 24, "slug": "karisik_pideler", "name": "Karışık Pideler", "sortOrder": 3 },
+        { "id": 70, "slug": "lahmacun", "name": "Lahmacun", "sortOrder": 4 }
+      ]
+    },
+    {
+      "id": 7,
+      "slug": "pizzalar",
+      "name": "Pizzalar",
+      "sortOrder": 7,
+      "subs": [
+        { "id": 25, "slug": "klasik_pizzalar", "name": "Klasik Pizzalar", "sortOrder": 1 },
+        { "id": 26, "slug": "ozel_pizzalar", "name": "Özel Pizzalar", "sortOrder": 2 },
+        { "id": 27, "slug": "ince_kruvasan_pizzalar", "name": "İnce Kruvasan Pizzalar", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 8,
+      "slug": "sandvicler",
+      "name": "Sandviçler",
+      "sortOrder": 8,
+      "subs": [
+        { "id": 28, "slug": "klasik_sandvicler", "name": "Klasik Sandviçler", "sortOrder": 1 },
+        { "id": 29, "slug": "tostlar", "name": "Tostlar", "sortOrder": 2 },
+        { "id": 30, "slug": "wraplar", "name": "Wraplar", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 9,
+      "slug": "burgerler",
+      "name": "Burgerler",
+      "sortOrder": 9,
+      "subs": [
+        { "id": 31, "slug": "klasik_burgerler", "name": "Klasik Burgerler", "sortOrder": 1 },
+        { "id": 32, "slug": "ozel_burgerler", "name": "Özel Burgerler", "sortOrder": 2 },
+        { "id": 33, "slug": "vejeteryan_burgerler", "name": "Vejeteryan Burgerler", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 10,
+      "slug": "tatlilar",
+      "name": "Tatlılar",
+      "sortOrder": 10,
+      "subs": [
+        { "id": 34, "slug": "sutlu_tatlilar", "name": "Sütlü Tatlılar", "sortOrder": 1 },
+        { "id": 35, "slug": "serbetli_tatlilar", "name": "Şerbetli Tatlılar", "sortOrder": 2 },
+        { "id": 36, "slug": "hamur_isi_tatlilar", "name": "Hamur İşi Tatlılar", "sortOrder": 3 },
+        { "id": 37, "slug": "meyveli_tatlilar", "name": "Meyveli Tatlılar", "sortOrder": 4 },
+        { "id": 82, "slug": "dondurmalar", "name": "Dondurmalar", "sortOrder": 5 },
+        { "id": 83, "slug": "soguk_tatlilar", "name": "Soğuk Tatlılar", "sortOrder": 6 },
+        { "id": 84, "slug": "cikolatali_tatlilar", "name": "Çikolatalı Tatlılar", "sortOrder": 7 },
+        { "id": 85, "slug": "pasta_cesitleri", "name": "Pastalar", "sortOrder": 8 },
+        { "id": 86, "slug": "kek_cesitleri", "name": "Kekler", "sortOrder": 9 }
+      ]
+    },
+    {
+      "id": 11,
+      "slug": "kahvalti",
+      "name": "Kahvaltı",
+      "sortOrder": 11,
+      "subs": [
+        { "id": 40, "slug": "serpme_kahvalti", "name": "Serpme Kahvaltı", "sortOrder": 1 },
+        { "id": 41, "slug": "omlet_ve_yumurta_cesitleri", "name": "Omlet ve Yumurta Çeşitleri", "sortOrder": 2 },
+        { "id": 42, "slug": "kahvaltilik_tatlilar", "name": "Kahvaltılık Tatlılar", "sortOrder": 3 },
+        { "id": 71, "slug": "gozleme", "name": "Gözleme", "sortOrder": 4 }
+      ]
+    },
+    {
+      "id": 12,
+      "slug": "yan_urunler",
+      "name": "Yan Ürünler",
+      "sortOrder": 12,
+      "subs": [
+        { "id": 43, "slug": "ekmek_ve_hamur_isleri", "name": "Ekmek ve Hamur İşleri", "sortOrder": 1 },
+        { "id": 44, "slug": "soslar", "name": "Soslar", "sortOrder": 2 },
+        { "id": 45, "slug": "garniturler", "name": "Garnitürler", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 13,
+      "slug": "durum_ve_doner",
+      "name": "Dürüm ve Döner",
+      "sortOrder": 13,
+      "subs": [
+        { "id": 46, "slug": "et_durum", "name": "Et Dürüm", "sortOrder": 1 },
+        { "id": 47, "slug": "tavuk_durum", "name": "Tavuk Dürüm", "sortOrder": 2 },
+        { "id": 48, "slug": "doner_porsiyon", "name": "Döner Porsiyon", "sortOrder": 3 },
+        { "id": 49, "slug": "iskender", "name": "İskender", "sortOrder": 4 }
+      ]
+    },
+    {
+      "id": 14,
+      "slug": "izgaralar",
+      "name": "Izgaralar",
+      "sortOrder": 14,
+      "subs": [
+        { "id": 50, "slug": "kirmizi_et_izgara", "name": "Kırmızı Et Izgara", "sortOrder": 1 },
+        { "id": 51, "slug": "tavuk_izgara", "name": "Tavuk Izgara", "sortOrder": 2 },
+        { "id": 52, "slug": "karisik_izgara", "name": "Karışık Izgara", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 15,
+      "slug": "deniz_urunleri",
+      "name": "Deniz Ürünleri",
+      "sortOrder": 15,
+      "subs": [
+        { "id": 53, "slug": "balik_cesitleri", "name": "Balık Çeşitleri", "sortOrder": 1 },
+        { "id": 54, "slug": "kabuklu_deniz_urunleri", "name": "Kabuklu Deniz Ürünleri", "sortOrder": 2 },
+        { "id": 55, "slug": "meze_tarzi_deniz_urunleri", "name": "Meze Tarzı Deniz Ürünleri", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 16,
+      "slug": "atistirmaliklar",
+      "name": "Atıştırmalıklar",
+      "sortOrder": 16,
+      "subs": [
+        { "id": 56, "slug": "patates_kizartmasi_cesitleri", "name": "Patates Kızartması Çeşitleri", "sortOrder": 1 },
+        { "id": 57, "slug": "kizartmalar", "name": "Kızartmalar", "sortOrder": 2 },
+        { "id": 58, "slug": "cips_ve_nachos", "name": "Cips ve Nachos", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 17,
+      "slug": "kokteyller",
+      "name": "Kokteyller",
+      "sortOrder": 17,
+      "subs": [
+        { "id": 59, "slug": "alkollu_kokteyller", "name": "Alkollü Kokteyller", "sortOrder": 1 },
+        { "id": 60, "slug": "alkolsuz_kokteyller", "name": "Alkolsüz Kokteyller (Mocktail)", "sortOrder": 2 }
+      ]
+    },
+    {
+      "id": 18,
+      "slug": "asya_mutfagi",
+      "name": "Asya Mutfağı",
+      "sortOrder": 18,
+      "subs": [
+        { "id": 61, "slug": "noodle_cesitleri", "name": "Noodle Çeşitleri", "sortOrder": 1 },
+        { "id": 62, "slug": "sushi", "name": "Sushi", "sortOrder": 2 },
+        { "id": 63, "slug": "wok_yemekleri", "name": "Wok Yemekleri", "sortOrder": 3 },
+        { "id": 72, "slug": "ramen", "name": "Ramen", "sortOrder": 4 }
+      ]
+    },
+    {
+      "id": 19,
+      "slug": "cocuk_menusu",
+      "name": "Çocuk Menüsü",
+      "sortOrder": 19,
+      "subs": [
+        { "id": 64, "slug": "cocuk_ana_yemekleri", "name": "Çocuk Ana Yemekleri", "sortOrder": 1 },
+        { "id": 65, "slug": "cocuk_tatlilari", "name": "Çocuk Tatlıları", "sortOrder": 2 },
+        { "id": 73, "slug": "cocuk_icecekleri", "name": "Çocuk İçecekleri", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 20,
+      "slug": "italyan_mutfagi",
+      "name": "İtalyan Mutfağı",
+      "sortOrder": 20,
+      "subs": [
+        { "id": 74, "slug": "risotto", "name": "Risotto", "sortOrder": 1 },
+        { "id": 75, "slug": "lazanya_ve_firin_makarna", "name": "Lazanya ve Fırın Makarna", "sortOrder": 2 },
+        { "id": 76, "slug": "antipasti", "name": "Antipasti", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 21,
+      "slug": "meksika_mutfagi",
+      "name": "Meksika Mutfağı",
+      "sortOrder": 21,
+      "subs": [
+        { "id": 77, "slug": "taco", "name": "Taco", "sortOrder": 1 },
+        { "id": 78, "slug": "burrito_ve_quesadilla", "name": "Burrito ve Quesadilla", "sortOrder": 2 },
+        { "id": 79, "slug": "fajita", "name": "Fajita", "sortOrder": 3 }
+      ]
+    },
+    {
+      "id": 22,
+      "slug": "steakhouse",
+      "name": "Steakhouse",
+      "sortOrder": 22,
+      "subs": [
+        { "id": 80, "slug": "steak_cesitleri", "name": "Steak Çeşitleri", "sortOrder": 1 },
+        { "id": 81, "slug": "steak_yanlari", "name": "Steak Yanları", "sortOrder": 2 }
+      ]
+    }
+  ],
+  "tags": [
+    { "id": 1, "slug": "glutensiz", "name": "Glutensiz", "sortOrder": 1 },
+    { "id": 2, "slug": "vegan", "name": "Vegan", "sortOrder": 2 },
+    { "id": 3, "slug": "vejeteryan", "name": "Vejeteryan", "sortOrder": 3 },
+    { "id": 4, "slug": "acili", "name": "Acılı", "sortOrder": 4 },
+    { "id": 5, "slug": "seker_ilavesiz", "name": "Şeker İlavesiz", "sortOrder": 5 },
+    { "id": 6, "slug": "laktozsuz", "name": "Laktozsuz", "sortOrder": 6 },
+    { "id": 7, "slug": "populer", "name": "Popüler", "sortOrder": 7 },
+    { "id": 8, "slug": "sef_ozel", "name": "Şef Özel", "sortOrder": 8 },
+    { "id": 9, "slug": "yeni", "name": "Yeni", "sortOrder": 9 }
+  ],
+  "allergens": [
+    { "id": 1, "slug": "gluten", "name": "Glüten içeren tahıllar", "sortOrder": 1 },
+    { "id": 2, "slug": "kabuklular", "name": "Kabuklular", "sortOrder": 2 },
+    { "id": 3, "slug": "yumurta", "name": "Yumurta", "sortOrder": 3 },
+    { "id": 4, "slug": "balik", "name": "Balık", "sortOrder": 4 },
+    { "id": 5, "slug": "yer_fistigi", "name": "Yer fıstığı", "sortOrder": 5 },
+    { "id": 6, "slug": "soya", "name": "Soya", "sortOrder": 6 },
+    { "id": 7, "slug": "sut", "name": "Süt", "sortOrder": 7 },
+    { "id": 8, "slug": "sert_kabuklu_yemisler", "name": "Sert kabuklu yemişler", "sortOrder": 8 },
+    { "id": 9, "slug": "kereviz", "name": "Kereviz", "sortOrder": 9 },
+    { "id": 10, "slug": "hardal", "name": "Hardal", "sortOrder": 10 },
+    { "id": 11, "slug": "susam", "name": "Susam", "sortOrder": 11 },
+    { "id": 12, "slug": "sulfur_dioksit", "name": "Kükürt dioksit / sülfitler", "sortOrder": 12 },
+    { "id": 13, "slug": "aci_bakla", "name": "Acı bakla", "sortOrder": 13 },
+    { "id": 14, "slug": "yumusakcalar", "name": "Yumuşakçalar", "sortOrder": 14 }
+  ]
+}

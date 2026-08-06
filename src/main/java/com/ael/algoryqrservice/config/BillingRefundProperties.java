@@ -13,4 +13,5 @@ public class BillingRefundProperties {
 
     private int monthlyCoolingDays = 7;
     private int yearlyCoolingDays = 14;
+    private int pendingStuckMinutes = 15;
 }

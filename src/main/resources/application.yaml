@@ -1,6 +1,10 @@
 spring:
   application:
     name: algoryqr-service
+  servlet:
+    multipart:
+      max-file-size: ${STORAGE_MAX_FILE_SIZE:5MB}
+      max-request-size: ${STORAGE_MAX_FILE_SIZE:5MB}
   datasource:
     url: ${DB_URL:jdbc:postgresql://185.184.210.52:5432/algoryqrdb}
     username: ${DB_USERNAME:postgres}
@@ -81,14 +85,30 @@ server:
 app:
   url: ${APP_URL:http://localhost:3000}
   service-name: ${APP_SERVICE_NAME:qr-service}
+  storage:
+    filer-url: ${STORAGE_FILER_URL:http://localhost:8888}
+    s3-endpoint: ${STORAGE_S3_ENDPOINT:}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    bucket: ${STORAGE_BUCKET:qr-product-images}
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8888/buckets/qr-product-images}
+    max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:5242880}
   menu:
     category-max-depth: ${MENU_CATEGORY_MAX_DEPTH:10}
+  seed:
+    menu-products:
+      enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:true }
+      only-if-empty: ${APP_SEED_MENU_PRODUCTS_ONLY_IF_EMPTY:false}
+  smart-report:
+    quota-period: ${SMART_REPORT_QUOTA_PERIOD:DAY}
+    quota-limit: ${SMART_REPORT_QUOTA_LIMIT:1}
+    zone: ${SMART_REPORT_QUOTA_ZONE:Europe/Istanbul}
 
 payment:
   service:
     url: ${PAYMENT_SERVICE_URL:http://localhost:8080}
     pending-timeout-minutes: ${PAYMENT_PENDING_TIMEOUT_MINUTES:30}
-    auth-token: ${PAYMENT_SERVICE_AUTH_TOKEN:}
+    auth-token: ${PAYMENT_SERVICE_AUTH_TOKEN:6da7324f50e3d4dec722013510fd2c3ab5ce5c84ad7eb9af98bab23c2795db6e7761be271c480d41dd89c636305e027e}
     auth-header: ${PAYMENT_SERVICE_AUTH_HEADER:X-Service-Token}
   rabbitmq:
     exchange: ${PAYMENT_EVENTS_EXCHANGE:payment.events}
@@ -96,10 +116,18 @@ payment:
     events-queue: ${PAYMENT_EVENTS_QUEUE:qr-service.payment.events}
     events-routing-key: ${PAYMENT_EVENTS_ROUTING_KEY:qr-service.payment.events}
 
+smart-report:
+  rabbitmq:
+    queue: ${SMART_REPORT_QUEUE:smart_report.generate}
+    events-exchange: ${SMART_REPORT_EVENTS_EXCHANGE:smart_report.events}
+    events-queue: ${SMART_REPORT_EVENTS_QUEUE:qr-service.smart_report.events}
+    events-routing-key: ${SMART_REPORT_EVENTS_ROUTING_KEY:smart_report.status}
+
 billing:
   refund:
     monthly-cooling-days: ${BILLING_REFUND_MONTHLY_COOLING_DAYS:7}
     yearly-cooling-days: ${BILLING_REFUND_YEARLY_COOLING_DAYS:14}
+    pending-stuck-minutes: ${BILLING_REFUND_PENDING_STUCK_MINUTES:15}
 
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}

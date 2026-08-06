@@ -1,0 +1,17 @@
+DELETE FROM tbl_plan_package_item
+WHERE product_id IN (
+    SELECT id
+    FROM tbl_product
+    WHERE code NOT IN ('QR_CREATE', 'SMART_ASSISTANT', 'SMART_SUMMARY', 'SMART_REPORTING')
+);
+
+DELETE FROM tbl_user_entitlement
+WHERE product_id IN (
+    SELECT id
+    FROM tbl_product
+    WHERE code NOT IN ('QR_CREATE', 'SMART_ASSISTANT', 'SMART_SUMMARY', 'SMART_REPORTING')
+)
+   OR product_code NOT IN ('QR_CREATE', 'SMART_ASSISTANT', 'SMART_SUMMARY', 'SMART_REPORTING');
+
+DELETE FROM tbl_product
+WHERE code NOT IN ('QR_CREATE', 'SMART_ASSISTANT', 'SMART_SUMMARY', 'SMART_REPORTING');

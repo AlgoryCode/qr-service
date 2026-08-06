@@ -40,7 +40,7 @@ BFF: `POST /api/analytics/menu/{menuId}/events`
 
 ## Okuma API (owner)
 
-`GET /analytics/menu/{menuId}/report?from=&to=` — scope `QR_ANALYTICS_OWNER`
+`GET /analytics/menu/{menuId}/report?from=&to=` — scope `SMART_REPORTING_OWNER`
 
 Dönen başlıca alanlar: `kpis`, `daily`, `hourly`, `devices`, `topProducts`, `topCategories`, `categoryProductTree`, `sampleJourneys`, `funnel`.
 
@@ -54,4 +54,4 @@ BFF: `GET /api/analytics/menu/{menuId}/report`
 
 ## Entitlement
 
-Ürün: `QR_ANALYTICS` / scope: `QR_ANALYTICS_OWNER`
+Ürün: `SMART_REPORTING` / scope: `SMART_REPORTING_OWNER`

@@ -39,14 +39,6 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
             """)
     List<Object[]> findActiveMenusWithQrByUserId(@Param("userId") Long userId);
 
-    Optional<Menu> findByPublicSlugIgnoreCaseAndDeletedFalse(String publicSlug);
-
-    Optional<Menu> findByPublicSlugIgnoreCaseAndActiveTrueAndDeletedFalse(String publicSlug);
-
-    boolean existsByPublicSlugIgnoreCaseAndDeletedFalse(String publicSlug);
-
-    boolean existsByPublicSlugIgnoreCaseAndDeletedFalseAndMenuIdNot(String publicSlug, Long menuId);
-
     @Query("""
             select menu.qrId
             from Menu menu

@@ -38,9 +38,9 @@ class PackageCatalogServiceTest {
     void ensureFreePackage_whenMissing_thenCreateFreePackageOnce() {
         Product qrCreate = product(1L, CatalogProducts.QR_CREATE, CatalogScopes.QR_CREATE_OWNER, true);
         when(productRepository.findByCode(CatalogProducts.QR_CREATE)).thenReturn(Optional.of(qrCreate));
-        when(productRepository.findByCode(CatalogProducts.QR_MENU)).thenReturn(Optional.empty());
-        when(productRepository.findByCode(CatalogProducts.QR_AGENT)).thenReturn(Optional.empty());
-        when(productRepository.findByCode(CatalogProducts.QR_ANALYTICS)).thenReturn(Optional.empty());
+        when(productRepository.findByCode(CatalogProducts.SMART_ASSISTANT)).thenReturn(Optional.empty());
+        when(productRepository.findByCode(CatalogProducts.SMART_SUMMARY)).thenReturn(Optional.empty());
+        when(productRepository.findByCode(CatalogProducts.SMART_REPORTING)).thenReturn(Optional.empty());
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(planPackageRepository.findByCode(CatalogPackages.FREE_PACKAGE)).thenReturn(Optional.empty());
         when(planPackageRepository.save(any(PlanPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));

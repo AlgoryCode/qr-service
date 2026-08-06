@@ -39,6 +39,7 @@ public class AnalyticsDtos {
             @NotNull MenuAnalyticsEventType type,
             Long categoryId,
             Long productId,
+            Integer servesPeople,
             Integer sequence,
             LocalDateTime occurredAt
     ) {

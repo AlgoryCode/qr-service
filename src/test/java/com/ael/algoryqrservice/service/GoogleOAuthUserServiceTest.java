@@ -128,6 +128,21 @@ class GoogleOAuthUserServiceTest {
     }
 
     @Test
+    void resolve_whenRegisterAndGoogleSubjectExists_thenThrowAccountExists() {
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.of(googleUser("sub-1", "user@example.com")));
+
+        assertThatThrownBy(() -> googleOAuthUserService.resolve(
+                GoogleAuthIntent.REGISTER,
+                identity("sub-1", "user@example.com", true),
+                clientInfo()
+        ))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("zaten kayıtlı");
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void resolve_whenEmailNotVerified_thenThrowUnauthorized() {
         assertThatThrownBy(() -> googleOAuthUserService.resolve(
                 GoogleAuthIntent.LOGIN,

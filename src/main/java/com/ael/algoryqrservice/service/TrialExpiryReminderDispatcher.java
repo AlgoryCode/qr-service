@@ -59,7 +59,7 @@ public class TrialExpiryReminderDispatcher {
         notificationPublisherService.publishTrialExpiryReminder(
                 eventId,
                 user.getEmail(),
-                user.getFirstName() + " " + user.getLastName(),
+                user.getDisplayName(),
                 purchase.getPackageName(),
                 purchase.getExpiresAt().format(EXPIRY_FORMATTER),
                 appUrl + "/dashboard/digital-menu"

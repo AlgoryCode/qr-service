@@ -1,7 +1,10 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
@@ -74,8 +77,77 @@ public class PaymentRequestMapper {
                 .build();
     }
 
+    public PaymentCheckoutFormRequest toCheckoutFormRequest(
+            Purchase purchase,
+            User user,
+            PlanPackage planPackage,
+            String clientIp,
+            AppProperties appProperties
+    ) {
+        PaymentStyle style = purchase.getPaymentStyle();
+        BigDecimal chargeAmount = purchase.getPrice();
+        int intervalMonths = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
+
+        Map<String, Object> sourceMetadata = new HashMap<>();
+        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("packageId", planPackage.getId());
+        sourceMetadata.put("packageCode", planPackage.getCode());
+        sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
+        sourceMetadata.put("purchaseId", purchase.getId());
+        sourceMetadata.put("installmentNumber", 1);
+        sourceMetadata.put("billingCycleNumber", 1);
+        sourceMetadata.put("billingPeriod", purchase.getBillingPeriod() == null ? null : purchase.getBillingPeriod().name());
+        sourceMetadata.put("billingIntervalMonths", intervalMonths);
+        sourceMetadata.put("paymentStyle", style.name());
+        sourceMetadata.put("validityDays", planPackage.getValidityDays());
+        sourceMetadata.put("totalAmount", chargeAmount);
+
+        return PaymentCheckoutFormRequest.builder()
+                .serviceName(appProperties.getServiceName())
+                .sourceReferenceId(String.valueOf(purchase.getId()))
+                .sourceMetadata(sourceMetadata)
+                .conversationId(purchase.getPaymentConversationId())
+                .locale("tr")
+                .price(chargeAmount)
+                .paidPrice(chargeAmount)
+                .currency(planPackage.getCurrency())
+                .paymentStyle(style.name())
+                .subscriptionCycleCount(null)
+                .billingIntervalMonths(style == PaymentStyle.SUBSCRIPTION ? intervalMonths : null)
+                .basketId("qr-purchase-" + purchase.getId())
+                .paymentGroup(style == PaymentStyle.SUBSCRIPTION ? "SUBSCRIPTION" : "PRODUCT")
+                .buyer(toBuyer(user, purchase.getBillingSnapshot(), clientIp))
+                .shippingAddress(toAddress(purchase.getBillingSnapshot()))
+                .billingAddress(toAddress(purchase.getBillingSnapshot()))
+                .basketItems(List.of(toBasketItem(planPackage, chargeAmount)))
+                .build();
+    }
+
+    public PaymentCardVerificationRequest toCardVerificationRequest(
+            User user,
+            BillingSnapshot billingSnapshot,
+            String clientIp,
+            AppProperties appProperties,
+            String conversationId
+    ) {
+        return PaymentCardVerificationRequest.builder()
+                .serviceName(appProperties.getServiceName())
+                .sourceReferenceId(String.valueOf(user.getId()))
+                .conversationId(conversationId)
+                .locale("tr")
+                .currency("TRY")
+                .buyer(toBuyer(user, billingSnapshot, clientIp))
+                .shippingAddress(toAddress(billingSnapshot))
+                .billingAddress(toAddress(billingSnapshot))
+                .build();
+    }
+
     public String buildConversationId(Long purchaseId) {
         return "qr-purchase-" + purchaseId + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    public String buildCardVerificationConversationId(Long userId) {
+        return "qr-card-verification-" + userId + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     private PaymentThreeDsRequest.PaymentCardPayload toPaymentCard(PaymentCardDto card) {
@@ -90,7 +162,18 @@ public class PaymentRequestMapper {
     }
 
     private PaymentThreeDsRequest.BuyerPayload toBuyer(User user, BillingSnapshot address, String clientIp) {
-        String identity = address.getTckn() != null ? address.getTckn() : address.getVkn();
+        String identity = firstNonBlank(address.getTckn(), address.getVkn());
+        if (identity == null) {
+            throw new BadRequestException(
+                    "Odeme icin fatura adresinizde TCKN veya VKN bilgisi bulunmalidir. Lutfen fatura adresinizi guncelleyin."
+            );
+        }
+        String gsmNumber = firstNonBlank(address.getPhone(), user.getPhone());
+        if (gsmNumber == null) {
+            throw new BadRequestException(
+                    "Odeme icin fatura adresinizde telefon numarasi bulunmalidir. Lutfen fatura adresinizi guncelleyin."
+            );
+        }
         String name = firstNonBlank(user.getFirstName(), address.getName(), "Musteri");
         String surname = firstNonBlank(user.getLastName(), address.getSurname(), "Kullanici");
         String registrationAddress = firstNonBlank(address.getAddress(), "Adres bilgisi yok");
@@ -98,9 +181,9 @@ public class PaymentRequestMapper {
                 .id(String.valueOf(user.getId()))
                 .name(name)
                 .surname(surname)
-                .gsmNumber(firstNonBlank(user.getPhone(), "5000000000"))
+                .gsmNumber(gsmNumber)
                 .email(user.getEmail())
-                .identityNumber(firstNonBlank(identity, "11111111111"))
+                .identityNumber(identity)
                 .registrationAddress(registrationAddress)
                 .ip(clientIp != null && !clientIp.isBlank() ? clientIp : "127.0.0.1")
                 .city(firstNonBlank(address.getCity(), "Istanbul"))

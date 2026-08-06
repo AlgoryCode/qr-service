@@ -52,7 +52,7 @@ class MenuPublicAccessServiceTest {
 
     @Test
     void evaluate_whenNoMenuScope_thenPackageInactive() {
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(false);
+        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(false);
 
         MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
 
@@ -69,7 +69,7 @@ class MenuPublicAccessServiceTest {
                 .startsAt(LocalDateTime.now().minusDays(1))
                 .expiresAt(LocalDateTime.now().plusDays(10))
                 .build();
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(true);
+        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(purchase));
         when(purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(List.of(11L), FulfillmentStatus.OVERDUE))
                 .thenReturn(true);
@@ -89,7 +89,7 @@ class MenuPublicAccessServiceTest {
                 .startsAt(LocalDateTime.now().minusDays(1))
                 .expiresAt(LocalDateTime.now().plusDays(10))
                 .build();
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(true);
+        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(purchase));
         when(purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(List.of(11L), FulfillmentStatus.OVERDUE))
                 .thenReturn(false);
@@ -109,7 +109,7 @@ class MenuPublicAccessServiceTest {
                 .startsAt(LocalDateTime.now().minusDays(1))
                 .expiresAt(LocalDateTime.now().plusDays(10))
                 .build();
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(true);
+        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(purchase));
         when(purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(List.of(11L), FulfillmentStatus.OVERDUE))
                 .thenReturn(false);
@@ -128,7 +128,7 @@ class MenuPublicAccessServiceTest {
 
     @Test
     void syncForUser_whenPackageInactive_thenDisableWithReason() {
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(false);
+        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(false);
 
         service.syncForUser(7L);
 

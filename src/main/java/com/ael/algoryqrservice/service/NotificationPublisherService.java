@@ -21,6 +21,7 @@ public class NotificationPublisherService {
 
     private static final String MESSAGE_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
     private static final String MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER = "PRO_TRIAL_EXPIRY_REMINDER";
+    private static final String MESSAGE_TYPE_SMART_REPORT_READY = "SMART_REPORT_READY";
 
     private final RabbitTemplate rabbitTemplate;
     private final PushNotificationProperties pushNotificationProperties;
@@ -81,6 +82,42 @@ public class NotificationPublisherService {
                 message
         );
         log.info("Trial expiry reminder queued. eventId={}, email={}", eventId, maskEmail(email));
+    }
+
+    public void publishSmartReportReady(
+            UUID eventId,
+            String email,
+            String userName,
+            String menuName,
+            String reportTitle,
+            String periodFrom,
+            String periodTo,
+            String reportUrl
+    ) {
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("userName", userName);
+        templateData.put("menuName", menuName);
+        templateData.put("reportTitle", reportTitle);
+        templateData.put("periodFrom", periodFrom);
+        templateData.put("periodTo", periodTo);
+        templateData.put("reportUrl", reportUrl);
+
+        NotificationRequestMessage message = new NotificationRequestMessage(
+                eventId,
+                pushNotificationProperties.getChannels(),
+                serviceName,
+                MESSAGE_TYPE_SMART_REPORT_READY,
+                new NotificationRecipientsMessage(email, List.of(), List.of()),
+                pushNotificationProperties.getSmartReportReadySubject(),
+                templateData,
+                false
+        );
+        rabbitTemplate.convertAndSend(
+                pushNotificationProperties.getMessaging().getExchange(),
+                pushNotificationProperties.getMessaging().getRoutingKey(),
+                message
+        );
+        log.info("Smart report ready notification queued. eventId={}, email={}", eventId, maskEmail(email));
     }
 
     private void publishVerificationCode(

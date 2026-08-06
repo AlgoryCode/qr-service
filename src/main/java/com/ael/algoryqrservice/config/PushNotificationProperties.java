@@ -11,6 +11,7 @@ public class PushNotificationProperties {
     private String paymentSubject = "Ödeme Onayı";
     private String passwordResetSubject = "Şifre Değiştirme Kodu";
     private String emailChangeSubject = "E-posta Değişiklik Kodu";
+    private String smartReportReadySubject = "Akıllı raporunuz hazır";
     private java.util.List<String> channels = java.util.List.of("mail");
 
     public Messaging getMessaging() {
@@ -43,6 +44,14 @@ public class PushNotificationProperties {
 
     public void setEmailChangeSubject(String emailChangeSubject) {
         this.emailChangeSubject = emailChangeSubject;
+    }
+
+    public String getSmartReportReadySubject() {
+        return smartReportReadySubject;
+    }
+
+    public void setSmartReportReadySubject(String smartReportReadySubject) {
+        this.smartReportReadySubject = smartReportReadySubject;
     }
 
     public java.util.List<String> getChannels() {

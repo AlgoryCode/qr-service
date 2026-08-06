@@ -58,6 +58,14 @@ public final class BillingPaymentDtos {
     ) {
     }
 
+    public record CardVerificationInit(
+            String conversationId,
+            String token,
+            String paymentPageUrl,
+            String checkoutFormContent
+    ) {
+    }
+
     public record RefundablePayment(
             String conversationId,
             String paymentId,
@@ -69,6 +77,18 @@ public final class BillingPaymentDtos {
     ) {
         public boolean isSuccess() {
             return status != null && "SUCCESS".equalsIgnoreCase(status.trim());
+        }
+
+        public boolean isCardVerificationComplete() {
+            if (status == null) {
+                return false;
+            }
+            String normalized = status.trim();
+            return "SUCCESS".equalsIgnoreCase(normalized) || "REFUNDED".equalsIgnoreCase(normalized);
+        }
+
+        public boolean isFailed() {
+            return status != null && "FAILURE".equalsIgnoreCase(status.trim());
         }
     }
 }

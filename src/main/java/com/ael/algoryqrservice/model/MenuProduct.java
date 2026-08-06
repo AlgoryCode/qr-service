@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.model;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -11,6 +12,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "tbl_menu_products")
@@ -39,10 +42,8 @@ public class MenuProduct extends QrBaseModel {
     @Column(nullable = false)
     private String currency = "TRY";
 
-    private String category;
-
-    @Column(name = "category_id")
-    private Long categoryId;
+    @Column(name = "sub_category_id", nullable = false)
+    private Long subCategoryId;
 
     @Column(nullable = false)
     private int sortOrder;
@@ -52,7 +53,37 @@ public class MenuProduct extends QrBaseModel {
     @Column(nullable = false)
     private boolean available = true;
 
+    @Column(name = "chef_recommended", nullable = false)
+    @Builder.Default
+    private boolean chefRecommended = false;
+
+    @Column(name = "rating_avg", nullable = false, precision = 3, scale = 2)
+    @Builder.Default
+    private BigDecimal ratingAvg = BigDecimal.ZERO;
+
+    @Column(name = "rating_count", nullable = false)
+    @Builder.Default
+    private long ratingCount = 0L;
+
+    @Column(name = "serves_people_min")
+    private Integer servesPeopleMin;
+
+    @Column(name = "serves_people_max")
+    private Integer servesPeopleMax;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private NutritionFacts nutrition;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "tbl_menu_product_tag", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "tag_id")
+    @Builder.Default
+    private Set<Long> tagIds = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "tbl_menu_product_allergen", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "allergen_id")
+    @Builder.Default
+    private Set<Long> allergenIds = new HashSet<>();
 }

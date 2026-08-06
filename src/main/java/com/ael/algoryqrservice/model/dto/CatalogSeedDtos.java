@@ -36,6 +36,7 @@ public final class CatalogSeedDtos {
         private List<String> features = new ArrayList<>();
         private String currency;
         private Integer validityDays;
+        private Integer trialDays;
         private Integer priority;
         private Boolean purchasable;
         private Boolean systemManaged;

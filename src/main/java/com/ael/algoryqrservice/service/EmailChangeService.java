@@ -116,9 +116,10 @@ public class EmailChangeService {
             throw new BadRequestException("Önce mevcut e-posta adresinizi doğrulamanız gerekir.");
         }
 
+        String currentEmail = request.getCurrentEmail().trim().toLowerCase();
         String newEmail = request.getNewEmail().trim().toLowerCase();
-        if (newEmail.equalsIgnoreCase(user.getEmail())) {
-            throw new BadRequestException("Yeni e-posta mevcut e-posta ile aynı olamaz");
+        if (newEmail.equalsIgnoreCase(currentEmail)) {
+            throw new BadRequestException("Bu e-postalar aynı.");
         }
         if (userRepository.existsByEmailAndIdNot(newEmail, user.getId())) {
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
@@ -185,7 +186,7 @@ public class EmailChangeService {
                 .build();
         codeRepository.save(entity);
 
-        String userName = (user.getFirstName() + " " + user.getLastName()).trim();
+        String userName = user.getDisplayName();
         try {
             notificationPublisherService.publishEmailChangeCode(
                     email,

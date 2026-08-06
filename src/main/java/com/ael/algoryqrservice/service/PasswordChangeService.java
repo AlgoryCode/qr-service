@@ -57,7 +57,7 @@ public class PasswordChangeService {
                 .build();
         passwordChangeCodeRepository.save(entity);
 
-        String userName = (user.getFirstName() + " " + user.getLastName()).trim();
+        String userName = user.getDisplayName();
         try {
             notificationPublisherService.publishPasswordChangeCode(
                     user.getEmail(),

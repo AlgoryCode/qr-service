@@ -10,10 +10,11 @@ Bu dok?man `algoryqr-service` i?inde paket sat?n alma, trial, free paket, ?deme 
 |------|----------|--------|
 | `PurchaseStatus` | `PENDING`, `ACTIVE`, `FAILED`, `EXPIRED`, `CANCELLED`, `SUPERSEDED` | `model/enums/PurchaseStatus.java` |
 | `PurchaseType` | `FREE`, `TRIAL`, `PAID`, `SYSTEM_GRANT` | `model/enums/PurchaseType.java` |
-| `PaymentMode` | `DIRECT`, `THREE_DS` | `model/enums/PaymentMode.java` |
+| `PaymentMode` | `DIRECT`, `THREE_DS`, `CHECKOUT_FORM` | `model/enums/PaymentMode.java` |
 | `PaymentStyle` | `ONE_TIME`, `BANK_INSTALLMENT`, `SUBSCRIPTION` | `model/enums/PaymentStyle.java` |
 | `FulfillmentStatus` | `PENDING`, `PAID`, `FAILED`, `OVERDUE`, `REVOKED` | `model/enums/FulfillmentStatus.java` |
 | `PurchaseCancellationReason` | `PAYMENT_TIMEOUT`, `MANUAL` | `model/enums/PurchaseCancellationReason.java` |
+| `RefundStatus` | `NONE`, `PENDING`, `COMPLETED`, `NEEDS_RECONCILE` | `model/enums/RefundStatus.java` |
 | `MenuPublicAccessDisabledReason` | `PACKAGE_INACTIVE`, `INSTALLMENT_OVERDUE` | `model/enums/MenuPublicAccessDisabledReason.java` |
 
 ### Kullan?labilirlik kurallar?
@@ -22,23 +23,27 @@ Bu dok?man `algoryqr-service` i?inde paket sat?n alma, trial, free paket, ?deme 
 |-------|--------|--------|
 | `Purchase` | `isUsable()` | `status == ACTIVE` **ve** `expiresAt` ge?mi? de?il |
 | `UserEntitlement` | `isUsable(PurchaseStatus)` | purchase `ACTIVE` + entitlement tarihi dolmam?? + (`unlimited` **veya** `remainingQuantity > 0`) |
-| `EntitlementService` | `hasUsableQrMenuPackage(userId)` | `QR_MENU` entitlement sat?r? var **ve** purchase `isUsable()` ? **remaining yok say?l?r** |
+| `EntitlementService` | `hasUsableQrCreatePackage(userId)` | `QR_CREATE` entitlement sat?r? var **ve** purchase `isUsable()` ? **remaining yok say?l?r** |
 
 ### Katalog sabitleri
 
 | Sabit | De?er | Dosya |
 |-------|--------|--------|
 | `CatalogPackages.FREE_PACKAGE` | Free paket kodu | `catalog/CatalogPackages.java` |
-| `CatalogProducts.QR_CREATE` | QR olu?turma hakk? | `catalog/CatalogProducts.java` |
-| `CatalogProducts.QR_MENU` | Men? QR hakk? | `catalog/CatalogProducts.java` |
-| `CatalogScopes.QR_CREATE_OWNER` | Scope: QR create | `catalog/CatalogScopes.java` |
-| `CatalogScopes.QR_MENU_OWNER` | Scope: men? y?netimi / public gate | `catalog/CatalogScopes.java` |
+| `CatalogProducts.QR_CREATE` | QR olusturma hakki | `catalog/CatalogProducts.java` |
+| `CatalogProducts.SMART_ASSISTANT` | Akilli Asistan | `catalog/CatalogProducts.java` |
+| `CatalogProducts.SMART_SUMMARY` | Akilli Ozet | `catalog/CatalogProducts.java` |
+| `CatalogProducts.SMART_REPORTING` | Akilli Raporlama | `catalog/CatalogProducts.java` |
+| `CatalogScopes.QR_CREATE_OWNER` | Scope: QR create / menu public gate | `catalog/CatalogScopes.java` |
+| `CatalogScopes.SMART_ASSISTANT_OWNER` | Scope: Akilli Asistan | `catalog/CatalogScopes.java` |
+| `CatalogScopes.SMART_SUMMARY_OWNER` | Scope: Akilli Ozet | `catalog/CatalogScopes.java` |
+| `CatalogScopes.SMART_REPORTING_OWNER` | Scope: Akilli Raporlama | `catalog/CatalogScopes.java` |
 
 Free paket i?eri?i (`PackageCatalogService.ensureFreePackage`):
 
 - Kod: `FREE_PACKAGE`
 - `purchasable=false`, `systemManaged=true`
-- Item: yaln?zca `QR_CREATE` ? **5** (`QR_MENU` yok)
+- Item: yaln?zca `QR_CREATE` ? **5** (yalnizca QR)
 
 ---
 
@@ -61,6 +66,9 @@ Free paket i?eri?i (`PackageCatalogService.ensureFreePackage`):
 | `GET` | `/purchases/my/entitlements` | `getMyEntitlements` | `EntitlementService.getUserEntitlements` |
 | `GET` | `/purchases/{purchaseId}/summary` | `getPurchaseSummary` | `PurchaseService.getPurchaseSummary` |
 | `POST` | `/purchases/{purchaseId}/cancel` | `cancelMyPurchase` | `PurchaseService.cancelMyPurchase` |
+| `POST` | `/purchases/{purchaseId}/cancel-at-period-end` | `cancelAtPeriodEnd` | `PurchaseService.cancelAtPeriodEnd` |
+| `POST` | `/purchases/{purchaseId}/resume-renewal` | `resumeRenewal` | `PurchaseService.resumeRenewal` |
+| `POST` | `/purchases/{purchaseId}/cancel-with-refund` | `cancelWithRefund` | `PurchaseService.cancelWithRefund` |
 | `GET` | `/purchases/{purchaseId}/installments` | `getPurchaseInstallments` | `PurchaseService.getPurchaseInstallments` |
 | `GET` | `/purchases/{purchaseId}/logs` | `getPurchaseLogs` | `PurchaseLogService.getPurchaseLogs` |
 
@@ -68,8 +76,11 @@ Free paket i?eri?i (`PackageCatalogService.ensureFreePackage`):
 
 | Method | Path | Controller | Service |
 |--------|------|------------|---------|
-| `POST` | `/trials/digital-menu-pro` | `TrialController.start` | `TrialService.startDigitalMenuPro` |
-| `GET` | `/trials/digital-menu-pro/status` | `TrialController.status` | `TrialService.status` |
+| `POST` | `/trials` | `TrialController.start` | `TrialService.start` |
+| `POST` | `/trials/digital-menu-pro` | `TrialController.startLegacy` | `TrialService.startDigitalMenuPro` (PRO only) |
+| `GET` | `/trials/status` | `TrialController.status` | `TrialService.status` |
+| `GET` | `/trials/digital-menu-pro/status` | `TrialController.statusLegacy` | `TrialService.status` |
+| `GET` | `/trials/eligible-packages` | `TrialController.eligiblePackages` | `TrialService.listEligiblePackages` |
 
 ### Admin
 
@@ -97,8 +108,7 @@ Free paket i?eri?i (`PackageCatalogService.ensureFreePackage`):
 | `PUT` | `/qr/update/{qrId}` | `QrService.updateQr` | Soft-delete + yeniden create |
 | `DELETE` | `/qr/delete/{qrId}` | `QrService.deleteQrByQrId` | QR + ba?l? Menu soft-delete |
 | `GET` | `/menu/public/id/{qrId}` | `MenuController` ? `MenuService.getPublicMenuByQrId` | Public gate |
-| `GET` | `/menu/public/slug/{slug}` | `MenuService.getPublicMenuBySlug` | Public gate |
-| Owner men? CRUD | `/menu/**` | `@RequiresProductScope(QR_MENU_OWNER)` | `ProductScopeAspect` ? `EntitlementService.requireScope` |
+| Owner menu CRUD | `/menu/**` | authenticated (product scope yok) | ownership checks in service |
 
 ---
 
@@ -109,7 +119,7 @@ flowchart TD
   Auth[Auth_Register_Login_OAuth_Session] --> Free[PackageActivationService.ensureFreePackage]
   Free --> FreeActive[FREE_ACTIVE_QR_CREATE_x5]
 
-  TrialApi[POST_/trials/digital-menu-pro] --> TrialSvc[TrialService.startDigitalMenuPro]
+  TrialApi[POST_/trials] --> TrialSvc[TrialService.start]
   TrialSvc --> TrialActive[TRIAL_ACTIVE_grant_SUPERSEDE]
 
   BuyApi[POST_/purchases] --> PurchaseSvc[PurchaseService.purchase]
@@ -138,15 +148,15 @@ flowchart TD
 ### Kurallar
 
 - Her kullan?c?n?n **mutlaka bir Free purchase kayd?** olur (`PurchaseType.FREE`).
-- Free?nin limitleri vard?r (katalog `items`; varsay?lan 5� `QR_CREATE`).
-- Pro / Ultimate / Trial usable iken UI ve access profile **�cretli/trial paketi** g�sterir; Free `SUPERSEDED` olarak durur (silinmez).
-- �cretli/trial bitince veya iptal edilince Free yeniden `ACTIVE` olur; haklar `EntitlementService.refreshForPackage` ile yenilenir.
+- Free?nin limitleri vard?r (katalog `items`; varsay?lan 5? `QR_CREATE`).
+- Pro / Ultimate / Trial usable iken UI ve access profile **?cretli/trial paketi** g?sterir; Free `SUPERSEDED` olarak durur (silinmez).
+- ?cretli/trial bitince veya iptal edilince Free yeniden `ACTIVE` olur; haklar `EntitlementService.refreshForPackage` ile yenilenir.
 
 ### Tetikleyiciler
 
-`PackageActivationService.ensureFreePackage(userId)` �u ak?�lardan �a?r?l?r:
+`PackageActivationService.ensureFreePackage(userId)` ?u ak??lardan ?a?r?l?r:
 
-- Auth kay?t / giri� (`AuthService`)
+- Auth kay?t / giri? (`AuthService`)
 - Session (`SessionService`)
 - Google OAuth (`GoogleOAuthUserService`)
 - Access profile resolve (`UserAccessProfileService`)
@@ -155,39 +165,43 @@ flowchart TD
 
 ### Metot zinciri
 
-1. S�resi dolan ACTIVE purchase?lar expire edilir.
-2. Usable **non-Free** varsa ? en y�ksek `priority` d�ner; Free baseline `SUPERSEDED` tutulur/olu�turulur.
-3. Usable non-Free yoksa ? mevcut Free `ACTIVE` yap?l?r (yoksa olu�turulur) + entitlement refresh + men� sync.
+1. S?resi dolan ACTIVE purchase?lar expire edilir.
+2. Usable **non-Free** varsa ? en y?ksek `priority` d?ner; Free baseline `SUPERSEDED` tutulur/olu?turulur.
+3. Usable non-Free yoksa ? mevcut Free `ACTIVE` yap?l?r (yoksa olu?turulur) + entitlement refresh + men? sync.
 
 ---
 
-## 5. Yol B ? Trial
+## 5. Yol B — Trial
 
 ### Endpoint
 
-`POST /trials/digital-menu-pro` ? `TrialController` ? `TrialService.startDigitalMenuPro(userId)`
+`POST /trials` → `TrialController` → `TrialService.start(userId, packageId)`
 
-Durum sorgusu: `GET /trials/digital-menu-pro/status` ? `TrialService.status(userId)`
+Legacy: `POST /trials/digital-menu-pro` → `TrialService.startDigitalMenuPro(userId)` (yalnızca `PRO_PACKAGE`)
 
-### Metot zinciri (`startDigitalMenuPro`)
+Durum sorgusu: `GET /trials/status` / `GET /trials/digital-menu-pro/status` → `TrialService.status(userId)`
 
-1. Kullan?c?da daha ?nce `PurchaseType.TRIAL` var m?? Varsa reddet (tek sefer)
-2. `trialEligible=true` ve `active=true` paketlerden en y?ksek priority se?ilir
-3. `Purchase` olu?turulur:
+### Metot zinciri (`start` / `startDigitalMenuPro`)
+
+1. `user.trialUsed` veya daha önce `PurchaseType.TRIAL` var mı? Varsa reddet (tek sefer)
+2. Aktif usable `PAID` varken reddet
+3. Paket: `active && trialEligible && !systemManaged` + geçerli `trialDays` (legacy: sabit `PRO_PACKAGE`)
+4. `Purchase` oluşturulur:
    - `purchaseType=TRIAL`
    - `status=ACTIVE` (hemen)
    - fiyat 0
-   - `expiresAt = now + package.validityDays`
-4. `PackageActivationService.activatePurchasedPackage(purchase)` ? di?er `ACTIVE` purchase?lar `SUPERSEDED`
-5. Paket item?lar? i?in `EntitlementService.grant(...)`
+   - `expiresAt = now + package.trialDays`
+5. `PackageActivationService.activatePurchasedPackage(purchase)` — diğer `ACTIVE` purchase’lar `SUPERSEDED`
+6. Paket item’ları için `EntitlementService.grant(...)`
 
-### S?n?rlar
+### Sınırlar
 
-- Kullan?c? ba??na **tek** trial
-- ?deme client?? ?a?r?lmaz
-- Trial start an?nda `MenuPublicAccessService.syncForUser` ?a?r?lmayabilir; sync men? create / scheduler / expire / sonraki purchase event ile gelir
-- `TrialExpiryReminderScheduler` ? s?resi yakla?an ACTIVE trial i?in hat?rlatma
-- `TrialService.status` okumada s?resi dolmu? trial?? expire edip free restore edebilir
+- Kullanıcı başına **tek** trial (`uk_purchase_trial_user` + `trial_used`)
+- Seed: yalnızca Pro `trialEligible`; Ultimate deneme dışı
+- Ödeme client’ı çağrılmaz
+- `expiresAt` sonrası haklar usable değildir; expire path Free’yi aynı işlemde restore eder + menu sync
+- `TrialExpiryReminderScheduler` — süresi yaklaşan ACTIVE trial için hatırlatma
+- `TrialService.status` okumada süresi dolmuş trial’ı expire eder; TRIAL varken `trialUsed` backfill edilir
 
 ---
 
@@ -233,7 +247,7 @@ Durum sorgusu: `GET /trials/digital-menu-pro/status` ? `TrialService.status(user
 `PendingPurchaseScheduler` (`fixedRate = 300_000` ms / 5 dk):
 
 1. **Reconcile:** `PENDING` + `paymentConversationId` dolu + en az 2 dk eski kayitlar icin payment-service `GET /payments/{conversationId}` sorgulanir. Status `SUCCESS` ise Rabbit event beklenmeden `handlePaymentSuccess` ile paket aktive edilir (`eventId=reconcile:{conversationId}:1`).
-2. **Timeout cancel:** `PurchaseService.cancelExpiredPendingPurchases(timeoutMinutes)` � default genelde **30 dakika**. Iptal oncesi yine payment SUCCESS kontrolu yapilir; odeme basariliysa iptal yerine aktivasyon.
+2. **Timeout cancel:** `PurchaseService.cancelExpiredPendingPurchases(timeoutMinutes)` ? default genelde **30 dakika**. Iptal oncesi yine payment SUCCESS kontrolu yapilir; odeme basariliysa iptal yerine aktivasyon.
 3. Gercekten odenmemis `PENDING` ? `CANCELLED` + `cancellationReason=PAYMENT_TIMEOUT`
 
 ---
@@ -305,10 +319,31 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 
 ### Refund / chargeback: `handlePaymentRefunded`
 
-- Fulfillment ? `REVOKED`
+- Fulfillment → `REVOKED` (purchase `CANCELLED` olsa bile; early-return yok)
 - `recalculatePaidPeriod(purchase)`:
-  - ?denen kalmad? ? purchase `EXPIRED`, free ensure, sync
-  - kald? ? `expiresAt` yeniden hesaplan?r; gerekirse free restore + sync
+  - odenen kalmadi → purchase `EXPIRED`, free ensure, sync
+  - kaldi → `expiresAt` yeniden hesaplanir; gerekirse free restore + sync
+- Purchase `CANCELLED` veya `EXPIRED` ise ek side-effect:
+  - `refundedAt` / `refundStatus=COMPLETED` (yoksa)
+  - entitlement revoke + menu deactivate
+  - remote subscription cancel (best-effort; fail → `NEEDS_RECONCILE`)
+
+### Kullanici iptal / iade
+
+| Endpoint | Kim | Davranis |
+|----------|-----|----------|
+| `POST /purchases/{id}/cancel` | Trial, PENDING, ONE_TIME / BANK_INSTALLMENT paid | Aninda `CANCELLED`; **para iadesi yok**. Paid ACTIVE `SUBSCRIPTION` reddedilir. |
+| `POST /purchases/{id}/cancel-at-period-end` | Paid ACTIVE subscription | `cancelAtPeriodEnd=true`; erisim `expiresAt` kadar surer |
+| `POST /purchases/{id}/resume-renewal` | Paid ACTIVE subscription | Donem sonu iptal bayragini kaldirir |
+| `POST /purchases/{id}/cancel-with-refund` | Paid ACTIVE subscription, cooling window icinde | Saga: `PENDING` → gateway refund → local `CANCELLED` |
+
+**ONE_TIME / BANK_INSTALLMENT politikasi:** Kullanici iade API'si yoktur. `/cancel` yalnizca erisimi keser; odeme iadesi yapilmaz. Iade yalnizca paid `SUBSCRIPTION` + soğuma penceresi (`billing.refund.monthly-cooling-days` / `yearly-cooling-days`) ile `/cancel-with-refund` uzerinden.
+
+**Refund saga guvenilirlik:**
+- `RefundStatus.PENDING` iken yeni iade baslatilamaz
+- Gateway iade basarili, lokal tamamlanamadi → `RefundReconcileScheduler` `getRefundablePayment` ile `remaining==0` ise local cancel tamamlar
+- Stuck `PENDING` (`refund_pending_at` + `pending-stuck-minutes`) ve odeme tarafinda hala bakiye varsa → `NONE`e rollback
+- Remote subscription cancel fail (iade sonrasi) → `NEEDS_RECONCILE` + scheduler retry
 
 ### Admin expire
 
@@ -326,7 +361,7 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 3. `PackageActivationService.restoreFreePackagesAfterPaidExpiry()`
 4. ?lgili user?lar i?in ek sync
 
-`EntitlementService.consume` / `hasUsableQrMenuPackage` i?inde de opportunistic `expireDuePurchases()` ?a?r?l?r.
+`EntitlementService.consume` / `hasUsableQrCreatePackage` i?inde de opportunistic `expireDuePurchases()` ?a?r?l?r.
 
 ---
 
@@ -353,7 +388,7 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 
 - `hasScope(userId, scopeCode)` ? usable entitlement + product.scopeCode e?le?mesi
 - `requireScope` ? yoksa `ForbiddenException`
-- Owner men? API: `@RequiresProductScope(CatalogScopes.QR_MENU_OWNER)` ? `ProductScopeAspect`
+- Owner men? API: authenticated (product scope yok; auth yeterli)
 
 ---
 
@@ -368,10 +403,8 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 1. `entitlementService.requireScope(userId, QR_CREATE_OWNER)`
 2. Tip `MENU` ise:
    1. `menuRepository.existsActiveLiveMenuQrForUser(userId)`  
-      **ve** `entitlementService.hasUsableQrMenuPackage(userId)`  
+      **ve** `entitlementService.hasUsableQrCreatePackage(userId)`  
       ? **409 Conflict**: `"Aktif bir dijital men? QR kayd?n?z zaten var"`
-   2. `requireScope(QR_MENU_OWNER)`
-   3. `consume(QR_MENU, 1)`
 3. `consume(QR_CREATE, 1)`
 4. `QrProviderFactory.get(type, ...).createQr(req)`
 5. Menu tipi i?in `MenuProvider` ? `MenuService.createMenuForQr` ? `MenuPublicAccessService.syncForUser`
@@ -402,8 +435,7 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 ### Endpoint?ler
 
 - `GET /menu/public/id/{qrId}` ? `MenuService.getPublicMenuByQrId`
-- `GET /menu/public/slug/{slug}` ? `MenuService.getPublicMenuBySlug`
-- ??eride: `buildPublicResponse(menu)`
+- ?�eride: `buildPublicResponse(menu)`
 
 ### Runtime kontroller (`buildPublicResponse`)
 
@@ -413,7 +445,7 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 
 ### Sync de?erlendirmesi (`MenuPublicAccessService.evaluate`)
 
-1. `entitlementService.hasScope(userId, QR_MENU_OWNER)` yoksa ? deny `PACKAGE_INACTIVE`
+1. `entitlementService.hasScope(userId, QR_CREATE_OWNER)` yoksa ? deny `PACKAGE_INACTIVE`
 2. Usable `ACTIVE` purchase yoksa ? deny `PACKAGE_INACTIVE`
 3. Bu purchase?lardan herhangi birinde fulfillment `OVERDUE` varsa ? deny `INSTALLMENT_OVERDUE`
 4. Aksi halde allow
@@ -439,14 +471,14 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 
 ## 12. S?n?r / karar matrisi
 
-| Durum | Normal QR | Menu QR | Owner men? API | Public men? |
+| Durum | Normal QR | Menu QR | Owner menu API | Public menu |
 |--------|-----------|---------|----------------|-------------|
-| Free ACTIVE (`QR_CREATE` kalan) | Evet | Hay?r | Hay?r | Hay?r |
-| Trial / Paid ACTIVE + `QR_MENU` usable | Evet (kota) | ?lk: evet; ikinci canl?: **409** | Scope + remaining | Sync true ise |
-| Purchase EXPIRED / CANCELLED (ACTIVE yok) | Free kurallar? | Hay?r | Hay?r | Hay?r |
-| Installment OVERDUE | Entitlement kalabilir | ? | Scope?a ba?l? | **Hay?r** |
-| PENDING purchase | Hen?z grant yok | Hay?r | Hay?r | Hay?r |
-| Payment success after `PAYMENT_TIMEOUT` cancel | Fulfill edilebilir | ? | ? | Sync sonras? |
+| Free ACTIVE (`QR_CREATE` kalan) | Evet | Ilk: evet; ikinci canli: **409** | Evet (auth) | Sync true ise |
+| Trial / Paid ACTIVE + `QR_CREATE` usable | Evet (kota) | Ilk: evet; ikinci canli: **409** | Evet (auth) | Sync true ise |
+| Purchase EXPIRED / CANCELLED (ACTIVE yok) | Free kurallari | Hayir | Evet (auth) | Hayir |
+| Installment OVERDUE | Entitlement kalabilir | ? | Evet (auth) | **Hayir** |
+| PENDING purchase | Henuz grant yok | Hayir | Evet (auth) | Hayir |
+| Payment success after `PAYMENT_TIMEOUT` cancel | Fulfill edilebilir | ? | ? | Sync sonrasi |
 | `FREE_PACKAGE` / systemManaged sat?n alma | ? | ? | ? | API reddeder |
 | ?kinci trial | ? | ? | ? | Red |
 
@@ -462,7 +494,7 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 | Entitlements | `EntitlementService` |
 | Trial | `TrialService`, `TrialExpiryReminderScheduler`, `TrialExpiryReminderDispatcher` |
 | Payment IO | `PaymentServiceClient`, `PaymentRequestMapper`, `PaymentEventConsumer` |
-| Schedulers | `PendingPurchaseScheduler`, `PackageExpirationScheduler` |
+| Schedulers | `PendingPurchaseScheduler`, `PackageExpirationScheduler`, `RefundReconcileScheduler` |
 | Menu access | `MenuPublicAccessService`, `MenuPublicAccessBackfillRunner` |
 | QR gate | `QrService`, `MenuRepository.existsActiveLiveMenuQrForUser` |
 | Aspect | `ProductScopeAspect` (`@RequiresProductScope`) |
@@ -475,13 +507,13 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 
 1. `POST /auth/register` ? `ensureFreePackage`
 2. `POST /qr/create` (link) ? `QR_CREATE` consume
-3. Menu create denemesi ? `QR_MENU_OWNER` yok ? Forbidden
+3. Menu owner API auth ile acilir (ayri QR_MENU scope yok)
 
 ### Senaryo 2 ? Trial ba?lat?p men? a?ma
 
-1. `POST /trials/digital-menu-pro` ? TRIAL ACTIVE + grant
-2. `POST /qr/create` type=`menu` ? consume `QR_MENU` + `QR_CREATE` ? `createMenuForQr` ? sync
-3. ?kinci menu create ? 409 (aktif canl? menu + usable package)
+1. `POST /trials` (veya legacy `POST /trials/digital-menu-pro`) → TRIAL ACTIVE + grant (`trialDays`)
+2. `POST /qr/create` type=`menu` → consume `QR_CREATE` → `createMenuForQr` → sync
+3. İkinci menu create → 409 (aktif canlı menu + usable package)
 
 ### Senaryo 3 ? ?cretli 3DS
 
@@ -508,6 +540,6 @@ HTTP webhook yok. Tamamlama kuyruk ?zerinden gelir.
 ## 15. Bak?m notlar?
 
 - Public eri?im **son sync** flag?ine bakar; her request?te `evaluate` yeniden ?al??t?r?lmaz.
-- `UserEntitlement.isUsable` remaining bitince scope false olabilir; buna kar??l?k ?aktif menu var m??? kontrol? `hasUsableQrMenuPackage` ile remaining?i yok sayar.
+- `UserEntitlement.isUsable` remaining bitince scope false olabilir; buna kar??l?k ?aktif menu var m??? kontrol? `hasUsableQrCreatePackage` ile remaining?i yok sayar.
 - QR silinmeden Menu soft-delete yap?lmazsa orphan aktif menu create?i yanl??l?kla bloklayabilir; `softDeleteQrAndLinkedMenu` bunu ?nler.
 - ?deme tamamlamas? yaln?zca RabbitMQ event?leri ile yap?l?r; bu serviste payment webhook controller yoktur.

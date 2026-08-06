@@ -956,8 +956,8 @@ public class PlanChangeService {
         String identity = address.getTckn() != null ? address.getTckn() : address.getVkn();
         return PaymentThreeDsRequest.BuyerPayload.builder()
                 .id(String.valueOf(user.getId()))
-                .name(user.getFirstName())
-                .surname(user.getLastName())
+                .name(user.getFirstName() != null && !user.getFirstName().isBlank() ? user.getFirstName() : "Musteri")
+                .surname(user.getLastName() != null && !user.getLastName().isBlank() ? user.getLastName() : "Kullanici")
                 .gsmNumber(user.getPhone())
                 .email(user.getEmail())
                 .identityNumber(identity != null ? identity : "11111111111")

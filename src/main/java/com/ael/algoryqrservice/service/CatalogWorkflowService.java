@@ -41,6 +41,7 @@ public class CatalogWorkflowService {
         packageRequest.setFeatures(request.getFeatures());
         packageRequest.setCurrency(request.getCurrency());
         packageRequest.setValidityDays(request.resolvedValidityDays());
+        packageRequest.setTrialDays(request.getTrialDays());
         packageRequest.setPriority(request.getPriority());
         packageRequest.setActive(true);
         packageRequest.setPurchasable(true);

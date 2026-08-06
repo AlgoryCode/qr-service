@@ -14,5 +14,4 @@ public class QrResponse {
     private String imgSrc;
     private String publicUrl;
     private Long menuId;
-    private String urlMode;
 }

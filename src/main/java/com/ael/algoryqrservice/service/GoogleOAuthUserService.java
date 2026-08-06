@@ -57,7 +57,7 @@ public class GoogleOAuthUserService {
                 identity.subject()
         );
         if (existingGoogleUser.isPresent()) {
-            return existingGoogleUser.get();
+            throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
 
         Optional<User> existingByEmail = userRepository.findByEmail(identity.email());

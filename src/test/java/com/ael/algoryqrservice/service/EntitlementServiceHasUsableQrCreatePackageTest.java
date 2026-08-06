@@ -23,7 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class EntitlementServiceHasUsableQrMenuPackageTest {
+class EntitlementServiceHasUsableQrCreatePackageTest {
 
     @Mock
     private UserEntitlementRepository entitlementRepository;
@@ -37,17 +37,19 @@ class EntitlementServiceHasUsableQrMenuPackageTest {
     private PurchaseLogService purchaseLogService;
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
+    @Mock
+    private org.springframework.beans.factory.ObjectProvider<PackageActivationService> packageActivationService;
 
     @InjectMocks
     private EntitlementService entitlementService;
 
     @Test
-    void hasUsableQrMenuPackage_whenRemainingZeroButPurchaseActive_thenTrue() {
+    void hasUsableQrCreatePackage_whenRemainingZeroButPurchaseActive_thenTrue() {
         Long userId = 7L;
         UserEntitlement entitlement = UserEntitlement.builder()
                 .id(1L)
                 .userId(userId)
-                .productCode(CatalogProducts.QR_MENU)
+                .productCode(CatalogProducts.QR_CREATE)
                 .purchaseId(10L)
                 .totalQuantity(1)
                 .remainingQuantity(0)
@@ -66,16 +68,16 @@ class EntitlementServiceHasUsableQrMenuPackageTest {
         when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(entitlement));
         when(purchaseRepository.findAllById(List.of(10L))).thenReturn(List.of(purchase));
 
-        assertThat(entitlementService.hasUsableQrMenuPackage(userId)).isTrue();
+        assertThat(entitlementService.hasUsableQrCreatePackage(userId)).isTrue();
     }
 
     @Test
-    void hasUsableQrMenuPackage_whenPurchaseExpiredByDate_thenFalse() {
+    void hasUsableQrCreatePackage_whenPurchaseExpiredByDate_thenFalse() {
         Long userId = 7L;
         UserEntitlement entitlement = UserEntitlement.builder()
                 .id(1L)
                 .userId(userId)
-                .productCode(CatalogProducts.QR_MENU)
+                .productCode(CatalogProducts.QR_CREATE)
                 .purchaseId(10L)
                 .totalQuantity(1)
                 .remainingQuantity(1)
@@ -94,6 +96,6 @@ class EntitlementServiceHasUsableQrMenuPackageTest {
         when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(entitlement));
         when(purchaseRepository.findAllById(List.of(10L))).thenReturn(List.of(purchase));
 
-        assertThat(entitlementService.hasUsableQrMenuPackage(userId)).isFalse();
+        assertThat(entitlementService.hasUsableQrCreatePackage(userId)).isFalse();
     }
 }

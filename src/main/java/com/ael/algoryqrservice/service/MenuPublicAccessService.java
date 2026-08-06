@@ -49,7 +49,7 @@ public class MenuPublicAccessService {
         if (userId == null) {
             return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
         }
-        if (!entitlementService.hasScope(userId, CatalogScopes.QR_MENU_OWNER)) {
+        if (!entitlementService.hasScope(userId, CatalogScopes.QR_CREATE_OWNER)) {
             return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
         }
 

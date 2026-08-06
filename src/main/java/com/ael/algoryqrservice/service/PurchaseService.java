@@ -3,9 +3,12 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.config.BillingRefundProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
@@ -22,6 +25,7 @@ import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseSummaryResponse;
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
@@ -66,6 +70,7 @@ public class PurchaseService {
     private final MenuPublicAccessService menuPublicAccessService;
     private final PlanChangeService planChangeService;
     private final SubscriptionRefundPolicy subscriptionRefundPolicy;
+    private final BillingRefundProperties billingRefundProperties;
     private final PlatformTransactionManager transactionManager;
 
     @Transactional
@@ -131,6 +136,27 @@ public class PurchaseService {
         );
 
         try {
+            if (request.getPaymentMode() == PaymentMode.CHECKOUT_FORM) {
+                PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toCheckoutFormRequest(
+                        purchase,
+                        user,
+                        planPackage,
+                        clientIp,
+                        appProperties
+                );
+                PaymentCheckoutFormResponse checkoutFormResponse =
+                        paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
+
+                return PurchaseInitiateResponse.builder()
+                        .purchaseId(purchase.getId())
+                        .status(purchase.getStatus())
+                        .conversationId(checkoutFormResponse.getConversationId())
+                        .token(checkoutFormResponse.getToken())
+                        .paymentPageUrl(checkoutFormResponse.getPaymentPageUrl())
+                        .checkoutFormContent(checkoutFormResponse.getCheckoutFormContent())
+                        .build();
+            }
+
             PaymentThreeDsRequest paymentRequest = paymentRequestMapper.toThreeDsRequest(
                     purchase,
                     user,
@@ -291,11 +317,8 @@ public class PurchaseService {
             return;
         }
         validateIdentity(event, metadata, purchase);
-        if (purchase.getStatus() == PurchaseStatus.CANCELLED) {
-            markEventProcessed(event, purchase.getId());
-            return;
-        }
         purchaseFulfillmentService.revokeInstallment(purchase, event, metadata);
+        applyExternalRefundSideEffects(purchase);
         markEventProcessed(event, purchase.getId());
     }
 
@@ -673,6 +696,9 @@ public class PurchaseService {
         if (purchase.getRefundStatus() == RefundStatus.NEEDS_RECONCILE) {
             throw new BadRequestException("Iade tamamlandi; abonelik senkronu bekleniyor");
         }
+        if (purchase.getRefundStatus() == RefundStatus.PENDING) {
+            throw new BadRequestException("Iade zaten devam ediyor");
+        }
         LocalDateTime now = LocalDateTime.now();
         if (!subscriptionRefundPolicy.isRefundEligible(purchase, now)) {
             throw new BadRequestException(
@@ -693,6 +719,7 @@ public class PurchaseService {
         }
 
         purchase.setRefundStatus(RefundStatus.PENDING);
+        purchase.setRefundPendingAt(now);
         purchaseRepository.save(purchase);
         purchaseLogService.log(
                 purchase.getId(),
@@ -707,6 +734,7 @@ public class PurchaseService {
         purchaseRepository.findByIdForUpdate(purchaseId).ifPresent(purchase -> {
             if (purchase.getRefundStatus() == RefundStatus.PENDING) {
                 purchase.setRefundStatus(RefundStatus.NONE);
+                purchase.setRefundPendingAt(null);
                 purchaseRepository.save(purchase);
             }
         });
@@ -718,6 +746,7 @@ public class PurchaseService {
 
         purchase.setRefundedAt(LocalDateTime.now());
         purchase.setRefundStatus(RefundStatus.COMPLETED);
+        purchase.setRefundPendingAt(null);
         purchaseLogService.log(
                 purchase.getId(),
                 userId,
@@ -757,6 +786,7 @@ public class PurchaseService {
                     locked.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
                 }
                 locked.setRefundStatus(RefundStatus.COMPLETED);
+                locked.setRefundPendingAt(null);
                 purchaseRepository.save(locked);
             } catch (RuntimeException exception) {
                 log.warn(
@@ -765,6 +795,136 @@ public class PurchaseService {
                         exception.getMessage()
                 );
             }
+        }
+    }
+
+    @Transactional
+    public void reconcilePendingRefunds() {
+        List<Purchase> pending = purchaseRepository.findByRefundStatus(RefundStatus.PENDING);
+        for (Purchase purchase : pending) {
+            try {
+                Purchase locked = purchaseRepository.findByIdForUpdate(purchase.getId()).orElse(null);
+                if (locked == null || locked.getRefundStatus() != RefundStatus.PENDING) {
+                    continue;
+                }
+
+                String conversationId = resolveRefundConversationId(locked);
+                if (conversationId == null || conversationId.isBlank()) {
+                    if (isRefundPendingStuck(locked)) {
+                        clearStuckPendingRefund(locked, "odeme kaydi yok");
+                    }
+                    continue;
+                }
+
+                BillingPaymentDtos.RefundablePayment payment;
+                try {
+                    payment = paymentServiceClient.getRefundablePayment(locked.getUserId(), conversationId);
+                } catch (PaymentServiceException exception) {
+                    log.warn(
+                            "Pending refund payment lookup failed. purchaseId={} reason={}",
+                            locked.getId(),
+                            exception.getMessage()
+                    );
+                    continue;
+                }
+
+                BigDecimal remaining = payment.remaining() == null ? BigDecimal.ZERO : payment.remaining();
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                    BigDecimal refundedAmount = payment.refundedAmount() == null
+                            ? locked.getPrice()
+                            : payment.refundedAmount();
+                    completeRefundCancel(locked.getId(), locked.getUserId(), refundedAmount);
+                    log.info(
+                            "Pending refund completed by reconcile. purchaseId={} conversationId={}",
+                            locked.getId(),
+                            conversationId
+                    );
+                    continue;
+                }
+
+                if (isRefundPendingStuck(locked)) {
+                    clearStuckPendingRefund(locked, "odeme tarafinda iade tamamlanmamis");
+                }
+            } catch (RuntimeException exception) {
+                log.warn(
+                        "Pending refund reconcile failed. purchaseId={} reason={}",
+                        purchase.getId(),
+                        exception.getMessage()
+                );
+            }
+        }
+    }
+
+    private boolean isRefundPendingStuck(Purchase purchase) {
+        LocalDateTime pendingAt = purchase.getRefundPendingAt();
+        if (pendingAt == null) {
+            return true;
+        }
+        return pendingAt.isBefore(
+                LocalDateTime.now().minusMinutes(Math.max(1, billingRefundProperties.getPendingStuckMinutes()))
+        );
+    }
+
+    private void clearStuckPendingRefund(Purchase purchase, String reason) {
+        purchase.setRefundStatus(RefundStatus.NONE);
+        purchase.setRefundPendingAt(null);
+        purchaseRepository.save(purchase);
+        log.warn(
+                "Stuck PENDING refund cleared to NONE. purchaseId={} reason={}",
+                purchase.getId(),
+                reason
+        );
+    }
+
+    private void applyExternalRefundSideEffects(Purchase purchase) {
+        if (purchase.getStatus() != PurchaseStatus.CANCELLED
+                && purchase.getStatus() != PurchaseStatus.EXPIRED) {
+            return;
+        }
+
+        if (purchase.getRefundedAt() == null) {
+            purchase.setRefundedAt(LocalDateTime.now());
+        }
+        if (purchase.getRefundStatus() == RefundStatus.NONE
+                || purchase.getRefundStatus() == RefundStatus.PENDING) {
+            purchase.setRefundStatus(RefundStatus.COMPLETED);
+            purchase.setRefundPendingAt(null);
+        }
+
+        entitlementService.revokeForCancelledPurchase(purchase);
+        menuPublicAccessService.deactivateActiveMenusForUser(purchase.getUserId());
+        cancelRemoteSubscriptionBestEffort(purchase);
+        purchaseRepository.save(purchase);
+    }
+
+    private void cancelRemoteSubscriptionBestEffort(Purchase purchase) {
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            return;
+        }
+        String subscriptionId = purchase.getSubscriptionId();
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            return;
+        }
+        if (purchase.getSubscriptionStatus() == SubscriptionStatus.CANCELLED) {
+            return;
+        }
+        try {
+            paymentServiceClient.cancelSubscription(purchase.getUserId(), subscriptionId);
+            purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
+            if (purchase.getRefundStatus() == RefundStatus.NEEDS_RECONCILE) {
+                purchase.setRefundStatus(RefundStatus.COMPLETED);
+                purchase.setRefundPendingAt(null);
+            }
+        } catch (PaymentServiceException exception) {
+            if (purchase.getRefundStatus() == RefundStatus.COMPLETED
+                    || purchase.getRefundStatus() == RefundStatus.NONE) {
+                purchase.setRefundStatus(RefundStatus.NEEDS_RECONCILE);
+            }
+            log.error(
+                    "Remote subscription cancel failed after external refund; marking NEEDS_RECONCILE. purchaseId={}",
+                    purchase.getId(),
+                    exception
+            );
         }
     }
 
@@ -783,7 +943,7 @@ public class PurchaseService {
 
     private PurchaseResponse applyLocalImmediateCancel(Purchase purchase, Long userId, BigDecimal refundedAmount) {
         LocalDateTime cancelledAt = LocalDateTime.now();
-        boolean wasActive = purchase.getStatus() == PurchaseStatus.ACTIVE;
+        PurchaseStatus previousStatus = purchase.getStatus();
         purchase.setStatus(PurchaseStatus.CANCELLED);
         purchase.setCancellationReason(PurchaseCancellationReason.MANUAL);
         purchase.setExpiresAt(cancelledAt);
@@ -794,7 +954,10 @@ public class PurchaseService {
         }
         purchaseRepository.save(purchase);
 
-        if (wasActive) {
+        boolean needsCleanup = previousStatus == PurchaseStatus.ACTIVE
+                || previousStatus == PurchaseStatus.EXPIRED
+                || refundedAmount != null;
+        if (needsCleanup) {
             entitlementService.revokeForCancelledPurchase(purchase);
             menuPublicAccessService.deactivateActiveMenusForUser(userId);
         }
@@ -982,6 +1145,8 @@ public class PurchaseService {
                 .currentPeriodPaidAt(purchase.getCurrentPeriodPaidAt())
                 .refundEligibleUntil(refundEligibleUntil)
                 .refundEligible(refundEligible)
+                .refundableAmount(resolveRefundableAmount(purchase, refundEligible))
+                .refundCoolingDays(resolveRefundCoolingDays(purchase))
                 .refundedAt(purchase.getRefundedAt())
                 .refundStatus(purchase.getRefundStatus())
                 .billingSnapshot(purchase.getBillingSnapshot())
@@ -1031,6 +1196,7 @@ public class PurchaseService {
                 .currentPeriodPaidAt(purchase.getCurrentPeriodPaidAt())
                 .refundEligibleUntil(refundEligibleUntil)
                 .refundEligible(refundEligible)
+                .refundCoolingDays(resolveRefundCoolingDays(purchase))
                 .refundedAt(purchase.getRefundedAt())
                 .refundStatus(purchase.getRefundStatus())
                 .billingSnapshot(purchase.getBillingSnapshot())
@@ -1051,6 +1217,44 @@ public class PurchaseService {
                 .expired(lifecycle.expired())
                 .usable(lifecycle.usable())
                 .build();
+    }
+
+    private BigDecimal resolveRefundableAmount(Purchase purchase, boolean refundEligible) {
+        if (!refundEligible) {
+            return null;
+        }
+        String conversationId = resolveRefundConversationId(purchase);
+        if (conversationId == null || conversationId.isBlank()) {
+            return null;
+        }
+        try {
+            BillingPaymentDtos.RefundablePayment refundable =
+                    paymentServiceClient.getRefundablePayment(purchase.getUserId(), conversationId);
+            BigDecimal remaining = refundable.remaining();
+            if (remaining == null || remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                return null;
+            }
+            return remaining;
+        } catch (RuntimeException exception) {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Refundable amount lookup skipped. purchaseId={} reason={}",
+                        purchase.getId(),
+                        exception.getMessage()
+                );
+            }
+            return null;
+        }
+    }
+
+    private Integer resolveRefundCoolingDays(Purchase purchase) {
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            return null;
+        }
+        BillingPeriod billingPeriod = purchase.getBillingPeriod() != null
+                ? purchase.getBillingPeriod()
+                : BillingPeriod.MONTHLY;
+        return subscriptionRefundPolicy.coolingDays(billingPeriod);
     }
 
     private LifecycleSnapshot resolveLifecycle(Purchase purchase) {

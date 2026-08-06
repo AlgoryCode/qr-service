@@ -103,6 +103,10 @@ public final class AccountDtos {
         @NotBlank(message = "challengeId zorunludur")
         private String challengeId;
 
+        @NotBlank(message = "Mevcut e-posta zorunludur")
+        @Email(message = "Geçerli bir e-posta adresi giriniz")
+        private String currentEmail;
+
         @NotBlank(message = "Yeni e-posta zorunludur")
         @Email(message = "Geçerli bir e-posta adresi giriniz")
         private String newEmail;

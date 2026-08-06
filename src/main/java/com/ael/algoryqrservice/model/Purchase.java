@@ -135,6 +135,9 @@ public class Purchase {
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt;
 
+    @Column(name = "refund_pending_at")
+    private LocalDateTime refundPendingAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "refund_status", nullable = false, length = 24)
     @ColumnDefault("'NONE'")

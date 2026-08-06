@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 
 public enum PaymentMode {
     DIRECT,
-    THREE_DS;
+    THREE_DS,
+    CHECKOUT_FORM;
 
     @JsonCreator
     public static PaymentMode fromValue(String value) {

@@ -12,4 +12,7 @@ public class PurchaseInitiateResponse {
     private PurchaseStatus status;
     private String conversationId;
     private String paymentHtml;
+    private String token;
+    private String paymentPageUrl;
+    private String checkoutFormContent;
 }

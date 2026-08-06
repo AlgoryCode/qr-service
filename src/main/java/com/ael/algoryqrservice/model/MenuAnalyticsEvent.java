@@ -55,6 +55,9 @@ public class MenuAnalyticsEvent {
     @Column(name = "product_id")
     private Long productId;
 
+    @Column(name = "serves_people")
+    private Integer servesPeople;
+
     @Column(nullable = false)
     private int sequence;
 

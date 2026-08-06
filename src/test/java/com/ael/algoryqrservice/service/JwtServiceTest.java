@@ -25,8 +25,8 @@ class JwtServiceTest {
         JwtService jwtService = new JwtService(properties);
         UserAccessProfile profile = new UserAccessProfile(
                 CatalogPackages.PRO_PACKAGE,
-                List.of(CatalogProducts.QR_CREATE, CatalogProducts.QR_MENU),
-                List.of(CatalogScopes.QR_CREATE_OWNER, CatalogScopes.QR_MENU_OWNER)
+                List.of(CatalogProducts.QR_CREATE, CatalogProducts.SMART_ASSISTANT),
+                List.of(CatalogScopes.QR_CREATE_OWNER, CatalogScopes.SMART_ASSISTANT_OWNER)
         );
 
         String token = jwtService.generateAccessToken(
@@ -40,8 +40,8 @@ class JwtServiceTest {
 
         Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
         assertThat(claims.get("activePackage")).isEqualTo("PRO_PACKAGE");
-        assertThat(claims.get("products", List.class)).containsExactly("QR_CREATE", "QR_MENU");
-        assertThat(claims.get("scopes", List.class)).containsExactly("QR_CREATE_OWNER", "QR_MENU_OWNER");
+        assertThat(claims.get("products", List.class)).containsExactly("QR_CREATE", "SMART_ASSISTANT");
+        assertThat(claims.get("scopes", List.class)).containsExactly("QR_CREATE_OWNER", "SMART_ASSISTANT_OWNER");
         assertThat(claims.get("provider")).isEqualTo("GOOGLE");
         assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_APP);
         assertThat(jwtService.isDashboardPrincipal(claims)).isFalse();

@@ -24,3 +24,8 @@ spring:
 
 app:
   url: http://localhost:3000
+
+google:
+  oauth:
+    frontend-callback-url: http://localhost:3000/api/auth/google/callback
+    handoff-ticket-ttl: PT2M

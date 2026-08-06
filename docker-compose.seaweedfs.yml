@@ -1,0 +1,30 @@
+services:
+  seaweedfs-master:
+    image: chrislusf/seaweedfs
+    command: master -ip=seaweedfs-master -mdir=/data
+    volumes:
+      - seaweedfs_master_data:/data
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs
+    command: volume -mserver=seaweedfs-master:9333 -ip=seaweedfs-volume -port=8080
+    depends_on:
+      - seaweedfs-master
+    volumes:
+      - seaweedfs_volume_data:/data
+
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs
+    command: filer -master=seaweedfs-master:9333 -ip=seaweedfs-filer
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+    ports:
+      - "8888:8888"
+    volumes:
+      - seaweedfs_filer_data:/data
+
+volumes:
+  seaweedfs_master_data:
+  seaweedfs_volume_data:
+  seaweedfs_filer_data:

@@ -4,19 +4,19 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
-import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductVisit;
 import com.ael.algoryqrservice.model.MenuVisit;
+import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
-import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
+import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -56,7 +56,7 @@ public class AnalyticsService {
     private final MenuAnalyticsEventRepository eventRepository;
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
-    private final MenuCategoryRepository menuCategoryRepository;
+    private final SubCategoryRepository subCategoryRepository;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -113,6 +113,7 @@ public class AnalyticsService {
                     .eventType(item.type())
                     .categoryId(item.categoryId())
                     .productId(item.productId())
+                    .servesPeople(item.servesPeople())
                     .sequence(sequence)
                     .occurredAt(occurredAt)
                     .build());
@@ -182,9 +183,9 @@ public class AnalyticsService {
         Map<Long, String> productNames = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).stream()
                 .collect(Collectors.toMap(MenuProduct::getProductId, MenuProduct::getName, (a, b) -> a));
-        Map<Long, String> categoryNames = menuCategoryRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscCategoryIdAsc(menuId).stream()
-                .collect(Collectors.toMap(MenuCategory::getCategoryId, MenuCategory::getName, (a, b) -> a));
+        Map<Long, String> categoryNames = subCategoryRepository
+                .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
+                .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
 
         List<AnalyticsDtos.TopProduct> topProducts = eventRepository.topProducts(menuId, fromDt, toDt).stream()
                 .limit(TOP_LIMIT)
@@ -401,8 +402,7 @@ public class AnalyticsService {
             if (item.categoryId() == null) {
                 throw new BadRequestException("CATEGORY_VIEW icin categoryId zorunludur");
             }
-            menuCategoryRepository.findByCategoryIdAndDeletedFalse(item.categoryId())
-                    .filter(c -> c.getMenuId().equals(menuId))
+            subCategoryRepository.findByIdAndDeletedFalse(item.categoryId())
                     .orElseThrow(() -> new BadRequestException("Kategori bulunamadi"));
         }
         if (item.type() == MenuAnalyticsEventType.PRODUCT_VIEW) {
@@ -412,6 +412,11 @@ public class AnalyticsService {
             menuProductRepository.findByProductIdAndDeletedFalse(item.productId())
                     .filter(p -> p.getMenuId().equals(menuId))
                     .orElseThrow(() -> new BadRequestException("Urun bulunamadi"));
+        }
+        if (item.type() == MenuAnalyticsEventType.SERVES_FILTER) {
+            if (item.servesPeople() == null || item.servesPeople() < 1) {
+                throw new BadRequestException("SERVES_FILTER icin servesPeople zorunludur");
+            }
         }
     }
 
@@ -510,6 +515,9 @@ public class AnalyticsService {
                     event.getProductId(),
                     "Urun #" + event.getProductId()
             );
+            case SERVES_FILTER -> event.getServesPeople() == null
+                    ? "Kisi sayisi filtresi"
+                    : event.getServesPeople() + " kisilik filtre";
         };
     }
 

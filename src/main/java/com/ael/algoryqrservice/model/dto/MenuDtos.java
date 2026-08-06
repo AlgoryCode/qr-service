@@ -1,13 +1,16 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 public final class MenuDtos {
@@ -24,11 +27,15 @@ public final class MenuDtos {
         private String description;
         private BigDecimal price;
         private String currency;
-        private String category;
-        private Long categoryId;
+        private Long subCategoryId;
+        private List<Long> tagIds;
+        private List<Long> allergenIds;
         private Integer sortOrder;
         private String imageUrl;
         private Boolean available;
+        private Boolean chefRecommended;
+        private Integer servesPeopleMin;
+        private Integer servesPeopleMax;
         private NutritionFacts nutrition;
     }
 
@@ -43,14 +50,50 @@ public final class MenuDtos {
         private String description;
         private BigDecimal price;
         private String currency;
-        private String category;
-        private Long categoryId;
-        private String categoryName;
-        private String categoryPath;
+        private Long subCategoryId;
+        private String subCategorySlug;
+        private String subCategoryName;
+        private Long mainCategoryId;
+        private String mainCategorySlug;
+        private String mainCategoryName;
+        private List<TaxonomyDtos.TagResponse> tags;
+        private List<TaxonomyDtos.AllergenResponse> allergens;
         private int sortOrder;
         private String imageUrl;
         private boolean available;
+        private boolean chefRecommended;
+        private BigDecimal ratingAvg;
+        private long ratingCount;
+        private Integer servesPeopleMin;
+        private Integer servesPeopleMax;
         private NutritionFacts nutrition;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProductRatingRequest {
+        @NotNull
+        @Min(1)
+        @Max(5)
+        private Integer score;
+
+        @Size(max = 500)
+        private String comment;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProductRatingResponse {
+        private Long productId;
+        private Long menuId;
+        private int score;
+        private String comment;
+        private BigDecimal ratingAvg;
+        private long ratingCount;
     }
 
     @Data
@@ -90,41 +133,7 @@ public final class MenuDtos {
         private Long menuId;
         private Long qrId;
         private String businessName;
-        private List<MenuCategoryResponse> categories;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MenuCategoryRequest {
-        private String name;
-        private Long parentId;
-        private Integer sortOrder;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MenuCategoryUpdateRequest {
-        private String name;
-        private Long parentId;
-        private Integer sortOrder;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MenuCategoryResponse {
-        private Long categoryId;
-        private Long menuId;
-        private Long parentId;
-        private String name;
-        private int sortOrder;
-        @Builder.Default
-        private List<MenuCategoryResponse> children = new ArrayList<>();
+        private List<TaxonomyDtos.MainCategoryResponse> categories;
     }
 
     @Data
@@ -141,8 +150,6 @@ public final class MenuDtos {
         private String phone;
         private String email;
         private String address;
-        private String publicSlug;
-        private String urlMode;
         private String publicUrl;
         private boolean active;
         private QrBrief qr;
@@ -188,7 +195,7 @@ public final class MenuDtos {
     public static class PublicMenuResponse {
         private MenuProfileResponse menu;
         private List<MenuProductResponse> products;
-        private List<MenuCategoryResponse> categories;
+        private List<TaxonomyDtos.MainCategoryResponse> categories;
         private String themeId;
         private int productPage;
         private int productSize;
@@ -207,8 +214,6 @@ public final class MenuDtos {
         private String phone;
         private String email;
         private String address;
-        private String urlMode;
-        private String publicSlug;
         private Boolean active;
     }
 
@@ -216,8 +221,57 @@ public final class MenuDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SlugAvailabilityResponse {
+    public static class ProductSearchFilter {
+        private Long mainCategoryId;
+        private Long subCategoryId;
+        private List<Long> tagIds;
+        private List<Long> allergenIds;
+        private Integer servesPeople;
+        private Integer servesPeopleMin;
+        private Integer servesPeopleMax;
+        private String q;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TagFacetCount {
+        private Long tagId;
         private String slug;
-        private boolean available;
+        private String name;
+        private long count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AllergenFacetCount {
+        private Long allergenId;
+        private String slug;
+        private String name;
+        private long count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ServesBucketFacet {
+        private String key;
+        private String label;
+        private long count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProductFacetsResponse {
+        private long totalMatching;
+        private List<TagFacetCount> tags;
+        private List<AllergenFacetCount> allergens;
+        private List<ServesBucketFacet> servesBuckets;
     }
 }

@@ -124,6 +124,7 @@ public class CatalogSeedService {
         planPackage.setSystemManaged(Boolean.TRUE.equals(seed.getSystemManaged())
                 || CatalogPackages.FREE_PACKAGE.equals(code));
         planPackage.setTrialEligible(Boolean.TRUE.equals(seed.getTrialEligible()));
+        applySeedTrialDays(planPackage, seed.getTrialDays());
         planPackage.setActive(seed.getActive() == null || Boolean.TRUE.equals(seed.getActive()));
         if (planPackage.getPrice() == null) {
             planPackage.setPrice(BigDecimal.ZERO);
@@ -147,6 +148,7 @@ public class CatalogSeedService {
             planPackage.setYearlyDiscount(BigDecimal.ZERO);
             planPackage.setPurchasable(false);
             planPackage.setTrialEligible(false);
+            planPackage.setTrialDays(null);
         } else if (seed.getLockPrice() != null) {
             planPackage.setPrice(seed.getLockPrice());
         }
@@ -212,6 +214,23 @@ public class CatalogSeedService {
             }
         }
         planPackage.getItems().removeIf(item -> !requestedCodes.contains(item.getProduct().getCode()));
+    }
+
+    private void applySeedTrialDays(PlanPackage planPackage, Integer trialDays) {
+        if (!planPackage.isTrialEligible()) {
+            planPackage.setTrialDays(null);
+            return;
+        }
+        if (trialDays == null) {
+            throw new BadRequestException("Deneme paketi icin trialDays zorunludur: " + planPackage.getCode());
+        }
+        int maxTrialDays = Math.min(planPackage.getValidityDays() == null ? 30 : planPackage.getValidityDays(), 30);
+        if (trialDays < 1 || trialDays > maxTrialDays) {
+            throw new BadRequestException(
+                    "trialDays 1 ile " + maxTrialDays + " arasinda olmalidir: " + planPackage.getCode()
+            );
+        }
+        planPackage.setTrialDays(trialDays);
     }
 
     private List<String> normalizeFeatures(List<String> features) {

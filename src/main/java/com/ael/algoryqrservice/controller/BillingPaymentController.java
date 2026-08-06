@@ -2,10 +2,17 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
+import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.CreateSavedCardRequest;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.service.BillingAddressService;
+import com.ael.algoryqrservice.service.PaymentRequestMapper;
 import com.ael.algoryqrservice.util.SecurityUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +36,9 @@ import java.util.List;
 public class BillingPaymentController {
     private final PaymentServiceClient paymentServiceClient;
     private final SecurityUtils securityUtils;
+    private final BillingAddressService billingAddressService;
+    private final PaymentRequestMapper paymentRequestMapper;
+    private final AppProperties appProperties;
 
     @GetMapping("/payment-methods")
     public List<BillingPaymentDtos.PaymentMethod> paymentMethods() {
@@ -48,6 +58,30 @@ public class BillingPaymentController {
                 request.expireMonth(),
                 request.expireYear()
         );
+    }
+
+    @PostMapping("/payment-methods/verification")
+    @ResponseStatus(HttpStatus.CREATED)
+    public BillingPaymentDtos.CardVerificationInit initiateCardVerification(HttpServletRequest httpServletRequest) {
+        User user = securityUtils.getCurrentUser();
+        BillingSnapshot billingSnapshot = billingAddressService.resolveDefaultSnapshot(user.getId());
+        String conversationId = paymentRequestMapper.buildCardVerificationConversationId(user.getId());
+        String clientIp = resolveClientIp(httpServletRequest);
+        PaymentCardVerificationRequest request = paymentRequestMapper.toCardVerificationRequest(
+                user, billingSnapshot, clientIp, appProperties, conversationId
+        );
+        PaymentCheckoutFormResponse response = paymentServiceClient.initiateCardVerification(user.getId(), request);
+        return new BillingPaymentDtos.CardVerificationInit(
+                response.getConversationId(),
+                response.getToken(),
+                response.getPaymentPageUrl(),
+                response.getCheckoutFormContent()
+        );
+    }
+
+    @GetMapping("/payment-methods/verification/{conversationId}")
+    public BillingPaymentDtos.RefundablePayment cardVerificationStatus(@PathVariable String conversationId) {
+        return paymentServiceClient.getCardVerificationStatus(userId(), conversationId);
     }
 
     @DeleteMapping("/payment-methods/{paymentMethodId}")
@@ -79,5 +113,13 @@ public class BillingPaymentController {
 
     private Long userId() {
         return securityUtils.getCurrentUser().getId();
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

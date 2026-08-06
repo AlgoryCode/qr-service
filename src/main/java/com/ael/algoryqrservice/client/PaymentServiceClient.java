@@ -1,6 +1,9 @@
 package com.ael.algoryqrservice.client;
 
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.PaymentClientProperties;
@@ -52,6 +55,88 @@ public class PaymentServiceClient {
         return createPayment(request, "/payments");
     }
 
+    public PaymentCheckoutFormResponse initializeCheckoutForm(Long userId, PaymentCheckoutFormRequest request) {
+        try {
+            if (userId == null) {
+                throw new PaymentServiceException("Ödeme için kullanıcı kimliği zorunludur");
+            }
+            log.info(
+                    "Checkout form payment requested. userId={}, conversationId={}, amount={}, currency={}",
+                    userId,
+                    request.getConversationId(),
+                    request.getPaidPrice() != null ? request.getPaidPrice() : request.getPrice(),
+                    request.getCurrency()
+            );
+            PaymentCheckoutFormResponse response = restClient.post()
+                    .uri("/payments/checkout-form")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(authHeaders(userId))
+                    .body(request)
+                    .retrieve()
+                    .body(PaymentCheckoutFormResponse.class);
+            log.info(
+                    "Checkout form payment initialized. userId={}, conversationId={}",
+                    userId,
+                    response != null ? response.getConversationId() : request.getConversationId()
+            );
+            return response;
+        } catch (PaymentServiceException exception) {
+            throw exception;
+        } catch (RestClientResponseException exception) {
+            String detail = extractErrorMessage(exception);
+            log.error(
+                    "Checkout form init failed. userId={}, conversationId={}, status={}",
+                    userId,
+                    request.getConversationId(),
+                    exception.getStatusCode()
+            );
+            throw new PaymentServiceException(
+                    detail == null || detail.isBlank()
+                            ? "Ödeme servisi hatası: " + exception.getStatusCode()
+                            : "Ödeme servisi hatası: " + detail
+            );
+        } catch (Exception exception) {
+            log.error("Payment service unreachable", exception);
+            throw new PaymentServiceException("Ödeme servisine ulaşılamadı");
+        }
+    }
+
+    public PaymentCheckoutFormResponse initiateCardVerification(Long userId, PaymentCardVerificationRequest request) {
+        try {
+            if (userId == null) {
+                throw new PaymentServiceException("Kart dogrulama icin kullanici kimligi zorunludur");
+            }
+            return restClient.post()
+                    .uri("/api/v1/payment-methods/verification")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(authHeaders(userId))
+                    .body(request)
+                    .retrieve()
+                    .body(PaymentCheckoutFormResponse.class);
+        } catch (PaymentServiceException exception) {
+            throw exception;
+        } catch (RestClientResponseException exception) {
+            String detail = extractErrorMessage(exception);
+            log.error(
+                    "Card verification init failed. status={} body={}",
+                    exception.getStatusCode(),
+                    exception.getResponseBodyAsString()
+            );
+            throw new PaymentServiceException(
+                    detail == null || detail.isBlank()
+                            ? "Kart dogrulama servisi hatasi: " + exception.getStatusCode()
+                            : "Kart dogrulama servisi hatasi: " + detail
+            );
+        } catch (Exception exception) {
+            log.error("Payment service unreachable", exception);
+            throw new PaymentServiceException("Odeme servisine ulasilamadi");
+        }
+    }
+
+    public BillingPaymentDtos.RefundablePayment getCardVerificationStatus(Long userId, String conversationId) {
+        return getRefundablePayment(userId, conversationId);
+    }
+
     public List<BillingPaymentDtos.PaymentMethod> getPaymentMethods(Long userId) {
         try {
             Map<String, Object> page = restClient.get()
@@ -84,6 +169,7 @@ public class PaymentServiceClient {
             String expireYear
     ) {
         try {
+            log.info("Payment method create requested. userId={}", userId);
             Map<String, Object> body = Map.of(
                     "alias", alias == null || alias.isBlank() ? "Kartım" : alias.trim(),
                     "email", email,
@@ -103,22 +189,36 @@ public class PaymentServiceClient {
             if (response == null) {
                 throw new PaymentServiceException("Ödeme yöntemi kaydedilemedi");
             }
-            return toPaymentMethod(response);
+            BillingPaymentDtos.PaymentMethod method = toPaymentMethod(response);
+            log.info(
+                    "Payment method created. userId={}, paymentMethodId={}, lastFour={}",
+                    userId,
+                    method.id(),
+                    method.lastFour()
+            );
+            return method;
         } catch (RestClientResponseException exception) {
-            log.error("Payment method create failed. status={}", exception.getStatusCode());
+            log.error("Payment method create failed. userId={}, status={}", userId, exception.getStatusCode());
             throw new PaymentServiceException("Kart kaydedilemedi: " + exception.getStatusCode());
         }
     }
 
     public void deletePaymentMethod(Long userId, String paymentMethodId) {
         try {
+            log.info("Payment method delete requested. userId={}, paymentMethodId={}", userId, paymentMethodId);
             restClient.delete()
                     .uri("/api/v1/payment-methods/{id}", paymentMethodId)
                     .headers(authHeaders(userId))
                     .retrieve()
                     .toBodilessEntity();
+            log.info("Payment method deleted. userId={}, paymentMethodId={}", userId, paymentMethodId);
         } catch (RestClientResponseException exception) {
-            log.error("Payment method delete failed. status={}", exception.getStatusCode());
+            log.error(
+                    "Payment method delete failed. userId={}, paymentMethodId={}, status={}",
+                    userId,
+                    paymentMethodId,
+                    exception.getStatusCode()
+            );
             throw new PaymentServiceException("Ödeme yöntemi silinemedi: " + exception.getStatusCode());
         }
     }
@@ -303,6 +403,12 @@ public class PaymentServiceClient {
             String clientIp
     ) {
         try {
+            log.info(
+                    "Payment refund requested. userId={}, conversationId={}, amount={}",
+                    userId,
+                    conversationId,
+                    amount
+            );
             Map<String, Object> body = new java.util.HashMap<>();
             body.put("conversationId", conversationId);
             body.put("locale", "tr");
@@ -319,17 +425,30 @@ public class PaymentServiceClient {
             if (response == null) {
                 throw new PaymentServiceException("Iade yaniti bos");
             }
-            return new BillingPaymentDtos.RefundResult(
+            BillingPaymentDtos.RefundResult result = new BillingPaymentDtos.RefundResult(
                     stringValue(response.get("conversationId")),
                     stringValue(response.get("paymentTransactionId")),
                     decimalValue(response.get("refundedPrice")),
                     stringValue(response.get("status"))
             );
+            log.info(
+                    "Payment refund completed. userId={}, conversationId={}, status={}, refundedPrice={}",
+                    userId,
+                    result.conversationId(),
+                    result.status(),
+                    result.refundedPrice()
+            );
+            return result;
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
             String detail = extractErrorMessage(exception);
-            log.error("Payment refund failed. status={} body={}", exception.getStatusCode(), exception.getResponseBodyAsString());
+            log.error(
+                    "Payment refund failed. userId={}, conversationId={}, status={}",
+                    userId,
+                    conversationId,
+                    exception.getStatusCode()
+            );
             throw new PaymentServiceException(
                     detail == null || detail.isBlank()
                             ? "Iade basarisiz: " + exception.getStatusCode()
@@ -344,18 +463,40 @@ public class PaymentServiceClient {
             if (userId == null) {
                 throw new PaymentServiceException("Ödeme için kullanıcı kimliği zorunludur");
             }
-            return restClient.post()
+            log.info(
+                    "Payment requested. userId={}, conversationId={}, path={}, amount={}, currency={}, style={}",
+                    userId,
+                    request.getConversationId(),
+                    path,
+                    request.getPaidPrice() != null ? request.getPaidPrice() : request.getPrice(),
+                    request.getCurrency(),
+                    request.getPaymentStyle()
+            );
+            PaymentThreeDsResponse response = restClient.post()
                     .uri(path)
                     .contentType(MediaType.APPLICATION_JSON)
                     .headers(authHeaders(userId))
                     .body(request)
                     .retrieve()
                     .body(PaymentThreeDsResponse.class);
+            log.info(
+                    "Payment accepted by payment-service. userId={}, conversationId={}, path={}",
+                    userId,
+                    response != null ? response.getConversationId() : request.getConversationId(),
+                    path
+            );
+            return response;
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
             String detail = extractErrorMessage(exception);
-            log.error("Payment service error. status={} body={}", exception.getStatusCode(), exception.getResponseBodyAsString());
+            log.error(
+                    "Payment service error. userId={}, conversationId={}, path={}, status={}",
+                    extractUserId(request),
+                    request.getConversationId(),
+                    path,
+                    exception.getStatusCode()
+            );
             throw new PaymentServiceException(
                     detail == null || detail.isBlank()
                             ? "Ödeme servisi hatası: " + exception.getStatusCode()

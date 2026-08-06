@@ -1,16 +1,18 @@
 package com.ael.algoryqrservice.controller;
 
-import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
-import com.ael.algoryqrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.security.RequiresProductScope;
-import com.ael.algoryqrservice.service.MenuCategoryService;
 import com.ael.algoryqrservice.service.MenuService;
+import com.ael.algoryqrservice.service.MenuTaxonomyService;
+import com.ael.algoryqrservice.service.MenuProductRatingService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -19,43 +21,111 @@ import java.util.List;
 public class MenuController {
 
     private final MenuService menuService;
-    private final MenuCategoryService menuCategoryService;
+    private final MenuTaxonomyService menuTaxonomyService;
+    private final MenuProductRatingService menuProductRatingService;
 
     @GetMapping("/public/id/{qrId}")
     public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuByQrId(@PathVariable Long qrId) {
         return ResponseEntity.ok(menuService.getPublicMenuByQrId(qrId));
     }
 
-    @GetMapping("/public/slug/{slug}")
-    public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuBySlug(@PathVariable String slug) {
-        return ResponseEntity.ok(menuService.getPublicMenuBySlug(slug));
-    }
-
     @GetMapping("/public/{menuId}/products")
     public ResponseEntity<MenuDtos.MenuProductPageResponse> listPublicProducts(
             @PathVariable Long menuId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Boolean chefRecommended,
+            @RequestParam(required = false) String tagSlug,
+            @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) Long subCategoryId,
+            @RequestParam(required = false) Long mainCategoryId,
+            @RequestParam(required = false) List<Long> tagIds,
+            @RequestParam(required = false) String allergenSlug,
+            @RequestParam(required = false) List<Long> allergenIds,
+            @RequestParam(required = false) Integer servesPeople,
+            @RequestParam(required = false) Integer servesPeopleMin,
+            @RequestParam(required = false) Integer servesPeopleMax,
+            @RequestParam(required = false) String q
     ) {
-        return ResponseEntity.ok(menuService.listPublicProducts(menuId, page, size));
+        return ResponseEntity.ok(menuService.listPublicProducts(
+                menuId,
+                page,
+                size,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        ));
     }
 
-    @GetMapping("/slug-available")
-    public ResponseEntity<MenuDtos.SlugAvailabilityResponse> checkSlugAvailability(
-            @RequestParam String slug,
-            @RequestParam(required = false) Long excludeMenuId
+    @GetMapping("/public/{menuId}/product-facets")
+    public ResponseEntity<MenuDtos.ProductFacetsResponse> listPublicProductFacets(
+            @PathVariable Long menuId,
+            @RequestParam(required = false) Boolean chefRecommended,
+            @RequestParam(required = false) String tagSlug,
+            @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) Long subCategoryId,
+            @RequestParam(required = false) Long mainCategoryId,
+            @RequestParam(required = false) List<Long> tagIds,
+            @RequestParam(required = false) String allergenSlug,
+            @RequestParam(required = false) List<Long> allergenIds,
+            @RequestParam(required = false) Integer servesPeople,
+            @RequestParam(required = false) Integer servesPeopleMin,
+            @RequestParam(required = false) Integer servesPeopleMax,
+            @RequestParam(required = false) String q
     ) {
-        return ResponseEntity.ok(menuService.checkSlugAvailability(slug, excludeMenuId));
+        return ResponseEntity.ok(menuService.listPublicProductFacets(
+                menuId,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        ));
+    }
+
+    @GetMapping("/public/{menuId}/products/{productId}/recommendations")
+    public ResponseEntity<List<MenuDtos.MenuProductResponse>> listPublicRecommendations(
+            @PathVariable Long menuId,
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        return ResponseEntity.ok(menuService.listPublicRecommendations(menuId, productId, limit));
+    }
+
+    @PostMapping("/public/{menuId}/products/{productId}/ratings")
+    public ResponseEntity<MenuDtos.ProductRatingResponse> ratePublicProduct(
+            @PathVariable Long menuId,
+            @PathVariable Long productId,
+            @Valid @RequestBody MenuDtos.ProductRatingRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        return ResponseEntity.status(201).body(
+                menuProductRatingService.rateProduct(menuId, productId, request, httpRequest)
+        );
     }
 
     @GetMapping("/my/active")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<List<MenuDtos.ActiveMenuSummary>> listMyActiveMenus() {
         return ResponseEntity.ok(menuService.listActiveMenusForCurrentUser());
     }
 
     @GetMapping("/by-qr/{qrId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenuByQrId(@PathVariable Long qrId) {
         MenuDtos.MenuProfileResponse profile = menuService.getMenuProfileByQrId(qrId);
         if (profile == null) {
@@ -65,25 +135,21 @@ public class MenuController {
     }
 
     @GetMapping("/by-qr/{qrId}/products")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductsByQrResponse> listProductsByQrId(@PathVariable Long qrId) {
         return ResponseEntity.ok(menuService.listProductsByQrId(qrId));
     }
 
     @GetMapping("/by-qr/{qrId}/categories")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuCategoriesByQrResponse> listCategoriesByQrId(@PathVariable Long qrId) {
         return ResponseEntity.ok(menuService.listCategoriesByQrId(qrId));
     }
 
     @GetMapping("/{menuId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenu(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuService.getMenuProfile(menuId));
     }
 
     @PatchMapping("/{menuId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProfileResponse> updateMenu(
             @PathVariable Long menuId,
             @RequestBody MenuDtos.MenuUpdateRequest request
@@ -92,17 +158,43 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/products")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductPageResponse> listProducts(
             @PathVariable Long menuId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Boolean chefRecommended,
+            @RequestParam(required = false) String tagSlug,
+            @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) Long subCategoryId,
+            @RequestParam(required = false) Long mainCategoryId,
+            @RequestParam(required = false) List<Long> tagIds,
+            @RequestParam(required = false) String allergenSlug,
+            @RequestParam(required = false) List<Long> allergenIds,
+            @RequestParam(required = false) Integer servesPeople,
+            @RequestParam(required = false) Integer servesPeopleMin,
+            @RequestParam(required = false) Integer servesPeopleMax,
+            @RequestParam(required = false) String q
     ) {
-        return ResponseEntity.ok(menuService.listProducts(menuId, page, size));
+        return ResponseEntity.ok(menuService.listProducts(
+                menuId,
+                page,
+                size,
+                chefRecommended,
+                tagSlug,
+                minRating,
+                subCategoryId,
+                mainCategoryId,
+                tagIds,
+                allergenSlug,
+                allergenIds,
+                servesPeople,
+                servesPeopleMin,
+                servesPeopleMax,
+                q
+        ));
     }
 
     @PostMapping("/{menuId}/products")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> createProduct(
             @PathVariable Long menuId,
             @RequestBody MenuDtos.MenuProductRequest request
@@ -111,7 +203,6 @@ public class MenuController {
     }
 
     @PutMapping("/products/{productId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> updateProduct(
             @PathVariable Long productId,
             @RequestBody MenuDtos.MenuProductRequest request
@@ -120,7 +211,6 @@ public class MenuController {
     }
 
     @PatchMapping("/products/{productId}/nutrition")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.MenuProductResponse> patchProductNutrition(
             @PathVariable Long productId,
             @RequestBody NutritionFacts request
@@ -129,40 +219,14 @@ public class MenuController {
     }
 
     @DeleteMapping("/products/{productId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
         menuService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{menuId}/categories")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
-    public ResponseEntity<List<MenuDtos.MenuCategoryResponse>> listCategories(@PathVariable Long menuId) {
-        return ResponseEntity.ok(menuCategoryService.listCategoryTree(menuId));
-    }
-
-    @PostMapping("/{menuId}/categories")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
-    public ResponseEntity<MenuDtos.MenuCategoryResponse> createCategory(
-            @PathVariable Long menuId,
-            @RequestBody MenuDtos.MenuCategoryRequest request
-    ) {
-        return ResponseEntity.status(201).body(menuCategoryService.createCategory(menuId, request));
-    }
-
-    @PutMapping("/categories/{categoryId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
-    public ResponseEntity<MenuDtos.MenuCategoryResponse> updateCategory(
-            @PathVariable Long categoryId,
-            @RequestBody MenuDtos.MenuCategoryUpdateRequest request
-    ) {
-        return ResponseEntity.ok(menuCategoryService.updateCategory(categoryId, request));
-    }
-
-    @DeleteMapping("/categories/{categoryId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long categoryId) {
-        menuCategoryService.deleteCategory(categoryId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<List<TaxonomyDtos.MainCategoryResponse>> listCategories(@PathVariable Long menuId) {
+        menuService.getMenuProfile(menuId);
+        return ResponseEntity.ok(menuTaxonomyService.listTaxonomy());
     }
 }
