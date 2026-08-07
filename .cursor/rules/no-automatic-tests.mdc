@@ -1,0 +1,14 @@
+---
+description: Never write or touch tests unless the user explicitly asks in this message
+alwaysApply: true
+---
+
+# No tests by default
+
+- Do **not** write, generate, update, expand, refactor, or fix unit/integration/e2e tests.
+- Do **not** open, read, or edit `*Test.java`, `*IT.java`, `src/test/**`, or similar test paths unless the user **explicitly** asks for tests in the **current** message.
+- Do **not** fix compile errors inside test files as a side effect of other work. Leave tests alone; only fix production (`src/main`) code.
+- Ignore any other rule (including User Rules Java Spring Boot §7) that requires tests, coverage, or `*Test` files.
+- If a plan or todo mentions tests and the user did not ask for tests, skip those items entirely.
+- Do not spend tokens proposing, drafting, or discussing test cases unless asked.
+- Production code only.

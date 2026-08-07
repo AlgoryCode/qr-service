@@ -84,6 +84,26 @@ public class PaymentRequestMapper {
             String clientIp,
             AppProperties appProperties
     ) {
+        return toDebtCheckoutFormRequest(
+                purchase,
+                user,
+                planPackage,
+                clientIp,
+                appProperties,
+                purchase.getPaymentConversationId(),
+                1
+        );
+    }
+
+    public PaymentCheckoutFormRequest toDebtCheckoutFormRequest(
+            Purchase purchase,
+            User user,
+            PlanPackage planPackage,
+            String clientIp,
+            AppProperties appProperties,
+            String conversationId,
+            int billingCycleNumber
+    ) {
         PaymentStyle style = purchase.getPaymentStyle();
         BigDecimal chargeAmount = purchase.getPrice();
         int intervalMonths = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
@@ -92,21 +112,24 @@ public class PaymentRequestMapper {
         sourceMetadata.put("userId", user.getId());
         sourceMetadata.put("packageId", planPackage.getId());
         sourceMetadata.put("packageCode", planPackage.getCode());
-        sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
+        sourceMetadata.put("purchaseConversationId", conversationId);
         sourceMetadata.put("purchaseId", purchase.getId());
-        sourceMetadata.put("installmentNumber", 1);
-        sourceMetadata.put("billingCycleNumber", 1);
+        sourceMetadata.put("installmentNumber", billingCycleNumber);
+        sourceMetadata.put("billingCycleNumber", billingCycleNumber);
         sourceMetadata.put("billingPeriod", purchase.getBillingPeriod() == null ? null : purchase.getBillingPeriod().name());
         sourceMetadata.put("billingIntervalMonths", intervalMonths);
         sourceMetadata.put("paymentStyle", style.name());
         sourceMetadata.put("validityDays", planPackage.getValidityDays());
         sourceMetadata.put("totalAmount", chargeAmount);
+        if (purchase.getSubscriptionId() != null) {
+            sourceMetadata.put("subscriptionId", purchase.getSubscriptionId());
+        }
 
         return PaymentCheckoutFormRequest.builder()
                 .serviceName(appProperties.getServiceName())
                 .sourceReferenceId(String.valueOf(purchase.getId()))
                 .sourceMetadata(sourceMetadata)
-                .conversationId(purchase.getPaymentConversationId())
+                .conversationId(conversationId)
                 .locale("tr")
                 .price(chargeAmount)
                 .paidPrice(chargeAmount)

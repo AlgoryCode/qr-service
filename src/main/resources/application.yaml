@@ -128,6 +128,8 @@ billing:
     monthly-cooling-days: ${BILLING_REFUND_MONTHLY_COOLING_DAYS:7}
     yearly-cooling-days: ${BILLING_REFUND_YEARLY_COOLING_DAYS:14}
     pending-stuck-minutes: ${BILLING_REFUND_PENDING_STUCK_MINUTES:15}
+  subscription:
+    manual-payment-grace-days: ${BILLING_SUBSCRIPTION_GRACE_DAYS:7}
 
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}

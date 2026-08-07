@@ -108,7 +108,11 @@ public class PurchaseFulfillmentService {
         if (event.getSubscriptionId() != null && !event.getSubscriptionId().isBlank()) {
             purchase.setSubscriptionId(event.getSubscriptionId());
         }
-        if (event.getSubscriptionStatus() != null && !event.getSubscriptionStatus().isBlank()) {
+        if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
+            purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+            purchase.setSubscriptionGraceEndsAt(null);
+            purchase.setCancelAtPeriodEnd(false);
+        } else if (event.getSubscriptionStatus() != null && !event.getSubscriptionStatus().isBlank()) {
             purchase.setSubscriptionStatus(SubscriptionStatus.valueOf(event.getSubscriptionStatus()));
         }
         purchase.setCancellationReason(null);

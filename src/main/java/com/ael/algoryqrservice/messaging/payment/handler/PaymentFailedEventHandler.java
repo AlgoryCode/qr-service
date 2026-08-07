@@ -28,6 +28,10 @@ public class PaymentFailedEventHandler implements PaymentEventHandler {
 
     @Override
     public void handle(PaymentCompletedEventDto event) {
+        if (PaymentEventTypes.PAYMENT_SUBSCRIPTION_PAST_DUE.equals(event.getEventType())) {
+            purchaseService.handleSubscriptionPastDue(event);
+            return;
+        }
         purchaseService.handlePaymentFailed(event);
     }
 }

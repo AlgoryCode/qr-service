@@ -71,6 +71,17 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.resumeRenewal(purchaseId, userId));
     }
 
+    @PostMapping("/{purchaseId}/pay-debt")
+    public ResponseEntity<PurchaseInitiateResponse> paySubscriptionDebt(
+            @PathVariable Long purchaseId,
+            HttpServletRequest httpServletRequest
+    ) {
+        String clientIp = resolveClientIp(httpServletRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                purchaseService.paySubscriptionDebt(securityUtils.getCurrentUser(), purchaseId, clientIp)
+        );
+    }
+
     @PostMapping("/{purchaseId}/cancel-with-refund")
     public ResponseEntity<PurchaseResponse> cancelWithRefund(
             @PathVariable Long purchaseId,

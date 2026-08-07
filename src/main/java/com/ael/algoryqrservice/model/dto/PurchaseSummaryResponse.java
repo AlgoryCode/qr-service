@@ -40,6 +40,8 @@ public class PurchaseSummaryResponse {
     private SubscriptionStatus subscriptionStatus;
     private BillingPeriod billingPeriod;
     private boolean cancelAtPeriodEnd;
+    private LocalDateTime subscriptionGraceEndsAt;
+    private boolean manualPaymentRequired;
     private LocalDateTime currentPeriodPaidAt;
     private LocalDateTime refundEligibleUntil;
     private boolean refundEligible;

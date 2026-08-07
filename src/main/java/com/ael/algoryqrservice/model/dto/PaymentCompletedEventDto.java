@@ -32,5 +32,6 @@ public class PaymentCompletedEventDto {
     private String periodEnd;
     private BigDecimal amount;
     private String currency;
+    private String errorCode;
     private String failureReason;
 }

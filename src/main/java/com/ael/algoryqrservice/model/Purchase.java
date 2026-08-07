@@ -129,6 +129,9 @@ public class Purchase {
     @Builder.Default
     private boolean cancelAtPeriodEnd = false;
 
+    @Column(name = "subscription_grace_ends_at")
+    private LocalDateTime subscriptionGraceEndsAt;
+
     @Column(name = "current_period_paid_at")
     private LocalDateTime currentPeriodPaidAt;
 

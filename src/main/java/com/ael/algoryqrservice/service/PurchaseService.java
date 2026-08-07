@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.config.BillingRefundProperties;
+import com.ael.algoryqrservice.config.BillingSubscriptionProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
@@ -71,6 +72,7 @@ public class PurchaseService {
     private final PlanChangeService planChangeService;
     private final SubscriptionRefundPolicy subscriptionRefundPolicy;
     private final BillingRefundProperties billingRefundProperties;
+    private final BillingSubscriptionProperties billingSubscriptionProperties;
     private final PlatformTransactionManager transactionManager;
 
     @Transactional
@@ -240,6 +242,9 @@ public class PurchaseService {
             if (purchase.getStatus() == PurchaseStatus.ACTIVE
                     && purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
                 purchase.setSubscriptionStatus(SubscriptionStatus.PAST_DUE);
+                purchase.setSubscriptionGraceEndsAt(
+                        LocalDateTime.now().plusDays(billingSubscriptionProperties.getManualPaymentGraceDays())
+                );
                 purchaseRepository.save(purchase);
                 log.warn(
                         "Marked subscription PAST_DUE after renewal failure. purchaseId={} eventId={}",
@@ -282,6 +287,128 @@ public class PurchaseService {
                 FulfillmentStatus.FAILED
         );
         markEventProcessed(event, purchase.getId());
+    }
+
+    @Transactional
+    public void handleSubscriptionPastDue(PaymentCompletedEventDto event) {
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        Long purchaseId = resolvePurchaseId(event);
+        Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
+        if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
+            return;
+        }
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            markEventProcessed(event, purchase.getId());
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        purchase.setSubscriptionStatus(SubscriptionStatus.PAST_DUE);
+        purchase.setSubscriptionGraceEndsAt(now.plusDays(billingSubscriptionProperties.getManualPaymentGraceDays()));
+        purchaseRepository.save(purchase);
+        purchaseLogService.log(
+                purchase.getId(),
+                purchase.getUserId(),
+                PurchaseLogAction.PURCHASE_PAYMENT_FAILED,
+                purchase.getPackageName() + " abonelik odemesi gecikti; "
+                        + billingSubscriptionProperties.getManualPaymentGraceDays()
+                        + " gun icinde borcu odeyin"
+        );
+        log.warn(
+                "Subscription marked PAST_DUE with manual payment grace. purchaseId={} graceEndsAt={} eventId={}",
+                purchase.getId(),
+                purchase.getSubscriptionGraceEndsAt(),
+                event.getEventId()
+        );
+        markEventProcessed(event, purchase.getId());
+    }
+
+    @Transactional
+    public PurchaseInitiateResponse paySubscriptionDebt(User user, Long purchaseId, String clientIp) {
+        Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
+        if (!purchase.getUserId().equals(user.getId())) {
+            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+        }
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            throw new BadRequestException("Bu islem yalnizca abonelikler icin gecerlidir");
+        }
+        boolean manualPaymentAllowed = purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE
+                || purchase.getPaymentMethodId() == null
+                || purchase.isCancelAtPeriodEnd();
+        if (!manualPaymentAllowed) {
+            throw new BadRequestException(
+                    "Otomatik yenileme acik ve kayitli kart var; manuel borc odemesi gerekmiyor"
+            );
+        }
+        if (purchase.getSubscriptionGraceEndsAt() != null
+                && purchase.getSubscriptionGraceEndsAt().isBefore(LocalDateTime.now())
+                && purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE) {
+            throw new BadRequestException("Borc odeme suresi doldu");
+        }
+        if (purchase.getStatus() != PurchaseStatus.ACTIVE
+                && purchase.getStatus() != PurchaseStatus.EXPIRED) {
+            throw new BadRequestException("Borc odemesi icin abonelik uygun degil");
+        }
+
+        PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
+        int nextCycle = resolveNextBillingCycle(purchase);
+        String conversationId = paymentRequestMapper.buildConversationId(purchase.getId());
+        purchase.setCurrentPeriodConversationId(conversationId);
+        purchase.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        purchaseRepository.save(purchase);
+
+        PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
+                purchase,
+                user,
+                planPackage,
+                clientIp,
+                appProperties,
+                conversationId,
+                nextCycle
+        );
+        PaymentCheckoutFormResponse checkoutFormResponse =
+                paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
+
+        purchaseLogService.log(
+                purchase.getId(),
+                user.getId(),
+                PurchaseLogAction.PURCHASE_DEBT_PAYMENT_STARTED,
+                purchase.getPackageName() + " abonelik borcu CF ile odenecek: " + purchase.getPrice()
+        );
+
+        return PurchaseInitiateResponse.builder()
+                .purchaseId(purchase.getId())
+                .status(purchase.getStatus())
+                .conversationId(checkoutFormResponse.getConversationId())
+                .token(checkoutFormResponse.getToken())
+                .paymentPageUrl(checkoutFormResponse.getPaymentPageUrl())
+                .checkoutFormContent(checkoutFormResponse.getCheckoutFormContent())
+                .build();
+    }
+
+    private Long resolvePurchaseId(PaymentCompletedEventDto event) {
+        String raw = event.getPurchaseId() != null && !event.getPurchaseId().isBlank()
+                ? event.getPurchaseId()
+                : event.getSourceReferenceId();
+        if (raw == null || raw.isBlank()) {
+            throw new InvalidPaymentEventException("Payment event purchase id is missing");
+        }
+        try {
+            return Long.valueOf(raw);
+        } catch (NumberFormatException exception) {
+            throw new InvalidPaymentEventException("Payment event purchase id is invalid");
+        }
+    }
+
+    private int resolveNextBillingCycle(Purchase purchase) {
+        return purchaseFulfillmentService.getFulfillments(purchase.getId()).stream()
+                .map(PurchaseFulfillmentResponse::getInstallmentNumber)
+                .filter(number -> number != null && number > 0)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
     }
 
     @Transactional
@@ -1142,6 +1269,8 @@ public class PurchaseService {
                 .subscriptionStatus(purchase.getSubscriptionStatus())
                 .billingPeriod(purchase.getBillingPeriod())
                 .cancelAtPeriodEnd(purchase.isCancelAtPeriodEnd())
+                .subscriptionGraceEndsAt(purchase.getSubscriptionGraceEndsAt())
+                .manualPaymentRequired(isManualPaymentRequired(purchase))
                 .currentPeriodPaidAt(purchase.getCurrentPeriodPaidAt())
                 .refundEligibleUntil(refundEligibleUntil)
                 .refundEligible(refundEligible)
@@ -1193,6 +1322,8 @@ public class PurchaseService {
                 .subscriptionStatus(purchase.getSubscriptionStatus())
                 .billingPeriod(purchase.getBillingPeriod())
                 .cancelAtPeriodEnd(purchase.isCancelAtPeriodEnd())
+                .subscriptionGraceEndsAt(purchase.getSubscriptionGraceEndsAt())
+                .manualPaymentRequired(isManualPaymentRequired(purchase))
                 .currentPeriodPaidAt(purchase.getCurrentPeriodPaidAt())
                 .refundEligibleUntil(refundEligibleUntil)
                 .refundEligible(refundEligible)
@@ -1284,6 +1415,17 @@ public class PurchaseService {
                 paymentApproaching,
                 expiryApproaching
         );
+    }
+
+    private boolean isManualPaymentRequired(Purchase purchase) {
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            return false;
+        }
+        if (purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE) {
+            return purchase.getSubscriptionGraceEndsAt() == null
+                    || !purchase.getSubscriptionGraceEndsAt().isBefore(LocalDateTime.now());
+        }
+        return purchase.getPaymentMethodId() == null || purchase.isCancelAtPeriodEnd();
     }
 
     private static final int APPROACHING_DAYS = 7;

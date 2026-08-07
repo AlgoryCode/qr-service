@@ -2,15 +2,23 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.config.BillingSubscriptionProperties;
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
+import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
+import com.ael.algoryqrservice.model.dto.PurchaseInitiateResponse;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
+import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
@@ -71,6 +79,8 @@ class PurchaseServicePaymentEventTest {
     @Mock
     private SubscriptionRefundPolicy subscriptionRefundPolicy;
     @Mock
+    private BillingSubscriptionProperties billingSubscriptionProperties;
+    @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @InjectMocks
@@ -104,6 +114,7 @@ class PurchaseServicePaymentEventTest {
                 .active(true)
                 .build();
         lenient().when(appProperties.getServiceName()).thenReturn("qr-service");
+        lenient().when(billingSubscriptionProperties.getManualPaymentGraceDays()).thenReturn(7);
     }
 
     @Test
@@ -232,6 +243,88 @@ class PurchaseServicePaymentEventTest {
         org.assertj.core.api.Assertions.assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         org.assertj.core.api.Assertions.assertThat(purchase.getSubscriptionStatus())
                 .isEqualTo(SubscriptionStatus.PAST_DUE);
+        assertThat(purchase.getSubscriptionGraceEndsAt()).isAfter(LocalDateTime.now().plusDays(6));
+    }
+
+    @Test
+    void handleSubscriptionPastDue_whenSubscription_thenSetGraceWindow() {
+        PaymentCompletedEventDto event = pastDueEvent();
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(purchase)).thenReturn(purchase);
+
+        purchaseService.handleSubscriptionPastDue(event);
+
+        assertThat(purchase.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.PAST_DUE);
+        assertThat(purchase.getSubscriptionGraceEndsAt()).isAfter(LocalDateTime.now().plusDays(6));
+        verify(purchaseLogService).log(
+                eq(10L),
+                eq(20L),
+                eq(PurchaseLogAction.PURCHASE_PAYMENT_FAILED),
+                any()
+        );
+        verify(paymentEventInboxRepository).save(any());
+    }
+
+    @Test
+    void paySubscriptionDebt_whenPastDue_thenInitializeCheckoutForm() {
+        User user = User.builder().id(20L).firstName("A").email("a@test.com").build();
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionStatus(SubscriptionStatus.PAST_DUE);
+        purchase.setSubscriptionGraceEndsAt(LocalDateTime.now().plusDays(5));
+        purchase.setPaymentMethodId(null);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(purchase)).thenReturn(purchase);
+        when(planPackageService.findPackage(30L)).thenReturn(planPackage);
+        when(purchaseFulfillmentService.getFulfillments(10L)).thenReturn(List.of(
+                PurchaseFulfillmentResponse.builder().installmentNumber(1).build()
+        ));
+        when(paymentRequestMapper.buildConversationId(10L)).thenReturn("debt-conversation-10");
+        PaymentCheckoutFormRequest checkoutRequest = PaymentCheckoutFormRequest.builder().build();
+        when(paymentRequestMapper.toDebtCheckoutFormRequest(
+                eq(purchase),
+                eq(user),
+                eq(planPackage),
+                eq("127.0.0.1"),
+                eq(appProperties),
+                eq("debt-conversation-10"),
+                eq(2)
+        )).thenReturn(checkoutRequest);
+        PaymentCheckoutFormResponse checkoutResponse = new PaymentCheckoutFormResponse();
+        checkoutResponse.setConversationId("debt-conversation-10");
+        checkoutResponse.setToken("cf-token");
+        checkoutResponse.setPaymentPageUrl("https://pay.example/cf");
+        when(paymentServiceClient.initializeCheckoutForm(20L, checkoutRequest)).thenReturn(checkoutResponse);
+
+        PurchaseInitiateResponse response = purchaseService.paySubscriptionDebt(user, 10L, "127.0.0.1");
+
+        assertThat(response.getToken()).isEqualTo("cf-token");
+        assertThat(response.getPaymentPageUrl()).isEqualTo("https://pay.example/cf");
+        assertThat(purchase.getPaymentMode()).isEqualTo(PaymentMode.CHECKOUT_FORM);
+        assertThat(purchase.getCurrentPeriodConversationId()).isEqualTo("debt-conversation-10");
+        verify(purchaseLogService).log(
+                eq(10L),
+                eq(20L),
+                eq(PurchaseLogAction.PURCHASE_DEBT_PAYMENT_STARTED),
+                any()
+        );
+    }
+
+    @Test
+    void paySubscriptionDebt_whenAutoRenewWithCard_thenReject() {
+        User user = User.builder().id(20L).firstName("A").email("a@test.com").build();
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        purchase.setPaymentMethodId(42L);
+        purchase.setCancelAtPeriodEnd(false);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.paySubscriptionDebt(user, 10L, "127.0.0.1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("manuel borc");
     }
 
     @Test
@@ -352,6 +445,20 @@ class PurchaseServicePaymentEventTest {
         verify(purchaseFulfillmentService).fulfillPaidInstallment(eq(purchase), eq(planPackage), any(), any());
         verify(purchaseRepository, never()).save(purchase);
         assertThat(purchase.getCancellationReason()).isNull();
+    }
+
+    private PaymentCompletedEventDto pastDueEvent() {
+        PaymentCompletedEventDto event = new PaymentCompletedEventDto();
+        event.setEventId("event-past-due");
+        event.setEventType("payment.subscription.past_due");
+        event.setPaymentId("payment-past-due");
+        event.setConversationId("conversation-10");
+        event.setServiceName("qr-service");
+        event.setSourceReferenceId("10");
+        event.setPurchaseId("10");
+        event.setAmount(new BigDecimal("100.00"));
+        event.setCurrency("TRY");
+        return event;
     }
 
     private PaymentCompletedEventDto failedEvent() {

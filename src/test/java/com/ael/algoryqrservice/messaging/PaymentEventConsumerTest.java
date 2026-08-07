@@ -1,14 +1,18 @@
 package com.ael.algoryqrservice.messaging;
 
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
+import com.ael.algoryqrservice.messaging.payment.PaymentEventTypes;
+import com.ael.algoryqrservice.messaging.payment.handler.PaymentEventHandlerRegistry;
+import com.ael.algoryqrservice.messaging.payment.handler.PaymentFailedEventHandler;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.service.PurchaseService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
@@ -19,35 +23,38 @@ class PaymentEventConsumerTest {
     @Mock
     private PurchaseService purchaseService;
 
-    @InjectMocks
-    private PaymentEventConsumer consumer;
+    private PaymentEventHandlerRegistry registry;
 
-    @Test
-    void onPaymentEvent_whenSubscriptionPaid_thenHandleSuccess() {
-        PaymentCompletedEventDto event = event("payment.subscription.paid");
-
-        consumer.onPaymentEvent(event);
-
-        verify(purchaseService).handlePaymentSuccess(event);
+    @BeforeEach
+    void setUp() {
+        registry = new PaymentEventHandlerRegistry(List.of(new PaymentFailedEventHandler(purchaseService)));
     }
 
     @Test
-    void onPaymentEvent_whenSubscriptionFailed_thenHandleFailed() {
-        PaymentCompletedEventDto event = event("payment.subscription.failed");
+    void dispatch_whenSubscriptionFailed_thenHandleFailed() {
+        PaymentCompletedEventDto event = event(PaymentEventTypes.PAYMENT_SUBSCRIPTION_FAILED);
 
-        consumer.onPaymentEvent(event);
+        registry.dispatch(event);
 
         verify(purchaseService).handlePaymentFailed(event);
     }
 
     @Test
-    void onPaymentEvent_whenUnsupportedType_thenRejectWithoutRequeue() {
+    void dispatch_whenSubscriptionPastDue_thenHandlePastDue() {
+        PaymentCompletedEventDto event = event(PaymentEventTypes.PAYMENT_SUBSCRIPTION_PAST_DUE);
+
+        registry.dispatch(event);
+
+        verify(purchaseService).handleSubscriptionPastDue(event);
+    }
+
+    @Test
+    void dispatch_whenUnsupportedType_thenThrow() {
         PaymentCompletedEventDto event = event("payment.unknown");
 
-        assertThatThrownBy(() -> consumer.onPaymentEvent(event))
-                .isInstanceOf(AmqpRejectAndDontRequeueException.class)
-                .cause()
-                .isInstanceOf(InvalidPaymentEventException.class);
+        assertThatThrownBy(() -> registry.dispatch(event))
+                .isInstanceOf(InvalidPaymentEventException.class)
+                .hasMessageContaining("Unsupported");
     }
 
     private PaymentCompletedEventDto event(String type) {

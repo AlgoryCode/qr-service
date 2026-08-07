@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.messaging.payment;
 
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.messaging.payment.conversion.PaymentEventPayloadConverter;
 import com.ael.algoryqrservice.messaging.payment.handler.PaymentEventHandlerRegistry;
@@ -19,13 +20,23 @@ public class PaymentEventConsumer {
     private final PaymentEventPayloadConverter payloadConverter;
     private final PaymentEventHandlerRegistry handlerRegistry;
 
-    @RabbitListener(queues = "#{paymentRabbitMqProperties.eventsQueue}")
+    @RabbitListener(
+            queues = "#{paymentRabbitMqProperties.eventsQueue}",
+            containerFactory = "paymentListenerContainerFactory"
+    )
     public void onPaymentEvent(Message message) {
         PaymentCompletedEventDto event;
         try {
             event = payloadConverter.convert(message);
         } catch (InvalidPaymentEventException exception) {
-            log.error("Payment event rejected during conversion. reason={}", exception.getMessage(), exception);
+            log.error(
+                    "Payment event rejected during conversion (poison → DLQ). contentType={} reason={}",
+                    message.getMessageProperties() != null
+                            ? message.getMessageProperties().getContentType()
+                            : null,
+                    exception.getMessage(),
+                    exception
+            );
             throw new AmqpRejectAndDontRequeueException(exception.getMessage(), exception);
         }
 
@@ -53,7 +64,7 @@ public class PaymentEventConsumer {
             );
         } catch (InvalidPaymentEventException exception) {
             log.error(
-                    "Payment event rejected. eventId={} eventType={} purchaseId={} reason={}",
+                    "Payment event rejected as poison (→ DLQ). eventId={} eventType={} purchaseId={} reason={}",
                     event.getEventId(),
                     event.getEventType(),
                     event.getSourceReferenceId(),
@@ -61,9 +72,18 @@ public class PaymentEventConsumer {
                     exception
             );
             throw new AmqpRejectAndDontRequeueException(exception.getMessage(), exception);
+        } catch (BadRequestException exception) {
+            log.warn(
+                    "Payment event processing deferred (retryable). eventId={} eventType={} purchaseId={} reason={}",
+                    event.getEventId(),
+                    event.getEventType(),
+                    event.getSourceReferenceId(),
+                    exception.getMessage()
+            );
+            throw exception;
         } catch (RuntimeException exception) {
             log.error(
-                    "Payment event processing failed. eventId={} eventType={} purchaseId={}",
+                    "Payment event processing failed (retryable). eventId={} eventType={} purchaseId={}",
                     event.getEventId(),
                     event.getEventType(),
                     event.getSourceReferenceId(),
