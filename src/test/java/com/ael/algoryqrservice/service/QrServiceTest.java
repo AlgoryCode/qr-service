@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.QrType;
 import com.ael.algoryqrservice.model.User;
+import com.ael.algoryqrservice.model.dto.QrListPageResponse;
 import com.ael.algoryqrservice.model.dto.QrListResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
@@ -74,11 +75,15 @@ class QrServiceTest {
         when(menuRepository.findActiveQrIdsByUserIdAndQrIdIn(eq(userId), anyCollection()))
                 .thenReturn(Set.of(activeMenuQr.getQrId()));
 
-        List<QrListResponse> response = qrService.getUserQrs(userId, false);
+        QrListPageResponse response = qrService.getUserQrs(userId, false, 0, 5);
 
-        assertThat(response)
+        assertThat(response.getContent())
                 .extracting(QrListResponse::getQrId)
                 .containsExactly(activeMenuQr.getQrId(), linkQr.getQrId());
+        assertThat(response.getTotalElements()).isEqualTo(2);
+        assertThat(response.getPage()).isZero();
+        assertThat(response.getSize()).isEqualTo(5);
+        assertThat(response.isHasNext()).isFalse();
     }
 
     @Test

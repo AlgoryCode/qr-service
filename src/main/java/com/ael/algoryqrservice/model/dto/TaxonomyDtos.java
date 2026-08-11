@@ -87,6 +87,20 @@ public final class TaxonomyDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class TaxonomyPageResponse {
+        private List<MainCategoryResponse> content;
+        private int page;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean hasNext;
+        private String q;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class SubCategoryResponse {
         private Long id;
         private Long mainCategoryId;

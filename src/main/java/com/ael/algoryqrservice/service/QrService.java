@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.Type;
 import com.ael.algoryqrservice.model.dto.QrNameRequest;
 import com.ael.algoryqrservice.model.dto.QrNameResponse;
+import com.ael.algoryqrservice.model.dto.QrListPageResponse;
 import com.ael.algoryqrservice.model.dto.QrListResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.QrResponse;
@@ -84,19 +85,39 @@ public class QrService {
         return createQR(req, existingQr.getUserId());
     }
 
-    public List<QrListResponse> getUserQrs(Long userId, boolean includeImage) {
+    public QrListPageResponse getUserQrs(Long userId, boolean includeImage, int page, int size) {
         Long currentUserId = securityUtils.getCurrentUser().getId();
         if (!currentUserId.equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Başka kullanıcının QR kayıtlarına erişilemez");
         }
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
         List<Qr> qrs = qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId);
         Set<Long> activeMenuQrIds = loadActiveMenuQrIds(userId, qrs);
 
-        return qrs
+        List<QrListResponse> filtered = qrs
                 .stream()
                 .filter(qr -> shouldShowQr(qr, activeMenuQrIds))
                 .map(qr -> mapToListResponse(qr, includeImage))
                 .toList();
+
+        long totalElements = filtered.size();
+        int totalPages = (int) Math.max(1, (totalElements + safeSize - 1) / safeSize);
+        if (totalElements == 0) {
+            totalPages = 0;
+        }
+        int from = Math.min(safePage * safeSize, filtered.size());
+        int to = Math.min(from + safeSize, filtered.size());
+        List<QrListResponse> content = filtered.subList(from, to);
+
+        return QrListPageResponse.builder()
+                .content(content)
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .hasNext(safePage + 1 < totalPages)
+                .build();
     }
 
     private Set<Long> loadActiveMenuQrIds(Long userId, List<Qr> qrs) {

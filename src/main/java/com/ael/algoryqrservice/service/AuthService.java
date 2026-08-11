@@ -136,12 +136,12 @@ public class AuthService {
         throw new BadRequestException("Çıkış için geçerli access token veya refresh token gerekli");
     }
 
-    public List<SessionResponse> getMySessions(String accessToken) {
+    public SessionPageResponse getMySessions(String accessToken, int page, int size) {
         User user = getCurrentUser();
         UUID currentSessionId = accessToken == null || accessToken.isBlank()
                 ? null
                 : jwtService.extractSessionIdIfSignatureValid(accessToken).orElse(null);
-        return sessionService.getUserSessions(user.getId(), currentSessionId);
+        return sessionService.getUserSessions(user.getId(), currentSessionId, page, size);
     }
 
     @Transactional

@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.BillingAddressDtos;
+import com.ael.algoryqrservice.model.dto.BillingAddressPageResponse;
 import com.ael.algoryqrservice.service.BillingAddressService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
@@ -8,8 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/billing-addresses")
@@ -19,8 +18,11 @@ public class BillingAddressController {
     private final SecurityUtils securityUtils;
 
     @GetMapping
-    public List<BillingAddressDtos.Response> list() {
-        return service.list(userId());
+    public BillingAddressPageResponse list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size
+    ) {
+        return service.list(userId(), page, size);
     }
 
     @GetMapping("/{id}")

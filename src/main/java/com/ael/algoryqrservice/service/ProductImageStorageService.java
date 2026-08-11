@@ -23,7 +23,9 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -47,6 +49,36 @@ public class ProductImageStorageService {
     private volatile S3Client s3Client;
 
     public ProductImageDtos.UploadResponse upload(Long menuId, MultipartFile file) {
+        return uploadWithPrefix(menuId, file, "menus/" + menuId + "/");
+    }
+
+    public ProductImageDtos.UploadResponse uploadLogo(Long menuId, MultipartFile file) {
+        return uploadWithPrefix(menuId, file, "menus/" + menuId + "/logo/");
+    }
+
+    public void deleteForMenu(Long menuId, String objectKey, String imageUrl) {
+        String resolvedKey = resolveObjectKey(objectKey, imageUrl);
+        if (resolvedKey == null || resolvedKey.isBlank()) {
+            throw new BadRequestException("objectKey veya imageUrl zorunludur");
+        }
+        if (!resolvedKey.startsWith("menus/" + menuId + "/")) {
+            throw new BadRequestException("Bu görsel bu menüye ait değil");
+        }
+        delete(resolvedKey);
+    }
+
+    public void deleteLogoForMenu(Long menuId, String objectKey, String imageUrl) {
+        String resolvedKey = resolveObjectKey(objectKey, imageUrl);
+        if (resolvedKey == null || resolvedKey.isBlank()) {
+            throw new BadRequestException("objectKey veya imageUrl zorunludur");
+        }
+        if (!resolvedKey.startsWith("menus/" + menuId + "/logo/")) {
+            throw new BadRequestException("Bu logo bu menüye ait değil");
+        }
+        delete(resolvedKey);
+    }
+
+    private ProductImageDtos.UploadResponse uploadWithPrefix(Long menuId, MultipartFile file, String keyPrefix) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Görsel dosyası zorunludur");
         }
@@ -63,7 +95,7 @@ public class ProductImageStorageService {
         validateMagicBytes(bytes, contentType);
 
         String extension = extensionForContentType(contentType);
-        String objectKey = "menus/" + menuId + "/" + UUID.randomUUID() + "." + extension;
+        String objectKey = keyPrefix + UUID.randomUUID() + "." + extension;
 
         if (storageProperties.isS3Mode()) {
             uploadViaS3(objectKey, bytes, contentType);
@@ -72,17 +104,6 @@ public class ProductImageStorageService {
         }
 
         return new ProductImageDtos.UploadResponse(buildPublicUrl(objectKey), objectKey);
-    }
-
-    public void deleteForMenu(Long menuId, String objectKey, String imageUrl) {
-        String resolvedKey = resolveObjectKey(objectKey, imageUrl);
-        if (resolvedKey == null || resolvedKey.isBlank()) {
-            throw new BadRequestException("objectKey veya imageUrl zorunludur");
-        }
-        if (!resolvedKey.startsWith("menus/" + menuId + "/")) {
-            throw new BadRequestException("Bu görsel bu menüye ait değil");
-        }
-        delete(resolvedKey);
     }
 
     public void delete(String objectKey) {
@@ -110,6 +131,38 @@ public class ProductImageStorageService {
                 log.warn("Görsel silinemedi: {}", objectKey, exception);
             }
         }
+    }
+
+    public void uploadBytes(String objectKey, byte[] bytes, String contentType) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BadRequestException("objectKey zorunludur");
+        }
+        if (bytes == null || bytes.length == 0) {
+            throw new BadRequestException("Görsel dosyası zorunludur");
+        }
+        if (contentType == null || contentType.isBlank()) {
+            throw new BadRequestException("Görsel içerik tipi belirlenemedi");
+        }
+        String normalizedType = contentType.toLowerCase(Locale.ROOT);
+        if (!storageProperties.getAllowedContentTypes().contains(normalizedType)) {
+            throw new BadRequestException("Desteklenmeyen görsel formatı");
+        }
+        validateMagicBytes(bytes, normalizedType);
+        if (storageProperties.isS3Mode()) {
+            uploadViaS3(objectKey, bytes, normalizedType);
+        } else {
+            uploadViaFiler(objectKey, bytes, normalizedType);
+        }
+    }
+
+    public boolean exists(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return false;
+        }
+        if (storageProperties.isS3Mode()) {
+            return existsViaS3(objectKey);
+        }
+        return existsViaFiler(objectKey);
     }
 
     public void validateImageUrl(String imageUrl) {
@@ -193,6 +246,46 @@ public class ProductImageStorageService {
             throw new BadRequestException("Görsel silinemedi");
         } catch (RuntimeException exception) {
             throw new BadRequestException("Depolama servisine bağlanılamadı");
+        }
+    }
+
+    private boolean existsViaS3(String objectKey) {
+        try {
+            S3Client client = s3Client();
+            ensureBucketExists(client);
+            client.headObject(HeadObjectRequest.builder()
+                    .bucket(storageProperties.getBucket())
+                    .key(objectKey)
+                    .build());
+            return true;
+        } catch (NoSuchKeyException exception) {
+            return false;
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                return false;
+            }
+            if (log.isWarnEnabled()) {
+                log.warn("S3 headObject failed. key={} status={}", objectKey, exception.statusCode());
+            }
+            return false;
+        } catch (RuntimeException exception) {
+            if (log.isWarnEnabled()) {
+                log.warn("S3 headObject connection failed. key={}", objectKey, exception);
+            }
+            return false;
+        }
+    }
+
+    private boolean existsViaFiler(String objectKey) {
+        String filerPath = filerObjectPath(objectKey);
+        try {
+            filerClient().head()
+                    .uri(filerPath)
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (RestClientException exception) {
+            return false;
         }
     }
 

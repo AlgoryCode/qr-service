@@ -6,11 +6,14 @@ import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.UserSession;
 import com.ael.algoryqrservice.model.dto.AuthResponse;
+import com.ael.algoryqrservice.model.dto.SessionPageResponse;
 import com.ael.algoryqrservice.model.dto.SessionResponse;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.repository.UserSessionRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -159,15 +162,24 @@ public class SessionService {
     }
 
     @Transactional(readOnly = true)
-    public List<SessionResponse> getUserSessions(Long userId) {
-        return getUserSessions(userId, null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<SessionResponse> getUserSessions(Long userId, UUID currentSessionId) {
-        return sessionRepository.findByUserIdOrderByLoggedInAtDesc(userId).stream()
+    public SessionPageResponse getUserSessions(Long userId, UUID currentSessionId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        Page<UserSession> result = sessionRepository.findByUserIdOrderByLoggedInAtDesc(
+                userId,
+                PageRequest.of(safePage, safeSize)
+        );
+        List<SessionResponse> content = result.getContent().stream()
                 .map(session -> toSessionResponse(session, currentSessionId))
                 .toList();
+        return SessionPageResponse.builder()
+                .content(content)
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .hasNext(result.hasNext())
+                .build();
     }
 
     private void validateSessionActive(UserSession session) {

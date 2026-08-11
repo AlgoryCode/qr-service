@@ -76,7 +76,19 @@ Canlı dosyalar (algoryqr-web-site):
 | `src/components/dashboard/menu/ProductImageField.tsx` | Upload UI |
 | `MenuProductsPanel` / `DigitalMenuProductDetailView` | Form bağlama |
 
-Referans kopyalar: [`docs/algoryqr-web-site/`](algoryqr-web-site/)
+## Related
+
+Şef avatar kataloğu: [`docs/chef-avatar.md`](chef-avatar.md)
+
+## Menü logosu
+
+| Method | Path | Auth |
+|--------|------|------|
+| `POST` | `/menu/{menuId}/logo` | JWT | multipart `file` → menü profili |
+| `DELETE` | `/menu/{menuId}/logo` | JWT | logoyu temizler |
+
+Object key: `menus/{menuId}/logo/{uuid}.{ext}`
+
 
 ### Ürün formu
 

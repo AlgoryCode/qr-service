@@ -32,6 +32,7 @@ import com.ael.algoryqrservice.repository.PlanChangeRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.util.IdentityNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -953,14 +954,13 @@ public class PlanChangeService {
 
     private PaymentThreeDsRequest.BuyerPayload toBuyer(User user, Purchase purchase, String clientIp) {
         var address = purchase.getBillingSnapshot();
-        String identity = address.getTckn() != null ? address.getTckn() : address.getVkn();
         return PaymentThreeDsRequest.BuyerPayload.builder()
                 .id(String.valueOf(user.getId()))
                 .name(user.getFirstName() != null && !user.getFirstName().isBlank() ? user.getFirstName() : "Musteri")
                 .surname(user.getLastName() != null && !user.getLastName().isBlank() ? user.getLastName() : "Kullanici")
                 .gsmNumber(user.getPhone())
                 .email(user.getEmail())
-                .identityNumber(identity != null ? identity : "11111111111")
+                .identityNumber(IdentityNumbers.firstOrDefault(address.getTckn(), address.getVkn()))
                 .registrationAddress(address.getAddress())
                 .ip(clientIp != null && !clientIp.isBlank() ? clientIp : "127.0.0.1")
                 .city(address.getCity())

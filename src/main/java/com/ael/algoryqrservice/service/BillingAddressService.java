@@ -5,9 +5,12 @@ import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillingAddress;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.dto.BillingAddressDtos;
+import com.ael.algoryqrservice.model.dto.BillingAddressPageResponse;
 import com.ael.algoryqrservice.model.dto.AddressDto;
 import com.ael.algoryqrservice.repository.BillingAddressRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,10 +22,21 @@ public class BillingAddressService {
     private final BillingAddressRepository repository;
 
     @Transactional(readOnly = true)
-    public List<BillingAddressDtos.Response> list(Long userId) {
-        return repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+    public BillingAddressPageResponse list(Long userId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        Page<BillingAddress> result = repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(
+                userId,
+                PageRequest.of(safePage, safeSize)
+        );
+        return BillingAddressPageResponse.builder()
+                .content(result.getContent().stream().map(this::toResponse).toList())
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .hasNext(result.hasNext())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +132,7 @@ public class BillingAddressService {
 
     private BillingAddress apply(BillingAddress address, BillingAddressDtos.Request request) {
         address.setType(request.type());
+        address.setTitle(request.title() == null ? null : request.title().trim());
         address.setName(request.name());
         address.setSurname(request.surname());
         address.setLegalName(request.legalName());
@@ -160,11 +175,11 @@ public class BillingAddressService {
     }
 
     private BillingAddressDtos.Response toResponse(BillingAddress address) {
-        return new BillingAddressDtos.Response(address.getId(), address.getType(), address.getName(),
-                address.getSurname(), address.getLegalName(), address.getTckn(), address.getVkn(),
-                address.getTaxOffice(), address.getMersis(), address.getCountry(), address.getCity(),
-                address.getDistrict(), address.getAddress(), address.getPostcode(), address.getEmail(),
-                address.getPhone(), address.isTaxpayerInvoice(), address.isDefaultAddress(),
-                address.getCreatedAt(), address.getUpdatedAt());
+        return new BillingAddressDtos.Response(address.getId(), address.getType(), address.getTitle(),
+                address.getName(), address.getSurname(), address.getLegalName(), address.getTckn(),
+                address.getVkn(), address.getTaxOffice(), address.getMersis(), address.getCountry(),
+                address.getCity(), address.getDistrict(), address.getAddress(), address.getPostcode(),
+                address.getEmail(), address.getPhone(), address.isTaxpayerInvoice(),
+                address.isDefaultAddress(), address.getCreatedAt(), address.getUpdatedAt());
     }
 }

@@ -59,10 +59,12 @@ public class AuthController {
     }
 
     @GetMapping("/sessions")
-    public ResponseEntity<List<SessionResponse>> getMySessions(
-            @RequestHeader(value = "Authorization", required = false) String authorization
+    public ResponseEntity<SessionPageResponse> getMySessions(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(authService.getMySessions(extractBearerToken(authorization)));
+        return ResponseEntity.ok(authService.getMySessions(extractBearerToken(authorization), page, size));
     }
 
     @DeleteMapping("/sessions/{sessionId}")

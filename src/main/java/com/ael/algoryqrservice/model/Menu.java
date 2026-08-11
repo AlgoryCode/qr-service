@@ -35,6 +35,18 @@ public class Menu extends QrBaseModel {
     @Column(length = 255)
     private String slogan;
 
+    @Column(name = "chef_name", length = 80)
+    private String chefName;
+
+    @Column(name = "chef_avatar_key", length = 64)
+    private String chefAvatarKey;
+
+    @Column(name = "logo_url", length = 1024)
+    private String logoUrl;
+
+    @Column(name = "logo_key", length = 255)
+    private String logoKey;
+
     private String phone;
     private String email;
     private String address;

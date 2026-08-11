@@ -147,12 +147,27 @@ public final class MenuDtos {
         private String themeId;
         private String businessName;
         private String slogan;
+        private String chefName;
+        private String chefDisplayName;
+        private String chefAvatarKey;
+        private String chefAvatarUrl;
+        private String logoUrl;
         private String phone;
         private String email;
         private String address;
         private String publicUrl;
         private boolean active;
         private QrBrief qr;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChefAvatarItem {
+        private String key;
+        private String label;
+        private String imageUrl;
     }
 
     @Data
@@ -211,6 +226,12 @@ public final class MenuDtos {
         private String themeId;
         private String businessName;
         private String slogan;
+        @Size(max = 80)
+        private String chefName;
+        @Size(max = 64)
+        private String chefAvatarKey;
+        @Size(max = 1024)
+        private String logoUrl;
         private String phone;
         private String email;
         private String address;

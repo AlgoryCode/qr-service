@@ -60,7 +60,7 @@ class BillingAddressControllerTest {
 
     private static BillingAddressDtos.Response sampleResponse(Long id, boolean defaultAddress) {
         return new BillingAddressDtos.Response(
-                id, BillingAddressType.INDIVIDUAL, "Ada", "Lovelace", null, null, null, null,
+                id, BillingAddressType.INDIVIDUAL, "Ev", "Ada", "Lovelace", null, null, null, null,
                 null, "TR", "İstanbul", "Kadıköy", "Adres", "34000", "ada@example.com",
                 "5551112233", false, defaultAddress, null, null);
     }

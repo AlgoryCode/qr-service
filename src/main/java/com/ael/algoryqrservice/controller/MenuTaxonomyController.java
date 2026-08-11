@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -20,6 +21,15 @@ public class MenuTaxonomyController {
     @GetMapping("/taxonomy")
     public ResponseEntity<List<TaxonomyDtos.MainCategoryResponse>> listTaxonomy() {
         return ResponseEntity.ok(menuTaxonomyService.listTaxonomy());
+    }
+
+    @GetMapping("/taxonomy/page")
+    public ResponseEntity<TaxonomyDtos.TaxonomyPageResponse> listTaxonomyPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(required = false) String q
+    ) {
+        return ResponseEntity.ok(menuTaxonomyService.listTaxonomyPage(page, size, q));
     }
 
     @GetMapping("/tags")

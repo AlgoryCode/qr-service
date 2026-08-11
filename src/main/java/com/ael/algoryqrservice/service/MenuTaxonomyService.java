@@ -12,6 +12,9 @@ import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuTagRepository;
 import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -56,6 +60,53 @@ public class MenuTaxonomyService {
                     .build());
         }
         return result;
+    }
+
+    @Transactional(readOnly = true)
+    public TaxonomyDtos.TaxonomyPageResponse listTaxonomyPage(int page, int size, String q) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        String query = q == null ? "" : q.trim();
+        boolean qBlank = query.isEmpty();
+        Page<MainCategory> result = mainCategoryRepository.searchByNameOrSlugOrSub(
+                query,
+                qBlank,
+                PageRequest.of(safePage, safeSize, Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("id")))
+        );
+        String needle = query.toLowerCase(Locale.ROOT);
+        List<TaxonomyDtos.MainCategoryResponse> content = new ArrayList<>();
+        for (MainCategory main : result.getContent()) {
+            List<SubCategory> subs = subCategoryRepository
+                    .findByMainCategoryIdAndDeletedFalseOrderBySortOrderAscIdAsc(main.getId());
+            boolean mainMatches = qBlank || containsIgnoreCase(main.getName(), needle)
+                    || containsIgnoreCase(main.getSlug(), needle);
+            List<SubCategory> visibleSubs = qBlank || mainMatches
+                    ? subs
+                    : subs.stream()
+                    .filter(sub -> containsIgnoreCase(sub.getName(), needle)
+                            || containsIgnoreCase(sub.getSlug(), needle))
+                    .toList();
+            content.add(TaxonomyDtos.MainCategoryResponse.builder()
+                    .id(main.getId())
+                    .slug(main.getSlug())
+                    .name(main.getName())
+                    .sortOrder(main.getSortOrder())
+                    .subs(visibleSubs.stream().map(this::toSubResponse).toList())
+                    .build());
+        }
+        return TaxonomyDtos.TaxonomyPageResponse.builder()
+                .content(content)
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .hasNext(result.hasNext())
+                .q(qBlank ? null : query)
+                .build();
+    }
+
+    private static boolean containsIgnoreCase(String value, String needle) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
     }
 
     @Transactional(readOnly = true)

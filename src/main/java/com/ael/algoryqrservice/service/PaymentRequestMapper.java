@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCardDto;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.util.IdentityNumbers;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -185,12 +186,7 @@ public class PaymentRequestMapper {
     }
 
     private PaymentThreeDsRequest.BuyerPayload toBuyer(User user, BillingSnapshot address, String clientIp) {
-        String identity = firstNonBlank(address.getTckn(), address.getVkn());
-        if (identity == null) {
-            throw new BadRequestException(
-                    "Odeme icin fatura adresinizde TCKN veya VKN bilgisi bulunmalidir. Lutfen fatura adresinizi guncelleyin."
-            );
-        }
+        String identity = IdentityNumbers.firstOrDefault(address.getTckn(), address.getVkn());
         String gsmNumber = firstNonBlank(address.getPhone(), user.getPhone());
         if (gsmNumber == null) {
             throw new BadRequestException(

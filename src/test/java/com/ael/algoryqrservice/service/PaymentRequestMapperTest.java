@@ -16,6 +16,7 @@ import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.util.IdentityNumbers;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -89,7 +90,7 @@ class PaymentRequestMapperTest {
     }
 
     @Test
-    void toThreeDsRequest_whenIdentityNumberMissing_thenThrowBadRequest() {
+    void toThreeDsRequest_whenIdentityNumberMissing_thenUsesDefaultIdentity() {
         PurchaseRequest request = new PurchaseRequest();
         request.setPaymentMode(PaymentMode.THREE_DS);
         request.setBillingPeriod(BillingPeriod.MONTHLY);
@@ -113,9 +114,11 @@ class PaymentRequestMapperTest {
         User user = User.builder().id(7L).firstName("Ada").lastName("Lovelace")
                 .email("ada@example.com").build();
 
-        assertThatThrownBy(() -> mapper.toThreeDsRequest(
+        PaymentThreeDsRequest result = mapper.toThreeDsRequest(
                 purchase, user, plan, request, "127.0.0.1", new AppProperties()
-        )).isInstanceOf(BadRequestException.class);
+        );
+
+        assertThat(result.getBuyer().getIdentityNumber()).isEqualTo(IdentityNumbers.DEFAULT);
     }
 
     @Test

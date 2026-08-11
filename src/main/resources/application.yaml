@@ -95,6 +95,12 @@ app:
     max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:5242880}
   menu:
     category-max-depth: ${MENU_CATEGORY_MAX_DEPTH:10}
+  chef-avatars:
+    items:
+      - key: default
+        label: Varsayılan Şef
+        object-key: chief_avatars/default.png
+        classpath-resource: chef-avatars/default.png
   seed:
     menu-products:
       enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:true }

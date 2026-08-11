@@ -26,6 +26,8 @@ public class BillingAddress {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private BillingAddressType type;
+    @Column(nullable = false, length = 80)
+    private String title;
     private String name;
     private String surname;
     private String legalName;

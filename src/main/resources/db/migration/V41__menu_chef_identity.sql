@@ -1,0 +1,5 @@
+ALTER TABLE tbl_menu
+    ADD COLUMN IF NOT EXISTS chef_name VARCHAR(80);
+
+ALTER TABLE tbl_menu
+    ADD COLUMN IF NOT EXISTS chef_avatar_key VARCHAR(64);

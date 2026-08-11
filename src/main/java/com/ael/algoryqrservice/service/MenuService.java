@@ -28,6 +28,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.ael.algoryqrservice.model.dto.ProductImageDtos;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -58,6 +61,7 @@ public class MenuService {
     private final AppProperties appProperties;
     private final SecurityUtils securityUtils;
     private final ProductImageStorageService productImageStorageService;
+    private final ChefAvatarService chefAvatarService;
 
     @Transactional(readOnly = true)
     public void requireOwnedMenu(Long menuId) {
@@ -76,6 +80,8 @@ public class MenuService {
                 .themeId(themeId)
                 .businessName(businessName)
                 .slogan(trimToNull(stringValue(details.get("slogan"))))
+                .chefName(trimToNull(stringValue(details.get("chefName"))))
+                .chefAvatarKey(resolveCreateChefAvatarKey(stringValue(details.get("chefAvatarKey"))))
                 .phone(stringValue(details.get("phone")))
                 .email(stringValue(details.get("email")))
                 .address(stringValue(details.get("address")))
@@ -586,6 +592,19 @@ public class MenuService {
         if (request.getSlogan() != null) {
             menu.setSlogan(trimToNull(request.getSlogan()));
         }
+        if (request.getChefName() != null) {
+            menu.setChefName(trimToNull(request.getChefName()));
+        }
+        if (request.getChefAvatarKey() != null) {
+            String avatarKey = trimToNull(request.getChefAvatarKey());
+            if (avatarKey != null && !chefAvatarService.isValidKey(avatarKey)) {
+                throw new BadRequestException("Geçersiz şef avatarı");
+            }
+            menu.setChefAvatarKey(avatarKey);
+        }
+        if (request.getLogoUrl() != null) {
+            applyLogoUrl(menu, request.getLogoUrl());
+        }
         if (request.getPhone() != null) menu.setPhone(trimToNull(request.getPhone()));
         if (request.getEmail() != null) menu.setEmail(trimToNull(request.getEmail()));
         if (request.getAddress() != null) menu.setAddress(trimToNull(request.getAddress()));
@@ -597,6 +616,33 @@ public class MenuService {
         qrGenerationService.updateQrContent(qr, publicUrl);
 
         return toMenuProfile(menu, publicUrl, null);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProfileResponse uploadLogo(Long menuId, MultipartFile file) {
+        Menu menu = ensureOwnedMenu(menuId);
+        ProductImageDtos.UploadResponse uploaded = productImageStorageService.uploadLogo(menuId, file);
+        String previousKey = menu.getLogoKey();
+        menu.setLogoUrl(uploaded.imageUrl());
+        menu.setLogoKey(uploaded.objectKey());
+        menuRepository.save(menu);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(uploaded.objectKey())) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+        return toMenuProfile(menu, buildPublicUrl(menu), null);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProfileResponse clearLogo(Long menuId) {
+        Menu menu = ensureOwnedMenu(menuId);
+        String previousKey = menu.getLogoKey();
+        menu.setLogoUrl(null);
+        menu.setLogoKey(null);
+        menuRepository.save(menu);
+        if (previousKey != null && !previousKey.isBlank()) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+        return toMenuProfile(menu, buildPublicUrl(menu), null);
     }
 
     @Transactional(readOnly = true)
@@ -1004,6 +1050,17 @@ public class MenuService {
         }
     }
 
+    private String resolveCreateChefAvatarKey(String avatarKey) {
+        String normalized = trimToNull(avatarKey);
+        if (normalized == null) {
+            return null;
+        }
+        if (!chefAvatarService.isValidKey(normalized)) {
+            throw new BadRequestException("Geçersiz şef avatarı");
+        }
+        return normalized;
+    }
+
     private MenuDtos.MenuProfileResponse toMenuProfile(
             Menu menu,
             String publicUrl,
@@ -1016,6 +1073,11 @@ public class MenuService {
                 .themeId(menu.getThemeId())
                 .businessName(menu.getBusinessName())
                 .slogan(menu.getSlogan())
+                .chefName(menu.getChefName())
+                .chefDisplayName(chefAvatarService.resolveDisplayName(menu.getChefName()))
+                .chefAvatarKey(menu.getChefAvatarKey())
+                .chefAvatarUrl(chefAvatarService.resolveImageUrl(menu.getChefAvatarKey()))
+                .logoUrl(menu.getLogoUrl())
                 .phone(menu.getPhone())
                 .email(menu.getEmail())
                 .address(menu.getAddress())
@@ -1023,6 +1085,30 @@ public class MenuService {
                 .active(menu.isActive())
                 .qr(qrBrief)
                 .build();
+    }
+
+    private void applyLogoUrl(Menu menu, String logoUrl) {
+        String normalized = trimToNull(logoUrl);
+        if (normalized == null) {
+            String previousKey = menu.getLogoKey();
+            menu.setLogoUrl(null);
+            menu.setLogoKey(null);
+            if (previousKey != null && !previousKey.isBlank()) {
+                productImageStorageService.deleteQuietly(previousKey);
+            }
+            return;
+        }
+        productImageStorageService.validateImageUrl(normalized);
+        String objectKey = productImageStorageService.extractObjectKey(normalized);
+        if (objectKey == null || !objectKey.startsWith("menus/" + menu.getMenuId() + "/logo/")) {
+            throw new BadRequestException("Geçersiz logo URL");
+        }
+        String previousKey = menu.getLogoKey();
+        menu.setLogoUrl(normalized);
+        menu.setLogoKey(objectKey);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(objectKey)) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
     }
 
     private void validateProductRequest(MenuDtos.MenuProductRequest request) {

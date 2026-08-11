@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.ael.algoryqrservice.service.ChefAvatarService;
 import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.MenuTaxonomyService;
 import com.ael.algoryqrservice.service.MenuProductRatingService;
@@ -23,6 +24,7 @@ public class MenuController {
     private final MenuService menuService;
     private final MenuTaxonomyService menuTaxonomyService;
     private final MenuProductRatingService menuProductRatingService;
+    private final ChefAvatarService chefAvatarService;
 
     @GetMapping("/public/id/{qrId}")
     public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuByQrId(@PathVariable Long qrId) {
@@ -142,6 +144,11 @@ public class MenuController {
     @GetMapping("/by-qr/{qrId}/categories")
     public ResponseEntity<MenuDtos.MenuCategoriesByQrResponse> listCategoriesByQrId(@PathVariable Long qrId) {
         return ResponseEntity.ok(menuService.listCategoriesByQrId(qrId));
+    }
+
+    @GetMapping("/chef-avatars")
+    public ResponseEntity<List<MenuDtos.ChefAvatarItem>> listChefAvatars() {
+        return ResponseEntity.ok(chefAvatarService.listAvatars());
     }
 
     @GetMapping("/{menuId}")

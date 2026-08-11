@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +16,9 @@ public final class BillingAddressDtos {
 
     public record Request(
             @NotNull(message = "Fatura tipi zorunludur") BillingAddressType type,
+            @NotBlank(message = "Adres adı zorunludur")
+            @Size(max = 80, message = "Adres adı en fazla 80 karakter olabilir")
+            String title,
             String name,
             String surname,
             String legalName,
@@ -56,6 +60,7 @@ public final class BillingAddressDtos {
     public record Response(
             Long id,
             BillingAddressType type,
+            String title,
             String name,
             String surname,
             String legalName,

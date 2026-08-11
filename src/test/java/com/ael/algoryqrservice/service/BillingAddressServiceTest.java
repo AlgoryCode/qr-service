@@ -179,7 +179,7 @@ class BillingAddressServiceTest {
 
     private static BillingAddress sampleCorporate(Long id, Long userId, boolean defaultAddress) {
         return BillingAddress.builder().id(id).userId(userId)
-                .type(BillingAddressType.CORPORATE).legalName("Algory")
+                .type(BillingAddressType.CORPORATE).title("Ofis").legalName("Algory")
                 .vkn("1234567890").taxOffice("Merkez").country("TR").city("İstanbul")
                 .district("Kadıköy").address("Adres 1").postcode("34000")
                 .email("billing@example.com").phone("5551112233")
@@ -188,7 +188,7 @@ class BillingAddressServiceTest {
 
     private static BillingAddressDtos.Request individualRequest(boolean defaultAddress) {
         return new BillingAddressDtos.Request(
-                BillingAddressType.INDIVIDUAL, "Ada", "Lovelace", null, null, null, null, null,
+                BillingAddressType.INDIVIDUAL, "Ev", "Ada", "Lovelace", null, null, null, null, null,
                 "TR", "İstanbul", "Kadıköy", "Adres", "34000", "ada@example.com", "5551112233",
                 false, defaultAddress);
     }
