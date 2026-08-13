@@ -4,14 +4,18 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
+import com.ael.algoryqrservice.model.MenuOrder;
+import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductVisit;
 import com.ael.algoryqrservice.model.MenuVisit;
 import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
+import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
+import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -24,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -36,6 +42,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -49,6 +56,7 @@ public class AnalyticsService {
     private static final int MAX_EVENTS = 50;
     private static final int TOP_LIMIT = 10;
     private static final int SAMPLE_JOURNEYS = 8;
+    private static final int UNSOLD_LIMIT = 8;
 
     private final MenuVisitRepository menuVisitRepository;
     private final MenuProductVisitRepository menuProductVisitRepository;
@@ -57,6 +65,8 @@ public class AnalyticsService {
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
     private final SubCategoryRepository subCategoryRepository;
+    private final MenuFeedbackService menuFeedbackService;
+    private final MenuOrderRepository menuOrderRepository;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -227,6 +237,8 @@ public class AnalyticsService {
                 categoryNames
         );
 
+        AnalyticsDtos.ReportFeedback feedback = menuFeedbackService.buildReportFeedback(menuId, from, to);
+
         return new AnalyticsDtos.MenuAnalyticsReportResponse(
                 menu.getMenuId(),
                 menu.getBusinessName(),
@@ -246,7 +258,142 @@ public class AnalyticsService {
                 topCategories,
                 tree,
                 journeys,
-                new AnalyticsDtos.FunnelCounts(menuOpens, categoryViews, productViews)
+                new AnalyticsDtos.FunnelCounts(menuOpens, categoryViews, productViews),
+                feedback
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuRevenueReportResponse getMenuRevenueReport(
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        Menu menu = requireOwnedMenu(menuId, ownerId);
+        LocalDateTime fromDt = from.atStartOfDay();
+        LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
+
+        List<MenuOrder> orders = menuOrderRepository
+                .findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
+                        menuId,
+                        MenuOrderStatus.CONFIRMED,
+                        fromDt,
+                        toDt
+                );
+
+        Map<Long, MenuProduct> productsById = menuProductRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).stream()
+                .collect(Collectors.toMap(MenuProduct::getProductId, p -> p, (a, b) -> a));
+        Map<Long, String> categoryNames = subCategoryRepository
+                .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
+                .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
+
+        BigDecimal totalRevenue = BigDecimal.ZERO;
+        long itemCount = 0L;
+        String currency = "TRY";
+        Map<LocalDate, BigDecimal> revenueByDay = new HashMap<>();
+        Map<LocalDate, Long> ordersByDay = new HashMap<>();
+        Map<Integer, BigDecimal> revenueByHour = new HashMap<>();
+        Map<Integer, Long> ordersByHour = new HashMap<>();
+        Map<Long, AnalyticsDtos.RevenueProduct> products = new LinkedHashMap<>();
+        Map<Long, AnalyticsDtos.RevenueCategory> categories = new LinkedHashMap<>();
+
+        for (MenuOrder order : orders) {
+            BigDecimal orderTotal = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
+            totalRevenue = totalRevenue.add(orderTotal);
+            if (order.getCurrency() != null && !order.getCurrency().isBlank()) {
+                currency = order.getCurrency();
+            }
+            LocalDate day = order.getConfirmedAt() != null
+                    ? order.getConfirmedAt().toLocalDate()
+                    : from;
+            int hour = order.getConfirmedAt() != null ? order.getConfirmedAt().getHour() : 0;
+            revenueByDay.merge(day, orderTotal, BigDecimal::add);
+            ordersByDay.merge(day, 1L, Long::sum);
+            revenueByHour.merge(hour, orderTotal, BigDecimal::add);
+            ordersByHour.merge(hour, 1L, Long::sum);
+
+            List<MenuOrderItem> items = order.getItems() == null ? List.of() : order.getItems();
+            for (MenuOrderItem item : items) {
+                long qty = item.getQuantity();
+                itemCount += qty;
+                BigDecimal line = item.getLineTotal() != null
+                        ? item.getLineTotal()
+                        : (item.getUnitPrice() != null
+                                ? item.getUnitPrice().multiply(BigDecimal.valueOf(qty))
+                                : BigDecimal.ZERO);
+
+                Long productId = item.getProductId();
+                AnalyticsDtos.RevenueProduct existingProduct = products.get(productId);
+                String productName = item.getProductName() != null
+                        ? item.getProductName()
+                        : "Ürün #" + productId;
+                products.put(productId, new AnalyticsDtos.RevenueProduct(
+                        productId,
+                        productName,
+                        (existingProduct == null ? 0L : existingProduct.quantity()) + qty,
+                        (existingProduct == null ? BigDecimal.ZERO : existingProduct.revenue()).add(line)
+                ));
+
+                MenuProduct catalog = productsById.get(productId);
+                Long categoryId = catalog == null ? 0L : catalog.getSubCategoryId();
+                String categoryName = categoryId == null || categoryId == 0L
+                        ? "Diğer"
+                        : categoryNames.getOrDefault(categoryId, "Kategori #" + categoryId);
+                Long categoryKey = categoryId == null ? 0L : categoryId;
+                AnalyticsDtos.RevenueCategory existingCategory = categories.get(categoryKey);
+                categories.put(categoryKey, new AnalyticsDtos.RevenueCategory(
+                        categoryKey == 0L ? null : categoryKey,
+                        categoryName,
+                        (existingCategory == null ? 0L : existingCategory.quantity()) + qty,
+                        (existingCategory == null ? BigDecimal.ZERO : existingCategory.revenue()).add(line)
+                ));
+            }
+        }
+
+        List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
+        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+            daily.add(new AnalyticsDtos.DailyRevenuePoint(
+                    cursor,
+                    revenueByDay.getOrDefault(cursor, BigDecimal.ZERO),
+                    ordersByDay.getOrDefault(cursor, 0L)
+            ));
+        }
+
+        List<AnalyticsDtos.RevenueProduct> productRows = products.values().stream()
+                .sorted(Comparator.comparing(AnalyticsDtos.RevenueProduct::revenue).reversed())
+                .toList();
+        List<AnalyticsDtos.RevenueCategory> categoryRows = categories.values().stream()
+                .sorted(Comparator.comparing(AnalyticsDtos.RevenueCategory::revenue).reversed())
+                .toList();
+
+        List<AnalyticsDtos.HourlyRevenuePoint> hourly = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            hourly.add(new AnalyticsDtos.HourlyRevenuePoint(
+                    hour,
+                    revenueByHour.getOrDefault(hour, BigDecimal.ZERO),
+                    ordersByHour.getOrDefault(hour, 0L)
+            ));
+        }
+
+        long orderCount = orders.size();
+        BigDecimal avgOrderValue = orderCount == 0
+                ? BigDecimal.ZERO
+                : totalRevenue.divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
+
+        return new AnalyticsDtos.MenuRevenueReportResponse(
+                menu.getMenuId(),
+                menu.getBusinessName(),
+                from,
+                to,
+                new AnalyticsDtos.RevenueKpis(totalRevenue, orderCount, itemCount, avgOrderValue, currency),
+                daily,
+                productRows,
+                categoryRows,
+                buildRevenueSpotlight(productRows),
+                hourly,
+                buildUnsoldCatalog(productsById, products.keySet())
         );
     }
 
@@ -438,6 +585,62 @@ public class AnalyticsService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;
+    }
+
+    private AnalyticsDtos.RevenueSpotlight buildRevenueSpotlight(List<AnalyticsDtos.RevenueProduct> productRows) {
+        if (productRows.isEmpty()) {
+            return new AnalyticsDtos.RevenueSpotlight(null, null, null);
+        }
+        AnalyticsDtos.RevenueProduct byQuantity = productRows.stream()
+                .max(Comparator
+                        .comparingLong(AnalyticsDtos.RevenueProduct::quantity)
+                        .thenComparing(AnalyticsDtos.RevenueProduct::revenue)
+                        .thenComparing(AnalyticsDtos.RevenueProduct::productId, Comparator.reverseOrder()))
+                .orElse(null);
+        AnalyticsDtos.RevenueProduct byRevenue = productRows.stream()
+                .max(Comparator
+                        .comparing(AnalyticsDtos.RevenueProduct::revenue)
+                        .thenComparingLong(AnalyticsDtos.RevenueProduct::quantity)
+                        .thenComparing(AnalyticsDtos.RevenueProduct::productId, Comparator.reverseOrder()))
+                .orElse(null);
+        AnalyticsDtos.RevenueProduct leastSold = productRows.stream()
+                .min(Comparator
+                        .comparingLong(AnalyticsDtos.RevenueProduct::quantity)
+                        .thenComparing(AnalyticsDtos.RevenueProduct::revenue)
+                        .thenComparing(AnalyticsDtos.RevenueProduct::productId))
+                .orElse(null);
+        return new AnalyticsDtos.RevenueSpotlight(
+                toSpotlightProduct(byQuantity),
+                toSpotlightProduct(byRevenue),
+                toSpotlightProduct(leastSold)
+        );
+    }
+
+    private AnalyticsDtos.RevenueSpotlightProduct toSpotlightProduct(AnalyticsDtos.RevenueProduct row) {
+        if (row == null) {
+            return null;
+        }
+        return new AnalyticsDtos.RevenueSpotlightProduct(
+                row.productId(),
+                row.name(),
+                row.quantity(),
+                row.revenue()
+        );
+    }
+
+    private AnalyticsDtos.UnsoldCatalog buildUnsoldCatalog(
+            Map<Long, MenuProduct> catalog,
+            Set<Long> soldProductIds
+    ) {
+        List<AnalyticsDtos.UnsoldProduct> unsold = catalog.values().stream()
+                .filter(product -> !soldProductIds.contains(product.getProductId()))
+                .sorted(Comparator.comparing(MenuProduct::getSortOrder).thenComparing(MenuProduct::getProductId))
+                .map(product -> new AnalyticsDtos.UnsoldProduct(product.getProductId(), product.getName()))
+                .toList();
+        return new AnalyticsDtos.UnsoldCatalog(
+                unsold.size(),
+                unsold.stream().limit(UNSOLD_LIMIT).toList()
+        );
     }
 
     private List<AnalyticsDtos.TreemapNode> buildCategoryProductTree(

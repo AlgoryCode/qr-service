@@ -1,19 +1,26 @@
 package com.ael.algoryqrservice.controller;
 
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.ChefAvatarService;
+import com.ael.algoryqrservice.service.MenuFeedbackService;
+import com.ael.algoryqrservice.service.MenuReservationService;
 import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.MenuTaxonomyService;
 import com.ael.algoryqrservice.service.MenuProductRatingService;
+import com.ael.algoryqrservice.service.MenuRatingService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -24,6 +31,9 @@ public class MenuController {
     private final MenuService menuService;
     private final MenuTaxonomyService menuTaxonomyService;
     private final MenuProductRatingService menuProductRatingService;
+    private final MenuRatingService menuRatingService;
+    private final MenuFeedbackService menuFeedbackService;
+    private final MenuReservationService menuReservationService;
     private final ChefAvatarService chefAvatarService;
 
     @GetMapping("/public/id/{qrId}")
@@ -120,6 +130,82 @@ public class MenuController {
         return ResponseEntity.status(201).body(
                 menuProductRatingService.rateProduct(menuId, productId, request, httpRequest)
         );
+    }
+
+    @GetMapping("/public/{menuId}/rating")
+    public ResponseEntity<MenuDtos.MenuRatingResponse> getPublicMenuRating(
+            @PathVariable Long menuId,
+            HttpServletRequest httpRequest
+    ) {
+        return ResponseEntity.ok(menuRatingService.getRating(menuId, httpRequest));
+    }
+
+    @PostMapping("/public/{menuId}/rating")
+    public ResponseEntity<MenuDtos.MenuRatingResponse> ratePublicMenu(
+            @PathVariable Long menuId,
+            @Valid @RequestBody MenuDtos.MenuRatingRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        return ResponseEntity.status(201).body(menuRatingService.rateMenu(menuId, request, httpRequest));
+    }
+
+    @GetMapping("/{menuId}/feedback")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.FeedbackPageResponse> listFeedback(
+            @PathVariable Long menuId,
+            @RequestParam(required = false, defaultValue = "all") String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Integer minScore,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(menuFeedbackService.listFeedback(
+                menuId, type, from, to, minScore, page, size
+        ));
+    }
+
+    @GetMapping("/{menuId}/feedback/summary")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.FeedbackSummaryResponse> feedbackSummary(@PathVariable Long menuId) {
+        return ResponseEntity.ok(menuFeedbackService.getSummary(menuId));
+    }
+
+    @PostMapping("/public/{menuId}/reservations")
+    public ResponseEntity<MenuDtos.ReservationResponse> createPublicReservation(
+            @PathVariable Long menuId,
+            @Valid @RequestBody MenuDtos.ReservationCreateRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        return ResponseEntity.status(201).body(
+                menuReservationService.createPublic(menuId, request, httpRequest)
+        );
+    }
+
+    @GetMapping("/{menuId}/reservations")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.ReservationPageResponse> listReservations(
+            @PathVariable Long menuId,
+            @RequestParam(required = false, defaultValue = "all") String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(menuReservationService.listForOwner(
+                menuId, status, from, to, q, page, size
+        ));
+    }
+
+    @PatchMapping("/{menuId}/reservations/{reservationId}")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.ReservationResponse> updateReservation(
+            @PathVariable Long menuId,
+            @PathVariable Long reservationId,
+            @RequestBody MenuDtos.ReservationUpdateRequest request
+    ) {
+        return ResponseEntity.ok(menuReservationService.updateForOwner(menuId, reservationId, request));
     }
 
     @GetMapping("/my/active")

@@ -103,6 +103,7 @@ public class MenuProductRatingService {
                 .comment(comment)
                 .ratingAvg(product.getRatingAvg())
                 .ratingCount(product.getRatingCount())
+                .userRating(score)
                 .build();
     }
 

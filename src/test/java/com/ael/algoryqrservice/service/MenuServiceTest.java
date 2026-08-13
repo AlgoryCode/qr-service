@@ -11,6 +11,7 @@ import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
+import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.model.nutrition.NutritionNutrientEntry;
@@ -355,7 +356,16 @@ class MenuServiceTest {
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuTaxonomyService.listTaxonomy()).thenReturn(List.of());
+        when(menuTaxonomyService.listTaxonomyPage(0, 6, null)).thenReturn(
+                TaxonomyDtos.TaxonomyPageResponse.builder()
+                        .content(List.of())
+                        .page(0)
+                        .size(6)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .hasNext(false)
+                        .build()
+        );
         when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
@@ -460,7 +470,16 @@ class MenuServiceTest {
                 .build();
         when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuTaxonomyService.listTaxonomy()).thenReturn(List.of());
+        when(menuTaxonomyService.listTaxonomyPage(0, 6, null)).thenReturn(
+                TaxonomyDtos.TaxonomyPageResponse.builder()
+                        .content(List.of())
+                        .page(0)
+                        .size(6)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .hasNext(false)
+                        .build()
+        );
         when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());

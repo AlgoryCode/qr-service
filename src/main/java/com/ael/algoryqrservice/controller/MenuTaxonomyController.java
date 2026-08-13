@@ -26,7 +26,7 @@ public class MenuTaxonomyController {
     @GetMapping("/taxonomy/page")
     public ResponseEntity<TaxonomyDtos.TaxonomyPageResponse> listTaxonomyPage(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "6") int size,
             @RequestParam(required = false) String q
     ) {
         return ResponseEntity.ok(menuTaxonomyService.listTaxonomyPage(page, size, q));

@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.GoogleAuthHandoffTicket;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
+import com.ael.algoryqrservice.repository.CustomerRepository;
 import com.ael.algoryqrservice.repository.GoogleAuthHandoffTicketRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
@@ -44,7 +45,11 @@ class GoogleAuthHandoffServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private CustomerRepository customerRepository;
+    @Mock
     private SessionService sessionService;
+    @Mock
+    private CustomerSessionService customerSessionService;
     @Mock
     private SecureRandom secureRandom;
 
@@ -55,7 +60,9 @@ class GoogleAuthHandoffServiceTest {
         service = new GoogleAuthHandoffService(
                 ticketRepository,
                 userRepository,
+                customerRepository,
                 sessionService,
+                customerSessionService,
                 new GoogleOAuthProperties(
                         "http://localhost:3000/api/auth/google/callback",
                         Duration.ofMinutes(2)
@@ -84,6 +91,7 @@ class GoogleAuthHandoffServiceTest {
         assertThat(stored.getTicketHash()).hasSize(64).isNotEqualTo(rawTicket);
         assertThat(stored.getUserId()).isEqualTo(10L);
         assertThat(stored.getIntent()).isEqualTo(GoogleAuthIntent.LOGIN);
+        assertThat(stored.getPrincipalType()).isEqualTo("APP");
         assertThat(stored.isConsumed()).isFalse();
     }
 

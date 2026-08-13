@@ -60,6 +60,19 @@ public class AnalyticsController {
         return ResponseEntity.ok(analyticsService.getMenuReport(menuId, ownerId, effectiveFrom, effectiveTo));
     }
 
+    @GetMapping("/menu/{menuId}/revenue")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<AnalyticsDtos.MenuRevenueReportResponse> getMenuRevenueReport(
+            @PathVariable Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(analyticsService.getMenuRevenueReport(menuId, ownerId, effectiveFrom, effectiveTo));
+    }
+
     @PostMapping("/menu/{menuId}/smart-reports")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createSmartReport(

@@ -40,8 +40,8 @@ class JwtServiceTest {
 
         Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
         assertThat(claims.get("activePackage")).isEqualTo("PRO_PACKAGE");
-        assertThat(claims.get("products", List.class)).containsExactly("QR_CREATE", "SMART_ASSISTANT");
-        assertThat(claims.get("scopes", List.class)).containsExactly("QR_CREATE_OWNER", "SMART_ASSISTANT_OWNER");
+        assertThat(jwtService.extractProducts(claims)).containsExactly("QR_CREATE", "SMART_ASSISTANT");
+        assertThat(jwtService.extractScopes(claims)).containsExactly("QR_CREATE_OWNER", "SMART_ASSISTANT_OWNER");
         assertThat(claims.get("provider")).isEqualTo("GOOGLE");
         assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_APP);
         assertThat(jwtService.isDashboardPrincipal(claims)).isFalse();
@@ -63,8 +63,31 @@ class JwtServiceTest {
         Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
         assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_DASHBOARD);
         assertThat(jwtService.isDashboardPrincipal(claims)).isTrue();
-        assertThat(claims.get("roles", List.class)).containsExactly("ROLE_ADMIN");
+        assertThat(jwtService.extractRoles(claims)).containsExactly("ROLE_ADMIN");
         assertThat(claims.get("userId")).isEqualTo(7);
+    }
+
+    @Test
+    void generateCustomerAccessToken_whenCustomer_thenIncludeCustomerPrincipalAndRole() {
+        JwtProperties properties = new JwtProperties();
+        properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
+        JwtService jwtService = new JwtService(properties);
+
+        String token = jwtService.generateCustomerAccessToken(
+                "customer@example.com",
+                UUID.randomUUID(),
+                99L,
+                AuthProvider.BASIC
+        );
+
+        Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
+        assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_CUSTOMER);
+        assertThat(jwtService.isCustomerPrincipal(claims)).isTrue();
+        assertThat(jwtService.isDashboardPrincipal(claims)).isFalse();
+        assertThat(jwtService.extractRoles(claims)).containsExactly("ROLE_CUSTOMER");
+        assertThat(claims.get("userId")).isEqualTo(99);
+        assertThat(claims.get("provider")).isEqualTo("BASIC");
+        assertThat(claims.get("typ")).isEqualTo("access");
     }
 
     @Test

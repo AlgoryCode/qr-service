@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillingAddress;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.dto.BillingAddressDtos;
+import com.ael.algoryqrservice.model.dto.BillingAddressPageResponse;
 import com.ael.algoryqrservice.model.enums.BillingAddressType;
 import com.ael.algoryqrservice.repository.BillingAddressRepository;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 import java.util.Optional;
@@ -146,13 +149,13 @@ class BillingAddressServiceTest {
     void list_whenAddressesExist_thenPreserveRepositoryOrder() {
         BillingAddress active = sampleCorporate(2L, 7L, true);
         BillingAddress other = sampleCorporate(1L, 7L, false);
-        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L))
-                .thenReturn(List.of(active, other));
+        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L, PageRequest.of(0, 5)))
+                .thenReturn(new PageImpl<>(List.of(active, other), PageRequest.of(0, 5), 2));
 
-        List<BillingAddressDtos.Response> result = service.list(7L);
+        BillingAddressPageResponse result = service.list(7L, 0, 5);
 
-        assertThat(result).extracting(BillingAddressDtos.Response::id).containsExactly(2L, 1L);
-        assertThat(result.getFirst().defaultAddress()).isTrue();
+        assertThat(result.getContent()).extracting(BillingAddressDtos.Response::id).containsExactly(2L, 1L);
+        assertThat(result.getContent().getFirst().defaultAddress()).isTrue();
     }
 
     @Test

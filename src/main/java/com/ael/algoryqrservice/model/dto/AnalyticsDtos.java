@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -123,6 +124,53 @@ public class AnalyticsDtos {
     ) {
     }
 
+    public record ScoreHistogramBucket(
+            int score,
+            long count
+    ) {
+    }
+
+    public record FeedbackCommentSample(
+            Long productId,
+            String productName,
+            int score,
+            String comment,
+            LocalDateTime createdAt
+    ) {
+    }
+
+    public record RatedProductSummary(
+            Long productId,
+            String name,
+            BigDecimal ratingAvg,
+            long ratingCount
+    ) {
+    }
+
+    public record MenuFeedbackSummary(
+            BigDecimal ratingAvg,
+            long ratingCount,
+            List<ScoreHistogramBucket> scoreHistogram,
+            List<FeedbackCommentSample> sampleComments
+    ) {
+    }
+
+    public record ProductFeedbackSummary(
+            BigDecimal ratingAvg,
+            long ratingCount,
+            List<RatedProductSummary> topRated,
+            List<RatedProductSummary> bottomRated,
+            List<ScoreHistogramBucket> scoreHistogram,
+            List<FeedbackCommentSample> sampleComments
+    ) {
+    }
+
+    public record ReportFeedback(
+            MenuFeedbackSummary menu,
+            ProductFeedbackSummary products
+    ) {
+    }
+
     public record MenuAnalyticsReportResponse(
             Long menuId,
             @NotBlank String menuName,
@@ -136,7 +184,89 @@ public class AnalyticsDtos {
             List<TopCategory> topCategories,
             List<TreemapNode> categoryProductTree,
             List<SampleJourney> sampleJourneys,
-            FunnelCounts funnel
+            FunnelCounts funnel,
+            ReportFeedback feedback
+    ) {
+    }
+
+    public record RevenueKpis(
+            BigDecimal totalRevenue,
+            long orderCount,
+            long itemCount,
+            BigDecimal avgOrderValue,
+            String currency
+    ) {
+    }
+
+    public record DailyRevenuePoint(
+            LocalDate date,
+            BigDecimal revenue,
+            long orderCount
+    ) {
+    }
+
+    public record RevenueProduct(
+            Long productId,
+            String name,
+            long quantity,
+            BigDecimal revenue
+    ) {
+    }
+
+    public record RevenueCategory(
+            Long categoryId,
+            String name,
+            long quantity,
+            BigDecimal revenue
+    ) {
+    }
+
+    public record RevenueSpotlightProduct(
+            Long productId,
+            String name,
+            long quantity,
+            BigDecimal revenue
+    ) {
+    }
+
+    public record RevenueSpotlight(
+            RevenueSpotlightProduct byQuantity,
+            RevenueSpotlightProduct byRevenue,
+            RevenueSpotlightProduct leastSoldByQuantity
+    ) {
+    }
+
+    public record HourlyRevenuePoint(
+            int hour,
+            BigDecimal revenue,
+            long orderCount
+    ) {
+    }
+
+    public record UnsoldProduct(
+            Long productId,
+            String name
+    ) {
+    }
+
+    public record UnsoldCatalog(
+            long count,
+            List<UnsoldProduct> products
+    ) {
+    }
+
+    public record MenuRevenueReportResponse(
+            Long menuId,
+            String menuName,
+            LocalDate from,
+            LocalDate to,
+            RevenueKpis kpis,
+            List<DailyRevenuePoint> daily,
+            List<RevenueProduct> products,
+            List<RevenueCategory> categories,
+            RevenueSpotlight spotlight,
+            List<HourlyRevenuePoint> hourly,
+            UnsoldCatalog unsold
     ) {
     }
 }

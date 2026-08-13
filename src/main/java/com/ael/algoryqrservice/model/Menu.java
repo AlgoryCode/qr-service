@@ -2,10 +2,13 @@ package com.ael.algoryqrservice.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "tbl_menu")
@@ -62,4 +65,12 @@ public class Menu extends QrBaseModel {
 
     @Column(name = "public_access_disabled_reason", length = 64)
     private String publicAccessDisabledReason;
+
+    @Column(name = "rating_avg", nullable = false, precision = 3, scale = 2)
+    @Builder.Default
+    private BigDecimal ratingAvg = BigDecimal.ZERO;
+
+    @Column(name = "rating_count", nullable = false)
+    @Builder.Default
+    private long ratingCount = 0L;
 }

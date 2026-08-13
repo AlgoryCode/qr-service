@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.dto.SessionPageResponse;
 import com.ael.algoryqrservice.model.dto.SessionResponse;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.repository.UserSessionRepository;
+import com.ael.algoryqrservice.security.AccessTokenBlacklistService;
 import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class SessionService {
     private final JwtPropertiesHelper jwtPropertiesHelper;
     private final PackageActivationService packageActivationService;
     private final UserAccessProfileService userAccessProfileService;
+    private final AccessTokenBlacklistService accessTokenBlacklistService;
 
     @Transactional
     public SessionTokens createSession(User user, ClientInfo clientInfo) {
@@ -121,13 +123,10 @@ public class SessionService {
 
     @Transactional
     public void revokeAllActiveSessions(Long userId) {
-        LocalDateTime now = LocalDateTime.now();
         List<UserSession> sessions = sessionRepository.findByUserIdOrderByLoggedInAtDesc(userId);
         for (UserSession session : sessions) {
             if (!session.isRevoked()) {
-                session.setRevoked(true);
-                session.setRevokedAt(now);
-                sessionRepository.save(session);
+                revoke(session);
             }
         }
     }
@@ -197,6 +196,7 @@ public class SessionService {
             session.setRevokedAt(LocalDateTime.now());
             sessionRepository.save(session);
         }
+        accessTokenBlacklistService.blacklist(session.getId(), session.getAccessExpiresAt());
     }
 
     private RefreshTokenParts parseRefreshToken(String refreshToken) {

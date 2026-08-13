@@ -47,6 +47,7 @@ public class MenuService {
 
     public static final int DEFAULT_PRODUCT_PAGE_SIZE = 20;
     public static final int MAX_PRODUCT_PAGE_SIZE = 50;
+    public static final int DEFAULT_CATEGORY_PAGE_SIZE = 6;
     public static final int DEFAULT_RECOMMENDATION_LIMIT = 6;
     public static final int MAX_RECOMMENDATION_LIMIT = 20;
 
@@ -881,16 +882,25 @@ public class MenuService {
                 0,
                 DEFAULT_PRODUCT_PAGE_SIZE
         );
+        TaxonomyDtos.TaxonomyPageResponse categoryPage = menuTaxonomyService.listTaxonomyPage(
+                0,
+                DEFAULT_CATEGORY_PAGE_SIZE,
+                null
+        );
 
         return MenuDtos.PublicMenuResponse.builder()
                 .menu(toMenuProfile(menu, buildPublicUrl(menu), null))
                 .products(productPage.getContent())
-                .categories(menuTaxonomyService.listTaxonomy())
+                .categories(categoryPage.getContent())
                 .themeId(menu.getThemeId())
                 .productPage(productPage.getPage())
                 .productSize(productPage.getSize())
                 .productTotalElements(productPage.getTotalElements())
                 .productHasNext(productPage.isHasNext())
+                .categoryPage(categoryPage.getPage())
+                .categorySize(categoryPage.getSize())
+                .categoryTotalElements(categoryPage.getTotalElements())
+                .categoryHasNext(categoryPage.isHasNext())
                 .build();
     }
 
@@ -1083,6 +1093,8 @@ public class MenuService {
                 .address(menu.getAddress())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
+                .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
+                .ratingCount(menu.getRatingCount())
                 .qr(qrBrief)
                 .build();
     }

@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.enums;
 
 public enum UserRole {
-    USER
+    USER,
+    WAITER
 }

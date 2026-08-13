@@ -31,6 +31,8 @@ public class GoogleOAuthUserService {
         return switch (intent) {
             case LOGIN -> login(identity);
             case REGISTER -> register(identity, clientInfo);
+            case CUSTOMER_LOGIN, CUSTOMER_REGISTER ->
+                    throw new BadRequestException("Geçersiz uygulama Google kimlik doğrulama amacı");
         };
     }
 

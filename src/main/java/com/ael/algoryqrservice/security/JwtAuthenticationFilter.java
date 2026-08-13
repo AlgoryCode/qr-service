@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.security;
 
+import com.ael.algoryqrservice.service.CustomerSessionService;
 import com.ael.algoryqrservice.service.DashboardSessionService;
 import com.ael.algoryqrservice.service.JwtService;
+import com.ael.algoryqrservice.service.MenuWaiterSessionService;
 import com.ael.algoryqrservice.service.SessionService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -26,6 +29,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final SessionService sessionService;
     private final DashboardSessionService dashboardSessionService;
+    private final CustomerSessionService customerSessionService;
+    private final MenuWaiterSessionService menuWaiterSessionService;
+    private final AccessTokenBlacklistService accessTokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -56,27 +62,58 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (jwtService.isDashboardPrincipal(claims)) {
             return dashboardSessionService.isSessionActive(sessionId);
         }
+        if (jwtService.isCustomerPrincipal(claims)) {
+            return customerSessionService.isSessionActive(sessionId);
+        }
+        if (jwtService.isWaiterPrincipal(claims)) {
+            return menuWaiterSessionService.isSessionActive(sessionId);
+        }
+        if (accessTokenBlacklistService.isBlacklisted(sessionId)) {
+            return false;
+        }
         return sessionService.isSessionActive(sessionId);
     }
 
     private void setAuthentication(HttpServletRequest request, Claims claims) {
-        String email = jwtService.extractEmail(claims);
-        if (email == null || email.isBlank()) {
+        String subject = jwtService.extractEmail(claims);
+        if (subject == null || subject.isBlank()) {
             return;
         }
 
+        String principalType = jwtService.extractPrincipalType(claims);
+        List<String> roles = jwtService.extractRoles(claims);
+        List<String> scopes;
+        List<String> products;
+        String activePackage;
+        Long menuId = null;
+        if (JwtService.PRINCIPAL_CUSTOMER.equals(principalType)
+                || JwtService.PRINCIPAL_WAITER.equals(principalType)) {
+            scopes = List.of();
+            products = List.of();
+            activePackage = null;
+            if (JwtService.PRINCIPAL_WAITER.equals(principalType)) {
+                menuId = jwtService.extractMenuId(claims);
+            }
+        } else {
+            scopes = jwtService.extractScopes(claims);
+            products = jwtService.extractProducts(claims);
+            activePackage = jwtService.extractActivePackage(claims);
+        }
+
         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                email,
+                subject,
                 null,
-                jwtService.extractRoles(claims).stream()
+                roles.stream()
                         .map(SimpleGrantedAuthority::new)
                         .toList()
         );
         authToken.setDetails(new JwtAccessPrincipal(
                 jwtService.extractUserId(claims),
-                jwtService.extractScopes(claims),
-                jwtService.extractProducts(claims),
-                jwtService.extractActivePackage(claims)
+                scopes,
+                products,
+                activePackage,
+                principalType,
+                menuId
         ));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }

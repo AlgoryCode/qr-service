@@ -27,6 +27,8 @@ public class JwtService {
     public static final String PRINCIPAL_TYPE_CLAIM = "principalType";
     public static final String PRINCIPAL_APP = "APP";
     public static final String PRINCIPAL_DASHBOARD = "DASHBOARD";
+    public static final String PRINCIPAL_CUSTOMER = "CUSTOMER";
+    public static final String PRINCIPAL_WAITER = "WAITER";
 
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ACCESS_TOKEN_TYPE = "access";
@@ -82,6 +84,50 @@ public class JwtService {
                 .compact();
     }
 
+    public String generateCustomerAccessToken(
+            String email,
+            UUID sessionId,
+            Long customerId,
+            AuthProvider provider
+    ) {
+        Date now = new Date();
+        return Jwts.builder()
+                .id(sessionId.toString())
+                .subject(email)
+                .claim("userId", customerId)
+                .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_CUSTOMER)
+                .claim(ROLES_CLAIM, List.of("ROLE_CUSTOMER"))
+                .claim(PROVIDER_CLAIM, resolveProvider(provider))
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateWaiterAccessToken(
+            String username,
+            UUID sessionId,
+            Long waiterId,
+            Long menuId,
+            Long ownerUserId
+    ) {
+        Date now = new Date();
+        return Jwts.builder()
+                .id(sessionId.toString())
+                .subject(username)
+                .claim("userId", waiterId)
+                .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_WAITER)
+                .claim(ROLES_CLAIM, List.of("ROLE_WAITER"))
+                .claim("menuId", menuId)
+                .claim("ownerUserId", ownerUserId)
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
     public Optional<Claims> parseValidAccessToken(String token) {
         try {
             Claims claims = extractAllClaims(token);
@@ -121,6 +167,37 @@ public class JwtService {
 
     public boolean isDashboardPrincipal(Claims claims) {
         return PRINCIPAL_DASHBOARD.equals(extractPrincipalType(claims));
+    }
+
+    public boolean isCustomerPrincipal(Claims claims) {
+        return PRINCIPAL_CUSTOMER.equals(extractPrincipalType(claims));
+    }
+
+    public boolean isWaiterPrincipal(Claims claims) {
+        return PRINCIPAL_WAITER.equals(extractPrincipalType(claims));
+    }
+
+    public Long extractMenuId(Claims claims) {
+        return extractLongClaim(claims, "menuId");
+    }
+
+    public Long extractOwnerUserId(Claims claims) {
+        return extractLongClaim(claims, "ownerUserId");
+    }
+
+    private Long extractLongClaim(Claims claims, String claimName) {
+        Object value = claims.get(claimName);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private Optional<UUID> extractSessionIdFromClaimsOptional(Claims claims) {

@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.BillingAddressDtos;
+import com.ael.algoryqrservice.model.dto.BillingAddressPageResponse;
 import com.ael.algoryqrservice.model.enums.BillingAddressType;
 import com.ael.algoryqrservice.service.BillingAddressService;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -19,13 +20,21 @@ class BillingAddressControllerTest {
         SecurityUtils securityUtils = mock(SecurityUtils.class);
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
         BillingAddressDtos.Response response = sampleResponse(4L, true);
-        when(service.list(7L)).thenReturn(List.of(response));
+        BillingAddressPageResponse page = BillingAddressPageResponse.builder()
+                .content(List.of(response))
+                .page(0)
+                .size(5)
+                .totalElements(1)
+                .totalPages(1)
+                .hasNext(false)
+                .build();
+        when(service.list(7L, 0, 5)).thenReturn(page);
         BillingAddressController controller = new BillingAddressController(service, securityUtils);
 
-        List<BillingAddressDtos.Response> result = controller.list();
+        BillingAddressPageResponse result = controller.list(0, 5);
 
-        assertThat(result).containsExactly(response);
-        verify(service).list(7L);
+        assertThat(result.getContent()).containsExactly(response);
+        verify(service).list(7L, 0, 5);
     }
 
     @Test

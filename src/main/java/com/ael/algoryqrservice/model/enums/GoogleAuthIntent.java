@@ -6,7 +6,9 @@ import java.util.Locale;
 
 public enum GoogleAuthIntent {
     LOGIN,
-    REGISTER;
+    REGISTER,
+    CUSTOMER_LOGIN,
+    CUSTOMER_REGISTER;
 
     public static GoogleAuthIntent from(String value) {
         if (value == null || value.isBlank()) {
@@ -21,5 +23,9 @@ public enum GoogleAuthIntent {
 
     public String value() {
         return name().toLowerCase(Locale.ROOT);
+    }
+
+    public boolean isCustomer() {
+        return this == CUSTOMER_LOGIN || this == CUSTOMER_REGISTER;
     }
 }

@@ -2,10 +2,12 @@ package com.ael.algoryqrservice.security;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
+import com.ael.algoryqrservice.model.Customer;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.GoogleOidcIdentity;
 import com.ael.algoryqrservice.model.enums.GoogleAuthErrorCode;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
+import com.ael.algoryqrservice.service.CustomerGoogleOAuthUserService;
 import com.ael.algoryqrservice.service.GoogleAuthHandoffService;
 import com.ael.algoryqrservice.service.GoogleAuthRedirectService;
 import com.ael.algoryqrservice.service.GoogleAuthSessionService;
@@ -29,17 +31,20 @@ public class GoogleOidcAuthenticationSuccessHandler implements AuthenticationSuc
 
     private final GoogleAuthSessionService sessionService;
     private final GoogleOAuthUserService googleOAuthUserService;
+    private final CustomerGoogleOAuthUserService customerGoogleOAuthUserService;
     private final GoogleAuthHandoffService handoffService;
     private final GoogleAuthRedirectService redirectService;
 
     public GoogleOidcAuthenticationSuccessHandler(
             GoogleAuthSessionService sessionService,
             GoogleOAuthUserService googleOAuthUserService,
+            CustomerGoogleOAuthUserService customerGoogleOAuthUserService,
             GoogleAuthHandoffService handoffService,
             GoogleAuthRedirectService redirectService
     ) {
         this.sessionService = sessionService;
         this.googleOAuthUserService = googleOAuthUserService;
+        this.customerGoogleOAuthUserService = customerGoogleOAuthUserService;
         this.handoffService = handoffService;
         this.redirectService = redirectService;
     }
@@ -66,8 +71,14 @@ public class GoogleOidcAuthenticationSuccessHandler implements AuthenticationSuc
         try {
             GoogleOidcIdentity identity = GoogleOidcIdentity.from(oidcUser);
             ClientInfo clientInfo = ClientInfo.from(request);
-            User user = googleOAuthUserService.resolve(intent, identity, clientInfo);
-            String ticket = handoffService.issue(user.getId(), intent);
+            String ticket;
+            if (intent.isCustomer()) {
+                Customer customer = customerGoogleOAuthUserService.resolve(intent, identity, clientInfo);
+                ticket = handoffService.issue(customer.getId(), intent);
+            } else {
+                User user = googleOAuthUserService.resolve(intent, identity, clientInfo);
+                ticket = handoffService.issue(user.getId(), intent);
+            }
             redirectService.success(response, intent, ticket);
         } catch (BadRequestException | UnauthorizedException exception) {
             log.warn("Google OAuth başarı akışı tamamlanamadı: {}", exception.getMessage());

@@ -4,8 +4,10 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
+import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.repository.DashboardUserRepository;
+import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import io.jsonwebtoken.Claims;
@@ -27,6 +29,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final DashboardUserRepository dashboardUserRepository;
+    private final MenuWaiterRepository menuWaiterRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final SessionService sessionService;
@@ -89,8 +92,14 @@ public class AuthService {
         if (dashboardUserRepository.existsByEmailIgnoreCase(email)) {
             throw new BadRequestException("Bu hesap dashboard girisi icindir. /dashboard/auth/login kullanin");
         }
+        if (menuWaiterRepository.existsByUsernameIgnoreCase(email)) {
+            throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");
+        }
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
+        if (user.getRole() == UserRole.WAITER) {
+            throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");
+        }
         if (user.getProvider() != AuthProvider.BASIC) {
             throw new BadCredentialsException("Geçersiz kimlik bilgileri");
         }

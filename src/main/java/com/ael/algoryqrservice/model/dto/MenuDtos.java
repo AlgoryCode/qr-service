@@ -1,8 +1,11 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.MenuReservationStatus;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -11,6 +14,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public final class MenuDtos {
@@ -94,6 +98,160 @@ public final class MenuDtos {
         private String comment;
         private BigDecimal ratingAvg;
         private long ratingCount;
+        private Integer userRating;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuRatingRequest {
+        @NotNull
+        @Min(1)
+        @Max(5)
+        private Integer score;
+
+        @Size(max = 500)
+        private String comment;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuRatingResponse {
+        private Long menuId;
+        private BigDecimal ratingAvg;
+        private long ratingCount;
+        private Integer userRating;
+        private Integer score;
+        private String comment;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FeedbackItemResponse {
+        private Long id;
+        private String type;
+        private Long productId;
+        private String productName;
+        private int score;
+        private String comment;
+        private String deviceType;
+        private LocalDateTime createdAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FeedbackPageResponse {
+        private List<FeedbackItemResponse> content;
+        private int page;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean hasNext;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ScoreHistogramBucket {
+        private int score;
+        private long count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FeedbackBucketSummary {
+        private BigDecimal ratingAvg;
+        private long ratingCount;
+        private List<ScoreHistogramBucket> scoreHistogram;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FeedbackSummaryResponse {
+        private Long menuId;
+        private FeedbackBucketSummary menu;
+        private FeedbackBucketSummary products;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReservationCreateRequest {
+        @NotBlank
+        @Size(max = 120)
+        private String customerName;
+
+        @Size(max = 40)
+        private String phone;
+
+        @Email
+        @Size(max = 255)
+        private String email;
+
+        @NotNull
+        @Min(1)
+        @Max(50)
+        private Integer partySize;
+
+        @NotNull
+        private LocalDateTime reservationAt;
+
+        @Size(max = 500)
+        private String note;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReservationUpdateRequest {
+        private MenuReservationStatus status;
+        private LocalDateTime reservationAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReservationResponse {
+        private Long id;
+        private Long menuId;
+        private String customerName;
+        private String phone;
+        private String email;
+        private int partySize;
+        private LocalDateTime reservationAt;
+        private MenuReservationStatus status;
+        private String note;
+        private String deviceType;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReservationPageResponse {
+        private List<ReservationResponse> content;
+        private int page;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean hasNext;
     }
 
     @Data
@@ -157,6 +315,8 @@ public final class MenuDtos {
         private String address;
         private String publicUrl;
         private boolean active;
+        private BigDecimal ratingAvg;
+        private long ratingCount;
         private QrBrief qr;
     }
 
@@ -216,6 +376,10 @@ public final class MenuDtos {
         private int productSize;
         private long productTotalElements;
         private boolean productHasNext;
+        private int categoryPage;
+        private int categorySize;
+        private long categoryTotalElements;
+        private boolean categoryHasNext;
     }
 
     @Data
