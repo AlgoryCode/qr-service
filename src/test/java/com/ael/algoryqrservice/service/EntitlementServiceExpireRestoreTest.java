@@ -3,9 +3,11 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.repository.UserEntitlementRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,10 @@ class EntitlementServiceExpireRestoreTest {
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
     @Mock
+    private MenuRepository menuRepository;
+    @Mock
+    private QrRepository qrRepository;
+    @Mock
     private ObjectProvider<PackageActivationService> packageActivationServiceProvider;
     @Mock
     private PackageActivationService packageActivationService;
@@ -52,6 +58,8 @@ class EntitlementServiceExpireRestoreTest {
                 planPackageRepository,
                 purchaseLogService,
                 menuPublicAccessService,
+                menuRepository,
+                qrRepository,
                 packageActivationServiceProvider
         );
         when(packageActivationServiceProvider.getObject()).thenReturn(packageActivationService);

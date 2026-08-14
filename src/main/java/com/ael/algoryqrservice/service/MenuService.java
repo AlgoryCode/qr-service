@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.catalog.CatalogThemes;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
@@ -63,6 +65,8 @@ public class MenuService {
     private final SecurityUtils securityUtils;
     private final ProductImageStorageService productImageStorageService;
     private final ChefAvatarService chefAvatarService;
+    private final EntitlementService entitlementService;
+    private final MenuQrSoftDeleteService menuQrSoftDeleteService;
 
     @Transactional(readOnly = true)
     public void requireOwnedMenu(Long menuId) {
@@ -73,6 +77,7 @@ public class MenuService {
     public Menu createMenuForQr(Qr qr, QrRequest request) {
         Map<String, Object> details = request.getDetails();
         String themeId = requireNonBlank(stringValue(details.get("themeId")), "themeId zorunludur");
+        requireAllowedTheme(qr.getUserId(), themeId);
         String businessName = requireNonBlank(stringValue(details.get("businessName")), "businessName zorunludur");
 
         Menu menu = Menu.builder()
@@ -98,6 +103,18 @@ public class MenuService {
     private void createProductsFromDetails(Menu menu, Object productsRaw) {
         if (!(productsRaw instanceof List<?> products) || products.isEmpty()) {
             return;
+        }
+        int validProductCount = 0;
+        for (Object item : products) {
+            if (item instanceof Map<?, ?> map) {
+                String name = stringValue(map.get("name"));
+                if (name != null && !name.isBlank()) {
+                    validProductCount++;
+                }
+            }
+        }
+        if (validProductCount > 0) {
+            entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), validProductCount);
         }
         int index = 0;
         for (Object item : products) {
@@ -146,6 +163,7 @@ public class MenuService {
             menuProductRepository.save(product);
             index++;
         }
+        entitlementService.syncMenuProductEntitlements(menu.getUserId());
     }
 
     private java.math.BigDecimal decimalValue(Object value) {
@@ -475,6 +493,7 @@ public class MenuService {
     public MenuDtos.MenuProductResponse createProduct(Long menuId, MenuDtos.MenuProductRequest request) {
         Menu menu = ensureOwnedMenu(menuId);
         validateProductRequest(request);
+        entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), 1);
         nutritionFactsService.validateForCreate(request.getNutrition());
         SubCategory subCategory = menuTaxonomyService.requireSubCategory(request.getSubCategoryId());
         Set<Long> tagIds = normalizeTagIds(request.getTagIds());
@@ -506,7 +525,9 @@ public class MenuService {
                 .nutrition(request.getNutrition())
                 .build();
 
-        return toProductResponse(menuProductRepository.save(product));
+        MenuDtos.MenuProductResponse response = toProductResponse(menuProductRepository.save(product));
+        entitlementService.syncMenuProductEntitlements(menu.getUserId());
+        return response;
     }
 
     @Transactional
@@ -572,10 +593,11 @@ public class MenuService {
     public void deleteProduct(Long productId) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
-        ensureOwnedMenu(product.getMenuId());
+        Menu menu = ensureOwnedMenu(product.getMenuId());
         productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
         product.setDeleted(true);
         menuProductRepository.save(product);
+        entitlementService.syncMenuProductEntitlements(menu.getUserId());
     }
 
     @Transactional
@@ -585,7 +607,9 @@ public class MenuService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
 
         if (request.getThemeId() != null && !request.getThemeId().isBlank()) {
-            menu.setThemeId(request.getThemeId().trim());
+            String themeId = request.getThemeId().trim();
+            requireAllowedTheme(menu.getUserId(), themeId);
+            menu.setThemeId(themeId);
         }
         if (request.getBusinessName() != null && !request.getBusinessName().isBlank()) {
             menu.setBusinessName(request.getBusinessName().trim());
@@ -609,7 +633,16 @@ public class MenuService {
         if (request.getPhone() != null) menu.setPhone(trimToNull(request.getPhone()));
         if (request.getEmail() != null) menu.setEmail(trimToNull(request.getEmail()));
         if (request.getAddress() != null) menu.setAddress(trimToNull(request.getAddress()));
-        if (request.getActive() != null) menu.setActive(request.getActive());
+        if (request.getActive() != null) {
+            boolean nextActive = request.getActive();
+            if (nextActive && !menu.isActive()) {
+                entitlementService.assertMenuActivationAllowed(menu.getUserId());
+            }
+            menu.setActive(nextActive);
+            qr.setActive(nextActive);
+            qrRepository.save(qr);
+            entitlementService.syncMenuEntitlements(menu.getUserId());
+        }
 
         menuRepository.save(menu);
 
@@ -617,6 +650,14 @@ public class MenuService {
         qrGenerationService.updateQrContent(qr, publicUrl);
 
         return toMenuProfile(menu, publicUrl, null);
+    }
+
+    @Transactional
+    public void deleteMenu(Long menuId) {
+        Menu menu = ensureOwnedMenu(menuId);
+        Qr qr = qrRepository.findById(menu.getQrId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
+        menuQrSoftDeleteService.softDeleteMenuQr(qr);
     }
 
     @Transactional
@@ -654,23 +695,26 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuProfileResponse getMenuProfileByQrId(Long qrId) {
-        List<Object[]> rows = menuRepository.findActiveMenuWithQrByQrId(qrId);
-        if (rows.isEmpty()) {
+        Qr qr = qrRepository.findById(qrId)
+                .filter(existing -> !existing.isDeleted())
+                .orElse(null);
+        if (qr == null) {
             return null;
         }
-        Object[] row = rows.getFirst();
-        Menu menu = (Menu) row[0];
-        Qr qr = (Qr) row[1];
-        requireOwnership(menu);
-        return toMenuProfile(
-                menu,
-                buildPublicUrl(menu),
-                MenuDtos.QrBrief.builder()
-                        .id(qr.getQrId())
-                        .name(qr.getQrName())
-                        .imgSrc(qr.getImgSrc())
-                        .build()
-        );
+        return menuRepository.findByQrIdAndDeletedFalse(qrId)
+                .map(menu -> {
+                    requireOwnership(menu);
+                    return toMenuProfile(
+                            menu,
+                            buildPublicUrl(menu),
+                            MenuDtos.QrBrief.builder()
+                                    .id(qr.getQrId())
+                                    .name(qr.getQrName())
+                                    .imgSrc(qr.getImgSrc())
+                                    .build()
+                    );
+                })
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -1150,6 +1194,12 @@ public class MenuService {
             return Integer.parseInt(value.toString().trim());
         } catch (NumberFormatException exception) {
             return null;
+        }
+    }
+
+    private void requireAllowedTheme(Long userId, String themeId) {
+        if (CatalogThemes.isCustomTheme(themeId)) {
+            entitlementService.requireScope(userId, CatalogScopes.CUSTOM_DESIGN_OWNER);
         }
     }
 

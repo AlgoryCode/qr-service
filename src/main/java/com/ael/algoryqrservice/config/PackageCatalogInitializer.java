@@ -14,6 +14,6 @@ public class PackageCatalogInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        packageCatalogService.ensureFreePackage();
+        packageCatalogService.ensureCatalogProducts();
     }
 }

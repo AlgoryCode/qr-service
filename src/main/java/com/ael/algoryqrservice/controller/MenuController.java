@@ -250,6 +250,13 @@ public class MenuController {
         return ResponseEntity.ok(menuService.updateMenu(menuId, request));
     }
 
+    @DeleteMapping("/{menuId}")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<Void> deleteMenu(@PathVariable Long menuId) {
+        menuService.deleteMenu(menuId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{menuId}/products")
     public ResponseEntity<MenuDtos.MenuProductPageResponse> listProducts(
             @PathVariable Long menuId,

@@ -61,6 +61,17 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     boolean existsActiveLiveMenuQrForUser(@Param("userId") Long userId);
 
     @Query("""
+            select count(menu)
+            from Menu menu, Qr qr
+            where menu.userId = :userId
+              and menu.qrId = qr.qrId
+              and menu.active = true
+              and menu.deleted = false
+              and qr.deleted = false
+            """)
+    long countActiveLiveMenusForUser(@Param("userId") Long userId);
+
+    @Query("""
             select distinct menu.userId
             from Menu menu
             where menu.deleted = false

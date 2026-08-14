@@ -106,7 +106,7 @@ public class TrialService {
         }
         if (purchase.getStatus() == PurchaseStatus.ACTIVE && purchase.isExpiredByDate()) {
             entitlementService.expirePurchase(purchase);
-            packageActivationService.ensureFreePackage(userId);
+            packageActivationService.ensureSubscriptionState(userId);
         }
         return statusOf(purchase);
     }

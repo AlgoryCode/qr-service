@@ -263,7 +263,7 @@ public class PurchaseFulfillmentService {
             purchase.setExpiresAt(LocalDateTime.now());
             purchaseRepository.save(purchase);
             entitlementService.synchronizePeriod(purchase);
-            packageActivationService.ensureFreePackage(purchase.getUserId());
+            packageActivationService.ensureSubscriptionState(purchase.getUserId());
             menuPublicAccessService.syncForUser(purchase.getUserId());
             return;
         }
@@ -282,7 +282,7 @@ public class PurchaseFulfillmentService {
         purchaseRepository.save(purchase);
         entitlementService.synchronizePeriod(purchase);
         if (purchase.getStatus() == PurchaseStatus.EXPIRED) {
-            packageActivationService.ensureFreePackage(purchase.getUserId());
+            packageActivationService.ensureSubscriptionState(purchase.getUserId());
         }
         menuPublicAccessService.syncForUser(purchase.getUserId());
     }

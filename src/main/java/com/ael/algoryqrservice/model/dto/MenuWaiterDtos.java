@@ -177,6 +177,10 @@ public final class MenuWaiterDtos {
     @AllArgsConstructor
     public static class CustomerListItem {
         private Long customerId;
+        private Long menuId;
+        private Long businessId;
+        private String menuName;
+        private Boolean menuDeleted;
         private String firstName;
         private String lastName;
         private String email;

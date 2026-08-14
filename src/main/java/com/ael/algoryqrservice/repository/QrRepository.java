@@ -9,4 +9,8 @@ import java.util.List;
 @Repository
 public interface QrRepository extends JpaRepository<Qr,Long> {
     List<Qr> findByUserIdAndDeletedFalseOrderByCreatedAtDesc(Long userId);
+
+    long countByUserIdAndDeletedFalse(Long userId);
+
+    long countByUserIdAndPurchaseIdAndDeletedFalse(Long userId, Long purchaseId);
 }

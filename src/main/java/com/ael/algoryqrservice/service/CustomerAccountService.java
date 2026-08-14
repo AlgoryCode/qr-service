@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Customer;
 import com.ael.algoryqrservice.model.CustomerMembership;
+import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.CustomerAuthDtos;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.MembershipStatus;
@@ -112,12 +113,12 @@ public class CustomerAccountService {
         if (menuId == null) {
             throw new BadRequestException("Menü zorunludur");
         }
-        if (!menuRepository.existsById(menuId)) {
-            throw new NotFoundException("Menü bulunamadı");
-        }
+        Menu menu = menuRepository.findById(menuId)
+                .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
 
         return membershipRepository.findByCustomerIdAndMenuId(customerId, menuId)
                 .map(existing -> {
+                    existing.setBusinessId(menu.getUserId());
                     existing.setStatus(MembershipStatus.ACTIVE);
                     if (existing.getJoinedAt() == null) {
                         existing.setJoinedAt(LocalDateTime.now());
@@ -127,6 +128,7 @@ public class CustomerAccountService {
                 .orElseGet(() -> membershipRepository.save(CustomerMembership.builder()
                         .customerId(customerId)
                         .menuId(menuId)
+                        .businessId(menu.getUserId())
                         .status(MembershipStatus.ACTIVE)
                         .joinedAt(LocalDateTime.now())
                         .build()));
@@ -151,6 +153,7 @@ public class CustomerAccountService {
                 .id(membership.getId())
                 .customerId(membership.getCustomerId())
                 .menuId(membership.getMenuId())
+                .businessId(membership.getBusinessId())
                 .status(membership.getStatus())
                 .joinedAt(membership.getJoinedAt())
                 .build();

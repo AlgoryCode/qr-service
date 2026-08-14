@@ -61,6 +61,16 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
 
     long countByMenuIdAndDeletedFalse(Long menuId);
 
+    @Query("""
+            select count(p)
+            from MenuProduct p
+            join Menu m on p.menuId = m.menuId
+            where m.userId = :userId
+              and p.deleted = false
+              and m.deleted = false
+            """)
+    long countActiveProductsForUser(@Param("userId") Long userId);
+
     boolean existsByMenuIdAndNameIgnoreCaseAndDeletedFalse(Long menuId, String name);
 
     @Query("""

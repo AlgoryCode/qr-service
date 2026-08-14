@@ -65,7 +65,7 @@ public class AuthService {
                 .build();
 
         User saved = userRepository.save(user);
-        packageActivationService.ensureFreePackage(saved.getId());
+        packageActivationService.ensureSubscriptionState(saved.getId());
 
         return RegisterResponse.builder()
                 .message("Kayıt başarılı")
@@ -83,7 +83,7 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
         User user = authenticate(request);
-        packageActivationService.ensureFreePackage(user.getId());
+        packageActivationService.ensureSubscriptionState(user.getId());
         return createAuthResponse(user, clientInfo);
     }
 

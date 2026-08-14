@@ -83,7 +83,7 @@ public class GoogleOAuthUserService {
                 .registrationDevice(clientInfo.device())
                 .registrationDeviceType(clientInfo.deviceType())
                 .build());
-        packageActivationService.ensureFreePackage(user.getId());
+        packageActivationService.ensureSubscriptionState(user.getId());
         return user;
     }
 

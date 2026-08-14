@@ -1,53 +1,29 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.model.PlanPackage;
-import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 public class PackageCatalogService {
 
-    private static final int FREE_QR_CREATE_QUANTITY = 5;
-    private static final int FREE_VALIDITY_DAYS = 36_500;
-    private static final int FREE_PRIORITY = 1;
-
     private final ProductRepository productRepository;
-    private final PlanPackageRepository planPackageRepository;
 
     @Transactional
-    public PlanPackage ensureFreePackage() {
-        Product qrCreate = ensureProduct(
-                CatalogProducts.QR_CREATE,
-                "QR Oluşturma",
-                CatalogScopes.QR_CREATE_OWNER,
-                true
-        );
-        ensureProduct(CatalogProducts.QR_MENU, "QR Menü", CatalogScopes.QR_MENU_OWNER, true);
-        ensureProduct(CatalogProducts.SMART_ASSISTANT, "Akıllı Asistan", CatalogScopes.SMART_ASSISTANT_OWNER, false);
-        ensureProduct(CatalogProducts.SMART_SUMMARY, "Akıllı Özet", CatalogScopes.SMART_SUMMARY_OWNER, false);
-        ensureProduct(CatalogProducts.SMART_REPORTING, "Akıllı Raporlama", CatalogScopes.SMART_REPORTING_OWNER, false);
-
-        return planPackageRepository.findByCode(CatalogPackages.FREE_PACKAGE)
-                .map(existing -> {
-                    if (existing.getFeatures() == null || existing.getFeatures().isEmpty()) {
-                        existing.setFeatures(List.of("5 QR olusturma hakki", "Temel kullanim"));
-                        return planPackageRepository.save(existing);
-                    }
-                    return existing;
-                })
-                .orElseGet(() -> createFreePackage(qrCreate));
+    public void ensureCatalogProducts() {
+        ensureProduct(CatalogProducts.QR_CREATE, "QR Olusturma", CatalogScopes.QR_CREATE_OWNER, true);
+        ensureProduct(CatalogProducts.QR_MENU, "QR Menu", CatalogScopes.QR_MENU_OWNER, true);
+        ensureProduct(CatalogProducts.MENU_PRODUCT, "Menu Urun Hakki", CatalogScopes.MENU_PRODUCT_OWNER, true);
+        ensureProduct(CatalogProducts.SMART_ASSISTANT, "Akilli Asistan", CatalogScopes.SMART_ASSISTANT_OWNER, false);
+        ensureProduct(CatalogProducts.SMART_SUMMARY, "Akilli Ozet", CatalogScopes.SMART_SUMMARY_OWNER, false);
+        ensureProduct(CatalogProducts.SMART_REPORTING, "Akilli Raporlama", CatalogScopes.SMART_REPORTING_OWNER, false);
+        ensureProduct(CatalogProducts.CUSTOM_DESIGN, "Ozel Tasarim Menu", CatalogScopes.CUSTOM_DESIGN_OWNER, false);
+        ensureProduct(CatalogProducts.WAITER_PANEL, "Garson Paneli", CatalogScopes.WAITER_PANEL_OWNER, false);
     }
 
     private Product ensureProduct(String code, String name, String scopeCode, boolean consumable) {
@@ -55,39 +31,11 @@ public class PackageCatalogService {
                 Product.builder()
                         .code(code)
                         .name(name)
-                        .description(name + " ürünü")
+                        .description(name + " urunu")
                         .scopeCode(scopeCode)
                         .consumable(consumable)
                         .active(true)
                         .build()
         ));
-    }
-
-    private PlanPackage createFreePackage(Product qrCreate) {
-        PlanPackage planPackage = PlanPackage.builder()
-                .code(CatalogPackages.FREE_PACKAGE)
-                .name("Free")
-                .description("5 adet QR olusturma hakki")
-                .features(List.of("5 QR olusturma hakki", "Temel kullanim"))
-                .price(BigDecimal.ZERO)
-                .subtotal(BigDecimal.ZERO)
-                .vatAmount(BigDecimal.ZERO)
-                .currency("TRY")
-                .active(true)
-                .validityDays(FREE_VALIDITY_DAYS)
-                .priority(FREE_PRIORITY)
-                .purchasable(false)
-                .systemManaged(true)
-                .trialEligible(false)
-                .build();
-
-        PlanPackageItem item = PlanPackageItem.builder()
-                .planPackage(planPackage)
-                .product(qrCreate)
-                .quantity(FREE_QR_CREATE_QUANTITY)
-                .unlimited(false)
-                .build();
-        planPackage.setItems(List.of(item));
-        return planPackageRepository.save(planPackage);
     }
 }

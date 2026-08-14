@@ -80,6 +80,7 @@ public class UserEntitlement {
         return unlimited || remainingQuantity != null && remainingQuantity > 0;
     }
 
+    /** Tüketilebilir hak (yeni kayıt oluşturma) — kalan miktar gerekir. */
     public boolean isUsable(PurchaseStatus purchaseStatus) {
         return purchaseStatus == PurchaseStatus.ACTIVE
                 && isStartedByDate()
@@ -93,5 +94,14 @@ public class UserEntitlement {
                 && isStartedByDate()
                 && !isExpiredByDate()
                 && hasRemaining();
+    }
+
+    /** Sahiplik / yönetim scope'u — kotası dolmuş olsa bile aktif pakette ürün varsa verilir. */
+    public boolean grantsScope(Purchase purchase) {
+        return purchase != null
+                && purchase.isUsable()
+                && isStartedByDate()
+                && !isExpiredByDate()
+                && (unlimited || (totalQuantity != null && totalQuantity > 0));
     }
 }

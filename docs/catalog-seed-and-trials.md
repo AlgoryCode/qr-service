@@ -29,16 +29,33 @@ Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expires
 
 ## Seed dosyaları
 
-- `src/main/resources/seed/catalog-tiers.json` — ürün + Free / Pro / Ultimate
+- `src/main/resources/seed/catalog-tiers.json` — ürün + Başlangıç / Pro / Ultimate
 - `src/main/resources/seed/catalog-tiers.sql` — opsiyonel manuel SQL
 
-Varsayılan içerik:
+### Ürünler
 
-- **Free**: 5× `QR_CREATE`, fiyat 0, `purchasable=false`, `systemManaged=true`, `trialEligible=false`
-- **Pro**: 30× `QR_CREATE` + `SMART_ASSISTANT` (unlimited), ~249 TRY / 30 gün, `trialEligible=true`, `trialDays=7`
-- **Ultimate**: 100× `QR_CREATE` + `SMART_ASSISTANT` + `SMART_SUMMARY` + `SMART_REPORTING` (unlimited), ~649 TRY / 30 gün, `trialEligible=false`
+| Kod | Açıklama |
+|-----|----------|
+| `QR_CREATE` | QR oluşturma kotası |
+| `QR_MENU` | Dijital menü (yayın, geri bildirim, rezervasyon) |
+| `MENU_PRODUCT` | Menüde tanımlanabilecek ürün sayısı |
+| `WAITER_PANEL` | Garson paneli, masa, sipariş ve müşteri yönetimi (Ultimate) |
+| `SMART_REPORTING` | Ciro takibi ve akıllı raporlar |
+| `SMART_ASSISTANT` | Akıllı asistan (Ultimate) |
+| `SMART_SUMMARY` | Akıllı özet (Ultimate) |
+| `CUSTOM_DESIGN` | Özel tasarım menü (Ultimate) |
 
-Fiyatlar import’ta ürün `unitPrice` + KDV üzerinden hesaplanır; Free/systemManaged 0 zorlanır; Pro/Ultimate için JSON `lockPrice` kullanılabilir.
+### Satılabilir paketler
+
+- **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `trialEligible=true`, `trialDays=7`
+- **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `trialEligible=true`, `trialDays=7`
+- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL` — 999 TRY/ay, yıllık 9215 TRY, `trialEligible=false`
+
+Garson sipariş/adisyon modülü yalnızca Ultimate pakette (`WAITER_PANEL` / `WAITER_PANEL_OWNER`). Başlangıç ve Pro paketlerinde bu özellik yoktur.
+
+`FREE_PACKAGE` ve `CORPORATE_PACKAGE` seed'de `active=false`; yeni kullanıcılara otomatik paket verilmez.
+
+Fiyatlar import'ta ürün `unitPrice` + KDV üzerinden hesaplanır; satılabilir paketler için JSON `lockPrice` / `yearlyPrice` kullanılabilir.
 
 ## Import API
 
@@ -76,7 +93,7 @@ Legacy: `POST /trials/digital-menu-pro` yalnızca `PRO_PACKAGE` (active + trialE
 2. Paket `active && trialEligible` ve geçerli `trialDays`; Free / `systemManaged` hedef olamaz.
 3. Aktif ücretli usable paket varken start → 400.
 4. Start: TRIAL ACTIVE, `expiresAt = now + trialDays`, entitlement grant, diğer ACTIVE → SUPERSEDED.
-5. Bitiş: `expiresAt` sonrası entitlement usable değildir; `expirePurchase` / due expire aynı işlemde Free restore + menu sync yapar.
+5. Bitiş: `expiresAt` sonrası entitlement usable değildir; `expirePurchase` / due expire menü erişimini senkronize eder (Free paket restore edilmez).
 6. Status: TRIAL purchase varken `trialUsed=false` ise `true` backfill edilir.
 
 ### Örnek

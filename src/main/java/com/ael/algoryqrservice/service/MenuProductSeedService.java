@@ -61,10 +61,14 @@ public class MenuProductSeedService {
             throw new BadRequestException("menuId zorunludur");
         }
         Long menuId = document.getMenuId();
-        Menu menu = menuRepository.findById(menuId)
-                .orElseThrow(() -> new BadRequestException("Menü bulunamadı: " + menuId));
+        Menu menu = menuRepository.findById(menuId).orElse(null);
+        if (menu == null) {
+            log.warn("Menu product seed skipped; menu not found: {}", menuId);
+            return 0;
+        }
         if (menu.isDeleted()) {
-            throw new BadRequestException("Silinmiş menüye seed yazılamaz: " + menuId);
+            log.warn("Menu product seed skipped; menu is deleted: {}", menuId);
+            return 0;
         }
         if (onlyIfEmpty && menuProductRepository.countByMenuIdAndDeletedFalse(menuId) > 0) {
             log.info("Menu product seed skipped; menu {} already has products", menuId);

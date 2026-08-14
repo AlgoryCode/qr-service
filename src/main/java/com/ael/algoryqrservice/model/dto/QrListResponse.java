@@ -17,4 +17,10 @@ public class QrListResponse {
     private String imgSrc;
     private Map<String, Object> details;
     private LocalDateTime createdAt;
+    private Long purchaseId;
+    private String packageName;
+    private Boolean legacy;
+    private Boolean activePackage;
+    private Boolean active;
+    private Long menuId;
 }

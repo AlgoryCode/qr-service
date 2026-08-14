@@ -36,10 +36,10 @@ public class PackageExpirationScheduler {
                 LocalDateTime.now()
         );
         entitlementService.expireDuePurchases();
-        packageActivationService.ensureFreeForUsers(
+        packageActivationService.syncSubscriptionStateForUsers(
                 duePurchases.stream().map(Purchase::getUserId).distinct().toList()
         );
-        packageActivationService.restoreFreePackagesAfterPaidExpiry();
+        packageActivationService.syncAfterPaidExpiry();
         menuPublicAccessService.syncForUsers(
                 duePurchases.stream().map(Purchase::getUserId).distinct().toList()
         );

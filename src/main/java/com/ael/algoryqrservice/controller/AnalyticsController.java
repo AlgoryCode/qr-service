@@ -48,7 +48,6 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}/report")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<AnalyticsDtos.MenuAnalyticsReportResponse> getMenuReport(
             @PathVariable Long menuId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -141,7 +140,6 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<AnalyticsDtos.VisitPageResponse> getMenuAnalytics(
             @PathVariable Long menuId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -154,7 +152,6 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}/product/{productId}")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<AnalyticsDtos.VisitPageResponse> getProductAnalytics(
             @PathVariable Long menuId,
             @PathVariable Long productId,

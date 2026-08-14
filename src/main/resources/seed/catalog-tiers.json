@@ -21,6 +21,16 @@
       "active": true
     },
     {
+      "code": "MENU_PRODUCT",
+      "name": "Menu Urun Hakki",
+      "description": "Dijital menude tanimlanabilecek urun sayisi",
+      "scopeCode": "MENU_PRODUCT_OWNER",
+      "unitPrice": 2.00,
+      "vatRate": 20.00,
+      "countable": true,
+      "active": true
+    },
+    {
       "code": "SMART_ASSISTANT",
       "name": "Akilli Asistan",
       "description": "Akilli asistan erisimi",
@@ -49,38 +59,62 @@
       "vatRate": 20.00,
       "countable": false,
       "active": true
+    },
+    {
+      "code": "CUSTOM_DESIGN",
+      "name": "Ozel Tasarim Menu",
+      "description": "Butik marka tasarimi hazirlama hakki",
+      "scopeCode": "CUSTOM_DESIGN_OWNER",
+      "unitPrice": 199.00,
+      "vatRate": 20.00,
+      "countable": false,
+      "active": true
+    },
+    {
+      "code": "WAITER_PANEL",
+      "name": "Garson Paneli",
+      "description": "Garson siparis ve adisyon modulu erisimi",
+      "scopeCode": "WAITER_PANEL_OWNER",
+      "unitPrice": 149.00,
+      "vatRate": 20.00,
+      "countable": false,
+      "active": true
     }
   ],
   "packages": [
     {
-      "code": "FREE_PACKAGE",
-      "name": "Free",
-      "description": "5 adet QR olusturma hakki",
+      "code": "STARTER_PACKAGE",
+      "name": "Baslangic",
+      "description": "Kucuk kafeler ve tatlicilar icin operasyonel giris paketi",
       "features": [
-        "5 QR olusturma hakki",
-        "Temel kullanim"
+        "50 urun hakki",
+        "1 aktif dijital menu",
+        "Standart sablonlar"
       ],
       "currency": "TRY",
-      "validityDays": 36500,
-      "priority": 1,
-      "purchasable": false,
-      "systemManaged": true,
-      "trialEligible": false,
+      "validityDays": 30,
+      "trialDays": 7,
+      "priority": 50,
+      "purchasable": true,
+      "systemManaged": false,
+      "trialEligible": true,
       "active": true,
-      "lockPrice": 0,
+      "lockPrice": 299.00,
+      "yearlyPrice": 2988.00,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 5, "unlimited": false }
+        { "productCode": "QR_CREATE", "quantity": 5, "unlimited": false },
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
+        { "productCode": "MENU_PRODUCT", "quantity": 50, "unlimited": false }
       ]
     },
     {
       "code": "PRO_PACKAGE",
       "name": "Pro",
-      "description": "30 QR olusturma, QR Menu ve Akilli Asistan",
+      "description": "Sinirsiz urun, QR ve menu ile ciro takibi",
       "features": [
-        "30 QR olusturma hakki",
-        "1 QR Menu",
-        "Akilli Asistan",
-        "30 gun gecerlilik"
+        "Sinirsiz urun hakki",
+        "Sinirsiz QR ve dijital menu",
+        "Ciro takibi ve gelir raporlamasi"
       ],
       "currency": "TRY",
       "validityDays": 30,
@@ -90,24 +124,27 @@
       "systemManaged": false,
       "trialEligible": true,
       "active": true,
-      "lockPrice": 249.00,
+      "lockPrice": 599.00,
+      "yearlyPrice": 5643.00,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 30, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
-        { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true }
+        { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": true },
+        { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
+        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true }
       ]
     },
     {
       "code": "ULTIMATE_PACKAGE",
       "name": "Ultimate",
-      "description": "100 QR, QR Menu, Akilli Asistan, Akilli Ozet ve Akilli Raporlama",
+      "description": "Pro ozellikleri, ozel tasarim ve yapay zeka araclari",
       "features": [
-        "100 QR olusturma hakki",
-        "1 QR Menu",
-        "Akilli Asistan",
-        "Akilli Ozet",
-        "Akilli Raporlama",
-        "30 gun gecerlilik"
+        "Sinirsiz urun, QR ve dijital menu",
+        "Garson siparis ve adisyon modulu",
+        "Ciro takibi ve gelismis raporlar",
+        "Haftalik akilli raporlama",
+        "Akilli asistan",
+        "Akilli ozet",
+        "Ozel tasarim menu"
       ],
       "currency": "TRY",
       "validityDays": 30,
@@ -117,14 +154,48 @@
       "systemManaged": false,
       "trialEligible": false,
       "active": true,
-      "lockPrice": 649.00,
+      "lockPrice": 999.00,
+      "yearlyPrice": 9215.00,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 100, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
+        { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": true },
+        { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
+        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true },
         { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true },
         { "productCode": "SMART_SUMMARY", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true }
+        { "productCode": "CUSTOM_DESIGN", "quantity": 1, "unlimited": true },
+        { "productCode": "WAITER_PANEL", "quantity": 1, "unlimited": true }
       ]
+    },
+    {
+      "code": "FREE_PACKAGE",
+      "name": "Free",
+      "description": "Kullanim disi — ucretsiz paket kaldirildi",
+      "features": [],
+      "currency": "TRY",
+      "validityDays": 30,
+      "priority": 1,
+      "purchasable": false,
+      "systemManaged": true,
+      "trialEligible": false,
+      "active": false,
+      "lockPrice": 0,
+      "items": []
+    },
+    {
+      "code": "CORPORATE_PACKAGE",
+      "name": "Kurumsal",
+      "description": "Kullanim disi — kurumsal paket kaldirildi",
+      "features": [],
+      "currency": "TRY",
+      "validityDays": 30,
+      "priority": 300,
+      "purchasable": false,
+      "systemManaged": false,
+      "trialEligible": false,
+      "active": false,
+      "lockPrice": 1299.00,
+      "items": []
     }
   ]
 }

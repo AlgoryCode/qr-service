@@ -58,6 +58,9 @@ public class UserSession {
     @Column(name = "device_type")
     private String deviceType;
 
+    @Column(name = "impersonator_dashboard_user_id")
+    private Long impersonatorDashboardUserId;
+
     public boolean isRefreshExpired() {
         return refreshExpiresAt.isBefore(LocalDateTime.now());
     }

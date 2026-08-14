@@ -16,4 +16,6 @@ public interface CustomerMembershipRepository extends JpaRepository<CustomerMemb
     boolean existsByCustomerIdAndMenuId(Long customerId, Long menuId);
 
     List<CustomerMembership> findByMenuIdAndStatusOrderByJoinedAtDesc(Long menuId, MembershipStatus status);
+
+    List<CustomerMembership> findByBusinessIdAndStatusOrderByJoinedAtDesc(Long businessId, MembershipStatus status);
 }

@@ -29,21 +29,30 @@ Bu dok?man `algoryqr-service` i?inde paket sat?n alma, trial, free paket, ?deme 
 
 | Sabit | De?er | Dosya |
 |-------|--------|--------|
-| `CatalogPackages.FREE_PACKAGE` | Free paket kodu | `catalog/CatalogPackages.java` |
+| `CatalogPackages.STARTER_PACKAGE` | Başlangıç paket kodu | `catalog/CatalogPackages.java` |
+| `CatalogPackages.PRO_PACKAGE` | Pro paket kodu | `catalog/CatalogPackages.java` |
+| `CatalogPackages.ULTIMATE_PACKAGE` | Ultimate paket kodu | `catalog/CatalogPackages.java` |
 | `CatalogProducts.QR_CREATE` | QR olusturma hakki | `catalog/CatalogProducts.java` |
+| `CatalogProducts.QR_MENU` | Dijital menu hakki | `catalog/CatalogProducts.java` |
+| `CatalogProducts.MENU_PRODUCT` | Menu urun hakki | `catalog/CatalogProducts.java` |
 | `CatalogProducts.SMART_ASSISTANT` | Akilli Asistan | `catalog/CatalogProducts.java` |
 | `CatalogProducts.SMART_SUMMARY` | Akilli Ozet | `catalog/CatalogProducts.java` |
 | `CatalogProducts.SMART_REPORTING` | Akilli Raporlama | `catalog/CatalogProducts.java` |
+| `CatalogProducts.CUSTOM_DESIGN` | Ozel tasarim menu | `catalog/CatalogProducts.java` |
+| `CatalogProducts.WAITER_PANEL` | Garson paneli (Ultimate) | `catalog/CatalogProducts.java` |
 | `CatalogScopes.QR_CREATE_OWNER` | Scope: QR create / menu public gate | `catalog/CatalogScopes.java` |
+| `CatalogScopes.QR_MENU_OWNER` | Scope: Dijital menu (feedback, rezervasyon) | `catalog/CatalogScopes.java` |
+| `CatalogScopes.WAITER_PANEL_OWNER` | Scope: Garson paneli, masa, siparis, musteri | `catalog/CatalogScopes.java` |
+| `CatalogScopes.MENU_PRODUCT_OWNER` | Scope: Menu urun limiti | `catalog/CatalogScopes.java` |
 | `CatalogScopes.SMART_ASSISTANT_OWNER` | Scope: Akilli Asistan | `catalog/CatalogScopes.java` |
 | `CatalogScopes.SMART_SUMMARY_OWNER` | Scope: Akilli Ozet | `catalog/CatalogScopes.java` |
 | `CatalogScopes.SMART_REPORTING_OWNER` | Scope: Akilli Raporlama | `catalog/CatalogScopes.java` |
+| `CatalogScopes.CUSTOM_DESIGN_OWNER` | Scope: Ozel tema / tasarim | `catalog/CatalogScopes.java` |
 
-Free paket i?eri?i (`PackageCatalogService.ensureFreePackage`):
+Abonelik durumu (`PackageActivationService.ensureSubscriptionState`):
 
-- Kod: `FREE_PACKAGE`
-- `purchasable=false`, `systemManaged=true`
-- Item: yaln?zca `QR_CREATE` ? **5** (yalnizca QR)
+- Kayıt/giriş/expiry sonrası yalnızca aktif TRIAL/PAID purchase senkronize edilir
+- Free paket otomatik verilmez; paketsiz kullanıcı entitlement almaz
 
 ---
 
@@ -104,11 +113,15 @@ Free paket i?eri?i (`PackageCatalogService.ensureFreePackage`):
 
 | Method | Path | Controller | Not |
 |--------|------|------------|-----|
-| `POST` | `/qr/create` | `QrController` ? `QrService.createQR` | Scope + consume; menu i?in 409 guard |
+| `POST` | `/qr/create` | `QrController` ? `QrService.createQR` | Scope + consume; menu için `QR_MENU` kotası |
 | `PUT` | `/qr/update/{qrId}` | `QrService.updateQr` | Soft-delete + yeniden create |
 | `DELETE` | `/qr/delete/{qrId}` | `QrService.deleteQrByQrId` | QR + ba?l? Menu soft-delete |
 | `GET` | `/menu/public/id/{qrId}` | `MenuController` ? `MenuService.getPublicMenuByQrId` | Public gate |
 | Owner menu CRUD | `/menu/**` | authenticated (product scope yok) | ownership checks in service |
+| Garson paneli (merchant) | `/waiter-panel/**` | `@RequiresProductScope(WAITER_PANEL_OWNER)` | Ultimate paket gerekir |
+| Garson mobil auth | `/waiter/auth/**` | `ROLE_WAITER` | owner'da `WAITER_PANEL_OWNER` olmali |
+| Garson mobil siparis | `/waiter/orders/**` | `ROLE_WAITER` | ayri controller |
+| Public siparis | `/menu/public/**/orders/**` | scope yok | musteri tarafi |
 
 ---
 
@@ -392,6 +405,8 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 - `hasScope(userId, scopeCode)` ? usable entitlement + product.scopeCode e?le?mesi
 - `requireScope` ? yoksa `ForbiddenException`
 - Owner men? API: authenticated (product scope yok; auth yeterli)
+- Garson paneli merchant API (`WaiterPanelController`): class-level `WAITER_PANEL_OWNER` zorunlu; yalnizca Ultimate pakette grant edilir
+- Garson login (`MenuWaiterAuthService.login`): menu sahibinin `WAITER_PANEL_OWNER` scope'u yoksa 403
 
 ---
 
@@ -405,12 +420,13 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 
 1. `entitlementService.requireScope(userId, QR_CREATE_OWNER)`
 2. Tip `MENU` ise:
-   1. `menuRepository.existsActiveLiveMenuQrForUser(userId)`  
-      **ve** `entitlementService.hasUsableQrCreatePackage(userId)`  
-      ? **409 Conflict**: `"Aktif bir dijital men? QR kayd?n?z zaten var"`
-3. `consume(QR_CREATE, 1)`
-4. `QrProviderFactory.get(type, ...).createQr(req)`
-5. Menu tipi i?in `MenuProvider` ? `MenuService.createMenuForQr` ? `MenuPublicAccessService.syncForUser`
+   1. `requireScope(QR_MENU_OWNER)`
+   2. `consume(QR_MENU, 1)` — kalan 0 ise **403 Forbidden**
+   3. `consume(QR_CREATE, 1)`
+3. `QrProviderFactory.get(type, ...).createQr(req)`
+4. Menu tipi için `MenuProvider` → `MenuService.createMenuForQr` → `MenuPublicAccessService.syncForUser`
+
+Menü QR silindiğinde `softDeleteQrAndLinkedMenu` → `release(QR_MENU, 1)` ile slot geri verilir.
 
 ### Aktif canl? menu QR tan?m? (`existsActiveLiveMenuQrForUser`)
 
@@ -424,7 +440,8 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 `QrService.softDeleteQrAndLinkedMenu(qr)`:
 
 - QR `deleted=true`
-- Ba?l? menu: `deleted=true`, `active=false`
+- Bağlı menu: `deleted=true`, `active=false`
+- Menü QR ise: `release(QR_MENU, 1)`
 
 ?a?r?ld??? yerler:
 
@@ -476,8 +493,9 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 
 | Durum | Normal QR | Menu QR | Owner menu API | Public menu |
 |--------|-----------|---------|----------------|-------------|
-| Free ACTIVE (`QR_CREATE` kalan) | Evet | Ilk: evet; ikinci canli: **409** | Evet (auth) | Sync true ise |
-| Trial / Paid ACTIVE + `QR_CREATE` usable | Evet (kota) | Ilk: evet; ikinci canli: **409** | Evet (auth) | Sync true ise |
+| Free ACTIVE (`QR_CREATE` kalan) | Evet | `QR_MENU` yok → scope/consume fail | Evet (auth) | Sync true ise |
+| Trial / Paid ACTIVE + `QR_MENU` kalan > 0 | Evet (kota) | Evet (kota) | Evet (auth) | Sync true ise |
+| Trial / Paid ACTIVE + `QR_MENU` kalan = 0 | Evet (kota) | **403** | Evet (auth) | Sync true ise |
 | Purchase EXPIRED / CANCELLED (ACTIVE yok) | Free kurallari | Hayir | Evet (auth) | Hayir |
 | Installment OVERDUE | Entitlement kalabilir | ? | Evet (auth) | **Hayir** |
 | PENDING purchase | Henuz grant yok | Hayir | Evet (auth) | Hayir |
@@ -515,8 +533,9 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 ### Senaryo 2 ? Trial ba?lat?p men? a?ma
 
 1. `POST /trials` (veya legacy `POST /trials/digital-menu-pro`) → TRIAL ACTIVE + grant (`trialDays`)
-2. `POST /qr/create` type=`menu` → consume `QR_CREATE` → `createMenuForQr` → sync
-3. İkinci menu create → 409 (aktif canlı menu + usable package)
+2. `POST /qr/create` type=`menu` → `consume(QR_MENU, 1)` + `consume(QR_CREATE, 1)` → `createMenuForQr` → sync
+3. Ek menü: `QR_MENU remainingQuantity > 0` olduğu sürece tekrar create edilebilir; kalan 0 ise 403
+4. Menü silinince `release(QR_MENU, 1)` ile slot açılır
 
 ### Senaryo 3 ? ?cretli 3DS
 

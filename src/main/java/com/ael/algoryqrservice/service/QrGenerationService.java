@@ -25,6 +25,7 @@ public class QrGenerationService {
 
         Qr qr = Qr.builder()
                 .userId(request.getUserId())
+                .purchaseId(request.getPurchaseId())
                 .qrName(request.getQrName())
                 .details(objectMapper.valueToTree(request.getDetails()))
                 .imgSrc(base64)

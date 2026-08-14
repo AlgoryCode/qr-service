@@ -1,8 +1,11 @@
 package com.ael.algoryqrservice.controller;
 
+import com.ael.algoryqrservice.model.dto.QrActiveRequest;
+import com.ael.algoryqrservice.model.dto.QrActiveResponse;
 import com.ael.algoryqrservice.model.dto.QrNameRequest;
 import com.ael.algoryqrservice.model.dto.QrNameResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
+import com.ael.algoryqrservice.model.enums.QrListScope;
 import com.ael.algoryqrservice.service.QrService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.google.zxing.WriterException;
@@ -24,9 +27,12 @@ public class QrController {
             @PathVariable Long userId,
             @RequestParam(defaultValue = "false") boolean includeImage,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "ALL") String scope
     ) {
-        return ResponseEntity.ok(qrService.getUserQrs(userId, includeImage, page, size));
+        return ResponseEntity.ok(
+                qrService.getUserQrs(userId, includeImage, page, size, QrListScope.from(scope))
+        );
     }
 
     @PostMapping("/create")
@@ -43,6 +49,14 @@ public class QrController {
     @PatchMapping("/update-name/{qrId}")
     public ResponseEntity<QrNameResponse> updateQrName(@PathVariable Long qrId, @RequestBody QrNameRequest req) {
         return ResponseEntity.ok(qrService.updateQrName(qrId, req));
+    }
+
+    @PatchMapping("/update-active/{qrId}")
+    public ResponseEntity<QrActiveResponse> updateMenuQrActive(
+            @PathVariable Long qrId,
+            @RequestBody QrActiveRequest req
+    ) {
+        return ResponseEntity.ok(qrService.updateMenuQrActive(qrId, req));
     }
 
     @DeleteMapping("/delete/{qrId}")

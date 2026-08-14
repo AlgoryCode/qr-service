@@ -63,6 +63,34 @@ public class JwtService {
                 .compact();
     }
 
+    public String generateImpersonatedAccessToken(
+            String email,
+            UUID sessionId,
+            Long userId,
+            UserRole role,
+            AuthProvider provider,
+            UserAccessProfile accessProfile,
+            Long impersonatorDashboardUserId
+    ) {
+        Date now = new Date();
+        return Jwts.builder()
+                .id(sessionId.toString())
+                .subject(email)
+                .claim("userId", userId)
+                .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_APP)
+                .claim(ROLES_CLAIM, List.of("ROLE_USER"))
+                .claim(PROVIDER_CLAIM, resolveProvider(provider))
+                .claim("activePackage", accessProfile.activePackage())
+                .claim("products", accessProfile.products())
+                .claim("scopes", accessProfile.scopes())
+                .claim("impersonatorUserId", impersonatorDashboardUserId)
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
     public String generateDashboardAccessToken(
             String email,
             UUID sessionId,

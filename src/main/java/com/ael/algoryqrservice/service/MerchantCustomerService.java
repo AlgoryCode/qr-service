@@ -35,10 +35,20 @@ public class MerchantCustomerService {
     @Transactional(readOnly = true)
     public List<MenuWaiterDtos.CustomerListItem> listCustomers(Long menuId) {
         requireOwnedMenu(menuId);
-
         List<CustomerMembership> memberships = customerMembershipRepository
                 .findByMenuIdAndStatusOrderByJoinedAtDesc(menuId, MembershipStatus.ACTIVE);
+        return mapMemberships(memberships);
+    }
 
+    @Transactional(readOnly = true)
+    public List<MenuWaiterDtos.CustomerListItem> listCustomersForCurrentBusiness() {
+        Long businessId = securityUtils.getCurrentUserId();
+        List<CustomerMembership> memberships = customerMembershipRepository
+                .findByBusinessIdAndStatusOrderByJoinedAtDesc(businessId, MembershipStatus.ACTIVE);
+        return mapMemberships(memberships);
+    }
+
+    private List<MenuWaiterDtos.CustomerListItem> mapMemberships(List<CustomerMembership> memberships) {
         if (memberships.isEmpty()) {
             return List.of();
         }
@@ -49,8 +59,17 @@ public class MerchantCustomerService {
                 .distinct()
                 .toList();
 
+        List<Long> menuIds = memberships.stream()
+                .map(CustomerMembership::getMenuId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
         Map<Long, Customer> customersById = customerRepository.findAllById(customerIds).stream()
                 .collect(Collectors.toMap(Customer::getId, Function.identity()));
+
+        Map<Long, Menu> menusById = menuRepository.findAllById(menuIds).stream()
+                .collect(Collectors.toMap(Menu::getMenuId, Function.identity()));
 
         List<MenuWaiterDtos.CustomerListItem> items = new ArrayList<>();
         for (CustomerMembership membership : memberships) {
@@ -58,8 +77,13 @@ public class MerchantCustomerService {
             if (customer == null) {
                 continue;
             }
+            Menu menu = menusById.get(membership.getMenuId());
             items.add(MenuWaiterDtos.CustomerListItem.builder()
                     .customerId(customer.getId())
+                    .menuId(membership.getMenuId())
+                    .businessId(membership.getBusinessId())
+                    .menuName(menu != null ? menu.getBusinessName() : null)
+                    .menuDeleted(menu != null && menu.isDeleted())
                     .firstName(customer.getFirstName())
                     .lastName(customer.getLastName())
                     .email(customer.getEmail())
@@ -72,7 +96,6 @@ public class MerchantCustomerService {
 
     private Menu requireOwnedMenu(Long menuId) {
         Menu menu = menuRepository.findById(menuId)
-                .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
         Long currentUserId = securityUtils.getCurrentUserId();
         if (!currentUserId.equals(menu.getUserId())) {

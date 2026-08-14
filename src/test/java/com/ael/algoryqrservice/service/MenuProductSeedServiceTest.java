@@ -117,6 +117,19 @@ class MenuProductSeedServiceTest {
     }
 
     @Test
+    void seedDocument_whenMenuDeleted_thenSkip() {
+        when(menuRepository.findById(4L)).thenReturn(Optional.of(Menu.builder().menuId(4L).deleted(true).build()));
+
+        int created = service.seedDocument(
+                MenuProductSeedDtos.Document.builder().menuId(4L).products(List.of()).build(),
+                false
+        );
+
+        assertThat(created).isZero();
+        verify(menuProductRepository, never()).save(any());
+    }
+
+    @Test
     void seedDocument_whenOnlyIfEmptyAndHasProducts_thenSkip() {
         when(menuRepository.findById(4L)).thenReturn(Optional.of(Menu.builder().menuId(4L).deleted(false).build()));
         when(menuProductRepository.countByMenuIdAndDeletedFalse(4L)).thenReturn(3L);

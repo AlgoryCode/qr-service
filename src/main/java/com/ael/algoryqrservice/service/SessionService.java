@@ -59,7 +59,7 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        packageActivationService.ensureFreePackage(user.getId());
+        packageActivationService.ensureSubscriptionState(user.getId());
         var accessProfile = userAccessProfileService.resolve(user.getId());
         String accessToken = jwtService.generateAccessToken(
                 user.getEmail(),
@@ -68,6 +68,50 @@ public class SessionService {
                 user.getRole(),
                 user.getProvider(),
                 accessProfile
+        );
+        String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
+
+        return new SessionTokens(session, accessToken, refreshToken, user);
+    }
+
+    @Transactional
+    public SessionTokens createImpersonationSession(
+            User user,
+            Long impersonatorDashboardUserId,
+            ClientInfo clientInfo
+    ) {
+        UUID sessionId = UUID.randomUUID();
+        String rawRefreshToken = UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
+
+        UserSession session = UserSession.builder()
+                .id(sessionId)
+                .userId(user.getId())
+                .refreshTokenHash(passwordEncoder.encode(rawRefreshToken))
+                .loggedInAt(now)
+                .accessExpiresAt(now.plus(jwtPropertiesHelper.getAccessDuration()))
+                .refreshExpiresAt(now.plus(jwtPropertiesHelper.getRefreshDuration()))
+                .lastActivityAt(now)
+                .revoked(false)
+                .ipAddress(clientInfo.ipAddress())
+                .userAgent(clientInfo.userAgent())
+                .device(clientInfo.device())
+                .deviceType(clientInfo.deviceType())
+                .impersonatorDashboardUserId(impersonatorDashboardUserId)
+                .build();
+
+        sessionRepository.save(session);
+
+        packageActivationService.ensureSubscriptionState(user.getId());
+        var accessProfile = userAccessProfileService.resolve(user.getId());
+        String accessToken = jwtService.generateImpersonatedAccessToken(
+                user.getEmail(),
+                sessionId,
+                user.getId(),
+                user.getRole(),
+                user.getProvider(),
+                accessProfile,
+                impersonatorDashboardUserId
         );
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
 
@@ -89,7 +133,7 @@ public class SessionService {
 
         User user = userRepository.findById(session.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
-        packageActivationService.ensureFreePackage(user.getId());
+        packageActivationService.ensureSubscriptionState(user.getId());
 
         String newRawRefreshToken = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();

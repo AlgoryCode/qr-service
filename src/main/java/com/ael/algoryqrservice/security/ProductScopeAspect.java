@@ -18,14 +18,23 @@ public class ProductScopeAspect {
     private final EntitlementService entitlementService;
 
     @Before("@annotation(requiresProductScope)")
-    public void requireScope(RequiresProductScope requiresProductScope) {
+    public void requireScopeOnMethod(RequiresProductScope requiresProductScope) {
+        enforceScope(requiresProductScope.value());
+    }
+
+    @Before("@within(requiresProductScope) && !@annotation(com.ael.algoryqrservice.security.RequiresProductScope)")
+    public void requireScopeOnClass(RequiresProductScope requiresProductScope) {
+        enforceScope(requiresProductScope.value());
+    }
+
+    private void enforceScope(String scopeCode) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null
                 && authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && principal.hasScope(requiresProductScope.value())) {
+                && principal.hasScope(scopeCode)) {
             return;
         }
         Long userId = securityUtils.getCurrentUserId();
-        entitlementService.requireScope(userId, requiresProductScope.value());
+        entitlementService.requireScope(userId, scopeCode);
     }
 }

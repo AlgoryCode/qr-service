@@ -1,0 +1,45 @@
+package com.ael.algoryqrservice.service;
+
+import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.Qr;
+import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.QrRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class MenuQrSoftDeleteService {
+
+    private final QrRepository qrRepository;
+    private final MenuRepository menuRepository;
+    private final EntitlementService entitlementService;
+
+    @Transactional
+    public void softDeleteMenuQr(Qr qr) {
+        if (qr.isDeleted()) {
+            return;
+        }
+
+        qr.setDeleted(true);
+        qrRepository.save(qr);
+
+        menuRepository.findByQrIdAndDeletedFalse(qr.getQrId()).ifPresent(menu -> softDeleteMenu(menu));
+
+        entitlementService.release(qr.getUserId(), CatalogProducts.QR_MENU, 1);
+        if (qr.getPurchaseId() != null
+                && entitlementService.isActivePurchase(qr.getUserId(), qr.getPurchaseId())) {
+            entitlementService.release(qr.getUserId(), CatalogProducts.QR_CREATE, 1);
+        }
+        entitlementService.syncMenuEntitlements(qr.getUserId());
+    }
+
+    private void softDeleteMenu(Menu menu) {
+        if (!menu.isDeleted()) {
+            menu.setDeleted(true);
+            menuRepository.save(menu);
+        }
+    }
+}

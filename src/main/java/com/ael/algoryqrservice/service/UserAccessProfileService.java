@@ -50,7 +50,7 @@ public class UserAccessProfileService {
     @Transactional
     public UserAccessProfile resolve(Long userId) {
         entitlementService.expireDuePurchasesForUser(userId);
-        packageActivationService.ensureFreePackage(userId);
+        packageActivationService.ensureSubscriptionState(userId);
         entitlementService.repairUsablePackageEntitlements(userId);
 
         List<Purchase> usablePurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
@@ -77,7 +77,7 @@ public class UserAccessProfileService {
                 .collect(Collectors.toMap(Purchase::getId, Function.identity(), (left, right) -> left));
 
         List<UserEntitlement> usableEntitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(entitlement -> isUsable(entitlement, usableById))
+                .filter(entitlement -> grantsScope(entitlement, usableById))
                 .toList();
 
         List<String> products = usableEntitlements.stream()
@@ -101,8 +101,8 @@ public class UserAccessProfileService {
         return new UserAccessProfile(activePurchase.getPackageCode(), products, scopes);
     }
 
-    private boolean isUsable(UserEntitlement entitlement, Map<Long, Purchase> usableById) {
+    private boolean grantsScope(UserEntitlement entitlement, Map<Long, Purchase> usableById) {
         Purchase purchase = usableById.get(entitlement.getPurchaseId());
-        return purchase != null && entitlement.isUsable(purchase);
+        return purchase != null && entitlement.grantsScope(purchase);
     }
 }

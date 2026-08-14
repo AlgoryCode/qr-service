@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
         @UniqueConstraint(columnNames = {"customer_id", "menu_id"})
 }, indexes = {
         @Index(name = "idx_customer_membership_menu_id", columnList = "menu_id"),
-        @Index(name = "idx_customer_membership_customer_id", columnList = "customer_id")
+        @Index(name = "idx_customer_membership_customer_id", columnList = "customer_id"),
+        @Index(name = "idx_customer_membership_business_id", columnList = "business_id")
 })
 @Getter
 @Setter
@@ -32,6 +33,9 @@ public class CustomerMembership {
 
     @Column(name = "menu_id", nullable = false)
     private Long menuId;
+
+    @Column(name = "business_id", nullable = false)
+    private Long businessId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

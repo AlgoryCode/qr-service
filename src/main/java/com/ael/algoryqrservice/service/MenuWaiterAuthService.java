@@ -1,6 +1,8 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.dto.LogoutRequest;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
@@ -23,6 +25,7 @@ public class MenuWaiterAuthService {
     private final MenuWaiterSessionService menuWaiterSessionService;
     private final JwtService jwtService;
     private final SecurityUtils securityUtils;
+    private final EntitlementService entitlementService;
 
     @Transactional
     public MenuWaiterDtos.WaiterAuthResponse login(
@@ -89,6 +92,9 @@ public class MenuWaiterAuthService {
         if (waiter.getPasswordHash() == null
                 || !passwordEncoder.matches(request.getPassword(), waiter.getPasswordHash())) {
             throw new BadCredentialsException("Geçersiz kimlik bilgileri");
+        }
+        if (!entitlementService.hasScope(waiter.getOwnerUserId(), CatalogScopes.WAITER_PANEL_OWNER)) {
+            throw new ForbiddenException("Garson paneli için uygun paket gerekli");
         }
         return waiter;
     }

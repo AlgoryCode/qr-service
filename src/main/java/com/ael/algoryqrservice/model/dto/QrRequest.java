@@ -15,6 +15,8 @@ import java.util.Map;
 public class QrRequest {
     private Long userId;
 
+    private Long purchaseId;
+
     private String qrName;
 
     private String type;

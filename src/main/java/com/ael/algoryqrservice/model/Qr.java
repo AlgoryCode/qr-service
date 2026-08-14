@@ -24,6 +24,9 @@ public class Qr extends QrBaseModel {
 
     private Long userId;
 
+    @Column(name = "purchase_id")
+    private Long purchaseId;
+
     private String qrName;
 
 
@@ -38,5 +41,8 @@ public class Qr extends QrBaseModel {
     @Column(columnDefinition = "jsonb")
     private JsonNode details;
 
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private boolean active = true;
 
 }

@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
@@ -38,6 +39,8 @@ class EntitlementServiceHasUsableQrCreatePackageTest {
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
     @Mock
+    private MenuRepository menuRepository;
+    @Mock
     private org.springframework.beans.factory.ObjectProvider<PackageActivationService> packageActivationService;
 
     @InjectMocks
@@ -63,7 +66,7 @@ class EntitlementServiceHasUsableQrCreatePackageTest {
                 .expiresAt(LocalDateTime.now().plusDays(10))
                 .build();
 
-        when(purchaseRepository.findByStatusAndExpiresAtBefore(eq(PurchaseStatus.ACTIVE), any()))
+        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(eq(userId), eq(PurchaseStatus.ACTIVE), any()))
                 .thenReturn(List.of());
         when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(entitlement));
         when(purchaseRepository.findAllById(List.of(10L))).thenReturn(List.of(purchase));
@@ -91,7 +94,7 @@ class EntitlementServiceHasUsableQrCreatePackageTest {
                 .expiresAt(LocalDateTime.now().minusDays(1))
                 .build();
 
-        when(purchaseRepository.findByStatusAndExpiresAtBefore(eq(PurchaseStatus.ACTIVE), any()))
+        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(eq(userId), eq(PurchaseStatus.ACTIVE), any()))
                 .thenReturn(List.of());
         when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(entitlement));
         when(purchaseRepository.findAllById(List.of(10L))).thenReturn(List.of(purchase));

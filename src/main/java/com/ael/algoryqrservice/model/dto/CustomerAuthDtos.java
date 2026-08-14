@@ -137,6 +137,7 @@ public final class CustomerAuthDtos {
         private Long id;
         private Long customerId;
         private Long menuId;
+        private Long businessId;
         private MembershipStatus status;
         private LocalDateTime joinedAt;
     }

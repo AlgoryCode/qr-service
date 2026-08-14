@@ -715,7 +715,7 @@ public class PurchaseService {
         }
 
         entitlementService.expirePurchase(purchase);
-        packageActivationService.ensureFreePackage(purchase.getUserId());
+        packageActivationService.ensureSubscriptionState(purchase.getUserId());
         menuPublicAccessService.syncForUser(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
@@ -1090,7 +1090,7 @@ public class PurchaseService {
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
         planChangeService.cancelScheduledForUser(userId);
-        packageActivationService.ensureFreePackage(userId);
+        packageActivationService.ensureSubscriptionState(userId);
         menuPublicAccessService.syncForUser(userId);
 
         String detail = purchase.getPackageName() + " paketi kullanıcı tarafından iptal edildi";
