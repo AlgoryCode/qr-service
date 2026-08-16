@@ -519,12 +519,15 @@ public class EntitlementService {
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
         int remaining = 0;
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU) || entitlement.isUnlimited()) {
+            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU)) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
             if (purchase == null || !entitlement.isUsable(purchase)) {
                 continue;
+            }
+            if (entitlement.isUnlimited()) {
+                return Integer.MAX_VALUE;
             }
             remaining += Math.max(0, entitlement.getRemainingQuantity());
         }
@@ -646,12 +649,15 @@ public class EntitlementService {
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
         int remaining = 0;
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.MENU_PRODUCT) || entitlement.isUnlimited()) {
+            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.MENU_PRODUCT)) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
             if (purchase == null || !entitlement.isUsable(purchase)) {
                 continue;
+            }
+            if (entitlement.isUnlimited()) {
+                return Integer.MAX_VALUE;
             }
             remaining += Math.max(0, entitlement.getRemainingQuantity());
         }
