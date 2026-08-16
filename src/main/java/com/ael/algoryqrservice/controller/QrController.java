@@ -65,5 +65,11 @@ public class QrController {
         return ResponseEntity.ok("Deleted Success");
     }
 
+    @DeleteMapping("/delete-menu/{qrId}")
+    public ResponseEntity<String> deleteMenuQr(@PathVariable Long qrId) {
+        qrService.softDeleteMenuQr(qrId);
+        return ResponseEntity.ok("Deleted Success");
+    }
+
 
 }

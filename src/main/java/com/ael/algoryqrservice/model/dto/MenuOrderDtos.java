@@ -103,11 +103,14 @@ public final class MenuOrderDtos {
         private Long waiterId;
         private String waiterName;
         private String waiterNote;
+        private Long billId;
+        private BigDecimal commissionAmount;
         private List<OrderItemResponse> items;
         private LocalDateTime submittedAt;
         private LocalDateTime confirmedAt;
         private LocalDateTime rejectedAt;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        private CampaignDtos.OrderCampaignSummary campaignSummary;
     }
 }

@@ -72,7 +72,7 @@ class QrServiceTest {
     private QrService qrService;
 
     @Test
-    void getUserQrs_whenMenuIsPassive_thenStillListedWithInactiveFlag() {
+    void getUserQrs_whenMenuQrExists_thenExcludedFromList() {
         Long userId = 7L;
         Qr activeMenuQr = qr(1L, userId, "menu", Map.of("themeId", "classic", "businessName", "Aktif"));
         activeMenuQr.setActive(true);
@@ -90,11 +90,9 @@ class QrServiceTest {
 
         assertThat(response.getContent())
                 .extracting(QrListResponse::getQrId)
-                .containsExactly(activeMenuQr.getQrId(), passiveMenuQr.getQrId(), linkQr.getQrId());
-        assertThat(response.getContent().get(0).getActive()).isTrue();
-        assertThat(response.getContent().get(1).getActive()).isFalse();
-        assertThat(response.getContent().get(2).getActive()).isTrue();
-        assertThat(response.getTotalElements()).isEqualTo(3);
+                .containsExactly(linkQr.getQrId());
+        assertThat(response.getContent().getFirst().getActive()).isTrue();
+        assertThat(response.getTotalElements()).isEqualTo(1);
     }
 
     @Test
@@ -235,11 +233,12 @@ class QrServiceTest {
 
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_CREATE, 1);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_MENU, 1);
+        verify(entitlementService, never()).syncQrCreateEntitlements(userId);
         verify(qrRepository, never()).save(any(Qr.class));
     }
 
     @Test
-    void deleteQrByQrId_whenActivePackageLinkQr_thenReleaseQrCreateEntitlement() {
+    void deleteQrByQrId_whenActivePackageLinkQr_thenSyncQrCreateEntitlements() {
         Long userId = 7L;
         Qr existing = qr(6L, userId, "link", Map.of("url", "https://example.com"));
         existing.setPurchaseId(10L);
@@ -248,16 +247,16 @@ class QrServiceTest {
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(userId).build());
         when(qrRepository.save(any(Qr.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuRepository.findByQrIdAndDeletedFalse(6L)).thenReturn(Optional.empty());
-        when(entitlementService.isActivePurchase(userId, 10L)).thenReturn(true);
 
         qrService.deleteQrByQrId(6L);
 
-        verify(entitlementService).release(userId, CatalogProducts.QR_CREATE, 1);
+        verify(entitlementService).syncQrCreateEntitlements(userId);
+        verify(entitlementService, never()).release(userId, CatalogProducts.QR_CREATE, 1);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_MENU, 1);
     }
 
     @Test
-    void deleteQrByQrId_whenLegacyPackageQr_thenDoesNotReleaseQrCreateEntitlement() {
+    void deleteQrByQrId_whenLegacyPackageQr_thenSyncQrCreateEntitlements() {
         Long userId = 7L;
         Qr existing = qr(8L, userId, "link", Map.of("url", "https://legacy.example.com"));
         existing.setPurchaseId(99L);
@@ -266,10 +265,10 @@ class QrServiceTest {
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(userId).build());
         when(qrRepository.save(any(Qr.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuRepository.findByQrIdAndDeletedFalse(8L)).thenReturn(Optional.empty());
-        when(entitlementService.isActivePurchase(userId, 99L)).thenReturn(false);
 
         qrService.deleteQrByQrId(8L);
 
+        verify(entitlementService).syncQrCreateEntitlements(userId);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_CREATE, 1);
     }
 

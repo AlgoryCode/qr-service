@@ -29,11 +29,8 @@ public class MenuQrSoftDeleteService {
         menuRepository.findByQrIdAndDeletedFalse(qr.getQrId()).ifPresent(menu -> softDeleteMenu(menu));
 
         entitlementService.release(qr.getUserId(), CatalogProducts.QR_MENU, 1);
-        if (qr.getPurchaseId() != null
-                && entitlementService.isActivePurchase(qr.getUserId(), qr.getPurchaseId())) {
-            entitlementService.release(qr.getUserId(), CatalogProducts.QR_CREATE, 1);
-        }
         entitlementService.syncMenuEntitlements(qr.getUserId());
+        entitlementService.syncQrCreateEntitlements(qr.getUserId());
     }
 
     private void softDeleteMenu(Menu menu) {

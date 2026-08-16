@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
@@ -34,18 +35,19 @@ public class TrialService {
     private final UserRepository userRepository;
     private final EntitlementService entitlementService;
     private final PackageActivationService packageActivationService;
+    private final UserTrialService userTrialService;
 
     @Transactional
     public TrialDtos.Status start(Long userId, Long packageId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadRequestException("Kullanici bulunamadi"));
-        if (user.isTrialUsed() || purchaseRepository.existsByUserIdAndPurchaseType(userId, PurchaseType.TRIAL)) {
+        if (userTrialService.hasUsedTrial(user) || userTrialService.hasTrialPurchase(userId)) {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         rejectIfHasUsablePaidPackage(userId);
 
         PlanPackage planPackage = resolveTrialPackage(packageId);
-        LocalDateTime startsAt = LocalDateTime.now();
+        LocalDateTime startsAt = AppTime.nowLocal();
         Purchase purchase;
         try {
             purchase = purchaseRepository.saveAndFlush(Purchase.builder()
@@ -64,8 +66,6 @@ public class TrialService {
         } catch (DataIntegrityViolationException exception) {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
-        user.setTrialUsed(true);
-        userRepository.save(user);
         packageActivationService.activatePurchasedPackage(purchase);
         for (PlanPackageItem item : planPackage.getItems()) {
             entitlementService.grant(
@@ -81,9 +81,10 @@ public class TrialService {
 
     @Transactional
     public TrialDtos.Status startDigitalMenuPro(Long userId) {
-        PlanPackage planPackage = packageRepository.findByCode(CatalogPackages.PRO_PACKAGE)
+        PlanPackage planPackage = packageRepository
+                .findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc()
                 .flatMap(existing -> packageRepository.findByIdWithItems(existing.getId()))
-                .filter(pkg -> pkg.isActive() && pkg.isTrialEligible() && !pkg.isSystemManaged())
+                .filter(pkg -> !pkg.isSystemManaged())
                 .orElseThrow(() -> new BadRequestException("Deneme icin uygun paket bulunamadi"));
         return start(userId, planPackage.getId());
     }
@@ -95,18 +96,20 @@ public class TrialService {
                 .findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(userId, PurchaseType.TRIAL)
                 .orElse(null);
         if (purchase == null) {
-            if (user != null && user.isTrialUsed()) {
-                return usedUnavailableStatus();
+            if (user != null && userTrialService.hasUsedTrial(user)) {
+                return usedUnavailableStatus(user);
             }
             return availableStatus();
-        }
-        if (user != null && !user.isTrialUsed()) {
-            user.setTrialUsed(true);
-            userRepository.save(user);
         }
         if (purchase.getStatus() == PurchaseStatus.ACTIVE && purchase.isExpiredByDate()) {
             entitlementService.expirePurchase(purchase);
             packageActivationService.ensureSubscriptionState(userId);
+            user = userRepository.findById(userId).orElse(user);
+            return usedUnavailableStatus(user);
+        }
+        if (purchase.getStatus() != PurchaseStatus.ACTIVE) {
+            user = userRepository.findById(userId).orElse(user);
+            return usedUnavailableStatus(user);
         }
         return statusOf(purchase);
     }
@@ -176,12 +179,12 @@ public class TrialService {
         );
     }
 
-    private TrialDtos.Status usedUnavailableStatus() {
+    private TrialDtos.Status usedUnavailableStatus(User user) {
         return new TrialDtos.Status(
                 TrialDtos.Lifecycle.TRIAL_EXPIRED,
                 null,
                 null,
-                null,
+                user != null ? user.getTrialEndDate() : null,
                 null,
                 null,
                 null,
@@ -199,7 +202,7 @@ public class TrialService {
         Integer daysUntilExpiry = null;
         if (purchase.getExpiresAt() != null && lifecycle == TrialDtos.Lifecycle.ACTIVE) {
             daysUntilExpiry = (int) ChronoUnit.DAYS.between(
-                    LocalDateTime.now().toLocalDate(),
+                    AppTime.nowLocal().toLocalDate(),
                     purchase.getExpiresAt().toLocalDate()
             );
             if (daysUntilExpiry < 0) {

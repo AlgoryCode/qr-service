@@ -45,6 +45,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> {})
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 .exceptionHandling(ex -> ex
@@ -64,6 +65,7 @@ public class SecurityConfig {
                         .requestMatchers(GoogleOAuthPaths.LEGACY_CALLBACK).permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/menu/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/campaign/claim").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/taxonomy", "/menu/taxonomy/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/tags").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/allergens").permitAll()
@@ -74,6 +76,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/events").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/analytics/site/visit").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

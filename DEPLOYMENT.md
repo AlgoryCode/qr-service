@@ -9,6 +9,7 @@
 | `GOOGLE_CLIENT_SECRET` | `GOCSPX-...` | Google OAuth client secret |
 | `GOOGLE_CALLBACK_URL` | `https://prod.qrapi.algorycode.com/google-auth/callback` | API OAuth callback (Google authorized redirect URI). Must be `/google-auth/callback`, never `/auth/google/callback` or the Next.js URL. |
 | `GOOGLE_FRONTEND_CALLBACK_URL` | `https://qr.algorycode.com/api/auth/google/callback` | Next.js handoff callback after Google login. Must include `/api/auth/google/callback`. |
+| `CORS_ALLOWED_ORIGINS` | `https://prod.adminqr.algorycode.com,https://qr.algorycode.com` | Comma-separated browser origins allowed to call the API directly (admin dashboard, web app). Required when the frontend uses an absolute API URL instead of a same-origin `/api` proxy. |
 | `PAYMENT_SERVICE_URL` | `http://payment-service:8080` | Internal payment-service URL |
 | `RABBITMQ_HOST` | `rabbitmq` | RabbitMQ hostname |
 | `RABBITMQ_PORT` | `5672` | RabbitMQ port |
@@ -179,4 +180,24 @@ WHERE email = 'admin@example.com';
 ```
 
 qr-dashboard-ui yalnızca `/dashboard/auth/*` kullanır. `/auth/login` ve `/account/myprofile` müşteri uygulamasınadır.
+
+## admin-qr-dashboard (prod.adminqr.algorycode.com)
+
+Tarayıcıdan doğrudan `https://prod.qrapi.algorycode.com` çağrılırsa CORS gerekir. Önerilen kurulum: same-origin proxy.
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `API_BASE_URL` | `/api` | Build-time. Relative path → tarayıcı same-origin istek atar, CORS gerekmez. |
+| `API_PROXY_TARGET` | `https://prod.qrapi.algorycode.com` | Build-time. Next.js rewrite hedefi (qr-service). |
+
+Docker build:
+
+```bash
+docker build \
+  --build-arg API_BASE_URL=/api \
+  --build-arg API_PROXY_TARGET=https://prod.qrapi.algorycode.com \
+  -t admin-qr-dashboard .
+```
+
+Alternatif (mutlak API URL kullanılıyorsa): qr-service'e `CORS_ALLOWED_ORIGINS=https://prod.adminqr.algorycode.com` ekleyin ve redeploy edin.
 

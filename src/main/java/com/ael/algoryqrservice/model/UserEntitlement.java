@@ -7,6 +7,8 @@ import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.ael.algoryqrservice.util.AppTime;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -69,11 +71,11 @@ public class UserEntitlement {
     private LocalDateTime updatedAt;
 
     public boolean isStartedByDate() {
-        return startsAt == null || !startsAt.isAfter(LocalDateTime.now());
+        return startsAt == null || !startsAt.isAfter(AppTime.nowLocal());
     }
 
     public boolean isExpiredByDate() {
-        return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
+        return expiresAt != null && expiresAt.isBefore(AppTime.nowLocal());
     }
 
     public boolean hasRemaining() {

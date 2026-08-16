@@ -1,16 +1,19 @@
 package com.ael.algoryqrservice.controller.admin;
 
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
+import com.ael.algoryqrservice.service.AdminTrialService;
 import com.ael.algoryqrservice.service.AdminUserService;
 import com.ael.algoryqrservice.util.ClientInfo;
 import com.ael.algoryqrservice.util.DashboardSecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
+    private final AdminTrialService adminTrialService;
     private final DashboardSecurityUtils dashboardSecurityUtils;
 
     @GetMapping
@@ -48,5 +52,13 @@ public class AdminUserController {
                 dashboardSecurityUtils.getCurrentDashboardUser(),
                 ClientInfo.from(httpRequest)
         ));
+    }
+
+    @PostMapping("/{id}/trial/extend")
+    public ResponseEntity<AdminUserDtos.ExtendTrialResponse> extendTrial(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminUserDtos.ExtendTrialRequest request
+    ) {
+        return ResponseEntity.ok(adminTrialService.extendTrial(id, request.getDays()));
     }
 }

@@ -8,13 +8,16 @@ import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.SubCategory;
+import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
+import com.ael.algoryqrservice.service.campaign.CampaignEvaluationService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,6 +47,10 @@ public class MenuWaiterOrderService {
     private final MenuProductRepository menuProductRepository;
     private final MenuOrderService menuOrderService;
     private final MenuTaxonomyService menuTaxonomyService;
+    private final TableBillService tableBillService;
+    private final WaiterCommissionService waiterCommissionService;
+    private final UserAccountingService userAccountingService;
+    private final CampaignEvaluationService campaignEvaluationService;
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
@@ -68,6 +75,8 @@ public class MenuWaiterOrderService {
         Map<Long, List<MenuOrder>> pendingByTable = pendingOrders.stream()
                 .collect(Collectors.groupingBy(MenuOrder::getTableId));
 
+        Map<Long, TableBill> openBillsByTable = tableBillService.findOpenBillsByMenuId(waiter.getMenuId());
+
         return tables.stream()
                 .map(table -> {
                     List<MenuOrder> tablePending = pendingByTable.getOrDefault(table.getId(), List.of());
@@ -77,6 +86,12 @@ public class MenuWaiterOrderService {
                                     Comparator.nullsLast(Comparator.naturalOrder())
                             ))
                             .orElse(null);
+
+                    TableBill openBill = openBillsByTable.get(table.getId());
+                    TableBillStatus billStatus = openBill != null
+                            ? TableBillStatus.OPEN
+                            : TableBillStatus.EMPTY;
+
                     return MenuWaiterDtos.TableOrderSummary.builder()
                             .tableId(table.getId())
                             .tableName(table.getName())
@@ -87,6 +102,12 @@ public class MenuWaiterOrderService {
                             .latestPendingStatus(latest != null ? latest.getStatus() : null)
                             .latestPendingTotal(latest != null ? latest.getTotalAmount() : null)
                             .latestPendingSubmittedAt(latest != null ? latest.getSubmittedAt() : null)
+                            .billStatus(billStatus)
+                            .openBillId(openBill != null ? openBill.getId() : null)
+                            .openBillTotal(openBill != null ? openBill.getTotalAmount() : null)
+                            .openBillItemCount(openBill != null && openBill.getItems() != null
+                                    ? openBill.getItems().size()
+                                    : 0)
                             .build();
                 })
                 .toList();
@@ -122,7 +143,16 @@ public class MenuWaiterOrderService {
         order.setConfirmedAt(LocalDateTime.now());
         order.setWaiterId(waiter.getId());
         order.setUpdatedAt(LocalDateTime.now());
-        return menuOrderService.toOrderResponse(menuOrderRepository.save(order));
+
+        TableBill bill = tableBillService.getOrOpenBill(waiter.getMenuId(), order.getTableId(), waiter.getId());
+        order.setBillId(bill.getId());
+        MenuOrder saved = menuOrderRepository.save(order);
+        tableBillService.addItemsFromOrder(bill, saved, waiter.getId());
+        waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
+        menuOrderRepository.save(saved);
+        userAccountingService.recordConfirmedOrderIncome(saved);
+        campaignEvaluationService.onOrderConfirmed(saved);
+        return menuOrderService.toOrderResponse(saved);
     }
 
     @Transactional
@@ -181,6 +211,9 @@ public class MenuWaiterOrderService {
 
         return MenuWaiterDtos.CatalogResponse.builder()
                 .products(products)
+                .commissionEnabled(waiter.isCommissionEnabled())
+                .commissionType(waiter.getCommissionType())
+                .commissionValue(waiter.getCommissionValue())
                 .build();
     }
 
@@ -248,6 +281,7 @@ public class MenuWaiterOrderService {
     ) {
         SubCategory sub = product.getSubCategoryId() == null ? null : subMap.get(product.getSubCategoryId());
         MainCategory main = sub == null ? null : mainMap.get(sub.getMainCategoryId());
+        boolean commissionEligible = waiterCommissionService.isCommissionEligible(product, subMap);
         return MenuWaiterDtos.CatalogProduct.builder()
                 .productId(product.getProductId())
                 .name(product.getName())
@@ -257,9 +291,11 @@ public class MenuWaiterOrderService {
                 .imageUrl(product.getImageUrl())
                 .available(product.isAvailable())
                 .subCategoryId(product.getSubCategoryId())
+                .subCategorySlug(sub == null ? null : sub.getSlug())
                 .subCategoryName(sub == null ? null : sub.getName())
                 .mainCategoryId(main == null ? null : main.getId())
                 .mainCategoryName(main == null ? null : main.getName())
+                .commissionEligible(commissionEligible)
                 .build();
     }
 

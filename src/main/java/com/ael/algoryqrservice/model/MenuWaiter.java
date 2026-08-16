@@ -1,9 +1,11 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -45,6 +47,18 @@ public class MenuWaiter {
     @ColumnDefault("true")
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "commission_enabled", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean commissionEnabled = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "commission_type", length = 10)
+    private WaiterCommissionType commissionType;
+
+    @Column(name = "commission_value", precision = 12, scale = 2)
+    private BigDecimal commissionValue;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.AnalyticsService;
+import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.SmartReportService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +34,7 @@ public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
     private final SmartReportService smartReportService;
+    private final EntitlementService entitlementService;
     private final SecurityUtils securityUtils;
 
     @PostMapping("/menu/{menuId}/events")
@@ -60,7 +62,6 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}/revenue")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<AnalyticsDtos.MenuRevenueReportResponse> getMenuRevenueReport(
             @PathVariable Long menuId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -69,7 +70,23 @@ public class AnalyticsController {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
         Long ownerId = securityUtils.getCurrentUser().getId();
+        requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(analyticsService.getMenuRevenueReport(menuId, ownerId, effectiveFrom, effectiveTo));
+    }
+
+    @GetMapping("/menu/{menuId}/waiter-performance")
+    public ResponseEntity<AnalyticsDtos.MenuWaiterPerformanceReportResponse> getMenuWaiterPerformanceReport(
+            @PathVariable Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        requireOrderAnalyticsScope(ownerId);
+        return ResponseEntity.ok(
+                analyticsService.getMenuWaiterPerformanceReport(menuId, ownerId, effectiveFrom, effectiveTo)
+        );
     }
 
     @PostMapping("/menu/{menuId}/smart-reports")
@@ -162,5 +179,13 @@ public class AnalyticsController {
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
         Long ownerId = securityUtils.getCurrentUser().getId();
         return ResponseEntity.ok(analyticsService.getProductAnalytics(menuId, productId, ownerId, effectiveFrom, effectiveTo));
+    }
+
+    private void requireOrderAnalyticsScope(Long userId) {
+        if (entitlementService.hasScope(userId, CatalogScopes.SMART_REPORTING_OWNER)
+                || entitlementService.hasScope(userId, CatalogScopes.WAITER_PANEL_OWNER)) {
+            return;
+        }
+        entitlementService.requireScope(userId, CatalogScopes.SMART_REPORTING_OWNER);
     }
 }

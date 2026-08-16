@@ -12,6 +12,8 @@ import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.ael.algoryqrservice.util.AppTime;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -148,11 +150,11 @@ public class Purchase {
     private RefundStatus refundStatus = RefundStatus.NONE;
 
     public boolean isStartedByDate() {
-        return startsAt == null || !startsAt.isAfter(LocalDateTime.now());
+        return startsAt == null || !startsAt.isAfter(AppTime.nowLocal());
     }
 
     public boolean isExpiredByDate() {
-        return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
+        return expiresAt != null && expiresAt.isBefore(AppTime.nowLocal());
     }
 
     public boolean isUsable() {

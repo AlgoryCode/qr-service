@@ -46,6 +46,7 @@ public class EntitlementService {
     private final MenuProductRepository menuProductRepository;
     private final QrRepository qrRepository;
     private final ObjectProvider<PackageActivationService> packageActivationService;
+    private final UserTrialService userTrialService;
 
     public EntitlementService(
             UserEntitlementRepository entitlementRepository,
@@ -57,7 +58,8 @@ public class EntitlementService {
             MenuRepository menuRepository,
             MenuProductRepository menuProductRepository,
             QrRepository qrRepository,
-            ObjectProvider<PackageActivationService> packageActivationService
+            ObjectProvider<PackageActivationService> packageActivationService,
+            UserTrialService userTrialService
     ) {
         this.entitlementRepository = entitlementRepository;
         this.purchaseRepository = purchaseRepository;
@@ -69,6 +71,7 @@ public class EntitlementService {
         this.menuProductRepository = menuProductRepository;
         this.qrRepository = qrRepository;
         this.packageActivationService = packageActivationService;
+        this.userTrialService = userTrialService;
     }
 
     @Transactional
@@ -211,7 +214,7 @@ public class EntitlementService {
         expireDuePurchasesForUser(userId);
 
         if (Objects.equals(productCode, CatalogProducts.QR_CREATE)) {
-            syncQrCreateUsageFromActiveQrs(userId);
+            syncQrCreateEntitlements(userId);
         }
 
         Product product = productRepository.findByCode(productCode).orElse(null);
@@ -421,7 +424,7 @@ public class EntitlementService {
                     .ifPresent(planPackage -> ensureEntitlementsForPackage(purchase, planPackage));
         }
         syncQrMenuUsageFromActiveMenus(userId);
-        syncQrCreateUsageFromActiveQrs(userId);
+        syncQrCreateEntitlements(userId);
         syncMenuProductUsageFromActiveProducts(userId);
     }
 
@@ -470,11 +473,13 @@ public class EntitlementService {
                 }));
     }
 
-    private void syncQrCreateUsageFromActiveQrs(Long userId) {
+    @Transactional
+    public void syncQrCreateEntitlements(Long userId) {
         if (userId == null) {
             return;
         }
 
+        long activeQrCount = qrRepository.countByUserIdAndDeletedFalse(userId);
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtAsc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
 
@@ -483,19 +488,16 @@ public class EntitlementService {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
-            if (purchase == null || !entitlement.isUsable(purchase)) {
+            if (purchase == null || !entitlement.grantsScope(purchase)) {
                 continue;
             }
 
-            long activeQrCount = qrRepository.countByUserIdAndPurchaseIdAndDeletedFalse(
-                    userId,
-                    entitlement.getPurchaseId()
-            );
             int total = entitlement.getTotalQuantity() != null ? entitlement.getTotalQuantity() : 0;
             int used = (int) Math.min(activeQrCount, total);
             entitlement.setUsedQuantity(used);
             entitlement.setRemainingQuantity(Math.max(0, total - used));
             entitlementRepository.save(entitlement);
+            return;
         }
     }
 
@@ -613,6 +615,10 @@ public class EntitlementService {
 
         purchase.setStatus(PurchaseStatus.EXPIRED);
         purchaseRepository.save(purchase);
+
+        if (purchase.getPurchaseType() == PurchaseType.TRIAL) {
+            userTrialService.markTrialCompleted(purchase.getUserId(), purchase.getExpiresAt());
+        }
 
         purchaseLogService.log(
                 purchase.getId(),

@@ -85,6 +85,8 @@ server:
 app:
   url: ${APP_URL:http://localhost:3000}
   service-name: ${APP_SERVICE_NAME:qr-service}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
   storage:
     filer-url: ${STORAGE_FILER_URL:http://localhost:8888}
     s3-endpoint: ${STORAGE_S3_ENDPOINT:}

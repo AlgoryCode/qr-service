@@ -112,7 +112,7 @@ class PurchaseServiceCancelTest {
         verify(entitlementService).revokeForCancelledPurchase(purchase);
         verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
         verify(purchaseFulfillmentService).cancelOpenFulfillments(10L);
-        verify(packageActivationService).ensureFreePackage(20L);
+        verify(packageActivationService).ensureSubscriptionState(20L);
         verify(menuPublicAccessService).syncForUser(20L);
         verify(paymentServiceClient, never()).cancelSubscription(any(), any());
     }
@@ -289,6 +289,6 @@ class PurchaseServiceCancelTest {
         verify(entitlementService, never()).revokeForCancelledPurchase(any());
         verify(menuPublicAccessService, never()).deactivateActiveMenusForUser(any());
         verify(purchaseFulfillmentService).cancelOpenFulfillments(eq(10L));
-        verify(packageActivationService).ensureFreePackage(20L);
+        verify(packageActivationService).ensureSubscriptionState(20L);
     }
 }

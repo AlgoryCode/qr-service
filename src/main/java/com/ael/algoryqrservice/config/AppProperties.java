@@ -13,8 +13,15 @@ public class AppProperties {
 
     private String url = "http://localhost:3000";
     private String serviceName = "qr-service";
+    private CorsSettings cors = new CorsSettings();
     private MenuSettings menu = new MenuSettings();
     private SeedSettings seed = new SeedSettings();
+
+    @Getter
+    @Setter
+    public static class CorsSettings {
+        private String allowedOrigins = "http://localhost:3000,http://localhost:3001";
+    }
 
     @Getter
     @Setter

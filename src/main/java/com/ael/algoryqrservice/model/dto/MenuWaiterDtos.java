@@ -1,6 +1,8 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -47,6 +49,12 @@ public final class MenuWaiterDtos {
 
         @Size(min = 6, max = 255)
         private String password;
+
+        private Boolean commissionEnabled;
+
+        private WaiterCommissionType commissionType;
+
+        private BigDecimal commissionValue;
     }
 
     @Data
@@ -59,6 +67,9 @@ public final class MenuWaiterDtos {
         private String username;
         private String displayName;
         private boolean active;
+        private boolean commissionEnabled;
+        private WaiterCommissionType commissionType;
+        private BigDecimal commissionValue;
         private LocalDateTime createdAt;
     }
 
@@ -118,6 +129,9 @@ public final class MenuWaiterDtos {
         private String username;
         private String displayName;
         private boolean active;
+        private boolean commissionEnabled;
+        private WaiterCommissionType commissionType;
+        private BigDecimal commissionValue;
     }
 
     @Data
@@ -142,9 +156,11 @@ public final class MenuWaiterDtos {
         private String imageUrl;
         private boolean available;
         private Long subCategoryId;
+        private String subCategorySlug;
         private String subCategoryName;
         private Long mainCategoryId;
         private String mainCategoryName;
+        private boolean commissionEligible;
     }
 
     @Data
@@ -153,6 +169,9 @@ public final class MenuWaiterDtos {
     @AllArgsConstructor
     public static class CatalogResponse {
         private List<CatalogProduct> products;
+        private boolean commissionEnabled;
+        private WaiterCommissionType commissionType;
+        private BigDecimal commissionValue;
     }
 
     @Data
@@ -169,6 +188,10 @@ public final class MenuWaiterDtos {
         private MenuOrderStatus latestPendingStatus;
         private BigDecimal latestPendingTotal;
         private LocalDateTime latestPendingSubmittedAt;
+        private TableBillStatus billStatus;
+        private Long openBillId;
+        private BigDecimal openBillTotal;
+        private int openBillItemCount;
     }
 
     @Data

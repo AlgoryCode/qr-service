@@ -60,22 +60,22 @@ WHERE NOT EXISTS (SELECT 1 FROM tbl_plan_package WHERE code = 'STARTER_PACKAGE')
 UPDATE tbl_plan_package SET
     name = 'Baslangic', description = 'Kucuk kafeler icin operasyonel giris paketi',
     features = '["50 urun hakki","1 aktif dijital menu","Standart sablonlar"]'::jsonb,
-    price = 299.00, subtotal = 249.17, vat_amount = 49.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 7, priority = 50,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = 2988.00, updated_at = NOW()
+    price = 299.00, subtotal = 249.17, vat_amount = 49.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 50,
+    purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 2988.00, updated_at = NOW()
 WHERE code = 'STARTER_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Pro', description = 'Sinirsiz urun, QR ve menu ile ciro takibi',
     features = '["Sinirsiz urun hakki","Sinirsiz QR ve dijital menu","Ciro takibi ve gelir raporlamasi"]'::jsonb,
-    price = 599.00, subtotal = 499.17, vat_amount = 99.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 7, priority = 100,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = 5643.00, updated_at = NOW()
+    price = 599.00, subtotal = 499.17, vat_amount = 99.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 100,
+    purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 5643.00, updated_at = NOW()
 WHERE code = 'PRO_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Ultimate', description = 'Pro ozellikleri, ozel tasarim ve yapay zeka araclari',
     features = '["Sinirsiz urun, QR ve dijital menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu"]'::jsonb,
-    price = 999.00, subtotal = 832.50, vat_amount = 166.50, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 200,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 9215.00, updated_at = NOW()
+    price = 999.00, subtotal = 832.50, vat_amount = 166.50, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 30, priority = 200,
+    purchasable = TRUE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = 9215.00, updated_at = NOW()
 WHERE code = 'ULTIMATE_PACKAGE';
 
 DELETE FROM tbl_plan_package_item

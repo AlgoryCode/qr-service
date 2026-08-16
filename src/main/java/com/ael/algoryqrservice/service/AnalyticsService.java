@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
+import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductVisit;
 import com.ael.algoryqrservice.model.MenuVisit;
@@ -16,6 +17,7 @@ import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
+import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -67,6 +69,7 @@ public class AnalyticsService {
     private final SubCategoryRepository subCategoryRepository;
     private final MenuFeedbackService menuFeedbackService;
     private final MenuOrderRepository menuOrderRepository;
+    private final MenuWaiterRepository menuWaiterRepository;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -395,6 +398,169 @@ public class AnalyticsService {
                 hourly,
                 buildUnsoldCatalog(productsById, products.keySet())
         );
+    }
+
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuWaiterPerformanceReportResponse getMenuWaiterPerformanceReport(
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        Menu menu = requireOwnedMenu(menuId, ownerId);
+        LocalDateTime fromDt = from.atStartOfDay();
+        LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
+
+        List<MenuOrder> orders = menuOrderRepository
+                .findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
+                        menuId,
+                        MenuOrderStatus.CONFIRMED,
+                        fromDt,
+                        toDt
+                );
+
+        List<MenuWaiter> waiters = menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId);
+        Map<Long, MenuWaiter> waitersById = waiters.stream()
+                .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
+
+        Map<Long, WaiterPerformanceAgg> statsByWaiterId = new LinkedHashMap<>();
+        for (MenuWaiter waiter : waiters) {
+            statsByWaiterId.put(waiter.getId(), new WaiterPerformanceAgg());
+        }
+
+        BigDecimal totalRevenue = BigDecimal.ZERO;
+        long assignedOrderCount = 0L;
+        long unassignedOrderCount = 0L;
+        WaiterPerformanceAgg unassignedStats = new WaiterPerformanceAgg();
+        String currency = "TRY";
+
+        for (MenuOrder order : orders) {
+            BigDecimal orderTotal = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
+            totalRevenue = totalRevenue.add(orderTotal);
+            if (order.getCurrency() != null && !order.getCurrency().isBlank()) {
+                currency = order.getCurrency();
+            }
+
+            Long waiterId = order.getWaiterId();
+            if (waiterId == null) {
+                unassignedOrderCount++;
+                unassignedStats.add(orderTotal);
+                continue;
+            }
+
+            assignedOrderCount++;
+            WaiterPerformanceAgg stats = statsByWaiterId.computeIfAbsent(waiterId, ignored -> new WaiterPerformanceAgg());
+            stats.add(orderTotal);
+        }
+
+        long activeWaiterCount = waiters.stream().filter(MenuWaiter::isActive).count();
+        long totalOrders = orders.size();
+        List<AnalyticsDtos.WaiterPerformanceRow> rows = new ArrayList<>();
+
+        for (MenuWaiter waiter : waiters) {
+            WaiterPerformanceAgg stats = statsByWaiterId.getOrDefault(waiter.getId(), new WaiterPerformanceAgg());
+            rows.add(buildWaiterPerformanceRow(
+                    waiter.getId(),
+                    waiter.getDisplayName(),
+                    waiter.isActive(),
+                    stats,
+                    totalRevenue,
+                    totalOrders
+            ));
+        }
+
+        for (Map.Entry<Long, WaiterPerformanceAgg> entry : statsByWaiterId.entrySet()) {
+            if (waitersById.containsKey(entry.getKey())) {
+                continue;
+            }
+            MenuWaiter missing = menuWaiterRepository.findById(entry.getKey()).orElse(null);
+            String name = missing != null ? missing.getDisplayName() : "Personel #" + entry.getKey();
+            boolean active = missing != null && missing.isActive();
+            rows.add(buildWaiterPerformanceRow(
+                    entry.getKey(),
+                    name,
+                    active,
+                    entry.getValue(),
+                    totalRevenue,
+                    totalOrders
+            ));
+        }
+
+        if (unassignedOrderCount > 0) {
+            rows.add(buildWaiterPerformanceRow(
+                    null,
+                    "Atanmamış",
+                    false,
+                    unassignedStats,
+                    totalRevenue,
+                    totalOrders
+            ));
+        }
+
+        rows.sort(Comparator
+                .comparing(AnalyticsDtos.WaiterPerformanceRow::revenue)
+                .reversed()
+                .thenComparing(AnalyticsDtos.WaiterPerformanceRow::displayName));
+
+        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+                menu.getMenuId(),
+                menu.getBusinessName(),
+                from,
+                to,
+                new AnalyticsDtos.WaiterPerformanceKpis(
+                        activeWaiterCount,
+                        assignedOrderCount,
+                        unassignedOrderCount,
+                        totalRevenue,
+                        currency
+                ),
+                rows
+        );
+    }
+
+    private AnalyticsDtos.WaiterPerformanceRow buildWaiterPerformanceRow(
+            Long waiterId,
+            String displayName,
+            boolean active,
+            WaiterPerformanceAgg stats,
+            BigDecimal totalRevenue,
+            long totalOrders
+    ) {
+        BigDecimal avgOrderValue = stats.orderCount == 0
+                ? BigDecimal.ZERO
+                : stats.revenue.divide(BigDecimal.valueOf(stats.orderCount), 2, RoundingMode.HALF_UP);
+        double revenueSharePercent = totalRevenue.compareTo(BigDecimal.ZERO) == 0
+                ? 0d
+                : stats.revenue
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(totalRevenue, 2, RoundingMode.HALF_UP)
+                        .doubleValue();
+        double orderSharePercent = totalOrders == 0
+                ? 0d
+                : BigDecimal.valueOf(stats.orderCount)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(totalOrders), 2, RoundingMode.HALF_UP)
+                        .doubleValue();
+        return new AnalyticsDtos.WaiterPerformanceRow(
+                waiterId,
+                displayName,
+                stats.orderCount,
+                stats.revenue,
+                avgOrderValue,
+                revenueSharePercent,
+                orderSharePercent,
+                active
+        );
+    }
+
+    private static final class WaiterPerformanceAgg {
+        private long orderCount;
+        private BigDecimal revenue = BigDecimal.ZERO;
+
+        private void add(BigDecimal amount) {
+            orderCount++;
+            revenue = revenue.add(amount);
+        }
     }
 
     @Transactional

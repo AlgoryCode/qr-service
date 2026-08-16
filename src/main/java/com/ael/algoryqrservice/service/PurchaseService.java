@@ -26,6 +26,8 @@ import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseSummaryResponse;
+import com.ael.algoryqrservice.model.dto.SubscriptionOverviewResponse;
+import com.ael.algoryqrservice.model.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
@@ -657,6 +659,29 @@ public class PurchaseService {
         return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public SubscriptionOverviewResponse getMySubscriptionOverview(Long userId) {
+        entitlementService.expireDuePurchasesForUser(userId);
+        packageActivationService.ensureSubscriptionState(userId);
+        entitlementService.repairUsablePackageEntitlements(userId);
+
+        List<UserEntitlementResponse> entitlements = entitlementService.getUserEntitlements(userId);
+
+        PurchaseSummaryResponse activePackage = null;
+        Long activePurchaseId = entitlementService.resolveActivePurchaseId(userId);
+        if (activePurchaseId != null) {
+            activePackage = purchaseRepository.findById(activePurchaseId)
+                    .filter(purchase -> userId.equals(purchase.getUserId()))
+                    .map(this::toSummary)
+                    .orElse(null);
+        }
+
+        return SubscriptionOverviewResponse.builder()
+                .activePackage(activePackage)
+                .entitlements(entitlements)
+                .build();
     }
 
     @Transactional

@@ -41,6 +41,12 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getUserPurchases(userId));
     }
 
+    @GetMapping("/my/subscription-overview")
+    public ResponseEntity<SubscriptionOverviewResponse> getMySubscriptionOverview() {
+        Long userId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.getMySubscriptionOverview(userId));
+    }
+
     @GetMapping("/my/logs")
     public ResponseEntity<List<PurchaseLogResponse>> getMyPurchaseLogs() {
         Long userId = securityUtils.getCurrentUser().getId();

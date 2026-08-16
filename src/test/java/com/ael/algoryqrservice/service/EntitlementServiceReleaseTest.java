@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
@@ -45,9 +46,13 @@ class EntitlementServiceReleaseTest {
     @Mock
     private MenuRepository menuRepository;
     @Mock
+    private MenuProductRepository menuProductRepository;
+    @Mock
     private QrRepository qrRepository;
     @Mock
     private ObjectProvider<PackageActivationService> packageActivationServiceProvider;
+    @Mock
+    private UserTrialService userTrialService;
 
     private EntitlementService entitlementService;
 
@@ -61,8 +66,10 @@ class EntitlementServiceReleaseTest {
                 purchaseLogService,
                 menuPublicAccessService,
                 menuRepository,
+                menuProductRepository,
                 qrRepository,
-                packageActivationServiceProvider
+                packageActivationServiceProvider,
+                userTrialService
         );
     }
 

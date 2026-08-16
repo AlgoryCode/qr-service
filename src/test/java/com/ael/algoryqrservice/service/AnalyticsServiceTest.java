@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
+import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
@@ -14,6 +15,7 @@ import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
+import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -62,6 +64,8 @@ class AnalyticsServiceTest {
     private MenuFeedbackService menuFeedbackService;
     @Mock
     private MenuOrderRepository menuOrderRepository;
+    @Mock
+    private MenuWaiterRepository menuWaiterRepository;
 
     private AnalyticsService service;
 
@@ -76,7 +80,8 @@ class AnalyticsServiceTest {
                 menuProductRepository,
                 subCategoryRepository,
                 menuFeedbackService,
-                menuOrderRepository
+                menuOrderRepository,
+                menuWaiterRepository
         );
     }
 
@@ -305,6 +310,73 @@ class AnalyticsServiceTest {
         assertThat(report.hourly()).hasSize(24);
         assertThat(report.hourly().get(14).orderCount()).isEqualTo(1L);
         assertThat(report.hourly().get(14).revenue()).isEqualByComparingTo("260.00");
+    }
+
+    @Test
+    void getMenuWaiterPerformanceReport_whenConfirmedOrders_thenGroupsByWaiterAndUnassigned() {
+        Long menuId = 5L;
+        Long ownerId = 9L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        when(menuRepository.findById(menuId)).thenReturn(Optional.of(publicMenu(menuId, ownerId)));
+
+        MenuWaiter ali = MenuWaiter.builder()
+                .id(101L)
+                .ownerUserId(ownerId)
+                .menuId(menuId)
+                .username("ali")
+                .passwordHash("hash")
+                .displayName("Ali")
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        MenuWaiter ayse = MenuWaiter.builder()
+                .id(102L)
+                .ownerUserId(ownerId)
+                .menuId(menuId)
+                .username("ayse")
+                .passwordHash("hash")
+                .displayName("Ayse")
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        when(menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId)).thenReturn(List.of(ali, ayse));
+
+        MenuOrder aliOrder = confirmedOrder(menuId, 1L, new BigDecimal("150.00"), 101L);
+        MenuOrder ayseOrder = confirmedOrder(menuId, 2L, new BigDecimal("90.00"), 102L);
+        MenuOrder unassignedOrder = confirmedOrder(menuId, 3L, new BigDecimal("20.00"), null);
+
+        when(menuOrderRepository.findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
+                eq(menuId), eq(MenuOrderStatus.CONFIRMED), any(), any()
+        )).thenReturn(List.of(aliOrder, ayseOrder, unassignedOrder));
+
+        AnalyticsDtos.MenuWaiterPerformanceReportResponse report =
+                service.getMenuWaiterPerformanceReport(menuId, ownerId, day, day);
+
+        assertThat(report.kpis().activeWaiterCount()).isEqualTo(2L);
+        assertThat(report.kpis().assignedOrderCount()).isEqualTo(2L);
+        assertThat(report.kpis().unassignedOrderCount()).isEqualTo(1L);
+        assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("260.00");
+        assertThat(report.waiters()).extracting(AnalyticsDtos.WaiterPerformanceRow::displayName)
+                .containsExactly("Ali", "Ayse", "Atanmamış");
+        assertThat(report.waiters().getFirst().orderCount()).isEqualTo(1L);
+        assertThat(report.waiters().getFirst().revenue()).isEqualByComparingTo("150.00");
+        assertThat(report.waiters().get(2).waiterId()).isNull();
+    }
+
+    private MenuOrder confirmedOrder(Long menuId, Long id, BigDecimal total, Long waiterId) {
+        return MenuOrder.builder()
+                .id(id)
+                .menuId(menuId)
+                .tableId(1L)
+                .tableSessionId(UUID.randomUUID())
+                .status(MenuOrderStatus.CONFIRMED)
+                .totalAmount(total)
+                .currency("TRY")
+                .waiterId(waiterId)
+                .confirmedAt(LocalDateTime.of(2026, 8, 13, 14, 30))
+                .build();
     }
 
     private Menu publicMenu(Long menuId, Long ownerId) {

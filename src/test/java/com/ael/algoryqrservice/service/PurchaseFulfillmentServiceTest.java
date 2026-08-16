@@ -222,7 +222,7 @@ class PurchaseFulfillmentServiceTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(entitlementService).synchronizePeriod(purchase);
-        verify(packageActivationService).ensureFreePackage(2L);
+        verify(packageActivationService).ensureSubscriptionState(2L);
         verify(menuPublicAccessService).syncForUser(2L);
     }
 }

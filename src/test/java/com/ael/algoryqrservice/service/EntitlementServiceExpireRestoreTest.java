@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
@@ -41,11 +42,15 @@ class EntitlementServiceExpireRestoreTest {
     @Mock
     private MenuRepository menuRepository;
     @Mock
+    private MenuProductRepository menuProductRepository;
+    @Mock
     private QrRepository qrRepository;
     @Mock
     private ObjectProvider<PackageActivationService> packageActivationServiceProvider;
     @Mock
     private PackageActivationService packageActivationService;
+    @Mock
+    private UserTrialService userTrialService;
 
     private EntitlementService entitlementService;
 
@@ -59,8 +64,10 @@ class EntitlementServiceExpireRestoreTest {
                 purchaseLogService,
                 menuPublicAccessService,
                 menuRepository,
+                menuProductRepository,
                 qrRepository,
-                packageActivationServiceProvider
+                packageActivationServiceProvider,
+                userTrialService
         );
         when(packageActivationServiceProvider.getObject()).thenReturn(packageActivationService);
     }
@@ -80,7 +87,8 @@ class EntitlementServiceExpireRestoreTest {
         entitlementService.expirePurchase(purchase);
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
-        verify(packageActivationService).ensureFreePackage(7L);
+        verify(userTrialService).markTrialCompleted(7L, purchase.getExpiresAt());
+        verify(packageActivationService).ensureSubscriptionState(7L);
         verify(menuPublicAccessService).syncForUser(7L);
     }
 
@@ -104,7 +112,8 @@ class EntitlementServiceExpireRestoreTest {
         entitlementService.expireDuePurchasesForUser(7L);
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
-        verify(packageActivationService).ensureFreePackage(7L);
+        verify(userTrialService).markTrialCompleted(7L, purchase.getExpiresAt());
+        verify(packageActivationService).ensureSubscriptionState(7L);
         verify(menuPublicAccessService).syncForUser(7L);
     }
 }

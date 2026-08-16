@@ -110,6 +110,13 @@ public class User {
     @Builder.Default
     private boolean trialUsed = false;
 
+    @Column(name = "trial_end_date")
+    private LocalDateTime trialEndDate;
+
+    public boolean hasCompletedTrial() {
+        return trialEndDate != null;
+    }
+
     public String getDisplayName() {
         StringBuilder name = new StringBuilder();
         if (firstName != null && !firstName.isBlank()) {

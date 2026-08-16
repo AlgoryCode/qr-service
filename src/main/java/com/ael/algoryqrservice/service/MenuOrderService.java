@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.RestaurantTable;
+import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableSession;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
@@ -18,6 +19,7 @@ import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
+import com.ael.algoryqrservice.service.campaign.CampaignEvaluationService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -46,6 +48,10 @@ public class MenuOrderService {
     private final MenuWaiterRepository menuWaiterRepository;
     private final CustomerRepository customerRepository;
     private final TableSessionService tableSessionService;
+    private final TableBillService tableBillService;
+    private final WaiterCommissionService waiterCommissionService;
+    private final UserAccountingService userAccountingService;
+    private final CampaignEvaluationService campaignEvaluationService;
     private final SecurityUtils securityUtils;
 
     @Transactional
@@ -94,12 +100,18 @@ public class MenuOrderService {
             throw new BadRequestException("Masa aktif değil");
         }
 
-        TableSession session = tableSessionService.openInternalSession(menuId, table.getId());
+        MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
+                .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
+
+        TableBill bill = tableBillService.getOrOpenBill(menuId, table.getId(), waiterId);
+        TableSession session = tableBillService.resolveBillSession(bill);
+
         LocalDateTime now = LocalDateTime.now();
         MenuOrder order = MenuOrder.builder()
                 .menuId(menuId)
                 .tableId(table.getId())
                 .tableSessionId(session.getId())
+                .billId(bill.getId())
                 .status(MenuOrderStatus.CONFIRMED)
                 .waiterId(waiterId)
                 .note(trimToNull(request.getNote()))
@@ -114,7 +126,13 @@ public class MenuOrderService {
                 .build();
 
         applyCartItems(order, menuId, request.getItems());
-        return toOrderResponse(menuOrderRepository.save(order));
+        MenuOrder saved = menuOrderRepository.save(order);
+        tableBillService.addItemsFromOrder(bill, saved, waiterId);
+        waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
+        menuOrderRepository.save(saved);
+        userAccountingService.recordConfirmedOrderIncome(saved);
+        campaignEvaluationService.onOrderConfirmed(saved);
+        return toOrderResponse(saved);
     }
 
     @Transactional
@@ -163,7 +181,14 @@ public class MenuOrderService {
         order.setStatus(MenuOrderStatus.CONFIRMED);
         order.setConfirmedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
-        return toOrderResponse(menuOrderRepository.save(order));
+
+        TableBill bill = tableBillService.getOrOpenBill(menuId, order.getTableId(), null);
+        order.setBillId(bill.getId());
+        MenuOrder saved = menuOrderRepository.save(order);
+        tableBillService.addItemsFromOrder(bill, saved, null);
+        userAccountingService.recordConfirmedOrderIncome(saved);
+        campaignEvaluationService.onOrderConfirmed(saved);
+        return toOrderResponse(saved);
     }
 
     @Transactional
@@ -368,12 +393,15 @@ public class MenuOrderService {
                 .waiterId(order.getWaiterId())
                 .waiterName(waiterName)
                 .waiterNote(order.getWaiterNote())
+                .billId(order.getBillId())
+                .commissionAmount(order.getCommissionAmount())
                 .items(items)
                 .submittedAt(order.getSubmittedAt())
                 .confirmedAt(order.getConfirmedAt())
                 .rejectedAt(order.getRejectedAt())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
+                .campaignSummary(campaignEvaluationService.summarizeOrder(order))
                 .build();
     }
 

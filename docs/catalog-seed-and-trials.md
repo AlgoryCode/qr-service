@@ -47,9 +47,9 @@ Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expires
 
 ### Satılabilir paketler
 
-- **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `trialEligible=true`, `trialDays=7`
-- **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `trialEligible=true`, `trialDays=7`
-- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL` — 999 TRY/ay, yıllık 9215 TRY, `trialEligible=false`
+- **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `trialEligible=false`
+- **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `trialEligible=false`
+- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL` — 999 TRY/ay, yıllık 9215 TRY, `trialEligible=true`, `trialDays=30`
 
 Garson sipariş/adisyon modülü yalnızca Ultimate pakette (`WAITER_PANEL` / `WAITER_PANEL_OWNER`). Başlangıç ve Pro paketlerinde bu özellik yoktur.
 
@@ -85,16 +85,24 @@ Admin dashboard: Paketler → **Seed katalogu içe aktar**.
 | POST | `/trials` | `{ "packageId" }` ile TRIAL başlat |
 | GET | `/trials/status` | `AVAILABLE` / `ACTIVE` / `TRIAL_EXPIRED` + bitiş bilgisi |
 
-Legacy: `POST /trials/digital-menu-pro` yalnızca `PRO_PACKAGE` (active + trialEligible) başlatır.
+Legacy: `POST /trials/digital-menu-pro` denemeye açık en yüksek öncelikli paketi başlatır (Ultimate).
+
+### Admin deneme uzatma
+
+| Method | Path | Davranış |
+|--------|------|----------|
+| POST | `/admin/users/{id}/trial/extend` | `{ "days": 30 }` — aktif denemeye gün ekler, bitmiş denemeyi yeniden açar veya Ultimate denemesi başlatır |
+
+Admin uzatması aktif ücretli paket varken reddedilir; deneme hakkı bayrakları sıfırlanır.
 
 ### Backend kurallar
 
-1. Kullanıcı başına tek deneme (`uk_purchase_trial_user` + `tbl_user.trial_used`).
+1. Kullanıcı başına tek deneme (`uk_purchase_trial_user` + `tbl_user.trial_end_date` / `trial_used`).
 2. Paket `active && trialEligible` ve geçerli `trialDays`; Free / `systemManaged` hedef olamaz.
 3. Aktif ücretli usable paket varken start → 400.
-4. Start: TRIAL ACTIVE, `expiresAt = now + trialDays`, entitlement grant, diğer ACTIVE → SUPERSEDED.
-5. Bitiş: `expiresAt` sonrası entitlement usable değildir; `expirePurchase` / due expire menü erişimini senkronize eder (Free paket restore edilmez).
-6. Status: TRIAL purchase varken `trialUsed=false` ise `true` backfill edilir.
+4. Start: TRIAL ACTIVE, `expiresAt = now + trialDays`, entitlement grant, diğer ACTIVE → SUPERSEDED; `trial_used` ve `trial_end_date` **başlangıçta set edilmez**.
+5. Bitiş: `expiresAt` sonrası `trial_end_date = expiresAt`, `trial_used = true`; entitlement usable değildir; `expirePurchase` menü erişimini senkronize eder.
+6. Kontrol: `trial_end_date IS NOT NULL` veya `trial_used = true` → deneme kullanılmış sayılır.
 
 ### Örnek
 

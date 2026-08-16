@@ -109,7 +109,7 @@ class GoogleOAuthUserServiceTest {
         assertThat(captor.getValue().getProviderSubject()).isEqualTo("sub-1");
         assertThat(captor.getValue().getPassword()).isNull();
         assertThat(result.getId()).isNotNull();
-        verify(packageActivationService).ensureFreePackage(result.getId());
+        verify(packageActivationService).ensureSubscriptionState(result.getId());
     }
 
     @Test

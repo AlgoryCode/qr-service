@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,6 +62,7 @@ public final class AdminUserDtos {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private boolean trialUsed;
+        private LocalDateTime trialEndDate;
         private String registrationIpAddress;
         private String registrationDevice;
         private String registrationDeviceType;
@@ -69,6 +72,27 @@ public final class AdminUserDtos {
         private long qrCount;
         private long activeMenuCount;
         private List<PurchaseResponse> purchases;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExtendTrialRequest {
+        @Min(1)
+        @Max(365)
+        private int days;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExtendTrialResponse {
+        private Long purchaseId;
+        private String packageName;
+        private LocalDateTime expiresAt;
+        private int daysAdded;
     }
 
     @Data

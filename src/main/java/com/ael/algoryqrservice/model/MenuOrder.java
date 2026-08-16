@@ -66,6 +66,12 @@ public class MenuOrder {
     @Column(name = "waiter_note", columnDefinition = "text")
     private String waiterNote;
 
+    @Column(name = "bill_id")
+    private Long billId;
+
+    @Column(name = "commission_amount", precision = 12, scale = 2)
+    private BigDecimal commissionAmount;
+
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 

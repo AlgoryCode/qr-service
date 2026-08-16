@@ -56,6 +56,10 @@ public class ProductImageStorageService {
         return uploadWithPrefix(menuId, file, "menus/" + menuId + "/logo/");
     }
 
+    public ProductImageDtos.UploadResponse uploadFeedbackScreenshot(Long userId, MultipartFile file) {
+        return uploadWithPrefix(userId, file, "platform-feedback/" + userId + "/");
+    }
+
     public void deleteForMenu(Long menuId, String objectKey, String imageUrl) {
         String resolvedKey = resolveObjectKey(objectKey, imageUrl);
         if (resolvedKey == null || resolvedKey.isBlank()) {

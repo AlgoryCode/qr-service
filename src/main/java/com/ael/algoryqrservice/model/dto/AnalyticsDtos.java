@@ -269,4 +269,35 @@ public class AnalyticsDtos {
             UnsoldCatalog unsold
     ) {
     }
+
+    public record WaiterPerformanceKpis(
+            long activeWaiterCount,
+            long assignedOrderCount,
+            long unassignedOrderCount,
+            BigDecimal totalRevenue,
+            String currency
+    ) {
+    }
+
+    public record WaiterPerformanceRow(
+            Long waiterId,
+            String displayName,
+            long orderCount,
+            BigDecimal revenue,
+            BigDecimal avgOrderValue,
+            double revenueSharePercent,
+            double orderSharePercent,
+            boolean active
+    ) {
+    }
+
+    public record MenuWaiterPerformanceReportResponse(
+            Long menuId,
+            String menuName,
+            LocalDate from,
+            LocalDate to,
+            WaiterPerformanceKpis kpis,
+            List<WaiterPerformanceRow> waiters
+    ) {
+    }
 }

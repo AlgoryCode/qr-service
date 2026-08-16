@@ -114,6 +114,7 @@ public class QrService {
 
         List<QrListResponse> filtered = qrs
                 .stream()
+                .filter(qr -> !isMenuQr(qr))
                 .filter(qr -> matchesScope(qr, scope, activePurchaseId))
                 .map(qr -> mapToListResponse(qr, includeImage, activePurchaseId, purchasesById))
                 .toList();
@@ -326,10 +327,7 @@ public class QrService {
             }
         });
 
-        if (qr.getPurchaseId() != null
-                && entitlementService.isActivePurchase(qr.getUserId(), qr.getPurchaseId())) {
-            entitlementService.release(qr.getUserId(), CatalogProducts.QR_CREATE, 1);
-        }
+        entitlementService.syncQrCreateEntitlements(qr.getUserId());
     }
 
     private void requireOwnership(Qr qr) {

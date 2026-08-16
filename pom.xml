@@ -195,6 +195,14 @@
                     <to>
                         <image>algorycode/algoryqr-service:${image.tag}</image>
                     </to>
+                    <container>
+                        <environment>
+                            <TZ>Europe/Istanbul</TZ>
+                        </environment>
+                        <jvmFlags>
+                            <jvmFlag>-Duser.timezone=Europe/Istanbul</jvmFlag>
+                        </jvmFlags>
+                    </container>
                 </configuration>
             </plugin>
             <plugin>

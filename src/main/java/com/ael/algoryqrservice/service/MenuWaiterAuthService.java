@@ -79,6 +79,9 @@ public class MenuWaiterAuthService {
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())
                 .active(waiter.isActive())
+                .commissionEnabled(waiter.isCommissionEnabled())
+                .commissionType(waiter.getCommissionType())
+                .commissionValue(waiter.getCommissionValue())
                 .build();
     }
 

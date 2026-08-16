@@ -14,7 +14,8 @@
         { "id": 5, "slug": "alkollu_icecekler", "name": "Alkollü İçecekler", "sortOrder": 5 },
         { "id": 6, "slug": "sutlu_icecekler", "name": "Sütlü İçecekler", "sortOrder": 6 },
         { "id": 66, "slug": "caylar", "name": "Çaylar", "sortOrder": 7 },
-        { "id": 67, "slug": "smoothie_ve_shake", "name": "Smoothie ve Shake", "sortOrder": 8 }
+        { "id": 67, "slug": "smoothie_ve_shake", "name": "Smoothie ve Shake", "sortOrder": 8 },
+        { "id": 82, "slug": "su", "name": "Su", "sortOrder": 9 }
       ]
     },
     {

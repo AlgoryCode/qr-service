@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
@@ -94,6 +95,20 @@ public class MenuWaiterService {
             if (request.getPassword() != null && !request.getPassword().isBlank()) {
                 waiter.setPasswordHash(passwordEncoder.encode(request.getPassword()));
             }
+            if (request.getCommissionEnabled() != null) {
+                waiter.setCommissionEnabled(request.getCommissionEnabled());
+                if (!request.getCommissionEnabled()) {
+                    waiter.setCommissionType(null);
+                    waiter.setCommissionValue(null);
+                }
+            }
+            if (request.getCommissionType() != null) {
+                waiter.setCommissionType(request.getCommissionType());
+            }
+            if (request.getCommissionValue() != null) {
+                validateCommissionValue(request.getCommissionType(), request.getCommissionValue());
+                waiter.setCommissionValue(request.getCommissionValue());
+            }
         }
 
         waiter.setUpdatedAt(LocalDateTime.now());
@@ -149,8 +164,20 @@ public class MenuWaiterService {
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())
                 .active(waiter.isActive())
+                .commissionEnabled(waiter.isCommissionEnabled())
+                .commissionType(waiter.getCommissionType())
+                .commissionValue(waiter.getCommissionValue())
                 .createdAt(waiter.getCreatedAt())
                 .build();
+    }
+
+    private void validateCommissionValue(WaiterCommissionType type, java.math.BigDecimal value) {
+        if (value == null || value.compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Komisyon değeri geçersiz");
+        }
+        if (type == WaiterCommissionType.PERCENT && value.compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+            throw new BadRequestException("Yüzde komisyon 100'den büyük olamaz");
+        }
     }
 
     private String normalizeUsername(String username) {

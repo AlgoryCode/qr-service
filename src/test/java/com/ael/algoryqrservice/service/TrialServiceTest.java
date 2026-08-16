@@ -29,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,13 +48,17 @@ class TrialServiceTest {
     EntitlementService entitlementService;
     @Mock
     PackageActivationService packageActivationService;
+    @Mock
+    UserTrialService userTrialService;
     @InjectMocks
     TrialService service;
 
     @Test
     void start_whenTrialHistoryExists_thenReject() {
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(true);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
+        when(userTrialService.hasTrialPurchase(7L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.start(7L, 2L))
                 .isInstanceOf(BadRequestException.class)
@@ -62,7 +67,9 @@ class TrialServiceTest {
 
     @Test
     void start_whenTrialUsedFlag_thenReject() {
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(true).build()));
+        User user = User.builder().id(7L).trialUsed(true).build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userTrialService.hasUsedTrial(user)).thenReturn(true);
 
         assertThatThrownBy(() -> service.start(7L, 2L))
                 .isInstanceOf(BadRequestException.class)
@@ -71,10 +78,23 @@ class TrialServiceTest {
     }
 
     @Test
+    void start_whenTrialEndDateSet_thenReject() {
+        User user = User.builder().id(7L).trialEndDate(LocalDateTime.now().minusDays(1)).build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userTrialService.hasUsedTrial(user)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.start(7L, 2L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("kullanilmis");
+    }
+
+    @Test
     void start_whenPackageIdProvided_thenGrantForTrialDays() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(false);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
+        when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
@@ -95,14 +115,21 @@ class TrialServiceTest {
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
         verify(packageActivationService).activatePurchasedPackage(any());
         verify(entitlementService).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
+        verify(userRepository, never()).save(any());
+    }
+
+    private void stubEligibleUser(User user) {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
+        when(userTrialService.hasTrialPurchase(user.getId())).thenReturn(false);
     }
 
     @Test
     void start_whenIneligiblePackage_thenReject() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
         plan.setTrialEligible(false);
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(false);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        stubEligibleUser(user);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
 
@@ -113,15 +140,39 @@ class TrialServiceTest {
     }
 
     @Test
-    void start_whenUltimateNotTrialEligible_thenReject() {
-        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, null);
-        plan.setTrialEligible(false);
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(false);
+    void start_whenUltimateTrialEligible_thenGrantForTrialDays() {
+        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, 30);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
+        when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
+        when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            Purchase purchase = invocation.getArgument(0);
+            purchase.setId(10L);
+            return purchase;
+        });
 
-        assertThatThrownBy(() -> service.start(7L, 3L))
+        TrialDtos.Status result = service.start(7L, 3L);
+
+        ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getExpiresAt())
+                .isEqualTo(captor.getValue().getStartsAt().plusDays(30));
+        assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
+    }
+
+    @Test
+    void start_whenStarterNotTrialEligible_thenReject() {
+        PlanPackage plan = trialPackage(2L, CatalogPackages.STARTER_PACKAGE, 30, null);
+        plan.setTrialEligible(false);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        stubEligibleUser(user);
+        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
+
+        assertThatThrownBy(() -> service.start(7L, 2L))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("uygun degil");
     }
@@ -129,8 +180,8 @@ class TrialServiceTest {
     @Test
     void start_whenMissingTrialDays_thenReject() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, null);
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(false);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        stubEligibleUser(user);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
 
@@ -150,7 +201,8 @@ class TrialServiceTest {
                 .expiresAt(LocalDateTime.now().plusDays(10))
                 .build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(false);
+        when(userTrialService.hasUsedTrial(any())).thenReturn(false);
+        when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
 
         assertThatThrownBy(() -> service.start(7L, 2L))
@@ -159,29 +211,29 @@ class TrialServiceTest {
     }
 
     @Test
-    void startDigitalMenuPro_whenAvailable_thenPinProPackage() {
-        PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
-        when(packageRepository.findByCode(CatalogPackages.PRO_PACKAGE)).thenReturn(Optional.of(plan));
-        when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(purchaseRepository.existsByUserIdAndPurchaseType(7L, PurchaseType.TRIAL)).thenReturn(false);
+    void startDigitalMenuPro_whenAvailable_thenPinTrialEligiblePackage() {
+        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, 30);
+        User user = User.builder().id(7L).trialUsed(false).build();
+        when(packageRepository.findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc())
+                .thenReturn(Optional.of(plan));
+        when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
+        stubEligibleUser(user);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
             purchase.setId(10L);
             return purchase;
         });
-        when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         TrialDtos.Status result = service.startDigitalMenuPro(7L);
 
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
-        verify(packageRepository).findByCode(CatalogPackages.PRO_PACKAGE);
+        verify(packageRepository).findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc();
     }
 
     @Test
-    void status_whenTrialDateExpired_thenExposeTrialExpiredAndRestoreFree() {
-        User user = User.builder().id(7L).trialUsed(true).build();
+    void status_whenTrialDateExpired_thenExposeTrialExpiredAndSyncSubscription() {
+        User user = User.builder().id(7L).trialUsed(false).build();
         Purchase purchase = Purchase.builder().id(10L).userId(7L).purchaseType(PurchaseType.TRIAL)
                 .status(PurchaseStatus.ACTIVE).startsAt(LocalDateTime.now().minusDays(31))
                 .expiresAt(LocalDateTime.now().minusDays(1)).build();
@@ -196,11 +248,11 @@ class TrialServiceTest {
         TrialDtos.Status result = service.status(7L);
 
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.TRIAL_EXPIRED);
-        verify(packageActivationService).ensureFreePackage(7L);
+        verify(packageActivationService).ensureSubscriptionState(7L);
     }
 
     @Test
-    void status_whenTrialExistsButTrialUsedFalse_thenBackfillTrue() {
+    void status_whenActiveTrial_thenDoesNotMarkTrialUsedEarly() {
         User user = User.builder().id(7L).trialUsed(false).build();
         Purchase purchase = Purchase.builder().id(10L).userId(7L).purchaseType(PurchaseType.TRIAL)
                 .status(PurchaseStatus.ACTIVE).startsAt(LocalDateTime.now().minusDays(1))
@@ -208,14 +260,13 @@ class TrialServiceTest {
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
                 .thenReturn(Optional.of(purchase));
-        when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(packageRepository.findById(any())).thenReturn(Optional.empty());
 
         TrialDtos.Status result = service.status(7L);
 
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
-        assertThat(user.isTrialUsed()).isTrue();
-        verify(userRepository).save(user);
+        assertThat(user.isTrialUsed()).isFalse();
+        verify(userRepository, never()).save(any());
     }
 
     private PlanPackage trialPackage(Long id, String code, int validityDays, Integer trialDays) {
