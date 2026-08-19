@@ -42,4 +42,5 @@ jobs:
 
       - name: Trigger Staging Coolify
         run: |
-          curl -X GET "${{ secrets.COOLIFY_STAGING_WEBHOOK_URL }}"
+          curl -X GET "${{ secrets.COOLIFY_STAGING_WEBHOOK_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"
