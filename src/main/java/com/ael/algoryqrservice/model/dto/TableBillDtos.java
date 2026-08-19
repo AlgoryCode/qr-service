@@ -32,6 +32,10 @@ public final class TableBillDtos {
         private String productName;
         private BigDecimal unitPrice;
         private int quantity;
+        private int paidQuantity;
+        private int unpaidQuantity;
+        private BigDecimal paidAmount;
+        private BigDecimal unpaidAmount;
         private BigDecimal lineTotal;
         private String note;
         private Long sourceOrderId;
@@ -55,6 +59,8 @@ public final class TableBillDtos {
         private LocalDateTime closedAt;
         private TableBillPaymentMethod paymentMethod;
         private BigDecimal totalAmount;
+        private BigDecimal paidTotal;
+        private BigDecimal remainingTotal;
         private String currency;
         private int itemCount;
         private List<BillItemResponse> items;
@@ -68,6 +74,38 @@ public final class TableBillDtos {
     public static class CloseBillRequest {
         @NotNull
         private TableBillPaymentMethod paymentMethod;
+
+        private Boolean tipReceived;
+
+        @DecimalMin(value = "0.01")
+        private BigDecimal tipAmount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PayBillItemLine {
+        @NotNull
+        private Long itemId;
+
+        @NotNull
+        @Min(1)
+        private Integer quantityToPay;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PayBillItemsRequest {
+        @NotNull
+        private TableBillPaymentMethod paymentMethod;
+
+        @NotNull
+        @Valid
+        @Size(min = 1)
+        private List<PayBillItemLine> items;
 
         private Boolean tipReceived;
 

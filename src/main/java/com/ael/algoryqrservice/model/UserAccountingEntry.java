@@ -82,6 +82,12 @@ public class UserAccountingEntry {
     @Column(name = "created_by_waiter_id")
     private Long createdByWaiterId;
 
+    @Column(name = "order_amount", precision = 12, scale = 2)
+    private BigDecimal orderAmount;
+
+    @Column(name = "tip_amount", precision = 12, scale = 2)
+    private BigDecimal tipAmount;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

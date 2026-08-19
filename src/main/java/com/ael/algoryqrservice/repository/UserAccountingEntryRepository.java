@@ -9,4 +9,6 @@ public interface UserAccountingEntryRepository
         extends JpaRepository<UserAccountingEntry, Long>, JpaSpecificationExecutor<UserAccountingEntry> {
 
     boolean existsBySourceTypeAndSourceOrderId(AccountingSourceType sourceType, Long sourceOrderId);
+
+    boolean existsBySourceTypeAndSourceBillId(AccountingSourceType sourceType, Long sourceBillId);
 }

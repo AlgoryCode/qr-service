@@ -147,12 +147,33 @@ public class UserAccountingService {
                 .map(t -> t.getName())
                 .orElse("Masa");
 
-        if (tipAmount != null && tipAmount.compareTo(BigDecimal.ZERO) > 0) {
+        BigDecimal orderAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal tip = tipAmount != null ? tipAmount : BigDecimal.ZERO;
+        BigDecimal totalAmount = orderAmount.add(tip);
+
+        if (totalAmount.compareTo(BigDecimal.ZERO) > 0
+                && !userAccountingEntryRepository.existsBySourceTypeAndSourceBillId(
+                AccountingSourceType.BILL_SALE,
+                bill.getId()
+        )) {
+            createBillSaleEntry(
+                    userId,
+                    "Adisyon - " + tableName,
+                    orderAmount,
+                    tip,
+                    totalAmount,
+                    bill.getCurrency(),
+                    occurredAt,
+                    menu.getMenuId(),
+                    bill.getId(),
+                    waiter != null ? waiter.getId() : null
+            );
+        } else if (tip.compareTo(BigDecimal.ZERO) > 0) {
             createSystemEntry(
                     userId,
                     AccountingEntryType.GELIR,
                     "Bahşiş - " + tableName,
-                    tipAmount,
+                    tip,
                     bill.getCurrency(),
                     occurredAt,
                     menu.getMenuId(),
@@ -204,6 +225,38 @@ public class UserAccountingService {
                 order.getId(),
                 order.getWaiterId()
         );
+    }
+
+    private void createBillSaleEntry(
+            Long userId,
+            String title,
+            BigDecimal orderAmount,
+            BigDecimal tipAmount,
+            BigDecimal totalAmount,
+            String currency,
+            LocalDateTime occurredAt,
+            Long menuId,
+            Long sourceBillId,
+            Long createdByWaiterId
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        UserAccountingEntry entry = UserAccountingEntry.builder()
+                .userId(userId)
+                .entryType(AccountingEntryType.GELIR)
+                .title(title)
+                .amount(totalAmount)
+                .orderAmount(orderAmount)
+                .tipAmount(tipAmount.compareTo(BigDecimal.ZERO) > 0 ? tipAmount : null)
+                .currency(currency != null && !currency.isBlank() ? currency : "TRY")
+                .occurredAt(occurredAt)
+                .menuId(menuId)
+                .sourceType(AccountingSourceType.BILL_SALE)
+                .sourceBillId(sourceBillId)
+                .createdByWaiterId(createdByWaiterId)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        userAccountingEntryRepository.save(entry);
     }
 
     private void createSystemEntry(

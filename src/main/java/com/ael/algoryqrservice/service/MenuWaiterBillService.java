@@ -55,6 +55,12 @@ public class MenuWaiterBillService {
     }
 
     @Transactional
+    public TableBillDtos.BillResponse payItems(Long billId, TableBillDtos.PayBillItemsRequest request) {
+        MenuWaiter waiter = requireCurrentWaiter();
+        return tableBillService.payItems(waiter.getMenuId(), billId, waiter, request);
+    }
+
+    @Transactional
     public TableBillDtos.BillResponse closeBill(Long billId, TableBillDtos.CloseBillRequest request) {
         MenuWaiter waiter = requireCurrentWaiter();
         return tableBillService.closeBill(

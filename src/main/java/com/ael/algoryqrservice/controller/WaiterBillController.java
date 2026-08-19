@@ -65,6 +65,14 @@ public class WaiterBillController {
         return ResponseEntity.ok(menuWaiterBillService.removeItem(billId, itemId));
     }
 
+    @PostMapping("/{billId}/pay-items")
+    public ResponseEntity<TableBillDtos.BillResponse> payItems(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.PayBillItemsRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.payItems(billId, request));
+    }
+
     @PostMapping("/{billId}/close")
     public ResponseEntity<TableBillDtos.BillResponse> closeBill(
             @PathVariable Long billId,

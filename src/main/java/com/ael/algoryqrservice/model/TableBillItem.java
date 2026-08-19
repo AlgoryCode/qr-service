@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,6 +39,11 @@ public class TableBillItem {
 
     @Column(nullable = false)
     private int quantity;
+
+    @Column(name = "paid_quantity", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private int paidQuantity = 0;
 
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;

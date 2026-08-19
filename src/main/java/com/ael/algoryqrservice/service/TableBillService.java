@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
+import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
@@ -15,6 +16,7 @@ import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.TableBillDtos;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +44,7 @@ public class TableBillService {
 
     private final TableBillRepository tableBillRepository;
     private final TableBillItemRepository tableBillItemRepository;
+    private final BillPaymentRepository billPaymentRepository;
     private final TableSessionRepository tableSessionRepository;
     private final TableSessionService tableSessionService;
     private final MenuProductRepository menuProductRepository;
@@ -153,9 +157,15 @@ public class TableBillService {
                 .orElseThrow(() -> new NotFoundException("Adisyon kalemi bulunamadı"));
 
         if (quantity <= 0) {
+            if (item.getPaidQuantity() > 0) {
+                throw new BadRequestException("Ödenmiş kalemler silinemez");
+            }
             bill.removeItem(item);
             tableBillItemRepository.delete(item);
         } else {
+            if (quantity < item.getPaidQuantity()) {
+                throw new BadRequestException("Adet, ödenen miktardan az olamaz");
+            }
             item.setQuantity(quantity);
             item.setLineTotal(item.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
             item.setUpdatedAt(LocalDateTime.now());
@@ -169,6 +179,69 @@ public class TableBillService {
     @Transactional
     public TableBillDtos.BillResponse removeItem(Long menuId, Long billId, Long itemId) {
         return updateItemQuantity(menuId, billId, itemId, 0);
+    }
+
+    @Transactional
+    public TableBillDtos.BillResponse payItems(
+            Long menuId,
+            Long billId,
+            MenuWaiter waiter,
+            TableBillDtos.PayBillItemsRequest request
+    ) {
+        if (request == null || request.getPaymentMethod() == null) {
+            throw new BadRequestException("Ödeme yöntemi seçilmelidir");
+        }
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BadRequestException("En az bir kalem seçilmelidir");
+        }
+
+        TableBill bill = requireOpenBill(menuId, billId);
+        LocalDateTime now = LocalDateTime.now();
+
+        for (TableBillDtos.PayBillItemLine line : request.getItems()) {
+            if (line.getItemId() == null || line.getQuantityToPay() == null || line.getQuantityToPay() <= 0) {
+                throw new BadRequestException("Geçersiz ödeme kalemi");
+            }
+            TableBillItem item = tableBillItemRepository.findByIdAndBillId(line.getItemId(), billId)
+                    .orElseThrow(() -> new NotFoundException("Adisyon kalemi bulunamadı"));
+            int unpaid = item.getQuantity() - item.getPaidQuantity();
+            if (line.getQuantityToPay() > unpaid) {
+                throw new BadRequestException("Ödenecek adet kalan miktardan fazla: " + item.getProductName());
+            }
+
+            BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(line.getQuantityToPay()))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            item.setPaidQuantity(item.getPaidQuantity() + line.getQuantityToPay());
+            item.setUpdatedAt(now);
+
+            BillPayment payment = BillPayment.builder()
+                    .bill(bill)
+                    .billItem(item)
+                    .waiterId(waiter.getId())
+                    .paymentMethod(request.getPaymentMethod())
+                    .amount(amount)
+                    .quantityPaid(line.getQuantityToPay())
+                    .tip(false)
+                    .paidAt(now)
+                    .createdAt(now)
+                    .build();
+            billPaymentRepository.save(payment);
+        }
+
+        bill.setUpdatedAt(now);
+        TableBill saved = tableBillRepository.save(bill);
+
+        if (isFullyPaid(saved)) {
+            BigDecimal tipAmount = resolveTipAmount(request.getTipReceived(), request.getTipAmount());
+            if (tipAmount != null) {
+                recordTipPayment(saved, waiter, request.getPaymentMethod(), tipAmount, now);
+            }
+            saved = finalizeBillClose(saved, waiter, request.getPaymentMethod(), tipAmount, now);
+        }
+
+        return toBillResponse(saved, null);
     }
 
     @Transactional
@@ -186,24 +259,108 @@ public class TableBillService {
 
         TableBill bill = requireOpenBill(menuId, billId);
         recalculateTotal(bill);
+        LocalDateTime now = LocalDateTime.now();
+
+        payAllRemainingItems(bill, waiter, paymentMethod, now);
 
         BigDecimal resolvedTipAmount = resolveTipAmount(tipReceived, tipAmount);
+        if (resolvedTipAmount != null) {
+            recordTipPayment(bill, waiter, paymentMethod, resolvedTipAmount, now);
+        }
 
-        LocalDateTime now = LocalDateTime.now();
+        TableBill saved = finalizeBillClose(bill, waiter, paymentMethod, resolvedTipAmount, now);
+        return toBillResponse(saved, null);
+    }
+
+    private void payAllRemainingItems(
+            TableBill bill,
+            MenuWaiter waiter,
+            TableBillPaymentMethod paymentMethod,
+            LocalDateTime now
+    ) {
+        if (bill.getItems() == null) {
+            return;
+        }
+        for (TableBillItem item : bill.getItems()) {
+            int unpaid = item.getQuantity() - item.getPaidQuantity();
+            if (unpaid <= 0) {
+                continue;
+            }
+            BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(unpaid))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            item.setPaidQuantity(item.getQuantity());
+            item.setUpdatedAt(now);
+
+            BillPayment payment = BillPayment.builder()
+                    .bill(bill)
+                    .billItem(item)
+                    .waiterId(waiter.getId())
+                    .paymentMethod(paymentMethod)
+                    .amount(amount)
+                    .quantityPaid(unpaid)
+                    .tip(false)
+                    .paidAt(now)
+                    .createdAt(now)
+                    .build();
+            billPaymentRepository.save(payment);
+        }
+    }
+
+    private void recordTipPayment(
+            TableBill bill,
+            MenuWaiter waiter,
+            TableBillPaymentMethod paymentMethod,
+            BigDecimal tipAmount,
+            LocalDateTime now
+    ) {
+        BillPayment tipPayment = BillPayment.builder()
+                .bill(bill)
+                .waiterId(waiter.getId())
+                .paymentMethod(paymentMethod)
+                .amount(tipAmount)
+                .quantityPaid(0)
+                .tip(true)
+                .paidAt(now)
+                .createdAt(now)
+                .build();
+        billPaymentRepository.save(tipPayment);
+    }
+
+    private TableBill finalizeBillClose(
+            TableBill bill,
+            MenuWaiter waiter,
+            TableBillPaymentMethod paymentMethod,
+            BigDecimal tipAmount,
+            LocalDateTime now
+    ) {
         bill.setStatus(TableBillStatus.CLOSED);
         bill.setClosedByWaiterId(waiter.getId());
         bill.setClosedAt(now);
         bill.setPaymentMethod(paymentMethod);
-        bill.setTipAmount(resolvedTipAmount);
+        bill.setTipAmount(tipAmount);
         bill.setUpdatedAt(now);
 
         TableBill saved = tableBillRepository.save(bill);
         revokeSessionsForTable(bill.getTableId());
 
-        Menu menu = menuRepository.findById(menuId).orElse(null);
-        userAccountingService.recordBillCloseIncome(menu, saved, waiter, resolvedTipAmount);
+        Menu menu = menuRepository.findById(bill.getMenuId()).orElse(null);
+        userAccountingService.recordBillCloseIncome(menu, saved, waiter, tipAmount);
 
-        return toBillResponse(saved, null);
+        return saved;
+    }
+
+    private boolean isFullyPaid(TableBill bill) {
+        if (bill.getItems() == null || bill.getItems().isEmpty()) {
+            return true;
+        }
+        for (TableBillItem item : bill.getItems()) {
+            if (item.getPaidQuantity() < item.getQuantity()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private BigDecimal resolveTipAmount(Boolean tipReceived, BigDecimal tipAmount) {
@@ -241,22 +398,44 @@ public class TableBillService {
                 .map(RestaurantTable::getName)
                 .orElse(null);
 
+        BigDecimal paidTotal = BigDecimal.ZERO;
         List<TableBillDtos.BillItemResponse> items = bill.getItems() == null
                 ? List.of()
                 : bill.getItems().stream()
-                .map(item -> TableBillDtos.BillItemResponse.builder()
-                        .id(item.getId())
-                        .productId(item.getProductId())
-                        .productName(item.getProductName())
-                        .unitPrice(item.getUnitPrice())
-                        .quantity(item.getQuantity())
-                        .lineTotal(item.getLineTotal())
-                        .note(item.getNote())
-                        .sourceOrderId(item.getSourceOrderId())
-                        .addedByWaiterId(item.getAddedByWaiterId())
-                        .createdAt(item.getCreatedAt())
-                        .build())
+                .map(item -> {
+                    BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+                    int paidQty = Math.max(0, item.getPaidQuantity());
+                    int unpaidQty = Math.max(0, item.getQuantity() - paidQty);
+                    BigDecimal paidAmount = unitPrice.multiply(BigDecimal.valueOf(paidQty))
+                            .setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal unpaidAmount = unitPrice.multiply(BigDecimal.valueOf(unpaidQty))
+                            .setScale(2, RoundingMode.HALF_UP);
+                    return TableBillDtos.BillItemResponse.builder()
+                            .id(item.getId())
+                            .productId(item.getProductId())
+                            .productName(item.getProductName())
+                            .unitPrice(item.getUnitPrice())
+                            .quantity(item.getQuantity())
+                            .paidQuantity(paidQty)
+                            .unpaidQuantity(unpaidQty)
+                            .paidAmount(paidAmount)
+                            .unpaidAmount(unpaidAmount)
+                            .lineTotal(item.getLineTotal())
+                            .note(item.getNote())
+                            .sourceOrderId(item.getSourceOrderId())
+                            .addedByWaiterId(item.getAddedByWaiterId())
+                            .createdAt(item.getCreatedAt())
+                            .build();
+                })
                 .toList();
+
+        for (TableBillDtos.BillItemResponse item : items) {
+            paidTotal = paidTotal.add(item.getPaidAmount() != null ? item.getPaidAmount() : BigDecimal.ZERO);
+        }
+
+        BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal remainingTotal = totalAmount.subtract(paidTotal).max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
 
         return TableBillDtos.BillResponse.builder()
                 .id(bill.getId())
@@ -269,7 +448,9 @@ public class TableBillService {
                 .openedAt(bill.getOpenedAt())
                 .closedAt(bill.getClosedAt())
                 .paymentMethod(bill.getPaymentMethod())
-                .totalAmount(bill.getTotalAmount())
+                .totalAmount(totalAmount)
+                .paidTotal(paidTotal)
+                .remainingTotal(remainingTotal)
                 .currency(bill.getCurrency())
                 .itemCount(items.size())
                 .items(items)

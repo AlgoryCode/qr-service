@@ -266,7 +266,31 @@ public class AnalyticsDtos {
             List<RevenueCategory> categories,
             RevenueSpotlight spotlight,
             List<HourlyRevenuePoint> hourly,
-            UnsoldCatalog unsold
+            UnsoldCatalog unsold,
+            RevenuePaymentBreakdown paymentBreakdown,
+            List<RevenuePersonnelRow> personnel
+    ) {
+    }
+
+    public record RevenuePaymentBreakdown(
+            BigDecimal cashRevenue,
+            BigDecimal cardRevenue,
+            BigDecimal tipRevenue,
+            BigDecimal grossRevenue,
+            BigDecimal fixedExpenseTotal,
+            BigDecimal netRevenue,
+            String currency
+    ) {
+    }
+
+    public record RevenuePersonnelRow(
+            Long waiterId,
+            String displayName,
+            BigDecimal revenue,
+            BigDecimal cashRevenue,
+            BigDecimal cardRevenue,
+            BigDecimal tipRevenue,
+            boolean active
     ) {
     }
 

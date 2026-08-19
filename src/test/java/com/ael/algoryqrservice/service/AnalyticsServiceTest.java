@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
@@ -9,9 +10,13 @@ import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.SubCategory;
+import com.ael.algoryqrservice.model.TableBill;
+import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
@@ -66,6 +71,10 @@ class AnalyticsServiceTest {
     private MenuOrderRepository menuOrderRepository;
     @Mock
     private MenuWaiterRepository menuWaiterRepository;
+    @Mock
+    private BillPaymentRepository billPaymentRepository;
+    @Mock
+    private MenuFixedExpenseService menuFixedExpenseService;
 
     private AnalyticsService service;
 
@@ -81,7 +90,9 @@ class AnalyticsServiceTest {
                 subCategoryRepository,
                 menuFeedbackService,
                 menuOrderRepository,
-                menuWaiterRepository
+                menuWaiterRepository,
+                billPaymentRepository,
+                menuFixedExpenseService
         );
     }
 
@@ -259,7 +270,7 @@ class AnalyticsServiceTest {
     }
 
     @Test
-    void getMenuRevenueReport_whenConfirmedOrders_thenSplitsSpotlightHourlyAndUnsold() {
+    void getMenuRevenueReport_whenBillPayments_thenSplitsSpotlightHourlyAndUnsold() {
         Long menuId = 5L;
         Long ownerId = 9L;
         LocalDate day = LocalDate.of(2026, 8, 13);
@@ -279,24 +290,24 @@ class AnalyticsServiceTest {
                         .name("Icecek")
                         .sortOrder(1)
                         .build()));
+        when(menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId)).thenReturn(List.of());
+        when(menuFixedExpenseService.totalDailyActiveAmount(menuId)).thenReturn(BigDecimal.ZERO);
 
-        MenuOrder order = MenuOrder.builder()
-                .id(20L)
-                .menuId(menuId)
-                .tableId(1L)
-                .tableSessionId(UUID.randomUUID())
-                .status(MenuOrderStatus.CONFIRMED)
-                .totalAmount(new BigDecimal("260.00"))
-                .currency("TRY")
-                .confirmedAt(LocalDateTime.of(2026, 8, 13, 14, 30))
-                .build();
-        order.addItem(line(1L, "Ayran", 10, "50.00"));
-        order.addItem(line(2L, "Izgara", 2, "200.00"));
-        order.addItem(line(3L, "Cay", 1, "10.00"));
+        TableBill bill = TableBill.builder().id(20L).menuId(menuId).currency("TRY").build();
+        TableBillItem ayran = TableBillItem.builder()
+                .id(1L).productId(1L).productName("Ayran").quantity(10).paidQuantity(10).build();
+        TableBillItem izgara = TableBillItem.builder()
+                .id(2L).productId(2L).productName("Izgara").quantity(2).paidQuantity(2).build();
+        TableBillItem cay = TableBillItem.builder()
+                .id(3L).productId(3L).productName("Cay").quantity(1).paidQuantity(1).build();
+        LocalDateTime paidAt = LocalDateTime.of(2026, 8, 13, 14, 30);
 
-        when(menuOrderRepository.findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
-                eq(menuId), eq(MenuOrderStatus.CONFIRMED), any(), any()
-        )).thenReturn(List.of(order));
+        when(billPaymentRepository.findByMenuIdAndPaidAtBetween(eq(menuId), any(), any()))
+                .thenReturn(List.of(
+                        payment(bill, ayran, new BigDecimal("50.00"), 10, paidAt),
+                        payment(bill, izgara, new BigDecimal("200.00"), 2, paidAt),
+                        payment(bill, cay, new BigDecimal("10.00"), 1, paidAt)
+                ));
 
         AnalyticsDtos.MenuRevenueReportResponse report = service.getMenuRevenueReport(menuId, ownerId, day, day);
 
@@ -308,8 +319,28 @@ class AnalyticsServiceTest {
         assertThat(report.unsold().count()).isEqualTo(1L);
         assertThat(report.unsold().products()).extracting(AnalyticsDtos.UnsoldProduct::name).containsExactly("Salata");
         assertThat(report.hourly()).hasSize(24);
-        assertThat(report.hourly().get(14).orderCount()).isEqualTo(1L);
+        assertThat(report.hourly().get(14).orderCount()).isEqualTo(3L);
         assertThat(report.hourly().get(14).revenue()).isEqualByComparingTo("260.00");
+        assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("260.00");
+    }
+
+    private BillPayment payment(
+            TableBill bill,
+            TableBillItem item,
+            BigDecimal amount,
+            int quantityPaid,
+            LocalDateTime paidAt
+    ) {
+        return BillPayment.builder()
+                .bill(bill)
+                .billItem(item)
+                .paymentMethod(TableBillPaymentMethod.CASH)
+                .amount(amount)
+                .quantityPaid(quantityPaid)
+                .tip(false)
+                .paidAt(paidAt)
+                .createdAt(paidAt)
+                .build();
     }
 
     @Test

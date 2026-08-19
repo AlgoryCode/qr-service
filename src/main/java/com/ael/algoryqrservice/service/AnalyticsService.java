@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
@@ -14,6 +15,9 @@ import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.TableBillItem;
+import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
@@ -70,6 +74,8 @@ public class AnalyticsService {
     private final MenuFeedbackService menuFeedbackService;
     private final MenuOrderRepository menuOrderRepository;
     private final MenuWaiterRepository menuWaiterRepository;
+    private final BillPaymentRepository billPaymentRepository;
+    private final MenuFixedExpenseService menuFixedExpenseService;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -277,13 +283,7 @@ public class AnalyticsService {
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
 
-        List<MenuOrder> orders = menuOrderRepository
-                .findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
-                        menuId,
-                        MenuOrderStatus.CONFIRMED,
-                        fromDt,
-                        toDt
-                );
+        List<BillPayment> payments = billPaymentRepository.findByMenuIdAndPaidAtBetween(menuId, fromDt, toDt);
 
         Map<Long, MenuProduct> productsById = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).stream()
@@ -291,7 +291,12 @@ public class AnalyticsService {
         Map<Long, String> categoryNames = subCategoryRepository
                 .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
                 .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
+        Map<Long, MenuWaiter> waitersById = menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId).stream()
+                .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
 
+        BigDecimal cashRevenue = BigDecimal.ZERO;
+        BigDecimal cardRevenue = BigDecimal.ZERO;
+        BigDecimal tipRevenue = BigDecimal.ZERO;
         BigDecimal totalRevenue = BigDecimal.ZERO;
         long itemCount = 0L;
         String currency = "TRY";
@@ -301,42 +306,54 @@ public class AnalyticsService {
         Map<Integer, Long> ordersByHour = new HashMap<>();
         Map<Long, AnalyticsDtos.RevenueProduct> products = new LinkedHashMap<>();
         Map<Long, AnalyticsDtos.RevenueCategory> categories = new LinkedHashMap<>();
+        Map<Long, PersonnelPaymentAgg> personnelStats = new LinkedHashMap<>();
+        Set<Long> distinctBills = new java.util.HashSet<>();
 
-        for (MenuOrder order : orders) {
-            BigDecimal orderTotal = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
-            totalRevenue = totalRevenue.add(orderTotal);
-            if (order.getCurrency() != null && !order.getCurrency().isBlank()) {
-                currency = order.getCurrency();
+        for (BillPayment payment : payments) {
+            BigDecimal amount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+            if (payment.getBill() != null && payment.getBill().getCurrency() != null
+                    && !payment.getBill().getCurrency().isBlank()) {
+                currency = payment.getBill().getCurrency();
             }
-            LocalDate day = order.getConfirmedAt() != null
-                    ? order.getConfirmedAt().toLocalDate()
-                    : from;
-            int hour = order.getConfirmedAt() != null ? order.getConfirmedAt().getHour() : 0;
-            revenueByDay.merge(day, orderTotal, BigDecimal::add);
-            ordersByDay.merge(day, 1L, Long::sum);
-            revenueByHour.merge(hour, orderTotal, BigDecimal::add);
-            ordersByHour.merge(hour, 1L, Long::sum);
 
-            List<MenuOrderItem> items = order.getItems() == null ? List.of() : order.getItems();
-            for (MenuOrderItem item : items) {
-                long qty = item.getQuantity();
+            if (payment.isTip()) {
+                tipRevenue = tipRevenue.add(amount);
+            } else if (payment.getPaymentMethod() == TableBillPaymentMethod.CASH) {
+                cashRevenue = cashRevenue.add(amount);
+            } else if (payment.getPaymentMethod() == TableBillPaymentMethod.CARD) {
+                cardRevenue = cardRevenue.add(amount);
+            }
+            totalRevenue = totalRevenue.add(amount);
+
+            LocalDate day = payment.getPaidAt() != null ? payment.getPaidAt().toLocalDate() : from;
+            int hour = payment.getPaidAt() != null ? payment.getPaidAt().getHour() : 0;
+            revenueByDay.merge(day, amount, BigDecimal::add);
+            revenueByHour.merge(hour, amount, BigDecimal::add);
+
+            if (payment.getBill() != null) {
+                distinctBills.add(payment.getBill().getId());
+            }
+
+            if (!payment.isTip()) {
+                ordersByDay.merge(day, 0L, (a, b) -> a);
+                ordersByHour.merge(hour, 0L, (a, b) -> a);
+            }
+
+            TableBillItem billItem = payment.getBillItem();
+            if (billItem != null && !payment.isTip()) {
+                long qty = payment.getQuantityPaid();
                 itemCount += qty;
-                BigDecimal line = item.getLineTotal() != null
-                        ? item.getLineTotal()
-                        : (item.getUnitPrice() != null
-                                ? item.getUnitPrice().multiply(BigDecimal.valueOf(qty))
-                                : BigDecimal.ZERO);
 
-                Long productId = item.getProductId();
+                Long productId = billItem.getProductId();
                 AnalyticsDtos.RevenueProduct existingProduct = products.get(productId);
-                String productName = item.getProductName() != null
-                        ? item.getProductName()
+                String productName = billItem.getProductName() != null
+                        ? billItem.getProductName()
                         : "Ürün #" + productId;
                 products.put(productId, new AnalyticsDtos.RevenueProduct(
                         productId,
                         productName,
                         (existingProduct == null ? 0L : existingProduct.quantity()) + qty,
-                        (existingProduct == null ? BigDecimal.ZERO : existingProduct.revenue()).add(line)
+                        (existingProduct == null ? BigDecimal.ZERO : existingProduct.revenue()).add(amount)
                 ));
 
                 MenuProduct catalog = productsById.get(productId);
@@ -350,9 +367,30 @@ public class AnalyticsService {
                         categoryKey == 0L ? null : categoryKey,
                         categoryName,
                         (existingCategory == null ? 0L : existingCategory.quantity()) + qty,
-                        (existingCategory == null ? BigDecimal.ZERO : existingCategory.revenue()).add(line)
+                        (existingCategory == null ? BigDecimal.ZERO : existingCategory.revenue()).add(amount)
                 ));
             }
+
+            if (payment.getWaiterId() != null) {
+                PersonnelPaymentAgg stats = personnelStats.computeIfAbsent(
+                        payment.getWaiterId(),
+                        ignored -> new PersonnelPaymentAgg()
+                );
+                stats.add(payment);
+            }
+        }
+
+        Map<LocalDate, java.util.Set<Long>> billsByDay = new HashMap<>();
+        for (BillPayment payment : payments) {
+            if (payment.isTip() || payment.getPaidAt() == null || payment.getBill() == null) {
+                continue;
+            }
+            LocalDate day = payment.getPaidAt().toLocalDate();
+            billsByDay.computeIfAbsent(day, ignored -> new java.util.HashSet<>())
+                    .add(payment.getBill().getId());
+        }
+        for (Map.Entry<LocalDate, java.util.Set<Long>> entry : billsByDay.entrySet()) {
+            ordersByDay.put(entry.getKey(), (long) entry.getValue().size());
         }
 
         List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
@@ -371,19 +409,62 @@ public class AnalyticsService {
                 .sorted(Comparator.comparing(AnalyticsDtos.RevenueCategory::revenue).reversed())
                 .toList();
 
+        Map<Integer, Long> paymentsByHour = new HashMap<>();
+        for (BillPayment payment : payments) {
+            if (payment.isTip() || payment.getPaidAt() == null) {
+                continue;
+            }
+            int hour = payment.getPaidAt().getHour();
+            paymentsByHour.merge(hour, 1L, Long::sum);
+        }
+
         List<AnalyticsDtos.HourlyRevenuePoint> hourly = new ArrayList<>();
         for (int hour = 0; hour < 24; hour++) {
             hourly.add(new AnalyticsDtos.HourlyRevenuePoint(
                     hour,
                     revenueByHour.getOrDefault(hour, BigDecimal.ZERO),
-                    ordersByHour.getOrDefault(hour, 0L)
+                    paymentsByHour.getOrDefault(hour, 0L)
             ));
         }
 
-        long orderCount = orders.size();
+        long orderCount = distinctBills.size();
         BigDecimal avgOrderValue = orderCount == 0
                 ? BigDecimal.ZERO
-                : totalRevenue.divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
+                : totalRevenue.subtract(tipRevenue).divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
+
+        long dayCount = from.until(to).getDays() + 1L;
+        BigDecimal dailyFixedTotal = menuFixedExpenseService.totalDailyActiveAmount(menuId);
+        BigDecimal fixedExpenseTotal = dailyFixedTotal.multiply(BigDecimal.valueOf(dayCount))
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal grossRevenue = totalRevenue;
+        BigDecimal netRevenue = grossRevenue.subtract(fixedExpenseTotal).max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        List<AnalyticsDtos.RevenuePersonnelRow> personnelRows = new ArrayList<>();
+        for (Map.Entry<Long, PersonnelPaymentAgg> entry : personnelStats.entrySet()) {
+            MenuWaiter waiter = waitersById.get(entry.getKey());
+            PersonnelPaymentAgg stats = entry.getValue();
+            personnelRows.add(new AnalyticsDtos.RevenuePersonnelRow(
+                    entry.getKey(),
+                    waiter != null ? waiter.getDisplayName() : "Personel #" + entry.getKey(),
+                    stats.total,
+                    stats.cash,
+                    stats.card,
+                    stats.tip,
+                    waiter == null || waiter.isActive()
+            ));
+        }
+        personnelRows.sort(Comparator.comparing(AnalyticsDtos.RevenuePersonnelRow::revenue).reversed());
+
+        AnalyticsDtos.RevenuePaymentBreakdown paymentBreakdown = new AnalyticsDtos.RevenuePaymentBreakdown(
+                cashRevenue.setScale(2, RoundingMode.HALF_UP),
+                cardRevenue.setScale(2, RoundingMode.HALF_UP),
+                tipRevenue.setScale(2, RoundingMode.HALF_UP),
+                grossRevenue.setScale(2, RoundingMode.HALF_UP),
+                fixedExpenseTotal,
+                netRevenue,
+                currency
+        );
 
         return new AnalyticsDtos.MenuRevenueReportResponse(
                 menu.getMenuId(),
@@ -396,8 +477,29 @@ public class AnalyticsService {
                 categoryRows,
                 buildRevenueSpotlight(productRows),
                 hourly,
-                buildUnsoldCatalog(productsById, products.keySet())
+                buildUnsoldCatalog(productsById, products.keySet()),
+                paymentBreakdown,
+                personnelRows
         );
+    }
+
+    private static final class PersonnelPaymentAgg {
+        private BigDecimal total = BigDecimal.ZERO;
+        private BigDecimal cash = BigDecimal.ZERO;
+        private BigDecimal card = BigDecimal.ZERO;
+        private BigDecimal tip = BigDecimal.ZERO;
+
+        private void add(BillPayment payment) {
+            BigDecimal amount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+            total = total.add(amount);
+            if (payment.isTip()) {
+                tip = tip.add(amount);
+            } else if (payment.getPaymentMethod() == TableBillPaymentMethod.CASH) {
+                cash = cash.add(amount);
+            } else if (payment.getPaymentMethod() == TableBillPaymentMethod.CARD) {
+                card = card.add(amount);
+            }
+        }
     }
 
     @Transactional(readOnly = true)
