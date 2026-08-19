@@ -19,6 +19,8 @@ USER spring:spring
 
 COPY --from=builder /app/target/*.jar app.jar
 
+LABEL org.opencontainers.image.source="https://github.com/AlgoryCode/qr-service"
+
 EXPOSE 8055
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
