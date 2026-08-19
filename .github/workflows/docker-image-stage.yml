@@ -14,14 +14,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Generate Short Commit Hash
-        id: versioning
+      # Kullanıcı ve repo adını küçük harfe çevirme + Hash alma
+      - name: Set Lowercase Repository & Commit Hash
+        id: prep
         run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           COMMIT_HASH=${GITHUB_SHA::7}
-          IMAGE_NAME="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "IMAGE_BASE=ghcr.io/${REPO_LOWER}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${COMMIT_HASH}" >> $GITHUB_ENV
-          echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_ENV
-          echo "Ortam: STAGING | Commit Hash: ${COMMIT_HASH}"
+          echo "Küçük Harf Depo Adı: ghcr.io/${REPO_LOWER}"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -36,8 +37,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_NAME }}:staging
+            ${{ env.IMAGE_BASE }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_BASE }}:staging
 
       - name: Trigger Staging Coolify
         run: |
