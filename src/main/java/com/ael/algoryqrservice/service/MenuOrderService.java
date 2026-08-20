@@ -50,7 +50,6 @@ public class MenuOrderService {
     private final TableSessionService tableSessionService;
     private final TableBillService tableBillService;
     private final WaiterCommissionService waiterCommissionService;
-    private final UserAccountingService userAccountingService;
     private final CampaignEvaluationService campaignEvaluationService;
     private final SecurityUtils securityUtils;
 
@@ -130,7 +129,6 @@ public class MenuOrderService {
         tableBillService.addItemsFromOrder(bill, saved, waiterId);
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
         menuOrderRepository.save(saved);
-        userAccountingService.recordConfirmedOrderIncome(saved);
         campaignEvaluationService.onOrderConfirmed(saved);
         return toOrderResponse(saved);
     }
@@ -186,7 +184,6 @@ public class MenuOrderService {
         order.setBillId(bill.getId());
         MenuOrder saved = menuOrderRepository.save(order);
         tableBillService.addItemsFromOrder(bill, saved, null);
-        userAccountingService.recordConfirmedOrderIncome(saved);
         campaignEvaluationService.onOrderConfirmed(saved);
         return toOrderResponse(saved);
     }

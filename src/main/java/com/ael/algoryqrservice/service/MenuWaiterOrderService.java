@@ -49,7 +49,6 @@ public class MenuWaiterOrderService {
     private final MenuTaxonomyService menuTaxonomyService;
     private final TableBillService tableBillService;
     private final WaiterCommissionService waiterCommissionService;
-    private final UserAccountingService userAccountingService;
     private final CampaignEvaluationService campaignEvaluationService;
     private final SecurityUtils securityUtils;
 
@@ -150,7 +149,6 @@ public class MenuWaiterOrderService {
         tableBillService.addItemsFromOrder(bill, saved, waiter.getId());
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
         menuOrderRepository.save(saved);
-        userAccountingService.recordConfirmedOrderIncome(saved);
         campaignEvaluationService.onOrderConfirmed(saved);
         return menuOrderService.toOrderResponse(saved);
     }

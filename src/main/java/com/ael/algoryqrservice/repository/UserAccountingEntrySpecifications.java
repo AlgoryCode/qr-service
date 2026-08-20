@@ -39,7 +39,8 @@ public final class UserAccountingEntrySpecifications {
             if (excludeBillDerivedSources) {
                 predicates.add(cb.not(root.get("sourceType").in(
                         AccountingSourceType.BILL_SALE,
-                        AccountingSourceType.BILL_TIP
+                        AccountingSourceType.BILL_TIP,
+                        AccountingSourceType.ORDER_SALE
                 )));
             }
             if (entryType != null) {

@@ -3,14 +3,12 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Menu;
-import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.UserAccountingEntry;
 import com.ael.algoryqrservice.model.dto.UserAccountingDtos;
 import com.ael.algoryqrservice.model.enums.AccountingEntryType;
 import com.ael.algoryqrservice.model.enums.AccountingLineType;
 import com.ael.algoryqrservice.model.enums.AccountingSourceType;
-import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
@@ -141,48 +139,6 @@ public class UserAccountingService {
         userAccountingEntryRepository.delete(entry);
     }
 
-    @Transactional
-    public void recordConfirmedOrderIncome(MenuOrder order) {
-        if (order == null || order.getStatus() != MenuOrderStatus.CONFIRMED) {
-            return;
-        }
-        if (order.getTotalAmount() == null || order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            return;
-        }
-        if (userAccountingEntryRepository.existsBySourceTypeAndSourceOrderId(
-                AccountingSourceType.ORDER_SALE,
-                order.getId()
-        )) {
-            return;
-        }
-
-        Menu menu = menuRepository.findById(order.getMenuId()).orElse(null);
-        if (menu == null) {
-            return;
-        }
-
-        LocalDateTime occurredAt = order.getConfirmedAt() != null
-                ? order.getConfirmedAt()
-                : order.getSubmittedAt() != null ? order.getSubmittedAt() : order.getCreatedAt();
-        if (occurredAt == null) {
-            occurredAt = LocalDateTime.now();
-        }
-
-        createSystemEntry(
-                menu.getUserId(),
-                AccountingEntryType.GELIR,
-                "Sipariş #" + order.getId(),
-                order.getTotalAmount(),
-                order.getCurrency(),
-                occurredAt,
-                menu.getMenuId(),
-                AccountingSourceType.ORDER_SALE,
-                null,
-                order.getId(),
-                order.getWaiterId()
-        );
-    }
-
     private List<UserAccountingDtos.LineItemResponse> buildBillLines(
             Long userId,
             AccountingEntryType typeFilter,
@@ -300,38 +256,6 @@ public class UserAccountingService {
                 entry.getMenuId() == null ? null : menuNames.get(entry.getMenuId()),
                 entry.getCreatedAt()
         );
-    }
-
-    private void createSystemEntry(
-            Long userId,
-            AccountingEntryType entryType,
-            String title,
-            BigDecimal amount,
-            String currency,
-            LocalDateTime occurredAt,
-            Long menuId,
-            AccountingSourceType sourceType,
-            Long sourceBillId,
-            Long sourceOrderId,
-            Long createdByWaiterId
-    ) {
-        LocalDateTime now = LocalDateTime.now();
-        UserAccountingEntry entry = UserAccountingEntry.builder()
-                .userId(userId)
-                .entryType(entryType)
-                .title(title)
-                .amount(amount)
-                .currency(currency != null && !currency.isBlank() ? currency : "TRY")
-                .occurredAt(occurredAt)
-                .menuId(menuId)
-                .sourceType(sourceType)
-                .sourceBillId(sourceBillId)
-                .sourceOrderId(sourceOrderId)
-                .createdByWaiterId(createdByWaiterId)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-        userAccountingEntryRepository.save(entry);
     }
 
     private UserAccountingDtos.SummaryTotals buildSummary(List<UserAccountingDtos.LineItemResponse> lines) {
