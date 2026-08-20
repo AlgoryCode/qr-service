@@ -61,6 +61,18 @@ public class MenuWaiterBillService {
     }
 
     @Transactional
+    public TableBillDtos.BillResponse payShare(Long billId, TableBillDtos.PayBillShareRequest request) {
+        MenuWaiter waiter = requireCurrentWaiter();
+        return tableBillService.payShare(waiter.getMenuId(), billId, waiter, request);
+    }
+
+    @Transactional(readOnly = true)
+    public TableBillDtos.SplitPreviewResponse getSplitPreview(Long billId, int personCount) {
+        MenuWaiter waiter = requireCurrentWaiter();
+        return tableBillService.getSplitPreview(waiter.getMenuId(), billId, personCount);
+    }
+
+    @Transactional
     public TableBillDtos.BillResponse closeBill(Long billId, TableBillDtos.CloseBillRequest request) {
         MenuWaiter waiter = requireCurrentWaiter();
         return tableBillService.closeBill(

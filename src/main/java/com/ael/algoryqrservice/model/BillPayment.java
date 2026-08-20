@@ -55,6 +55,12 @@ public class BillPayment {
     @Builder.Default
     private boolean tip = false;
 
+    @Column(name = "split_share_number")
+    private Integer splitShareNumber;
+
+    @Column(name = "split_person_count")
+    private Integer splitPersonCount;
+
     @Column(name = "paid_at", nullable = false)
     private LocalDateTime paidAt;
 

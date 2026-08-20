@@ -37,7 +37,7 @@ public class UserAccountingController {
     }
 
     @PostMapping
-    public ResponseEntity<UserAccountingDtos.EntryResponse> create(
+    public ResponseEntity<UserAccountingDtos.LineItemResponse> create(
             @Valid @RequestBody UserAccountingDtos.CreateRequest request
     ) {
         return ResponseEntity.status(201).body(userAccountingService.createManual(request));

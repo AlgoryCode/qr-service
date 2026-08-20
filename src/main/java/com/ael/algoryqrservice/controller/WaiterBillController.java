@@ -73,6 +73,22 @@ public class WaiterBillController {
         return ResponseEntity.ok(menuWaiterBillService.payItems(billId, request));
     }
 
+    @PostMapping("/{billId}/pay-share")
+    public ResponseEntity<TableBillDtos.BillResponse> payShare(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.PayBillShareRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.payShare(billId, request));
+    }
+
+    @GetMapping("/{billId}/split-preview")
+    public ResponseEntity<TableBillDtos.SplitPreviewResponse> getSplitPreview(
+            @PathVariable Long billId,
+            @org.springframework.web.bind.annotation.RequestParam int personCount
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.getSplitPreview(billId, personCount));
+    }
+
     @PostMapping("/{billId}/close")
     public ResponseEntity<TableBillDtos.BillResponse> closeBill(
             @PathVariable Long billId,

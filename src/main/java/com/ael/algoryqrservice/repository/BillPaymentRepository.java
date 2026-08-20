@@ -26,4 +26,8 @@ public interface BillPaymentRepository extends JpaRepository<BillPayment, Long> 
             @Param("fromDt") LocalDateTime fromDt,
             @Param("toDt") LocalDateTime toDt
     );
+
+    List<BillPayment> findByBillIdOrderByPaidAtAsc(Long billId);
+
+    boolean existsByBillIdAndSplitShareNumber(Long billId, Integer splitShareNumber);
 }

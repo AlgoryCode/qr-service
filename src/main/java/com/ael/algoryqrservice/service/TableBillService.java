@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +43,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TableBillService {
 
+    private static final int MAX_SPLIT_PERSON_COUNT = 20;
+
     private final TableBillRepository tableBillRepository;
     private final TableBillItemRepository tableBillItemRepository;
     private final BillPaymentRepository billPaymentRepository;
@@ -52,7 +55,6 @@ public class TableBillService {
     private final RestaurantTableRepository restaurantTableRepository;
     private final MenuWaiterRepository menuWaiterRepository;
     private final WaiterCommissionService waiterCommissionService;
-    private final UserAccountingService userAccountingService;
 
     @Transactional
     public TableBill getOrOpenBill(Long menuId, Long tableId, Long waiterId) {
@@ -245,6 +247,127 @@ public class TableBillService {
     }
 
     @Transactional
+    public TableBillDtos.BillResponse payShare(
+            Long menuId,
+            Long billId,
+            MenuWaiter waiter,
+            TableBillDtos.PayBillShareRequest request
+    ) {
+        if (request == null || request.getPaymentMethod() == null) {
+            throw new BadRequestException("Ödeme yöntemi seçilmelidir");
+        }
+        if (request.getPersonCount() == null || request.getPersonCount() < 2) {
+            throw new BadRequestException("Kişi adedi en az 2 olmalıdır");
+        }
+        if (request.getPersonCount() > MAX_SPLIT_PERSON_COUNT) {
+            throw new BadRequestException("Kişi adedi en fazla " + MAX_SPLIT_PERSON_COUNT + " olabilir");
+        }
+        if (request.getShareNumber() == null
+                || request.getShareNumber() < 1
+                || request.getShareNumber() > request.getPersonCount()) {
+            throw new BadRequestException("Geçersiz pay numarası");
+        }
+
+        TableBill bill = requireOpenBill(menuId, billId);
+        recalculateTotal(bill);
+        LocalDateTime now = LocalDateTime.now();
+
+        List<BillPayment> existingSplitPayments = loadSplitPayments(bill.getId());
+        validateSplitPersonCountConsistency(existingSplitPayments, request.getPersonCount());
+
+        if (billPaymentRepository.existsByBillIdAndSplitShareNumber(bill.getId(), request.getShareNumber())) {
+            throw new BadRequestException("Bu pay zaten ödendi");
+        }
+
+        BigDecimal itemPaidTotal = computeItemPaidTotal(bill);
+        BigDecimal splitPaidTotal = sumSplitPaymentAmounts(existingSplitPayments);
+        BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal currentRemaining = totalAmount.subtract(itemPaidTotal).subtract(splitPaidTotal)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (currentRemaining.compareTo(BigDecimal.ZERO) <= 0 && existingSplitPayments.isEmpty()) {
+            throw new BadRequestException("Kalan tutar bulunmuyor");
+        }
+
+        BigDecimal splitBaseRemaining = currentRemaining.add(splitPaidTotal);
+        BigDecimal[] shares = calculateEqualShares(splitBaseRemaining, request.getPersonCount());
+        BigDecimal shareAmount = shares[request.getShareNumber() - 1];
+
+        BillPayment payment = BillPayment.builder()
+                .bill(bill)
+                .waiterId(waiter.getId())
+                .paymentMethod(request.getPaymentMethod())
+                .amount(shareAmount)
+                .quantityPaid(0)
+                .tip(false)
+                .splitShareNumber(request.getShareNumber())
+                .splitPersonCount(request.getPersonCount())
+                .paidAt(now)
+                .createdAt(now)
+                .build();
+        billPaymentRepository.save(payment);
+
+        bill.setUpdatedAt(now);
+        TableBill saved = tableBillRepository.save(bill);
+
+        int paidShareCount = existingSplitPayments.size() + 1;
+        if (paidShareCount >= request.getPersonCount()) {
+            payAllRemainingItems(saved, waiter, request.getPaymentMethod(), now);
+            BigDecimal tipAmount = resolveTipAmount(request.getTipReceived(), request.getTipAmount());
+            if (tipAmount != null) {
+                recordTipPayment(saved, waiter, request.getPaymentMethod(), tipAmount, now);
+            }
+            saved = finalizeBillClose(saved, waiter, request.getPaymentMethod(), tipAmount, now);
+        }
+
+        return toBillResponse(saved, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TableBillDtos.SplitPreviewResponse getSplitPreview(Long menuId, Long billId, int personCount) {
+        if (personCount < 2 || personCount > MAX_SPLIT_PERSON_COUNT) {
+            throw new BadRequestException("Kişi adedi 2 ile " + MAX_SPLIT_PERSON_COUNT + " arasında olmalıdır");
+        }
+
+        TableBill bill = requireOpenBill(menuId, billId);
+        recalculateTotal(bill);
+
+        List<BillPayment> existingSplitPayments = loadSplitPayments(bill.getId());
+        validateSplitPersonCountConsistency(existingSplitPayments, personCount);
+
+        BigDecimal itemPaidTotal = computeItemPaidTotal(bill);
+        BigDecimal splitPaidTotal = sumSplitPaymentAmounts(existingSplitPayments);
+        BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal remainingTotal = totalAmount.subtract(itemPaidTotal).subtract(splitPaidTotal)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal splitBaseRemaining = remainingTotal.add(splitPaidTotal);
+        BigDecimal[] shares = calculateEqualShares(splitBaseRemaining, personCount);
+        Set<Integer> paidShareNumbers = existingSplitPayments.stream()
+                .map(BillPayment::getSplitShareNumber)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<TableBillDtos.SplitSharePreview> sharePreviews = new ArrayList<>();
+        for (int i = 0; i < personCount; i++) {
+            int shareNumber = i + 1;
+            sharePreviews.add(TableBillDtos.SplitSharePreview.builder()
+                    .shareNumber(shareNumber)
+                    .amount(shares[i])
+                    .paid(paidShareNumbers.contains(shareNumber))
+                    .build());
+        }
+
+        return TableBillDtos.SplitPreviewResponse.builder()
+                .personCount(personCount)
+                .remainingTotal(remainingTotal)
+                .shares(sharePreviews)
+                .build();
+    }
+
+    @Transactional
     public TableBillDtos.BillResponse closeBill(
             Long menuId,
             Long billId,
@@ -259,6 +382,15 @@ public class TableBillService {
 
         TableBill bill = requireOpenBill(menuId, billId);
         recalculateTotal(bill);
+
+        List<BillPayment> splitPayments = loadSplitPayments(bill.getId());
+        if (!splitPayments.isEmpty()) {
+            Integer personCount = splitPayments.get(0).getSplitPersonCount();
+            if (personCount != null && splitPayments.size() < personCount) {
+                throw new BadRequestException("Hesap bölme devam ediyor, önce tüm payleri alın");
+            }
+        }
+
         LocalDateTime now = LocalDateTime.now();
 
         payAllRemainingItems(bill, waiter, paymentMethod, now);
@@ -344,10 +476,6 @@ public class TableBillService {
 
         TableBill saved = tableBillRepository.save(bill);
         revokeSessionsForTable(bill.getTableId());
-
-        Menu menu = menuRepository.findById(bill.getMenuId()).orElse(null);
-        userAccountingService.recordBillCloseIncome(menu, saved, waiter, tipAmount);
-
         return saved;
     }
 
@@ -434,8 +562,23 @@ public class TableBillService {
         }
 
         BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
-        BigDecimal remainingTotal = totalAmount.subtract(paidTotal).max(BigDecimal.ZERO)
+        BigDecimal splitPaidTotal = sumSplitPaymentAmounts(loadSplitPayments(bill.getId()));
+        BigDecimal combinedPaidTotal = paidTotal.add(splitPaidTotal).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal remainingTotal = totalAmount.subtract(combinedPaidTotal).max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
+
+        List<BillPayment> payments = bill.getId() != null
+                ? billPaymentRepository.findByBillIdOrderByPaidAtAsc(bill.getId())
+                : List.of();
+        List<TableBillDtos.BillPaymentResponse> paymentResponses = payments.stream()
+                .map(this::toPaymentResponse)
+                .toList();
+
+        Integer splitPersonCount = payments.stream()
+                .map(BillPayment::getSplitPersonCount)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
 
         return TableBillDtos.BillResponse.builder()
                 .id(bill.getId())
@@ -449,13 +592,89 @@ public class TableBillService {
                 .closedAt(bill.getClosedAt())
                 .paymentMethod(bill.getPaymentMethod())
                 .totalAmount(totalAmount)
-                .paidTotal(paidTotal)
+                .paidTotal(combinedPaidTotal)
                 .remainingTotal(remainingTotal)
                 .currency(bill.getCurrency())
                 .itemCount(items.size())
                 .items(items)
                 .fixedCommissionAmount(fixedCommissionAmount)
+                .splitPersonCount(splitPersonCount)
+                .payments(paymentResponses)
                 .build();
+    }
+
+    private TableBillDtos.BillPaymentResponse toPaymentResponse(BillPayment payment) {
+        String itemSummary = null;
+        Long billItemId = null;
+        if (payment.getBillItem() != null) {
+            billItemId = payment.getBillItem().getId();
+            TableBillItem item = payment.getBillItem();
+            if (payment.getQuantityPaid() > 0) {
+                itemSummary = item.getProductName() + " x" + payment.getQuantityPaid();
+            }
+        } else if (payment.getSplitShareNumber() != null && payment.getSplitPersonCount() != null) {
+            itemSummary = "Pay " + payment.getSplitShareNumber() + "/" + payment.getSplitPersonCount();
+        }
+
+        return TableBillDtos.BillPaymentResponse.builder()
+                .id(payment.getId())
+                .amount(payment.getAmount())
+                .paymentMethod(payment.getPaymentMethod())
+                .paidAt(payment.getPaidAt())
+                .splitShareNumber(payment.getSplitShareNumber())
+                .splitPersonCount(payment.getSplitPersonCount())
+                .tip(payment.isTip())
+                .itemSummary(itemSummary)
+                .billItemId(billItemId)
+                .build();
+    }
+
+    private BigDecimal computeItemPaidTotal(TableBill bill) {
+        BigDecimal paidTotal = BigDecimal.ZERO;
+        if (bill.getItems() == null) {
+            return paidTotal;
+        }
+        for (TableBillItem item : bill.getItems()) {
+            BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            int paidQty = Math.max(0, item.getPaidQuantity());
+            paidTotal = paidTotal.add(unitPrice.multiply(BigDecimal.valueOf(paidQty))
+                    .setScale(2, RoundingMode.HALF_UP));
+        }
+        return paidTotal.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private List<BillPayment> loadSplitPayments(Long billId) {
+        return billPaymentRepository.findByBillIdOrderByPaidAtAsc(billId).stream()
+                .filter(p -> p.getSplitShareNumber() != null && !p.isTip())
+                .toList();
+    }
+
+    private BigDecimal sumSplitPaymentAmounts(List<BillPayment> splitPayments) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (BillPayment payment : splitPayments) {
+            total = total.add(payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO);
+        }
+        return total.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void validateSplitPersonCountConsistency(List<BillPayment> existingSplitPayments, int personCount) {
+        for (BillPayment payment : existingSplitPayments) {
+            if (payment.getSplitPersonCount() != null && payment.getSplitPersonCount() != personCount) {
+                throw new BadRequestException("Mevcut bölme ile kişi adedi uyuşmuyor");
+            }
+        }
+    }
+
+    private BigDecimal[] calculateEqualShares(BigDecimal total, int personCount) {
+        BigDecimal[] shares = new BigDecimal[personCount];
+        BigDecimal base = total.divide(BigDecimal.valueOf(personCount), 2, RoundingMode.DOWN);
+        BigDecimal allocated = BigDecimal.ZERO;
+        for (int i = 0; i < personCount - 1; i++) {
+            shares[i] = base;
+            allocated = allocated.add(base);
+        }
+        shares[personCount - 1] = total.subtract(allocated).setScale(2, RoundingMode.HALF_UP);
+        return shares;
     }
 
     public TableSession resolveBillSession(TableBill bill) {

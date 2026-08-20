@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionRecordType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -47,6 +48,42 @@ public final class TableBillDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class BillPaymentResponse {
+        private Long id;
+        private BigDecimal amount;
+        private TableBillPaymentMethod paymentMethod;
+        private LocalDateTime paidAt;
+        private Integer splitShareNumber;
+        private Integer splitPersonCount;
+        private boolean tip;
+        private String itemSummary;
+        private Long billItemId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SplitSharePreview {
+        private int shareNumber;
+        private BigDecimal amount;
+        private boolean paid;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SplitPreviewResponse {
+        private int personCount;
+        private BigDecimal remainingTotal;
+        private List<SplitSharePreview> shares;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class BillResponse {
         private Long id;
         private Long menuId;
@@ -65,6 +102,8 @@ public final class TableBillDtos {
         private int itemCount;
         private List<BillItemResponse> items;
         private BigDecimal fixedCommissionAmount;
+        private Integer splitPersonCount;
+        private List<BillPaymentResponse> payments;
     }
 
     @Data
@@ -106,6 +145,29 @@ public final class TableBillDtos {
         @Valid
         @Size(min = 1)
         private List<PayBillItemLine> items;
+
+        private Boolean tipReceived;
+
+        @DecimalMin(value = "0.01")
+        private BigDecimal tipAmount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PayBillShareRequest {
+        @NotNull
+        @Min(2)
+        @Max(20)
+        private Integer personCount;
+
+        @NotNull
+        @Min(1)
+        private Integer shareNumber;
+
+        @NotNull
+        private TableBillPaymentMethod paymentMethod;
 
         private Boolean tipReceived;
 

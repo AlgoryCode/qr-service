@@ -78,6 +78,14 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
             """)
     List<Long> findDistinctUserIdsByDeletedFalse();
 
+    @Query("""
+            select menu.menuId
+            from Menu menu
+            where menu.userId = :userId
+              and menu.deleted = false
+            """)
+    List<Long> findMenuIdsByUserId(@Param("userId") Long userId);
+
     @Modifying(clearAutomatically = false, flushAutomatically = true)
     @Query("""
             update Menu menu
