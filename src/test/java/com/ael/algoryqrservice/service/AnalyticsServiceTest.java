@@ -16,6 +16,7 @@ import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
@@ -26,6 +27,7 @@ import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
 import com.ael.algoryqrservice.repository.SubCategoryRepository;
+import com.ael.algoryqrservice.repository.TableBillRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,6 +76,8 @@ class AnalyticsServiceTest {
     @Mock
     private BillPaymentRepository billPaymentRepository;
     @Mock
+    private TableBillRepository tableBillRepository;
+    @Mock
     private MenuFixedExpenseService menuFixedExpenseService;
 
     private AnalyticsService service;
@@ -92,6 +96,7 @@ class AnalyticsServiceTest {
                 menuOrderRepository,
                 menuWaiterRepository,
                 billPaymentRepository,
+                tableBillRepository,
                 menuFixedExpenseService
         );
     }
@@ -373,10 +378,22 @@ class AnalyticsServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
         when(menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId)).thenReturn(List.of(ali, ayse));
+        when(tableBillRepository.findByMenuIdAndStatusAndClosedAtBetween(
+                eq(menuId), eq(TableBillStatus.CLOSED), any(), any()
+        )).thenReturn(List.of(
+                TableBill.builder()
+                        .id(10L)
+                        .menuId(menuId)
+                        .tableId(1L)
+                        .status(TableBillStatus.CLOSED)
+                        .closedByWaiterId(101L)
+                        .closedAt(LocalDateTime.of(2026, 8, 13, 18, 0))
+                        .build()
+        ));
 
-        MenuOrder aliOrder = confirmedOrder(menuId, 1L, new BigDecimal("150.00"), 101L);
-        MenuOrder ayseOrder = confirmedOrder(menuId, 2L, new BigDecimal("90.00"), 102L);
-        MenuOrder unassignedOrder = confirmedOrder(menuId, 3L, new BigDecimal("20.00"), null);
+        MenuOrder aliOrder = confirmedOrder(menuId, 1L, new BigDecimal("150.00"), 101L, 2, new BigDecimal("15.00"));
+        MenuOrder ayseOrder = confirmedOrder(menuId, 2L, new BigDecimal("90.00"), 102L, 1, new BigDecimal("9.00"));
+        MenuOrder unassignedOrder = confirmedOrder(menuId, 3L, new BigDecimal("20.00"), null, 1, BigDecimal.ZERO);
 
         when(menuOrderRepository.findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
                 eq(menuId), eq(MenuOrderStatus.CONFIRMED), any(), any()
@@ -389,14 +406,36 @@ class AnalyticsServiceTest {
         assertThat(report.kpis().assignedOrderCount()).isEqualTo(2L);
         assertThat(report.kpis().unassignedOrderCount()).isEqualTo(1L);
         assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("260.00");
+        assertThat(report.kpis().itemCount()).isEqualTo(4L);
+        assertThat(report.kpis().totalCommission()).isEqualByComparingTo("24.00");
+        assertThat(report.kpis().billsClosedCount()).isEqualTo(1L);
         assertThat(report.waiters()).extracting(AnalyticsDtos.WaiterPerformanceRow::displayName)
                 .containsExactly("Ali", "Ayse", "Atanmamış");
         assertThat(report.waiters().getFirst().orderCount()).isEqualTo(1L);
+        assertThat(report.waiters().getFirst().itemCount()).isEqualTo(2L);
         assertThat(report.waiters().getFirst().revenue()).isEqualByComparingTo("150.00");
+        assertThat(report.waiters().getFirst().commissionAmount()).isEqualByComparingTo("15.00");
+        assertThat(report.waiters().getFirst().billsClosedCount()).isEqualTo(1L);
         assertThat(report.waiters().get(2).waiterId()).isNull();
+        assertThat(report.products()).isNotEmpty();
+        assertThat(report.daily()).hasSize(1);
+        assertThat(report.hourly()).hasSize(24);
     }
 
-    private MenuOrder confirmedOrder(Long menuId, Long id, BigDecimal total, Long waiterId) {
+    private MenuOrder confirmedOrder(
+            Long menuId,
+            Long id,
+            BigDecimal total,
+            Long waiterId,
+            int itemQuantity,
+            BigDecimal commission
+    ) {
+        MenuOrderItem item = MenuOrderItem.builder()
+                .productId(11L)
+                .productName("Cay")
+                .quantity(itemQuantity)
+                .lineTotal(total)
+                .build();
         return MenuOrder.builder()
                 .id(id)
                 .menuId(menuId)
@@ -406,8 +445,14 @@ class AnalyticsServiceTest {
                 .totalAmount(total)
                 .currency("TRY")
                 .waiterId(waiterId)
+                .commissionAmount(commission)
                 .confirmedAt(LocalDateTime.of(2026, 8, 13, 14, 30))
+                .items(new java.util.ArrayList<>(List.of(item)))
                 .build();
+    }
+
+    private MenuOrder confirmedOrder(Long menuId, Long id, BigDecimal total, Long waiterId) {
+        return confirmedOrder(menuId, id, total, waiterId, 1, BigDecimal.ZERO);
     }
 
     private Menu publicMenu(Long menuId, Long ownerId) {

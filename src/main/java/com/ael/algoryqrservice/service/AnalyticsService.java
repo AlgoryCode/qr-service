@@ -15,8 +15,10 @@ import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
@@ -27,6 +29,7 @@ import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
 import com.ael.algoryqrservice.repository.SubCategoryRepository;
+import com.ael.algoryqrservice.repository.TableBillRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -64,6 +67,8 @@ public class AnalyticsService {
     private static final int SAMPLE_JOURNEYS = 8;
     private static final int UNSOLD_LIMIT = 8;
 
+    private static final int WAITER_TOP_PRODUCTS = 5;
+
     private final MenuVisitRepository menuVisitRepository;
     private final MenuProductVisitRepository menuProductVisitRepository;
     private final MenuAnalyticsSessionRepository sessionRepository;
@@ -75,6 +80,7 @@ public class AnalyticsService {
     private final MenuOrderRepository menuOrderRepository;
     private final MenuWaiterRepository menuWaiterRepository;
     private final BillPaymentRepository billPaymentRepository;
+    private final TableBillRepository tableBillRepository;
     private final MenuFixedExpenseService menuFixedExpenseService;
 
     @Transactional
@@ -521,6 +527,13 @@ public class AnalyticsService {
                         toDt
                 );
 
+        List<TableBill> closedBills = tableBillRepository.findByMenuIdAndStatusAndClosedAtBetween(
+                menuId,
+                TableBillStatus.CLOSED,
+                fromDt,
+                toDt
+        );
+
         List<MenuWaiter> waiters = menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId);
         Map<Long, MenuWaiter> waitersById = waiters.stream()
                 .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
@@ -531,10 +544,18 @@ public class AnalyticsService {
         }
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
+        long totalItemCount = 0L;
+        BigDecimal totalCommission = BigDecimal.ZERO;
         long assignedOrderCount = 0L;
         long unassignedOrderCount = 0L;
+        long billsClosedCount = 0L;
         WaiterPerformanceAgg unassignedStats = new WaiterPerformanceAgg();
         String currency = "TRY";
+        Map<LocalDate, BigDecimal> revenueByDay = new HashMap<>();
+        Map<LocalDate, Long> ordersByDay = new HashMap<>();
+        Map<Integer, BigDecimal> revenueByHour = new HashMap<>();
+        Map<Integer, Long> ordersByHour = new HashMap<>();
+        Map<Long, ProductAgg> aggregateProducts = new LinkedHashMap<>();
 
         for (MenuOrder order : orders) {
             BigDecimal orderTotal = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
@@ -543,16 +564,57 @@ public class AnalyticsService {
                 currency = order.getCurrency();
             }
 
+            BigDecimal orderCommission = order.getCommissionAmount() != null
+                    ? order.getCommissionAmount()
+                    : BigDecimal.ZERO;
+            totalCommission = totalCommission.add(orderCommission);
+
+            LocalDate day = order.getConfirmedAt() != null ? order.getConfirmedAt().toLocalDate() : from;
+            int hour = order.getConfirmedAt() != null ? order.getConfirmedAt().getHour() : 0;
+            revenueByDay.merge(day, orderTotal, BigDecimal::add);
+            ordersByDay.merge(day, 1L, Long::sum);
+            revenueByHour.merge(hour, orderTotal, BigDecimal::add);
+            ordersByHour.merge(hour, 1L, Long::sum);
+
+            long orderItemCount = 0L;
+            if (order.getItems() != null) {
+                for (MenuOrderItem item : order.getItems()) {
+                    int qty = item.getQuantity();
+                    orderItemCount += qty;
+                    totalItemCount += qty;
+
+                    Long productId = item.getProductId();
+                    String productName = item.getProductName() != null
+                            ? item.getProductName()
+                            : "Ürün #" + productId;
+                    BigDecimal lineTotal = item.getLineTotal() != null
+                            ? item.getLineTotal()
+                            : BigDecimal.ZERO;
+                    aggregateProducts.computeIfAbsent(productId, ignored -> new ProductAgg(productId, productName))
+                            .add(qty, lineTotal);
+                }
+            }
+
             Long waiterId = order.getWaiterId();
             if (waiterId == null) {
                 unassignedOrderCount++;
-                unassignedStats.add(orderTotal);
+                unassignedStats.add(orderTotal, orderItemCount, orderCommission, order.getItems());
                 continue;
             }
 
             assignedOrderCount++;
             WaiterPerformanceAgg stats = statsByWaiterId.computeIfAbsent(waiterId, ignored -> new WaiterPerformanceAgg());
-            stats.add(orderTotal);
+            stats.add(orderTotal, orderItemCount, orderCommission, order.getItems());
+        }
+
+        for (TableBill bill : closedBills) {
+            billsClosedCount++;
+            Long closedByWaiterId = bill.getClosedByWaiterId();
+            if (closedByWaiterId == null) {
+                continue;
+            }
+            WaiterPerformanceAgg stats = statsByWaiterId.computeIfAbsent(closedByWaiterId, ignored -> new WaiterPerformanceAgg());
+            stats.billsClosedCount++;
         }
 
         long activeWaiterCount = waiters.stream().filter(MenuWaiter::isActive).count();
@@ -567,7 +629,8 @@ public class AnalyticsService {
                     waiter.isActive(),
                     stats,
                     totalRevenue,
-                    totalOrders
+                    totalOrders,
+                    totalItemCount
             ));
         }
 
@@ -584,7 +647,8 @@ public class AnalyticsService {
                     active,
                     entry.getValue(),
                     totalRevenue,
-                    totalOrders
+                    totalOrders,
+                    totalItemCount
             ));
         }
 
@@ -595,7 +659,8 @@ public class AnalyticsService {
                     false,
                     unassignedStats,
                     totalRevenue,
-                    totalOrders
+                    totalOrders,
+                    totalItemCount
             ));
         }
 
@@ -603,6 +668,30 @@ public class AnalyticsService {
                 .comparing(AnalyticsDtos.WaiterPerformanceRow::revenue)
                 .reversed()
                 .thenComparing(AnalyticsDtos.WaiterPerformanceRow::displayName));
+
+        List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
+        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+            daily.add(new AnalyticsDtos.DailyRevenuePoint(
+                    cursor,
+                    revenueByDay.getOrDefault(cursor, BigDecimal.ZERO),
+                    ordersByDay.getOrDefault(cursor, 0L)
+            ));
+        }
+
+        List<AnalyticsDtos.HourlyRevenuePoint> hourly = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            hourly.add(new AnalyticsDtos.HourlyRevenuePoint(
+                    hour,
+                    revenueByHour.getOrDefault(hour, BigDecimal.ZERO),
+                    ordersByHour.getOrDefault(hour, 0L)
+            ));
+        }
+
+        List<AnalyticsDtos.WaiterPerformanceProduct> products = aggregateProducts.values().stream()
+                .map(ProductAgg::toDto)
+                .sorted(Comparator.comparing(AnalyticsDtos.WaiterPerformanceProduct::quantity).reversed())
+                .limit(TOP_LIMIT)
+                .toList();
 
         return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
                 menu.getMenuId(),
@@ -614,9 +703,15 @@ public class AnalyticsService {
                         assignedOrderCount,
                         unassignedOrderCount,
                         totalRevenue,
+                        totalItemCount,
+                        totalCommission,
+                        billsClosedCount,
                         currency
                 ),
-                rows
+                rows,
+                daily,
+                hourly,
+                products
         );
     }
 
@@ -626,7 +721,8 @@ public class AnalyticsService {
             boolean active,
             WaiterPerformanceAgg stats,
             BigDecimal totalRevenue,
-            long totalOrders
+            long totalOrders,
+            long totalItemCount
     ) {
         BigDecimal avgOrderValue = stats.orderCount == 0
                 ? BigDecimal.ZERO
@@ -643,25 +739,93 @@ public class AnalyticsService {
                         .multiply(BigDecimal.valueOf(100))
                         .divide(BigDecimal.valueOf(totalOrders), 2, RoundingMode.HALF_UP)
                         .doubleValue();
+        double itemSharePercent = totalItemCount == 0
+                ? 0d
+                : BigDecimal.valueOf(stats.itemCount)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(totalItemCount), 2, RoundingMode.HALF_UP)
+                        .doubleValue();
+        List<AnalyticsDtos.WaiterPerformanceProduct> topProducts = stats.products.values().stream()
+                .map(ProductAgg::toDto)
+                .sorted(Comparator.comparing(AnalyticsDtos.WaiterPerformanceProduct::quantity).reversed())
+                .limit(WAITER_TOP_PRODUCTS)
+                .toList();
         return new AnalyticsDtos.WaiterPerformanceRow(
                 waiterId,
                 displayName,
                 stats.orderCount,
+                stats.itemCount,
                 stats.revenue,
+                stats.commission,
+                stats.billsClosedCount,
                 avgOrderValue,
                 revenueSharePercent,
                 orderSharePercent,
-                active
+                itemSharePercent,
+                active,
+                topProducts
         );
     }
 
     private static final class WaiterPerformanceAgg {
         private long orderCount;
+        private long itemCount;
+        private long billsClosedCount;
+        private BigDecimal revenue = BigDecimal.ZERO;
+        private BigDecimal commission = BigDecimal.ZERO;
+        private final Map<Long, ProductAgg> products = new LinkedHashMap<>();
+
+        private void add(
+                BigDecimal amount,
+                long items,
+                BigDecimal orderCommission,
+                List<MenuOrderItem> orderItems
+        ) {
+            orderCount++;
+            itemCount += items;
+            revenue = revenue.add(amount);
+            commission = commission.add(orderCommission);
+            if (orderItems == null) {
+                return;
+            }
+            for (MenuOrderItem item : orderItems) {
+                int qty = item.getQuantity();
+                Long productId = item.getProductId();
+                String productName = item.getProductName() != null
+                        ? item.getProductName()
+                        : "Ürün #" + productId;
+                BigDecimal lineTotal = item.getLineTotal() != null
+                        ? item.getLineTotal()
+                        : BigDecimal.ZERO;
+                products.computeIfAbsent(productId, ignored -> new ProductAgg(productId, productName))
+                        .add(qty, lineTotal);
+            }
+        }
+    }
+
+    private static final class ProductAgg {
+        private final Long productId;
+        private final String name;
+        private long quantity;
         private BigDecimal revenue = BigDecimal.ZERO;
 
-        private void add(BigDecimal amount) {
-            orderCount++;
-            revenue = revenue.add(amount);
+        private ProductAgg(Long productId, String name) {
+            this.productId = productId;
+            this.name = name;
+        }
+
+        private void add(int qty, BigDecimal lineTotal) {
+            quantity += qty;
+            revenue = revenue.add(lineTotal);
+        }
+
+        private AnalyticsDtos.WaiterPerformanceProduct toDto() {
+            return new AnalyticsDtos.WaiterPerformanceProduct(
+                    productId,
+                    name,
+                    quantity,
+                    revenue
+            );
         }
     }
 

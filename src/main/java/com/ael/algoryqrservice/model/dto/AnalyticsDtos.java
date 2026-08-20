@@ -294,11 +294,22 @@ public class AnalyticsDtos {
     ) {
     }
 
+    public record WaiterPerformanceProduct(
+            Long productId,
+            String name,
+            long quantity,
+            BigDecimal revenue
+    ) {
+    }
+
     public record WaiterPerformanceKpis(
             long activeWaiterCount,
             long assignedOrderCount,
             long unassignedOrderCount,
             BigDecimal totalRevenue,
+            long itemCount,
+            BigDecimal totalCommission,
+            long billsClosedCount,
             String currency
     ) {
     }
@@ -307,11 +318,16 @@ public class AnalyticsDtos {
             Long waiterId,
             String displayName,
             long orderCount,
+            long itemCount,
             BigDecimal revenue,
+            BigDecimal commissionAmount,
+            long billsClosedCount,
             BigDecimal avgOrderValue,
             double revenueSharePercent,
             double orderSharePercent,
-            boolean active
+            double itemSharePercent,
+            boolean active,
+            List<WaiterPerformanceProduct> topProducts
     ) {
     }
 
@@ -321,7 +337,10 @@ public class AnalyticsDtos {
             LocalDate from,
             LocalDate to,
             WaiterPerformanceKpis kpis,
-            List<WaiterPerformanceRow> waiters
+            List<WaiterPerformanceRow> waiters,
+            List<DailyRevenuePoint> daily,
+            List<HourlyRevenuePoint> hourly,
+            List<WaiterPerformanceProduct> products
     ) {
     }
 }
