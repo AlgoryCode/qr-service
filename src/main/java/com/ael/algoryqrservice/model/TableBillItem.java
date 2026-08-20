@@ -48,6 +48,11 @@ public class TableBillItem {
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
 
+    @Column(name = "commission_amount", nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal commissionAmount = BigDecimal.ZERO;
+
     @Column(columnDefinition = "text")
     private String note;
 

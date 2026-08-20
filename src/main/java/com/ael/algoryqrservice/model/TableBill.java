@@ -73,6 +73,14 @@ public class TableBill {
     @Column(name = "tip_amount", precision = 12, scale = 2)
     private BigDecimal tipAmount;
 
+    @Column(name = "commission_amount", nullable = false, precision = 12, scale = 2)
+    @ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal commissionAmount = BigDecimal.ZERO;
+
+    @Column(name = "commission_settled_at")
+    private LocalDateTime commissionSettledAt;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

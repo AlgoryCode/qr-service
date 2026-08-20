@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.WaiterCommissionScope;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,6 +57,10 @@ public class MenuWaiter {
     @Enumerated(EnumType.STRING)
     @Column(name = "commission_type", length = 10)
     private WaiterCommissionType commissionType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "commission_scope", length = 20)
+    private WaiterCommissionScope commissionScope;
 
     @Column(name = "commission_value", precision = 12, scale = 2)
     private BigDecimal commissionValue;

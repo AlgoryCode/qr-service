@@ -40,4 +40,13 @@ public interface WaiterCommissionRecordRepository extends JpaRepository<WaiterCo
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    boolean existsByBillId(Long billId);
+
+    @Query("""
+            SELECT COALESCE(SUM(r.amount), 0)
+            FROM WaiterCommissionRecord r
+            WHERE r.billId = :billId
+            """)
+    BigDecimal sumAmountByBillId(@Param("billId") Long billId);
 }

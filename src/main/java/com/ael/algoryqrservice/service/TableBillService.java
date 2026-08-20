@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.event.BillClosedEvent;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillPayment;
@@ -25,6 +26,7 @@ import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
 import com.ael.algoryqrservice.repository.TableSessionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,7 @@ public class TableBillService {
     private final RestaurantTableRepository restaurantTableRepository;
     private final MenuWaiterRepository menuWaiterRepository;
     private final WaiterCommissionService waiterCommissionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public TableBill getOrOpenBill(Long menuId, Long tableId, Long waiterId) {
@@ -476,6 +479,7 @@ public class TableBillService {
 
         TableBill saved = tableBillRepository.save(bill);
         revokeSessionsForTable(bill.getTableId());
+        eventPublisher.publishEvent(new BillClosedEvent(saved.getId(), saved.getMenuId(), saved.getClosedByWaiterId()));
         return saved;
     }
 
@@ -755,20 +759,6 @@ public class TableBillService {
             TableBill bill,
             List<WaiterCommissionService.CommissionLineItem> addedItems
     ) {
-        if (addedItems == null || addedItems.isEmpty()) {
-            return;
-        }
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId).orElse(null);
-        if (waiter == null) {
-            return;
-        }
-        waiterCommissionService.recordFixedItemAddCommission(
-                waiter,
-                bill.getId(),
-                null,
-                addedItems,
-                bill.getCurrency()
-        );
     }
 
     private void recalculateTotal(TableBill bill) {

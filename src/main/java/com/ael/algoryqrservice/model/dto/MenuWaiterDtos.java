@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.model.enums.WaiterCommissionScope;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -54,6 +55,8 @@ public final class MenuWaiterDtos {
 
         private WaiterCommissionType commissionType;
 
+        private WaiterCommissionScope commissionScope;
+
         private BigDecimal commissionValue;
     }
 
@@ -69,6 +72,7 @@ public final class MenuWaiterDtos {
         private boolean active;
         private boolean commissionEnabled;
         private WaiterCommissionType commissionType;
+        private WaiterCommissionScope commissionScope;
         private BigDecimal commissionValue;
         private LocalDateTime createdAt;
     }

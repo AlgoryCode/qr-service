@@ -37,12 +37,16 @@ class WaiterCommissionServiceTest {
     private MenuTaxonomyService menuTaxonomyService;
     @Mock
     private MenuProductRepository menuProductRepository;
+    @Mock
+    private com.ael.algoryqrservice.repository.TableBillRepository tableBillRepository;
+    @Mock
+    private com.ael.algoryqrservice.repository.MenuWaiterRepository menuWaiterRepository;
 
     @InjectMocks
     private WaiterCommissionService waiterCommissionService;
 
     @Test
-    void recordPercentOrderCommission_whenEnabled_thenCalculatesAndPersists() {
+    void recordPercentOrderCommission_whenCalled_thenNoLongerPersistsAtConfirm() {
         MenuWaiter waiter = MenuWaiter.builder()
                 .id(7L)
                 .menuId(1L)
@@ -57,20 +61,10 @@ class WaiterCommissionServiceTest {
                 .currency("TRY")
                 .build();
 
-        when(commissionRecordRepository.save(any(WaiterCommissionRecord.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
         BigDecimal amount = waiterCommissionService.recordPercentOrderCommission(waiter, order, 10L);
 
-        assertThat(amount).isEqualByComparingTo("20.00");
-        assertThat(order.getCommissionAmount()).isEqualByComparingTo("20.00");
-
-        ArgumentCaptor<WaiterCommissionRecord> captor = ArgumentCaptor.forClass(WaiterCommissionRecord.class);
-        verify(commissionRecordRepository).save(captor.capture());
-        WaiterCommissionRecord saved = captor.getValue();
-        assertThat(saved.getRecordType()).isEqualTo(WaiterCommissionRecordType.PERCENT_ORDER);
-        assertThat(saved.getOrderId()).isEqualTo(20L);
-        assertThat(saved.getBillId()).isEqualTo(10L);
+        assertThat(amount).isEqualByComparingTo("0");
+        verify(commissionRecordRepository, never()).save(any(WaiterCommissionRecord.class));
     }
 
     @Test

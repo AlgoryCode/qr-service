@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.model.enums.WaiterCommissionScope;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
@@ -99,15 +100,24 @@ public class MenuWaiterService {
                 waiter.setCommissionEnabled(request.getCommissionEnabled());
                 if (!request.getCommissionEnabled()) {
                     waiter.setCommissionType(null);
+                    waiter.setCommissionScope(null);
                     waiter.setCommissionValue(null);
                 }
             }
             if (request.getCommissionType() != null) {
                 waiter.setCommissionType(request.getCommissionType());
             }
+            if (request.getCommissionScope() != null) {
+                waiter.setCommissionScope(request.getCommissionScope());
+            }
             if (request.getCommissionValue() != null) {
-                validateCommissionValue(request.getCommissionType(), request.getCommissionValue());
+                validateCommissionValue(request.getCommissionType() != null
+                        ? request.getCommissionType()
+                        : waiter.getCommissionType(), request.getCommissionValue());
                 waiter.setCommissionValue(request.getCommissionValue());
+            }
+            if (Boolean.TRUE.equals(waiter.isCommissionEnabled()) && waiter.getCommissionScope() == null) {
+                waiter.setCommissionScope(WaiterCommissionScope.PER_ITEM);
             }
         }
 
@@ -166,6 +176,7 @@ public class MenuWaiterService {
                 .active(waiter.isActive())
                 .commissionEnabled(waiter.isCommissionEnabled())
                 .commissionType(waiter.getCommissionType())
+                .commissionScope(waiter.getCommissionScope())
                 .commissionValue(waiter.getCommissionValue())
                 .createdAt(waiter.getCreatedAt())
                 .build();
