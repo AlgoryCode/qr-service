@@ -1,7 +1,7 @@
 name: Deploy to Staging
 
 on:
-  workflow_dispatch: # Sadece manuel butonla çalışır
+  workflow_dispatch:
 
 jobs:
   build-and-deploy-staging:
@@ -14,7 +14,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Kullanıcı ve repo adını küçük harfe çevirme + Hash alma
       - name: Set Lowercase Repository & Commit Hash
         id: prep
         run: |
@@ -22,7 +21,6 @@ jobs:
           COMMIT_HASH=${GITHUB_SHA::7}
           echo "IMAGE_BASE=ghcr.io/${REPO_LOWER}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${COMMIT_HASH}" >> $GITHUB_ENV
-          echo "Küçük Harf Depo Adı: ghcr.io/${REPO_LOWER}"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -40,7 +38,14 @@ jobs:
             ${{ env.IMAGE_BASE }}:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_BASE }}:staging
 
-      - name: Trigger Staging Coolify
+      - name: Update Coolify Application Image Tag
         run: |
-          curl -X GET "${{ secrets.COOLIFY_STAGING_WEBHOOK_URL }}&tag=${{ env.IMAGE_TAG }}" \
+          curl -X PATCH "http://185.184.210.52:8000/api/v1/applications/jf3herc4muflonhlmrlqn60v" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_tag\": \"${{ env.IMAGE_TAG }}\"}"
+
+      - name: Trigger Staging Coolify Deploy
+        run: |
+          curl -X GET "http://185.184.210.52:8000/api/v1/deploy?uuid=jf3herc4muflonhlmrlqn60v&force=false" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"
