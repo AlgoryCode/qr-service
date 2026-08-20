@@ -29,7 +29,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,12 +87,7 @@ class UserAccountingServiceTest {
                 .userId(7L)
                 .businessName("Test Cafe")
                 .build()));
-        when(tableBillRepository.findClosedBillsForMenus(
-                eq(List.of(5L)),
-                eq(TableBillStatus.CLOSED),
-                any(),
-                any()
-        )).thenReturn(List.of(bill));
+        when(tableBillRepository.findAll(any(Specification.class))).thenReturn(List.of(bill));
         when(restaurantTableRepository.findById(9L)).thenReturn(Optional.of(RestaurantTable.builder()
                 .id(9L)
                 .name("Masa 3")

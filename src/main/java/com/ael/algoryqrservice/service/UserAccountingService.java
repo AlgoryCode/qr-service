@@ -15,6 +15,7 @@ import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
+import com.ael.algoryqrservice.repository.TableBillSpecifications;
 import com.ael.algoryqrservice.repository.UserAccountingEntryRepository;
 import com.ael.algoryqrservice.repository.UserAccountingEntrySpecifications;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -199,11 +200,13 @@ public class UserAccountingService {
             return List.of();
         }
 
-        List<TableBill> closedBills = tableBillRepository.findClosedBillsForMenus(
-                menuIds,
-                TableBillStatus.CLOSED,
-                fromDt,
-                toDt
+        List<TableBill> closedBills = tableBillRepository.findAll(
+                TableBillSpecifications.closedForMenus(
+                        menuIds,
+                        TableBillStatus.CLOSED,
+                        fromDt,
+                        toDt
+                )
         );
 
         List<UserAccountingDtos.LineItemResponse> lines = new ArrayList<>();
