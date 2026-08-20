@@ -289,6 +289,7 @@ class PurchaseServicePaymentEventTest {
                 eq(planPackage),
                 eq("127.0.0.1"),
                 eq(appProperties),
+                any(),
                 eq("debt-conversation-10"),
                 eq(2)
         )).thenReturn(checkoutRequest);

@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
@@ -83,7 +84,8 @@ public class PaymentRequestMapper {
             User user,
             PlanPackage planPackage,
             String clientIp,
-            AppProperties appProperties
+            AppProperties appProperties,
+            PaymentClientProperties paymentClientProperties
     ) {
         return toDebtCheckoutFormRequest(
                 purchase,
@@ -91,6 +93,7 @@ public class PaymentRequestMapper {
                 planPackage,
                 clientIp,
                 appProperties,
+                paymentClientProperties,
                 purchase.getPaymentConversationId(),
                 1
         );
@@ -102,6 +105,7 @@ public class PaymentRequestMapper {
             PlanPackage planPackage,
             String clientIp,
             AppProperties appProperties,
+            PaymentClientProperties paymentClientProperties,
             String conversationId,
             int billingCycleNumber
     ) {
@@ -138,8 +142,9 @@ public class PaymentRequestMapper {
                 .paymentStyle(style.name())
                 .subscriptionCycleCount(null)
                 .billingIntervalMonths(style == PaymentStyle.SUBSCRIPTION ? intervalMonths : null)
-                .basketId("qr-purchase-" + purchase.getId())
+                .basketId("qrpurchase" + purchase.getId())
                 .paymentGroup(style == PaymentStyle.SUBSCRIPTION ? "SUBSCRIPTION" : "PRODUCT")
+                .provider(blankToNull(paymentClientProperties.getGatewayProvider()))
                 .buyer(toBuyer(user, purchase.getBillingSnapshot(), clientIp))
                 .shippingAddress(toAddress(purchase.getBillingSnapshot()))
                 .billingAddress(toAddress(purchase.getBillingSnapshot()))
@@ -167,11 +172,11 @@ public class PaymentRequestMapper {
     }
 
     public String buildConversationId(Long purchaseId) {
-        return "qr-purchase-" + purchaseId + "-" + UUID.randomUUID().toString().substring(0, 8);
+        return "qrpurchase" + purchaseId + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 
     public String buildCardVerificationConversationId(Long userId) {
-        return "qr-card-verification-" + userId + "-" + UUID.randomUUID().toString().substring(0, 8);
+        return "qrcardverification" + userId + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 
     private PaymentThreeDsRequest.PaymentCardPayload toPaymentCard(PaymentCardDto card) {
@@ -240,6 +245,10 @@ public class PaymentRequestMapper {
             }
         }
         return null;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private PaymentThreeDsRequest.BasketItemPayload toBasketItem(

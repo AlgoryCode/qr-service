@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.config.BillingRefundProperties;
 import com.ael.algoryqrservice.config.BillingSubscriptionProperties;
+import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
@@ -66,6 +67,7 @@ public class PurchaseService {
     private final PaymentServiceClient paymentServiceClient;
     private final PaymentRequestMapper paymentRequestMapper;
     private final AppProperties appProperties;
+    private final PaymentClientProperties paymentClientProperties;
     private final PaymentEventInboxRepository paymentEventInboxRepository;
     private final PackageActivationService packageActivationService;
     private final PurchaseFulfillmentService purchaseFulfillmentService;
@@ -146,10 +148,16 @@ public class PurchaseService {
                         user,
                         planPackage,
                         clientIp,
-                        appProperties
+                        appProperties,
+                        paymentClientProperties
                 );
                 PaymentCheckoutFormResponse checkoutFormResponse =
                         paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
+                if (checkoutFormResponse.getConversationId() != null
+                        && !checkoutFormResponse.getConversationId().isBlank()) {
+                    purchase.setPaymentConversationId(checkoutFormResponse.getConversationId());
+                    purchaseRepository.save(purchase);
+                }
 
                 return PurchaseInitiateResponse.builder()
                         .purchaseId(purchase.getId())
@@ -368,11 +376,17 @@ public class PurchaseService {
                 planPackage,
                 clientIp,
                 appProperties,
+                paymentClientProperties,
                 conversationId,
                 nextCycle
         );
         PaymentCheckoutFormResponse checkoutFormResponse =
                 paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
+        if (checkoutFormResponse.getConversationId() != null
+                && !checkoutFormResponse.getConversationId().isBlank()) {
+            purchase.setCurrentPeriodConversationId(checkoutFormResponse.getConversationId());
+            purchaseRepository.save(purchase);
+        }
 
         purchaseLogService.log(
                 purchase.getId(),

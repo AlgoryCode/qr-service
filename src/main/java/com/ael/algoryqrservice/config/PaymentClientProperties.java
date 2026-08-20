@@ -15,4 +15,5 @@ public class PaymentClientProperties {
     private int pendingTimeoutMinutes = 30;
     private String authToken = "";
     private String authHeader = "X-Service-Token";
+    private String gatewayProvider;
 }
