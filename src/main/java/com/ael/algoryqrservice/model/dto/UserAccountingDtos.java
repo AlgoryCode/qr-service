@@ -1,7 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.AccountingEntryType;
-import com.ael.algoryqrservice.model.enums.AccountingLineType;
 import com.ael.algoryqrservice.model.enums.AccountingSourceType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -42,22 +41,6 @@ public final class UserAccountingDtos {
         private Long menuId;
     }
 
-    public record LineItemResponse(
-            String id,
-            AccountingLineType type,
-            AccountingEntryType entryType,
-            String title,
-            BigDecimal amount,
-            String currency,
-            LocalDateTime occurredAt,
-            String note,
-            Long billId,
-            Long entryId,
-            String menuName,
-            LocalDateTime createdAt
-    ) {
-    }
-
     public record EntryResponse(
             Long id,
             AccountingEntryType entryType,
@@ -76,6 +59,29 @@ public final class UserAccountingDtos {
     ) {
     }
 
+    public record DetailLineItem(
+            Long id,
+            String productName,
+            BigDecimal unitPrice,
+            int quantity,
+            BigDecimal lineTotal,
+            String note,
+            Long sourceOrderId
+    ) {
+    }
+
+    public record EntryDetailResponse(
+            Long entryId,
+            AccountingSourceType sourceType,
+            Long sourceBillId,
+            Long sourceOrderId,
+            String title,
+            BigDecimal amount,
+            String currency,
+            List<DetailLineItem> items
+    ) {
+    }
+
     public record SummaryTotals(
             BigDecimal totalGelir,
             BigDecimal totalGider,
@@ -85,7 +91,7 @@ public final class UserAccountingDtos {
     }
 
     public record EntryPageResponse(
-            List<LineItemResponse> content,
+            List<EntryResponse> content,
             int page,
             int size,
             long totalElements,

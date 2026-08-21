@@ -24,7 +24,9 @@ import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
 import com.ael.algoryqrservice.repository.TableSessionRepository;
+import com.ael.algoryqrservice.event.BillClosedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,7 @@ public class TableBillService {
     private final RestaurantTableRepository restaurantTableRepository;
     private final MenuWaiterRepository menuWaiterRepository;
     private final WaiterCommissionService waiterCommissionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public TableBill getOrOpenBill(Long menuId, Long tableId, Long waiterId) {
@@ -476,6 +479,11 @@ public class TableBillService {
 
         TableBill saved = tableBillRepository.save(bill);
         revokeSessionsForTable(bill.getTableId());
+        eventPublisher.publishEvent(new BillClosedEvent(
+                saved.getId(),
+                saved.getMenuId(),
+                waiter.getId()
+        ));
         return saved;
     }
 

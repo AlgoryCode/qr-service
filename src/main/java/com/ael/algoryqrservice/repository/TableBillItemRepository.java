@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface TableBillItemRepository extends JpaRepository<TableBillItem, Long> {
 
     Optional<TableBillItem> findByIdAndBillId(Long id, Long billId);
+
+    java.util.List<TableBillItem> findByBillId(Long billId);
 }
