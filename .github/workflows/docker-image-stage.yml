@@ -38,14 +38,14 @@ jobs:
             ${{ env.IMAGE_BASE }}:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_BASE }}:staging
 
-      - name: Update Coolify Application Image Tag
+      - name: Coolify Image Tagini Commit Hash Olarak Güncelle
         run: |
-          curl -X PATCH "http://185.184.210.52:8000/api/v1/applications/jf3herc4muflonhlmrlqn60v" \
+          curl -f -X PATCH "http://185.184.210.52:8000/api/v1/applications/qhtkkldcm5dyab07cmleow37" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d "{\"docker_registry_image_tag\": \"${{ env.IMAGE_TAG }}\"}"
 
-      - name: Trigger Staging Coolify Deploy
+      - name: Staging Deployunu Tetikle
         run: |
-          curl -f -v "http://185.184.210.52:8000/api/v1/deploy?uuid=qhtkkldcm5dyab07cmleow37&force=true" \
+          curl -f "http://185.184.210.52:8000/api/v1/deploy?uuid=qhtkkldcm5dyab07cmleow37&force=true" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"
