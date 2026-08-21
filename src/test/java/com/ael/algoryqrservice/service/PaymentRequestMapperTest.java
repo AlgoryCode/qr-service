@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
@@ -168,7 +169,7 @@ class PaymentRequestMapperTest {
                 .email("ada@example.com").phone("5551112233").build();
 
         PaymentCheckoutFormRequest result = mapper.toCheckoutFormRequest(
-                purchase, user, plan, "127.0.0.1", new AppProperties()
+                purchase, user, plan, "127.0.0.1", new AppProperties(), new PaymentClientProperties()
         );
 
         assertThat(result.getPrice()).isEqualByComparingTo("99.00");
@@ -202,15 +203,17 @@ class PaymentRequestMapperTest {
     }
 
     @Test
-    void toCardVerificationRequest_whenIdentityMissing_thenThrowBadRequest() {
+    void toCardVerificationRequest_whenIdentityMissing_thenUseDefaultIdentity() {
         BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
                 .phone("5551112233").build();
         User user = User.builder().id(7L).firstName("Ada").lastName("Lovelace")
                 .email("ada@example.com").build();
 
-        assertThatThrownBy(() -> mapper.toCardVerificationRequest(
+        PaymentCardVerificationRequest result = mapper.toCardVerificationRequest(
                 user, snapshot, "127.0.0.1", new AppProperties(), "conv"
-        )).isInstanceOf(BadRequestException.class);
+        );
+
+        assertThat(result.getBuyer().getIdentityNumber()).isEqualTo(IdentityNumbers.DEFAULT);
     }
 
     @Test
@@ -218,8 +221,8 @@ class PaymentRequestMapperTest {
         String first = mapper.buildCardVerificationConversationId(7L);
         String second = mapper.buildCardVerificationConversationId(7L);
 
-        assertThat(first).startsWith("qr-card-verification-7-");
-        assertThat(second).startsWith("qr-card-verification-7-");
+        assertThat(first).startsWith("qrcardverification7");
+        assertThat(second).startsWith("qrcardverification7");
         assertThat(first).isNotEqualTo(second);
     }
 

@@ -24,6 +24,7 @@ public class PaymentCheckoutFormRequest {
     private Integer billingIntervalMonths;
     private String basketId;
     private String paymentGroup;
+    private String provider;
     private PaymentThreeDsRequest.BuyerPayload buyer;
     private PaymentThreeDsRequest.AddressPayload shippingAddress;
     private PaymentThreeDsRequest.AddressPayload billingAddress;

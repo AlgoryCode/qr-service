@@ -120,6 +120,7 @@ payment:
     pending-timeout-minutes: ${PAYMENT_PENDING_TIMEOUT_MINUTES:30}
     auth-token: ${PAYMENT_SERVICE_AUTH_TOKEN:6da7324f50e3d4dec722013510fd2c3ab5ce5c84ad7eb9af98bab23c2795db6e7761be271c480d41dd89c636305e027e}
     auth-header: ${PAYMENT_SERVICE_AUTH_HEADER:X-Service-Token}
+    gateway-provider: ${PAYMENT_GATEWAY_PROVIDER:}
   rabbitmq:
     exchange: ${PAYMENT_EVENTS_EXCHANGE:payment.events}
     service-name: ${APP_SERVICE_NAME:qr-service}
