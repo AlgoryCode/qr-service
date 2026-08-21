@@ -47,6 +47,10 @@ jobs:
 
       - name: Trigger Staging Coolify Deploy
         run: |
-          curl -X GET "http://185.184.210.52:8000/api/v1/deploy?uuid=jf3herc4muflonhlmrlqn60v&force=true&tag=${{ env.IMAGE_TAG }}" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"
-          
+          curl -f -v -X POST "http://185.184.210.52:8000/api/v1/deploy" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "uuid": "jf3herc4muflonhlmrlqn60v",
+              "force": true
+            }'
