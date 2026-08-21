@@ -1,16 +1,14 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.model.Menu;
-import com.ael.algoryqrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.UserAccountingEntry;
 import com.ael.algoryqrservice.model.dto.UserAccountingDtos;
 import com.ael.algoryqrservice.model.enums.AccountingEntryType;
-import com.ael.algoryqrservice.model.enums.AccountingLineType;
 import com.ael.algoryqrservice.model.enums.AccountingSourceType;
-import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.repository.MenuOrderItemRepository;
+import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
+import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
 import com.ael.algoryqrservice.repository.UserAccountingEntryRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -39,9 +37,15 @@ class UserAccountingServiceTest {
     @Mock
     private TableBillRepository tableBillRepository;
     @Mock
+    private TableBillItemRepository tableBillItemRepository;
+    @Mock
     private MenuRepository menuRepository;
     @Mock
     private RestaurantTableRepository restaurantTableRepository;
+    @Mock
+    private MenuOrderRepository menuOrderRepository;
+    @Mock
+    private MenuOrderItemRepository menuOrderItemRepository;
     @Mock
     private SecurityUtils securityUtils;
 
@@ -54,17 +58,22 @@ class UserAccountingServiceTest {
     }
 
     @Test
-    void listForCurrentUser_whenClosedBillAndManualEntryExist_thenReturnsUnifiedLines() {
+    void listForCurrentUser_whenBillSaleAndManualExist_thenReturnsStoredLinesWithoutTip() {
         LocalDateTime closedAt = LocalDateTime.of(2026, 8, 20, 12, 0);
-        TableBill bill = TableBill.builder()
+
+        UserAccountingEntry billSale = UserAccountingEntry.builder()
                 .id(42L)
-                .menuId(5L)
-                .tableId(9L)
-                .status(TableBillStatus.CLOSED)
-                .totalAmount(new BigDecimal("150.00"))
-                .tipAmount(new BigDecimal("20.00"))
+                .userId(7L)
+                .entryType(AccountingEntryType.GELIR)
+                .title("Adisyon - Masa 3")
+                .amount(new BigDecimal("150.00"))
                 .currency("TRY")
-                .closedAt(closedAt)
+                .occurredAt(closedAt)
+                .menuId(5L)
+                .sourceType(AccountingSourceType.BILL_SALE)
+                .sourceBillId(42L)
+                .sourceOrderId(99L)
+                .createdAt(closedAt)
                 .updatedAt(closedAt)
                 .build();
 
@@ -82,17 +91,13 @@ class UserAccountingServiceTest {
                 .build();
 
         when(menuRepository.findMenuIdsByUserId(7L)).thenReturn(List.of(5L));
-        when(menuRepository.findById(5L)).thenReturn(Optional.of(Menu.builder()
+        when(menuRepository.findById(5L)).thenReturn(Optional.of(com.ael.algoryqrservice.model.Menu.builder()
                 .menuId(5L)
                 .userId(7L)
                 .businessName("Test Cafe")
                 .build()));
-        when(tableBillRepository.findAll(any(Specification.class))).thenReturn(List.of(bill));
-        when(restaurantTableRepository.findById(9L)).thenReturn(Optional.of(RestaurantTable.builder()
-                .id(9L)
-                .name("Masa 3")
-                .build()));
-        when(userAccountingEntryRepository.findAll(any(Specification.class))).thenReturn(List.of(manualEntry));
+        when(userAccountingEntryRepository.findAll(any(Specification.class)))
+                .thenReturn(List.of(billSale, manualEntry));
 
         UserAccountingDtos.EntryPageResponse response = userAccountingService.listForCurrentUser(
                 "all",
@@ -103,34 +108,25 @@ class UserAccountingServiceTest {
                 20
         );
 
-        assertThat(response.content()).hasSize(3);
+        assertThat(response.content()).hasSize(2);
         assertThat(response.content())
-                .extracting(UserAccountingDtos.LineItemResponse::id)
-                .containsExactlyInAnyOrder("BILL-42", "BILL-TIP-42", "ENTRY-11");
+                .extracting(UserAccountingDtos.EntryResponse::id)
+                .containsExactlyInAnyOrder(42L, 11L);
         assertThat(response.content())
-                .filteredOn(line -> line.id().equals("BILL-42"))
+                .filteredOn(line -> line.sourceType() == AccountingSourceType.BILL_SALE)
                 .singleElement()
                 .satisfies(line -> {
-                    assertThat(line.type()).isEqualTo(AccountingLineType.BILL);
                     assertThat(line.title()).isEqualTo("Adisyon - Masa 3");
+                    assertThat(line.sourceOrderId()).isEqualTo(99L);
+                    assertThat(line.menuName()).isEqualTo("Test Cafe");
                 });
-        assertThat(response.content())
-                .filteredOn(line -> line.type() == AccountingLineType.MANUAL)
-                .singleElement()
-                .extracting(UserAccountingDtos.LineItemResponse::entryId)
-                .isEqualTo(11L);
-        assertThat(response.summary().totalGelir()).isEqualByComparingTo("170.00");
+        assertThat(response.summary().totalGelir()).isEqualByComparingTo("150.00");
         assertThat(response.summary().totalGider()).isEqualByComparingTo("5000.00");
     }
 
     @Test
-    void listForCurrentUser_whenGiderFilter_thenSkipsBillLines() {
+    void listForCurrentUser_whenGiderFilter_thenReturnsOnlyMatching() {
         when(menuRepository.findMenuIdsByUserId(7L)).thenReturn(List.of(5L));
-        when(menuRepository.findById(5L)).thenReturn(Optional.of(Menu.builder()
-                .menuId(5L)
-                .userId(7L)
-                .businessName("Test Cafe")
-                .build()));
         when(userAccountingEntryRepository.findAll(any(Specification.class))).thenReturn(List.of());
 
         UserAccountingDtos.EntryPageResponse response = userAccountingService.listForCurrentUser(

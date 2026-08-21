@@ -15,34 +15,20 @@ public final class UserAccountingEntrySpecifications {
     private UserAccountingEntrySpecifications() {
     }
 
-    public static Specification<UserAccountingEntry> forUser(
+    public static Specification<UserAccountingEntry> forUserListedSources(
             Long userId,
             AccountingEntryType entryType,
             LocalDateTime from,
             LocalDateTime to,
             String pattern
     ) {
-        return forUser(userId, entryType, from, to, pattern, false);
-    }
-
-    public static Specification<UserAccountingEntry> forUser(
-            Long userId,
-            AccountingEntryType entryType,
-            LocalDateTime from,
-            LocalDateTime to,
-            String pattern,
-            boolean excludeBillDerivedSources
-    ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("userId"), userId));
-            if (excludeBillDerivedSources) {
-                predicates.add(cb.not(root.get("sourceType").in(
-                        AccountingSourceType.BILL_SALE,
-                        AccountingSourceType.BILL_TIP,
-                        AccountingSourceType.ORDER_SALE
-                )));
-            }
+            predicates.add(root.get("sourceType").in(
+                    AccountingSourceType.MANUAL,
+                    AccountingSourceType.BILL_SALE
+            ));
             if (entryType != null) {
                 predicates.add(cb.equal(root.get("entryType"), entryType));
             }

@@ -37,10 +37,15 @@ public class UserAccountingController {
     }
 
     @PostMapping
-    public ResponseEntity<UserAccountingDtos.LineItemResponse> create(
+    public ResponseEntity<UserAccountingDtos.EntryResponse> create(
             @Valid @RequestBody UserAccountingDtos.CreateRequest request
     ) {
         return ResponseEntity.status(201).body(userAccountingService.createManual(request));
+    }
+
+    @GetMapping("/{entryId}/detail")
+    public ResponseEntity<UserAccountingDtos.EntryDetailResponse> detail(@PathVariable Long entryId) {
+        return ResponseEntity.ok(userAccountingService.getDetailForCurrentUser(entryId));
     }
 
     @DeleteMapping("/{entryId}")

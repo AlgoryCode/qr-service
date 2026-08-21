@@ -3,17 +3,21 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.MenuOrder;
+import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.TableBill;
+import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.UserAccountingEntry;
 import com.ael.algoryqrservice.model.dto.UserAccountingDtos;
 import com.ael.algoryqrservice.model.enums.AccountingEntryType;
-import com.ael.algoryqrservice.model.enums.AccountingLineType;
 import com.ael.algoryqrservice.model.enums.AccountingSourceType;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.repository.MenuOrderItemRepository;
+import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
+import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
-import com.ael.algoryqrservice.repository.TableBillSpecifications;
 import com.ael.algoryqrservice.repository.UserAccountingEntryRepository;
 import com.ael.algoryqrservice.repository.UserAccountingEntrySpecifications;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -27,9 +31,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -37,12 +43,15 @@ public class UserAccountingService {
 
     private final UserAccountingEntryRepository userAccountingEntryRepository;
     private final TableBillRepository tableBillRepository;
+    private final TableBillItemRepository tableBillItemRepository;
     private final MenuRepository menuRepository;
     private final RestaurantTableRepository restaurantTableRepository;
+    private final MenuOrderRepository menuOrderRepository;
+    private final MenuOrderItemRepository menuOrderItemRepository;
     private final SecurityUtils securityUtils;
 
     @Transactional
-    public UserAccountingDtos.LineItemResponse createManual(UserAccountingDtos.CreateRequest request) {
+    public UserAccountingDtos.EntryResponse createManual(UserAccountingDtos.CreateRequest request) {
         if (request == null) {
             throw new BadRequestException("İstek gövdesi zorunludur");
         }
@@ -78,7 +87,72 @@ public class UserAccountingService {
                 .updatedAt(now)
                 .build();
 
-        return toLineItem(userAccountingEntryRepository.save(entry), resolveMenuNames());
+        return toEntryResponse(userAccountingEntryRepository.save(entry), resolveMenuNames(userId));
+    }
+
+    @Transactional
+    public void recordBillSale(Long billId) {
+        if (billId == null) {
+            return;
+        }
+        if (userAccountingEntryRepository.existsBySourceTypeAndSourceBillId(AccountingSourceType.BILL_SALE, billId)) {
+            return;
+        }
+
+        TableBill bill = tableBillRepository.findWithItemsById(billId)
+                .orElse(null);
+        if (bill == null || bill.getStatus() != TableBillStatus.CLOSED) {
+            return;
+        }
+
+        BigDecimal amount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        Menu menu = menuRepository.findById(bill.getMenuId()).orElse(null);
+        if (menu == null || menu.getUserId() == null) {
+            return;
+        }
+
+        String tableName = restaurantTableRepository.findById(bill.getTableId())
+                .map(t -> t.getName())
+                .orElse("Masa");
+
+        List<TableBillItem> items = bill.getItems();
+        if (items == null || items.isEmpty()) {
+            items = tableBillItemRepository.findByBillId(billId);
+        }
+        Long sourceOrderId = resolveSingleSourceOrderId(items);
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime occurredAt = bill.getClosedAt() != null ? bill.getClosedAt() : now;
+
+        UserAccountingEntry entry = UserAccountingEntry.builder()
+                .userId(menu.getUserId())
+                .entryType(AccountingEntryType.GELIR)
+                .title("Adisyon - " + tableName)
+                .amount(amount)
+                .currency(resolveCurrency(bill.getCurrency()))
+                .occurredAt(occurredAt)
+                .menuId(bill.getMenuId())
+                .sourceType(AccountingSourceType.BILL_SALE)
+                .sourceBillId(bill.getId())
+                .sourceOrderId(sourceOrderId)
+                .createdByWaiterId(bill.getClosedByWaiterId())
+                .orderAmount(amount)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+
+        try {
+            userAccountingEntryRepository.save(entry);
+        } catch (Exception ex) {
+            if (userAccountingEntryRepository.existsBySourceTypeAndSourceBillId(AccountingSourceType.BILL_SALE, billId)) {
+                return;
+            }
+            throw ex;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -95,26 +169,35 @@ public class UserAccountingService {
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
         LocalDateTime toDt = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
         String query = trimToNull(q);
-        String pattern = query == null ? null : query.toLowerCase(Locale.ROOT);
+        String pattern = query == null ? null : "%" + query.toLowerCase(Locale.ROOT) + "%";
 
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? 20 : Math.min(size, 100);
 
-        Map<Long, String> menuNames = resolveMenuNames();
-        List<UserAccountingDtos.LineItemResponse> lines = new ArrayList<>();
-        lines.addAll(buildBillLines(userId, typeFilter, fromDt, toDt, pattern, menuNames));
-        lines.addAll(buildManualLines(userId, typeFilter, fromDt, toDt, pattern, menuNames));
+        Map<Long, String> menuNames = resolveMenuNames(userId);
+        List<UserAccountingEntry> entries = userAccountingEntryRepository.findAll(
+                UserAccountingEntrySpecifications.forUserListedSources(
+                        userId,
+                        typeFilter,
+                        fromDt,
+                        toDt,
+                        pattern
+                )
+        );
 
-        lines.sort(Comparator
-                .comparing(UserAccountingDtos.LineItemResponse::occurredAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(UserAccountingDtos.LineItemResponse::createdAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(UserAccountingDtos.LineItemResponse::id, Comparator.reverseOrder()));
+        List<UserAccountingDtos.EntryResponse> lines = entries.stream()
+                .map(entry -> toEntryResponse(entry, menuNames))
+                .sorted(Comparator
+                        .comparing(UserAccountingDtos.EntryResponse::occurredAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(UserAccountingDtos.EntryResponse::createdAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(UserAccountingDtos.EntryResponse::id, Comparator.reverseOrder()))
+                .toList();
 
         long totalElements = lines.size();
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
         int fromIndex = Math.min(safePage * safeSize, lines.size());
         int toIndex = Math.min(fromIndex + safeSize, lines.size());
-        List<UserAccountingDtos.LineItemResponse> pageContent = lines.subList(fromIndex, toIndex);
+        List<UserAccountingDtos.EntryResponse> pageContent = lines.subList(fromIndex, toIndex);
 
         return new UserAccountingDtos.EntryPageResponse(
                 pageContent,
@@ -124,6 +207,70 @@ public class UserAccountingService {
                 totalPages,
                 safePage + 1 < totalPages,
                 buildSummary(lines)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public UserAccountingDtos.EntryDetailResponse getDetailForCurrentUser(Long entryId) {
+        Long userId = securityUtils.getCurrentUserId();
+        UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
+                .filter(e -> e.getUserId().equals(userId))
+                .orElseThrow(() -> new NotFoundException("Kayıt bulunamadı"));
+
+        if (entry.getSourceType() == AccountingSourceType.BILL_TIP) {
+            throw new NotFoundException("Kayıt bulunamadı");
+        }
+
+        List<UserAccountingDtos.DetailLineItem> items = new ArrayList<>();
+
+        if (entry.getSourceOrderId() != null) {
+            MenuOrder order = menuOrderRepository.findById(entry.getSourceOrderId()).orElse(null);
+            if (order != null) {
+                requireOwnedMenu(order.getMenuId(), userId);
+                List<MenuOrderItem> orderItems = menuOrderItemRepository.findByOrderId(order.getId());
+                for (MenuOrderItem item : orderItems) {
+                    items.add(new UserAccountingDtos.DetailLineItem(
+                            item.getId(),
+                            item.getProductName(),
+                            item.getUnitPrice(),
+                            item.getQuantity(),
+                            item.getLineTotal(),
+                            item.getNote(),
+                            order.getId()
+                    ));
+                }
+            }
+        } else if (entry.getSourceBillId() != null) {
+            TableBill bill = tableBillRepository.findWithItemsById(entry.getSourceBillId()).orElse(null);
+            if (bill != null) {
+                requireOwnedMenu(bill.getMenuId(), userId);
+                List<TableBillItem> billItems = bill.getItems();
+                if (billItems == null || billItems.isEmpty()) {
+                    billItems = tableBillItemRepository.findByBillId(bill.getId());
+                }
+                for (TableBillItem item : billItems) {
+                    items.add(new UserAccountingDtos.DetailLineItem(
+                            item.getId(),
+                            item.getProductName(),
+                            item.getUnitPrice(),
+                            item.getQuantity(),
+                            item.getLineTotal(),
+                            item.getNote(),
+                            item.getSourceOrderId()
+                    ));
+                }
+            }
+        }
+
+        return new UserAccountingDtos.EntryDetailResponse(
+                entry.getId(),
+                entry.getSourceType(),
+                entry.getSourceBillId(),
+                entry.getSourceOrderId(),
+                entry.getTitle(),
+                entry.getAmount(),
+                entry.getCurrency(),
+                items
         );
     }
 
@@ -139,130 +286,49 @@ public class UserAccountingService {
         userAccountingEntryRepository.delete(entry);
     }
 
-    private List<UserAccountingDtos.LineItemResponse> buildBillLines(
-            Long userId,
-            AccountingEntryType typeFilter,
-            LocalDateTime fromDt,
-            LocalDateTime toDt,
-            String pattern,
-            Map<Long, String> menuNames
-    ) {
-        if (typeFilter != null && typeFilter != AccountingEntryType.GELIR) {
-            return List.of();
+    private Long resolveSingleSourceOrderId(List<TableBillItem> items) {
+        if (items == null || items.isEmpty()) {
+            return null;
         }
-
-        List<Long> menuIds = menuRepository.findMenuIdsByUserId(userId);
-        if (menuIds.isEmpty()) {
-            return List.of();
-        }
-
-        List<TableBill> closedBills = tableBillRepository.findAll(
-                TableBillSpecifications.closedForMenus(
-                        menuIds,
-                        TableBillStatus.CLOSED,
-                        fromDt,
-                        toDt
-                )
-        );
-
-        List<UserAccountingDtos.LineItemResponse> lines = new ArrayList<>();
-        for (TableBill bill : closedBills) {
-            String tableName = restaurantTableRepository.findById(bill.getTableId())
-                    .map(t -> t.getName())
-                    .orElse("Masa");
-            String saleTitle = "Adisyon - " + tableName;
-            BigDecimal orderAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
-            if (orderAmount.compareTo(BigDecimal.ZERO) > 0 && matchesPattern(pattern, saleTitle, null)) {
-                lines.add(new UserAccountingDtos.LineItemResponse(
-                        "BILL-" + bill.getId(),
-                        AccountingLineType.BILL,
-                        AccountingEntryType.GELIR,
-                        saleTitle,
-                        orderAmount,
-                        resolveCurrency(bill.getCurrency()),
-                        bill.getClosedAt(),
-                        null,
-                        bill.getId(),
-                        null,
-                        menuNames.get(bill.getMenuId()),
-                        bill.getUpdatedAt()
-                ));
-            }
-
-            BigDecimal tipAmount = bill.getTipAmount();
-            if (tipAmount != null && tipAmount.compareTo(BigDecimal.ZERO) > 0) {
-                String tipTitle = "Bahşiş - " + tableName;
-                if (matchesPattern(pattern, tipTitle, null)) {
-                    lines.add(new UserAccountingDtos.LineItemResponse(
-                            "BILL-TIP-" + bill.getId(),
-                            AccountingLineType.BILL,
-                            AccountingEntryType.GELIR,
-                            tipTitle,
-                            tipAmount,
-                            resolveCurrency(bill.getCurrency()),
-                            bill.getClosedAt(),
-                            null,
-                            bill.getId(),
-                            null,
-                            menuNames.get(bill.getMenuId()),
-                            bill.getUpdatedAt()
-                    ));
-                }
+        Set<Long> orderIds = new HashSet<>();
+        for (TableBillItem item : items) {
+            if (item.getSourceOrderId() != null) {
+                orderIds.add(item.getSourceOrderId());
             }
         }
-        return lines;
+        if (orderIds.size() == 1) {
+            return orderIds.iterator().next();
+        }
+        return null;
     }
 
-    private List<UserAccountingDtos.LineItemResponse> buildManualLines(
-            Long userId,
-            AccountingEntryType typeFilter,
-            LocalDateTime fromDt,
-            LocalDateTime toDt,
-            String pattern,
-            Map<Long, String> menuNames
-    ) {
-        String searchPattern = pattern == null ? null : "%" + pattern + "%";
-        List<UserAccountingEntry> entries = userAccountingEntryRepository.findAll(
-                UserAccountingEntrySpecifications.forUser(
-                        userId,
-                        typeFilter,
-                        fromDt,
-                        toDt,
-                        searchPattern,
-                        true
-                )
-        );
-
-        return entries.stream()
-                .map(entry -> toLineItem(entry, menuNames))
-                .toList();
-    }
-
-    private UserAccountingDtos.LineItemResponse toLineItem(
+    private UserAccountingDtos.EntryResponse toEntryResponse(
             UserAccountingEntry entry,
             Map<Long, String> menuNames
     ) {
-        return new UserAccountingDtos.LineItemResponse(
-                "ENTRY-" + entry.getId(),
-                AccountingLineType.MANUAL,
+        return new UserAccountingDtos.EntryResponse(
+                entry.getId(),
                 entry.getEntryType(),
                 entry.getTitle(),
                 entry.getAmount(),
                 entry.getCurrency(),
                 entry.getOccurredAt(),
                 entry.getNote(),
-                entry.getSourceBillId(),
-                entry.getId(),
+                entry.getMenuId(),
                 entry.getMenuId() == null ? null : menuNames.get(entry.getMenuId()),
+                entry.getSourceType(),
+                entry.getSourceBillId(),
+                entry.getSourceOrderId(),
+                entry.getCreatedByWaiterId(),
                 entry.getCreatedAt()
         );
     }
 
-    private UserAccountingDtos.SummaryTotals buildSummary(List<UserAccountingDtos.LineItemResponse> lines) {
+    private UserAccountingDtos.SummaryTotals buildSummary(List<UserAccountingDtos.EntryResponse> lines) {
         BigDecimal gelir = BigDecimal.ZERO;
         BigDecimal gider = BigDecimal.ZERO;
         BigDecimal borc = BigDecimal.ZERO;
-        for (UserAccountingDtos.LineItemResponse line : lines) {
+        for (UserAccountingDtos.EntryResponse line : lines) {
             switch (line.entryType()) {
                 case GELIR -> gelir = gelir.add(line.amount());
                 case GIDER -> gider = gider.add(line.amount());
@@ -272,8 +338,7 @@ public class UserAccountingService {
         return new UserAccountingDtos.SummaryTotals(gelir, gider, borc, "TRY");
     }
 
-    private Map<Long, String> resolveMenuNames() {
-        Long userId = securityUtils.getCurrentUserId();
+    private Map<Long, String> resolveMenuNames(Long userId) {
         List<Long> menuIds = menuRepository.findMenuIdsByUserId(userId);
         Map<Long, String> menuNames = new HashMap<>();
         for (Long menuId : menuIds) {
@@ -282,15 +347,6 @@ public class UserAccountingService {
                     .ifPresent(name -> menuNames.put(menuId, name));
         }
         return menuNames;
-    }
-
-    private boolean matchesPattern(String pattern, String title, String note) {
-        if (pattern == null || pattern.isBlank()) {
-            return true;
-        }
-        String lowerTitle = title == null ? "" : title.toLowerCase(Locale.ROOT);
-        String lowerNote = note == null ? "" : note.toLowerCase(Locale.ROOT);
-        return lowerTitle.contains(pattern) || lowerNote.contains(pattern);
     }
 
     private String resolveCurrency(String currency) {

@@ -18,6 +18,9 @@ public interface TableBillRepository extends JpaRepository<TableBill, Long>, Jpa
     Optional<TableBill> findByMenuIdAndTableIdAndStatus(Long menuId, Long tableId, TableBillStatus status);
 
     @EntityGraph(attributePaths = "items")
+    Optional<TableBill> findWithItemsById(Long id);
+
+    @EntityGraph(attributePaths = "items")
     Optional<TableBill> findByIdAndMenuId(Long id, Long menuId);
 
     List<TableBill> findByMenuIdAndStatus(Long menuId, TableBillStatus status);
