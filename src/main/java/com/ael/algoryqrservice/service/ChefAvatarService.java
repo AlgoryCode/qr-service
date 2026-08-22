@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.config.ChefAvatarProperties;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import lombok.RequiredArgsConstructor;
@@ -144,9 +145,13 @@ public class ChefAvatarService {
     public static class ChefAvatarSeedRunner implements ApplicationRunner {
 
         private final ChefAvatarService chefAvatarService;
+        private final AppProperties appProperties;
 
         @Override
         public void run(ApplicationArguments args) {
+            if (!appProperties.getSeed().isChefAvatars()) {
+                return;
+            }
             chefAvatarService.seedCatalogIfMissing();
         }
     }

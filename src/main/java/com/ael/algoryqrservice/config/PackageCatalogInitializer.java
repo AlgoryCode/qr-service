@@ -11,9 +11,13 @@ import org.springframework.stereotype.Component;
 public class PackageCatalogInitializer implements ApplicationRunner {
 
     private final PackageCatalogService packageCatalogService;
+    private final AppProperties appProperties;
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!appProperties.getSeed().isPackageCatalog()) {
+            return;
+        }
         packageCatalogService.ensureCatalogProducts();
     }
 }
