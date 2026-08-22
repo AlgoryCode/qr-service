@@ -49,15 +49,8 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: true
-  flyway:
-    enabled: ${FLYWAY_STATUS:false}
-    baseline-on-migrate: true
-    baseline-version: 1
-    ignore-missing-migrations: true
-    validate-on-migrate: false
-    locations: classpath:db/migration
 
 management:
   endpoints:

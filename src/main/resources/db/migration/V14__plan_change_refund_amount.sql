@@ -1,2 +1,0 @@
-ALTER TABLE tbl_plan_change
-    ADD COLUMN IF NOT EXISTS refund_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
