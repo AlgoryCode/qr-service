@@ -13,9 +13,13 @@ import org.springframework.stereotype.Component;
 public class MenuPublicAccessBackfillRunner implements ApplicationRunner {
 
     private final MenuPublicAccessService menuPublicAccessService;
+    private final AppProperties appProperties;
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!appProperties.getSeed().isPublicAccessBackfill()) {
+            return;
+        }
         try {
             menuPublicAccessService.syncAllMenuOwners();
             log.info("Menu public access backfill completed");

@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.MenuAllergen;
@@ -195,9 +196,13 @@ public class TaxonomySeedService {
     @RequiredArgsConstructor
     public static class TaxonomySeedRunner implements ApplicationRunner {
         private final TaxonomySeedService taxonomySeedService;
+        private final AppProperties appProperties;
 
         @Override
         public void run(ApplicationArguments args) {
+            if (!appProperties.getSeed().isTaxonomy()) {
+                return;
+            }
             taxonomySeedService.upsertClasspathSeed();
         }
     }

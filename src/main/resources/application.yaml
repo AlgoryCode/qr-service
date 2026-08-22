@@ -49,7 +49,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: true
 
 management:
@@ -99,8 +99,12 @@ app:
         object-key: chief_avatars/default.png
         classpath-resource: chef-avatars/default.png
   seed:
+    taxonomy: ${APP_SEED_TAXONOMY_ENABLED:false}
+    package-catalog: ${APP_SEED_PACKAGE_CATALOG_ENABLED:false}
+    public-access-backfill: ${APP_SEED_PUBLIC_ACCESS_BACKFILL_ENABLED:false}
+    chef-avatars: ${APP_SEED_CHEF_AVATARS_ENABLED:false}
     menu-products:
-      enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:true}
+      enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:false}
       only-if-empty: ${APP_SEED_MENU_PRODUCTS_ONLY_IF_EMPTY:true}
   smart-report:
     quota-period: ${SMART_REPORT_QUOTA_PERIOD:DAY}

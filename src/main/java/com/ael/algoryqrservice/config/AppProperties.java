@@ -32,6 +32,10 @@ public class AppProperties {
     @Getter
     @Setter
     public static class SeedSettings {
+        private boolean taxonomy = false;
+        private boolean packageCatalog = false;
+        private boolean publicAccessBackfill = false;
+        private boolean chefAvatars = false;
         private MenuProductsSeed menuProducts = new MenuProductsSeed();
     }
 
@@ -39,6 +43,6 @@ public class AppProperties {
     @Setter
     public static class MenuProductsSeed {
         private boolean enabled = false;
-        private boolean onlyIfEmpty = false;
+        private boolean onlyIfEmpty = true;
     }
 }
