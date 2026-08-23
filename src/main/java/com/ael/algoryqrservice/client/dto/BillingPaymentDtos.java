@@ -91,4 +91,17 @@ public final class BillingPaymentDtos {
             return status != null && "FAILURE".equalsIgnoreCase(status.trim());
         }
     }
+
+    public record StoredCardCharge(
+            String conversationId,
+            String status
+    ) {
+        public boolean isSuccess() {
+            return status != null && "SUCCESS".equalsIgnoreCase(status.trim());
+        }
+
+        public boolean isInitiated() {
+            return status != null && "INITIATED".equalsIgnoreCase(status.trim());
+        }
+    }
 }

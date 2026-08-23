@@ -203,6 +203,42 @@ class PaymentRequestMapperTest {
     }
 
     @Test
+    void toPlanChangeCheckoutFormRequest_whenDifference_thenMarkPlanChangeMetadata() {
+        PlanPackage plan = PlanPackage.builder().id(2L).code(CatalogPackages.PRO_PACKAGE).name("PRO")
+                .price(new BigDecimal("300.00")).currency("TRY").validityDays(30).build();
+        BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
+                .name("Ada").surname("Lovelace").country("TR").city("İstanbul")
+                .address("Adres").postcode("34000").tckn("12345678901").phone("5551112233").build();
+        Purchase purchase = Purchase.builder().id(10L).paymentConversationId("planchng-1")
+                .paymentStyle(PaymentStyle.SUBSCRIPTION)
+                .billingPeriod(BillingPeriod.MONTHLY)
+                .billingIntervalMonths(1)
+                .price(new BigDecimal("300.00"))
+                .billingSnapshot(snapshot).build();
+        User user = User.builder().id(7L).firstName("Ada").lastName("Lovelace")
+                .email("ada@example.com").phone("5551112233").build();
+
+        PaymentCheckoutFormRequest result = mapper.toPlanChangeCheckoutFormRequest(
+                purchase,
+                user,
+                plan,
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "planchng-1",
+                new BigDecimal("80.00")
+        );
+
+        assertThat(result.getPrice()).isEqualByComparingTo("80.00");
+        assertThat(result.getPaidPrice()).isEqualByComparingTo("80.00");
+        assertThat(result.getPaymentStyle()).isEqualTo("ONE_TIME");
+        assertThat(result.getBasketId()).isEqualTo("qrplanchng10");
+        assertThat(result.getSourceMetadata().get("planChange")).isEqualTo(true);
+        assertThat(result.getSourceMetadata().get("planChangeDifference")).isEqualTo(true);
+        assertThat(result.getSourceMetadata().get("totalAmount")).isEqualTo(new BigDecimal("80.00"));
+    }
+
+    @Test
     void toCardVerificationRequest_whenValid_thenForceNominalMetadataAndNoBasket() {
         BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
                 .name("Ada").surname("Lovelace").country("TR").city("İstanbul")
