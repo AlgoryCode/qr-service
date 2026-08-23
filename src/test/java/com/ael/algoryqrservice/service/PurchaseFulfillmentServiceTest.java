@@ -108,6 +108,25 @@ class PurchaseFulfillmentServiceTest {
         assertThat(captor.getAllValues().get(0).getAmount()).isEqualByComparingTo("100.00");
         assertThat(captor.getAllValues().get(0).getStatus()).isEqualTo(FulfillmentStatus.PENDING);
         assertThat(captor.getAllValues().get(0).getInstallmentNumber()).isEqualTo(1);
+        assertThat(captor.getAllValues().get(0).getInstallmentId()).isEqualTo("conv-sub:1");
+        assertThat(captor.getAllValues().get(0).getEventId()).isEqualTo("pending:conv-sub");
+    }
+
+    @Test
+    void initializeSchedule_whenConversationIdPresent_thenUsesUuidAsAttemptKey() {
+        purchase.setId(42L);
+        purchase.setPaymentConversationId("a1b2c3d4e5f64789a1b2c3d4e5f64789");
+        purchase.setPrice(new BigDecimal("50.00"));
+        purchase.setCurrency("TRY");
+        purchase.setInstallmentCount(1);
+        when(fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(42L)).thenReturn(List.of());
+
+        fulfillmentService.initializeSchedule(purchase, "qr-service");
+
+        ArgumentCaptor<PurchaseFulfillment> captor = ArgumentCaptor.forClass(PurchaseFulfillment.class);
+        verify(fulfillmentRepository).save(captor.capture());
+        assertThat(captor.getValue().getEventId()).isEqualTo("pending:a1b2c3d4e5f64789a1b2c3d4e5f64789");
+        assertThat(captor.getValue().getInstallmentId()).isEqualTo("a1b2c3d4e5f64789a1b2c3d4e5f64789:1");
     }
 
     @Test

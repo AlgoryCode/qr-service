@@ -21,10 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -42,10 +40,9 @@ public class PurchaseFulfillmentService {
         if (!fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(purchase.getId()).isEmpty()) {
             return;
         }
-        String seed = serviceName + ":" + purchase.getPaymentConversationId();
-        String planId = UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
         LocalDateTime anchor = purchase.getPurchasedAt() != null ? purchase.getPurchasedAt() : LocalDateTime.now();
-        String installmentId = planId + ":1";
+        String attemptKey = resolvePaymentAttemptKey(purchase);
+        String installmentId = attemptKey + ":1";
         fulfillmentRepository.save(PurchaseFulfillment.builder()
                 .purchaseId(purchase.getId())
                 .installmentId(installmentId)
@@ -55,8 +52,16 @@ public class PurchaseFulfillmentService {
                 .dueAt(anchor)
                 .amount(purchase.getPrice())
                 .currency(purchase.getCurrency())
-                .eventId("pending:" + installmentId)
+                .eventId("pending:" + attemptKey)
                 .build());
+    }
+
+    private String resolvePaymentAttemptKey(Purchase purchase) {
+        String conversationId = purchase.getPaymentConversationId();
+        if (conversationId != null && !conversationId.isBlank()) {
+            return conversationId;
+        }
+        return String.valueOf(purchase.getId());
     }
 
     @Transactional

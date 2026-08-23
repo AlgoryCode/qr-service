@@ -576,7 +576,7 @@ public class PlanChangeService {
                 .status(PurchaseStatus.PENDING)
                 .build());
 
-        purchase.setPaymentConversationId(paymentRequestMapper.buildConversationId(purchase.getId()));
+        purchase.setPaymentConversationId(paymentRequestMapper.newPaymentAttemptId(user.getId()));
         purchaseRepository.save(purchase);
         purchaseFulfillmentService.initializeSchedule(purchase, appProperties.getServiceName());
         return purchase;

@@ -47,6 +47,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
@@ -290,7 +291,7 @@ class PurchaseServicePaymentEventTest {
         when(purchaseFulfillmentService.getFulfillments(10L)).thenReturn(List.of(
                 PurchaseFulfillmentResponse.builder().installmentNumber(1).build()
         ));
-        when(paymentRequestMapper.buildConversationId(10L)).thenReturn("debt-conversation-10");
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("debt-conversation-10");
         PaymentCheckoutFormRequest checkoutRequest = PaymentCheckoutFormRequest.builder().build();
         when(paymentRequestMapper.toDebtCheckoutFormRequest(
                 eq(purchase),
@@ -528,7 +529,7 @@ class PurchaseServicePaymentEventTest {
             }
             return saved;
         });
-        when(paymentRequestMapper.buildConversationId(10L)).thenReturn("conversation-10");
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conversation-10");
         when(paymentRequestMapper.toDebtCheckoutFormRequest(
                 any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
                 eq("conversation-10"), eq(1)

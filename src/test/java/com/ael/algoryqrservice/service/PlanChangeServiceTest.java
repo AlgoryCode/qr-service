@@ -304,7 +304,7 @@ class PlanChangeServiceTest {
                 new BillingPaymentDtos.PaymentMethod("55", "Kart", "visa", "4242", 12, 2030)
         ));
         when(appProperties.getServiceName()).thenReturn("qr-service");
-        when(paymentRequestMapper.buildConversationId(anyLong())).thenReturn("conv-1");
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conv-1");
         when(paymentServiceClient.createDirectPayment(any())).thenReturn(new PaymentThreeDsResponse());
         when(planChangeRepository.save(any(PlanChange.class))).thenAnswer(invocation -> {
             PlanChange pc = invocation.getArgument(0);
@@ -382,7 +382,7 @@ class PlanChangeServiceTest {
         when(planPackageService.findPackage(2L)).thenReturn(pro);
         when(planPackageService.findActivePackage(1L)).thenReturn(starter);
         when(planChangeRepository.existsByUserIdAndStatus(anyLong(), any())).thenReturn(false);
-        when(paymentRequestMapper.buildConversationId(anyLong())).thenReturn("conv-down");
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conv-down");
         when(paymentServiceClient.getRefundablePayment(10L, "paid-conv-pro"))
                 .thenReturn(new BillingPaymentDtos.RefundablePayment(
                         "paid-conv-pro",
@@ -469,7 +469,7 @@ class PlanChangeServiceTest {
         when(planPackageService.findPackage(2L)).thenReturn(pro);
         when(planPackageService.findActivePackage(1L)).thenReturn(starter);
         when(planChangeRepository.existsByUserIdAndStatus(anyLong(), any())).thenReturn(false);
-        when(paymentRequestMapper.buildConversationId(anyLong())).thenReturn("conv-down-0");
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conv-down-0");
         when(paymentServiceClient.getRefundablePayment(10L, "paid-conv-empty"))
                 .thenReturn(new BillingPaymentDtos.RefundablePayment(
                         "paid-conv-empty",
