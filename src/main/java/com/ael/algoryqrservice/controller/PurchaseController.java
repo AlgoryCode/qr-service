@@ -123,8 +123,15 @@ public class PurchaseController {
     private String resolveClientIp(HttpServletRequest request) {
         String forwardedFor = request.getHeader("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
+            for (String candidate : forwardedFor.split(",")) {
+                String ip = candidate.trim();
+                if (ip.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+                    return ip;
+                }
+            }
             return forwardedFor.split(",")[0].trim();
         }
-        return request.getRemoteAddr();
+        String remote = request.getRemoteAddr();
+        return remote == null || remote.isBlank() ? "127.0.0.1" : remote;
     }
 }

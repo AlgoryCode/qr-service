@@ -79,7 +79,7 @@ public class PurchaseService {
     private final BillingSubscriptionProperties billingSubscriptionProperties;
     private final PlatformTransactionManager transactionManager;
 
-    @Transactional
+    @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
         PlanPackage planPackage = planPackageService.findActivePackage(request.getPackageId());
         if (!planPackage.isPurchasable() || planPackage.isSystemManaged()
