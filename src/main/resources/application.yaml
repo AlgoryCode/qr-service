@@ -140,6 +140,17 @@ billing:
   subscription:
     manual-payment-grace-days: ${BILLING_SUBSCRIPTION_GRACE_DAYS:7}
 
+trendyol-go:
+  base-url: ${TGO_BASE_URL:https://api.tgoapps.com}
+  user-agent-name: ${TGO_USER_AGENT_NAME:AlgoryQR}
+  encrypt-key: ${TGO_CREDENTIALS_ENCRYPT_KEY:}
+  connect-timeout: ${TGO_CONNECT_TIMEOUT:5s}
+  read-timeout: ${TGO_READ_TIMEOUT:20s}
+  max-attempts: ${TGO_MAX_ATTEMPTS:3}
+  poll-enabled: ${TGO_POLL_ENABLED:true}
+  poll-lookback-hours: ${TGO_POLL_LOOKBACK_HOURS:24}
+  webhook-api-key: ${TGO_WEBHOOK_API_KEY:}
+
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}

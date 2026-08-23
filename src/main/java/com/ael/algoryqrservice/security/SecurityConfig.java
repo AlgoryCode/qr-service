@@ -79,6 +79,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/site/visit").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/integrations/trendyol-go/webhooks/orders").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
