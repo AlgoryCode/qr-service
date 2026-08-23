@@ -74,7 +74,7 @@ public class MenuWaiterAuthService {
                 .orElseThrow(() -> new BadCredentialsException("Garson bulunamadı"));
         return MenuWaiterDtos.WaiterMeResponse.builder()
                 .waiterId(waiter.getId())
-                .menuId(waiter.getMenuId())
+                .branchId(waiter.getBranchId())
                 .ownerUserId(waiter.getOwnerUserId())
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())

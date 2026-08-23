@@ -86,6 +86,7 @@ public final class CampaignDtos {
     @AllArgsConstructor
     public static class ActiveCampaignResponse {
         private Long id;
+        private Long menuId;
         private String templateCode;
         private String name;
         private String slogan;

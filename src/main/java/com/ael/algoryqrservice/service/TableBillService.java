@@ -529,6 +529,15 @@ public class TableBillService {
                 .collect(Collectors.toMap(TableBill::getTableId, bill -> bill, (a, b) -> a));
     }
 
+    @Transactional(readOnly = true)
+    public Map<Long, TableBill> findOpenBillsByMenuIds(java.util.Collection<Long> menuIds) {
+        if (menuIds == null || menuIds.isEmpty()) {
+            return Map.of();
+        }
+        return tableBillRepository.findByMenuIdInAndStatus(menuIds, TableBillStatus.OPEN).stream()
+                .collect(Collectors.toMap(TableBill::getTableId, bill -> bill, (a, b) -> a));
+    }
+
     public TableBillDtos.BillResponse toBillResponse(TableBill bill, BigDecimal fixedCommissionAmount) {
         String tableName = restaurantTableRepository.findById(bill.getTableId())
                 .map(RestaurantTable::getName)
@@ -772,6 +781,7 @@ public class TableBillService {
         }
         waiterCommissionService.recordFixedItemAddCommission(
                 waiter,
+                bill.getMenuId(),
                 bill.getId(),
                 null,
                 addedItems,

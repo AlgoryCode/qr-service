@@ -85,14 +85,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         List<String> scopes;
         List<String> products;
         String activePackage;
-        Long menuId = null;
+        Long branchId = null;
         if (JwtService.PRINCIPAL_CUSTOMER.equals(principalType)
                 || JwtService.PRINCIPAL_WAITER.equals(principalType)) {
             scopes = List.of();
             products = List.of();
             activePackage = null;
             if (JwtService.PRINCIPAL_WAITER.equals(principalType)) {
-                menuId = jwtService.extractMenuId(claims);
+                branchId = jwtService.extractBranchId(claims);
             }
         } else {
             scopes = jwtService.extractScopes(claims);
@@ -113,7 +113,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 products,
                 activePackage,
                 principalType,
-                menuId
+                branchId
         ));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }

@@ -3,7 +3,6 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.model.dto.CampaignDtos;
 import com.ael.algoryqrservice.service.campaign.CampaignManualGrantService;
 import com.ael.algoryqrservice.service.campaign.CampaignService;
-import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,14 +22,10 @@ public class WaiterCampaignController {
 
     private final CampaignService campaignService;
     private final CampaignManualGrantService campaignManualGrantService;
-    private final SecurityUtils securityUtils;
 
     @GetMapping("/active")
-    public ResponseEntity<List<CampaignDtos.ActiveCampaignResponse>> listActive(
-            @RequestParam(required = false) Long menuId
-    ) {
-        Long resolvedMenuId = menuId != null ? menuId : securityUtils.getCurrentWaiterMenuId();
-        return ResponseEntity.ok(campaignService.listActiveCampaigns(resolvedMenuId));
+    public ResponseEntity<List<CampaignDtos.ActiveCampaignResponse>> listActive() {
+        return ResponseEntity.ok(campaignService.listActiveCampaignsForCurrentWaiter());
     }
 
     @GetMapping("/customers")

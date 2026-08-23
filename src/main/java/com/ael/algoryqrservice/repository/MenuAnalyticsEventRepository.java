@@ -20,6 +20,13 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
             LocalDateTime to
     );
 
+    long countByMenuIdInAndEventTypeAndOccurredAtBetween(
+            Collection<Long> menuIds,
+            MenuAnalyticsEventType eventType,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
     @Query(value = """
             select cast(date_trunc('day', occurred_at) as date) as day,
                    count(*) filter (where event_type = 'MENU_OPEN'),
@@ -36,6 +43,21 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
     );
 
     @Query(value = """
+            select cast(date_trunc('day', occurred_at) as date) as day,
+                   count(*) filter (where event_type = 'MENU_OPEN'),
+                   count(*) filter (where event_type = 'PRODUCT_VIEW')
+            from tbl_menu_analytics_event
+            where menu_id in (:menuIds) and occurred_at between :from and :to
+            group by day
+            order by day
+            """, nativeQuery = true)
+    List<Object[]> countDailyOpenAndProductByMenuIdIn(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query(value = """
             select extract(hour from occurred_at) as hour_of_day, count(*)
             from tbl_menu_analytics_event
             where menu_id = :menuId and occurred_at between :from and :to
@@ -44,6 +66,19 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
             """, nativeQuery = true)
     List<Object[]> countHourlyByMenuId(
             @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query(value = """
+            select extract(hour from occurred_at) as hour_of_day, count(*)
+            from tbl_menu_analytics_event
+            where menu_id in (:menuIds) and occurred_at between :from and :to
+            group by hour_of_day
+            order by hour_of_day
+            """, nativeQuery = true)
+    List<Object[]> countHourlyByMenuIdIn(
+            @Param("menuIds") Collection<Long> menuIds,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );
@@ -64,6 +99,21 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
     );
 
     @Query("""
+            select e.productId, count(e) from MenuAnalyticsEvent e
+            where e.menuId in :menuIds
+              and e.eventType = com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType.PRODUCT_VIEW
+              and e.occurredAt between :from and :to
+              and e.productId is not null
+            group by e.productId
+            order by count(e) desc
+            """)
+    List<Object[]> topProductsByMenuIds(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
             select e.categoryId, count(e) from MenuAnalyticsEvent e
             where e.menuId = :menuId
               and e.eventType = com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType.CATEGORY_VIEW
@@ -74,6 +124,21 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
             """)
     List<Object[]> topCategories(
             @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select e.categoryId, count(e) from MenuAnalyticsEvent e
+            where e.menuId in :menuIds
+              and e.eventType = com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType.CATEGORY_VIEW
+              and e.occurredAt between :from and :to
+              and e.categoryId is not null
+            group by e.categoryId
+            order by count(e) desc
+            """)
+    List<Object[]> topCategoriesByMenuIds(
+            @Param("menuIds") Collection<Long> menuIds,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );
@@ -93,6 +158,21 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
             @Param("to") LocalDateTime to
     );
 
+    @Query("""
+            select e.categoryId, e.productId, count(e) from MenuAnalyticsEvent e
+            where e.menuId in :menuIds
+              and e.eventType = com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType.PRODUCT_VIEW
+              and e.occurredAt between :from and :to
+              and e.productId is not null
+            group by e.categoryId, e.productId
+            order by count(e) desc
+            """)
+    List<Object[]> productViewsByCategoryForMenuIds(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
     @Query(value = """
             select avg(cnt)::float8 from (
                 select count(*) as cnt
@@ -105,6 +185,22 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
             """, nativeQuery = true)
     Double avgProductsPerSession(
             @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query(value = """
+            select avg(cnt)::float8 from (
+                select count(*) as cnt
+                from tbl_menu_analytics_event
+                where menu_id in (:menuIds)
+                  and event_type = 'PRODUCT_VIEW'
+                  and occurred_at between :from and :to
+                group by session_id
+            ) session_counts
+            """, nativeQuery = true)
+    Double avgProductsPerSessionByMenuIds(
+            @Param("menuIds") Collection<Long> menuIds,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );

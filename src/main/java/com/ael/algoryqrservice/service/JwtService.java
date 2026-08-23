@@ -137,7 +137,7 @@ public class JwtService {
             String username,
             UUID sessionId,
             Long waiterId,
-            Long menuId,
+            Long branchId,
             Long ownerUserId
     ) {
         Date now = new Date();
@@ -147,7 +147,7 @@ public class JwtService {
                 .claim("userId", waiterId)
                 .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_WAITER)
                 .claim(ROLES_CLAIM, List.of("ROLE_WAITER"))
-                .claim("menuId", menuId)
+                .claim("branchId", branchId)
                 .claim("ownerUserId", ownerUserId)
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
@@ -205,8 +205,8 @@ public class JwtService {
         return PRINCIPAL_WAITER.equals(extractPrincipalType(claims));
     }
 
-    public Long extractMenuId(Claims claims) {
-        return extractLongClaim(claims, "menuId");
+    public Long extractBranchId(Claims claims) {
+        return extractLongClaim(claims, "branchId");
     }
 
     public Long extractOwnerUserId(Claims claims) {

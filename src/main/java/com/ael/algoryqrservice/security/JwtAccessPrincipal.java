@@ -10,7 +10,7 @@ public record JwtAccessPrincipal(
         List<String> products,
         String activePackage,
         String principalType,
-        Long menuId
+        Long branchId
 ) {
     public JwtAccessPrincipal(
             Long userId,

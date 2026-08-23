@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Table(name = "tbl_menu_waiter", uniqueConstraints = {
         @UniqueConstraint(name = "uk_menu_waiter_username", columnNames = "username")
 }, indexes = {
-        @Index(name = "idx_menu_waiter_menu", columnList = "menu_id"),
+        @Index(name = "idx_menu_waiter_branch", columnList = "branch_id"),
         @Index(name = "idx_menu_waiter_owner", columnList = "owner_user_id")
 })
 @Getter
@@ -31,8 +31,8 @@ public class MenuWaiter {
     @Column(name = "owner_user_id", nullable = false)
     private Long ownerUserId;
 
-    @Column(name = "menu_id", nullable = false)
-    private Long menuId;
+    @Column(name = "branch_id")
+    private Long branchId;
 
     @Column(nullable = false, unique = true, length = 64)
     private String username;

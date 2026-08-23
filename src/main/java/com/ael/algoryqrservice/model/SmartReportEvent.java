@@ -42,11 +42,17 @@ public class SmartReportEvent {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "menu_id", nullable = false)
+    @Column(name = "menu_id")
     private Long menuId;
 
-    @Column(name = "menu_name", nullable = false)
+    @Column(name = "menu_name")
     private String menuName;
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Column(name = "branch_name")
+    private String branchName;
 
     @Column(name = "from_date", nullable = false)
     private LocalDate fromDate;

@@ -64,6 +64,31 @@ public class SmartReportService {
             String locale,
             SmartReportDtos.Options options
     ) {
+        return enqueue(null, menuId, ownerId, from, to, locale, options);
+    }
+
+    @Transactional
+    public SmartReportDtos.SmartReportAccepted enqueueForBranch(
+            Long branchId,
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to,
+            String locale,
+            SmartReportDtos.Options options
+    ) {
+        return enqueue(branchId, menuId, ownerId, from, to, locale, options);
+    }
+
+    private SmartReportDtos.SmartReportAccepted enqueue(
+            Long branchId,
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to,
+            String locale,
+            SmartReportDtos.Options options
+    ) {
         if (from == null || to == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from and to are required");
         }
@@ -73,20 +98,48 @@ public class SmartReportService {
 
         assertQuotaAvailable(ownerId);
 
-        AnalyticsDtos.MenuAnalyticsReportResponse report =
-                analyticsService.getMenuReport(menuId, ownerId, from, to);
+        AnalyticsDtos.MenuAnalyticsReportResponse report = branchId != null
+                ? analyticsService.getBranchReport(branchId, menuId, ownerId, from, to)
+                : analyticsService.getMenuReport(menuId, ownerId, from, to);
 
         UUID processId = UUID.randomUUID();
         String resolvedLocale = locale == null || locale.isBlank() ? "tr" : locale.trim();
-        String menuName = report.menuName() != null && !report.menuName().isBlank()
-                ? report.menuName()
-                : ("Menu #" + menuId);
+        Long resolvedMenuId = report.menuId();
+        String menuName = report.menuName();
+        Long resolvedBranchId = report.branchId() != null ? report.branchId() : branchId;
+        String branchName = report.branchName();
+        if (menuName == null || menuName.isBlank()) {
+            menuName = branchName != null && !branchName.isBlank()
+                    ? branchName
+                    : (resolvedMenuId != null ? "Menu #" + resolvedMenuId : "Sube");
+        }
+        Long payloadMenuId = resolvedMenuId != null ? resolvedMenuId : 0L;
+        AnalyticsDtos.MenuAnalyticsReportResponse aiReport = new AnalyticsDtos.MenuAnalyticsReportResponse(
+                payloadMenuId,
+                menuName,
+                report.branchId(),
+                report.branchName(),
+                report.from(),
+                report.to(),
+                report.kpis(),
+                report.daily(),
+                report.hourly(),
+                report.devices(),
+                report.topProducts(),
+                report.topCategories(),
+                report.categoryProductTree(),
+                report.sampleJourneys(),
+                report.funnel(),
+                report.feedback()
+        );
 
         smartReportEventRepository.save(SmartReportEvent.builder()
                 .processId(processId)
                 .userId(ownerId)
-                .menuId(menuId)
-                .menuName(menuName)
+                .menuId(resolvedMenuId)
+                .menuName(resolvedMenuId != null ? menuName : null)
+                .branchId(resolvedBranchId)
+                .branchName(branchName)
                 .fromDate(from)
                 .toDate(to)
                 .locale(resolvedLocale)
@@ -98,8 +151,8 @@ public class SmartReportService {
         SmartReportGenerateMessage payload = new SmartReportGenerateMessage(
                 processId,
                 ownerId,
-                menuId,
-                report,
+                payloadMenuId,
+                aiReport,
                 resolvedLocale,
                 SmartReportDtos.toOptionsMap(options)
         );
@@ -121,9 +174,10 @@ public class SmartReportService {
         }
 
         log.info(
-                "Smart report queued. processId={} menuId={} userId={} from={} to={}",
+                "Smart report queued. processId={} branchId={} menuId={} userId={} from={} to={}",
                 processId,
-                menuId,
+                resolvedBranchId,
+                resolvedMenuId,
                 ownerId,
                 from,
                 to
@@ -221,6 +275,8 @@ public class SmartReportService {
                 event.getProcessId(),
                 event.getMenuId(),
                 event.getMenuName(),
+                event.getBranchId(),
+                event.getBranchName(),
                 event.getFromDate(),
                 event.getToDate(),
                 event.getLocale(),
@@ -240,6 +296,8 @@ public class SmartReportService {
                 event.getProcessId(),
                 event.getMenuId(),
                 event.getMenuName(),
+                event.getBranchId(),
+                event.getBranchName(),
                 event.getFromDate(),
                 event.getToDate(),
                 event.getLocale(),

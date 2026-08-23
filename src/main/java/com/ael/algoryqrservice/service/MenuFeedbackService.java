@@ -25,6 +25,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -125,14 +126,22 @@ public class MenuFeedbackService {
 
     @Transactional(readOnly = true)
     public AnalyticsDtos.ReportFeedback buildReportFeedback(Long menuId, LocalDate from, LocalDate to) {
+        return buildReportFeedback(List.of(menuId), from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.ReportFeedback buildReportFeedback(Collection<Long> menuIds, LocalDate from, LocalDate to) {
+        if (menuIds == null || menuIds.isEmpty()) {
+            return emptyReportFeedback();
+        }
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
-        Map<Long, String> productNames = productNames(menuId);
+        Map<Long, String> productNames = productNames(menuIds);
         Pageable samplePage = PageRequest.of(0, SAMPLE_COMMENTS);
         Pageable topPage = PageRequest.of(0, RATED_PRODUCTS_LIMIT);
 
         List<AnalyticsDtos.FeedbackCommentSample> menuComments = menuRatingRepository
-                .sampleCommentsByMenuIdAndPeriod(menuId, fromDt, toDt, samplePage)
+                .sampleCommentsByMenuIdInAndPeriod(menuIds, fromDt, toDt, samplePage)
                 .stream()
                 .map(r -> new AnalyticsDtos.FeedbackCommentSample(
                         null,
@@ -144,7 +153,7 @@ public class MenuFeedbackService {
                 .toList();
 
         List<AnalyticsDtos.FeedbackCommentSample> productComments = menuProductRatingRepository
-                .sampleCommentsByMenuIdAndPeriod(menuId, fromDt, toDt, samplePage)
+                .sampleCommentsByMenuIdInAndPeriod(menuIds, fromDt, toDt, samplePage)
                 .stream()
                 .map(r -> new AnalyticsDtos.FeedbackCommentSample(
                         r.getMenuProductId(),
@@ -156,34 +165,42 @@ public class MenuFeedbackService {
                 .toList();
 
         List<AnalyticsDtos.RatedProductSummary> topRated = menuProductRatingRepository
-                .topRatedProductsByPeriod(menuId, fromDt, toDt, MIN_RATINGS_FOR_RANK, topPage)
+                .topRatedProductsByMenuIdsAndPeriod(menuIds, fromDt, toDt, MIN_RATINGS_FOR_RANK, topPage)
                 .stream()
                 .map(row -> toRatedProduct(row, productNames))
                 .toList();
 
         List<AnalyticsDtos.RatedProductSummary> bottomRated = menuProductRatingRepository
-                .bottomRatedProductsByPeriod(menuId, fromDt, toDt, MIN_RATINGS_FOR_RANK, topPage)
+                .bottomRatedProductsByMenuIdsAndPeriod(menuIds, fromDt, toDt, MIN_RATINGS_FOR_RANK, topPage)
                 .stream()
                 .map(row -> toRatedProduct(row, productNames))
                 .toList();
 
         return new AnalyticsDtos.ReportFeedback(
                 new AnalyticsDtos.MenuFeedbackSummary(
-                        toAvg(menuRatingRepository.averageScoreByMenuIdAndPeriod(menuId, fromDt, toDt)),
-                        menuRatingRepository.countByMenuIdAndPeriod(menuId, fromDt, toDt),
+                        toAvg(menuRatingRepository.averageScoreByMenuIdInAndPeriod(menuIds, fromDt, toDt)),
+                        menuRatingRepository.countByMenuIdInAndPeriod(menuIds, fromDt, toDt),
                         toAnalyticsHistogram(
-                                menuRatingRepository.scoreHistogramByMenuIdAndPeriod(menuId, fromDt, toDt)),
+                                menuRatingRepository.scoreHistogramByMenuIdInAndPeriod(menuIds, fromDt, toDt)),
                         menuComments
                 ),
                 new AnalyticsDtos.ProductFeedbackSummary(
-                        toAvg(menuProductRatingRepository.averageScoreByMenuIdAndPeriod(menuId, fromDt, toDt)),
-                        menuProductRatingRepository.countByMenuIdAndPeriod(menuId, fromDt, toDt),
+                        toAvg(menuProductRatingRepository.averageScoreByMenuIdInAndPeriod(menuIds, fromDt, toDt)),
+                        menuProductRatingRepository.countByMenuIdInAndPeriod(menuIds, fromDt, toDt),
                         topRated,
                         bottomRated,
                         toAnalyticsHistogram(
-                                menuProductRatingRepository.scoreHistogramByMenuIdAndPeriod(menuId, fromDt, toDt)),
+                                menuProductRatingRepository.scoreHistogramByMenuIdInAndPeriod(menuIds, fromDt, toDt)),
                         productComments
                 )
+        );
+    }
+
+    private AnalyticsDtos.ReportFeedback emptyReportFeedback() {
+        return new AnalyticsDtos.ReportFeedback(
+                new AnalyticsDtos.MenuFeedbackSummary(BigDecimal.ZERO, 0L, List.of(), List.of()),
+                new AnalyticsDtos.ProductFeedbackSummary(
+                        BigDecimal.ZERO, 0L, List.of(), List.of(), List.of(), List.of())
         );
     }
 
@@ -199,7 +216,11 @@ public class MenuFeedbackService {
     }
 
     private Map<Long, String> productNames(Long menuId) {
-        return menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).stream()
+        return productNames(List.of(menuId));
+    }
+
+    private Map<Long, String> productNames(Collection<Long> menuIds) {
+        return menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuIds).stream()
                 .collect(Collectors.toMap(MenuProduct::getProductId, MenuProduct::getName, (a, b) -> a));
     }
 

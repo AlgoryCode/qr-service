@@ -45,7 +45,7 @@ class WaiterCommissionServiceTest {
     void recordPercentOrderCommission_whenEnabled_thenCalculatesAndPersists() {
         MenuWaiter waiter = MenuWaiter.builder()
                 .id(7L)
-                .menuId(1L)
+                .branchId(3L)
                 .commissionEnabled(true)
                 .commissionType(WaiterCommissionType.PERCENT)
                 .commissionValue(new BigDecimal("10"))
@@ -53,6 +53,7 @@ class WaiterCommissionServiceTest {
 
         MenuOrder order = MenuOrder.builder()
                 .id(20L)
+                .menuId(1L)
                 .totalAmount(new BigDecimal("200.00"))
                 .currency("TRY")
                 .build();
@@ -77,7 +78,7 @@ class WaiterCommissionServiceTest {
     void recordFixedTableCloseCommission_whenEnabled_thenPersistsFixedAmount() {
         MenuWaiter waiter = MenuWaiter.builder()
                 .id(7L)
-                .menuId(1L)
+                .branchId(3L)
                 .commissionEnabled(true)
                 .commissionType(WaiterCommissionType.FIXED)
                 .commissionValue(new BigDecimal("25.00"))
@@ -85,6 +86,7 @@ class WaiterCommissionServiceTest {
 
         TableBill bill = TableBill.builder()
                 .id(10L)
+                .menuId(1L)
                 .totalAmount(new BigDecimal("150.00"))
                 .currency("TRY")
                 .build();
@@ -106,7 +108,7 @@ class WaiterCommissionServiceTest {
     void recordFixedItemAddCommission_whenEligibleProduct_thenPersistsPerQuantity() {
         MenuWaiter waiter = MenuWaiter.builder()
                 .id(7L)
-                .menuId(1L)
+                .branchId(3L)
                 .commissionEnabled(true)
                 .commissionType(WaiterCommissionType.FIXED)
                 .commissionValue(new BigDecimal("5.00"))
@@ -126,6 +128,7 @@ class WaiterCommissionServiceTest {
 
         BigDecimal amount = waiterCommissionService.recordFixedItemAddCommission(
                 waiter,
+                1L,
                 10L,
                 20L,
                 List.of(new WaiterCommissionService.CommissionLineItem(100L, 2)),
@@ -144,7 +147,7 @@ class WaiterCommissionServiceTest {
     void recordFixedItemAddCommission_whenSuCategory_thenSkipsCommission() {
         MenuWaiter waiter = MenuWaiter.builder()
                 .id(7L)
-                .menuId(1L)
+                .branchId(3L)
                 .commissionEnabled(true)
                 .commissionType(WaiterCommissionType.FIXED)
                 .commissionValue(new BigDecimal("5.00"))
@@ -162,6 +165,7 @@ class WaiterCommissionServiceTest {
 
         BigDecimal amount = waiterCommissionService.recordFixedItemAddCommission(
                 waiter,
+                1L,
                 10L,
                 null,
                 List.of(new WaiterCommissionService.CommissionLineItem(200L, 3)),

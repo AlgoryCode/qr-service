@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.model.MenuFixedExpense;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -12,4 +13,6 @@ public interface MenuFixedExpenseRepository extends JpaRepository<MenuFixedExpen
     List<MenuFixedExpense> findByMenuIdOrderByTitleAsc(Long menuId);
 
     List<MenuFixedExpense> findByMenuIdAndActiveTrueOrderByTitleAsc(Long menuId);
+
+    List<MenuFixedExpense> findByMenuIdInAndActiveTrueOrderByTitleAsc(Collection<Long> menuIds);
 }

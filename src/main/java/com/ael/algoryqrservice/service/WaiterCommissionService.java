@@ -53,6 +53,7 @@ public class WaiterCommissionService {
         } else if (waiter.getCommissionType() == WaiterCommissionType.FIXED) {
             BigDecimal amount = recordFixedItemAddCommission(
                     waiter,
+                    order.getMenuId(),
                     billId,
                     order.getId(),
                     toCommissionLineItems(order.getItems()),
@@ -85,7 +86,8 @@ public class WaiterCommissionService {
 
         WaiterCommissionRecord record = WaiterCommissionRecord.builder()
                 .waiterId(waiter.getId())
-                .menuId(waiter.getMenuId())
+                .menuId(order.getMenuId())
+                .branchId(waiter.getBranchId())
                 .billId(billId)
                 .orderId(order.getId())
                 .recordType(WaiterCommissionRecordType.PERCENT_ORDER)
@@ -102,6 +104,7 @@ public class WaiterCommissionService {
     @Transactional
     public BigDecimal recordFixedItemAddCommission(
             MenuWaiter waiter,
+            Long menuId,
             Long billId,
             Long orderId,
             List<CommissionLineItem> items,
@@ -142,7 +145,8 @@ public class WaiterCommissionService {
             BigDecimal amount = value.multiply(BigDecimal.valueOf(quantity));
             WaiterCommissionRecord record = WaiterCommissionRecord.builder()
                     .waiterId(waiter.getId())
-                    .menuId(waiter.getMenuId())
+                    .menuId(menuId)
+                    .branchId(waiter.getBranchId())
                     .billId(billId)
                     .orderId(orderId)
                     .recordType(WaiterCommissionRecordType.FIXED_ITEM_ADD)
@@ -175,7 +179,8 @@ public class WaiterCommissionService {
 
         WaiterCommissionRecord record = WaiterCommissionRecord.builder()
                 .waiterId(waiter.getId())
-                .menuId(waiter.getMenuId())
+                .menuId(bill.getMenuId())
+                .branchId(waiter.getBranchId())
                 .billId(bill.getId())
                 .orderId(null)
                 .recordType(WaiterCommissionRecordType.FIXED_TABLE_CLOSE)
