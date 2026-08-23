@@ -85,10 +85,11 @@ public class PaymentServiceClient {
         } catch (RestClientResponseException exception) {
             String detail = extractErrorMessage(exception);
             log.error(
-                    "Checkout form init failed. userId={}, conversationId={}, status={}",
+                    "Checkout form init failed. userId={}, conversationId={}, status={} body={}",
                     userId,
                     request.getConversationId(),
-                    exception.getStatusCode()
+                    exception.getStatusCode(),
+                    exception.getResponseBodyAsString()
             );
             throw new PaymentServiceException(
                     detail == null || detail.isBlank()
