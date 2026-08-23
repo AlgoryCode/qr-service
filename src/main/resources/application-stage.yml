@@ -62,6 +62,10 @@ server:
 app:
   url: ${APP_URL:http://localhost:3000}
 
+payment:
+  service:
+    gateway-provider: ${PAYMENT_GATEWAY_PROVIDER:PAYTR}
+
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}

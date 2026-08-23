@@ -151,6 +151,11 @@ public class PurchaseService {
                         appProperties,
                         paymentClientProperties
                 );
+                log.info(
+                        "Checkout form provider selected. purchaseId={} provider={}",
+                        purchase.getId(),
+                        checkoutFormRequest.getProvider()
+                );
                 PaymentCheckoutFormResponse checkoutFormResponse =
                         paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
                 if (checkoutFormResponse.getConversationId() != null
