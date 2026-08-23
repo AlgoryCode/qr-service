@@ -33,4 +33,8 @@ public class PlanChangeResponse {
     private boolean warningAck;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
+    private String conversationId;
+    private String token;
+    private String paymentPageUrl;
+    private String checkoutFormContent;
 }

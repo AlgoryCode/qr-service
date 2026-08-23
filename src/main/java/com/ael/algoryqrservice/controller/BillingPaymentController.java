@@ -48,15 +48,11 @@ public class BillingPaymentController {
     @PostMapping("/payment-methods")
     @ResponseStatus(HttpStatus.CREATED)
     public BillingPaymentDtos.PaymentMethod createPaymentMethod(@Valid @RequestBody CreateSavedCardRequest request) {
-        User user = securityUtils.getCurrentUser();
-        return paymentServiceClient.createPaymentMethod(
-                user.getId(),
-                user.getEmail(),
-                request.alias(),
-                request.cardHolderName(),
-                request.cardNumber(),
-                request.expireMonth(),
-                request.expireYear()
+        if (request == null) {
+            throw new BadRequestException("Kart bilgisi gecersiz");
+        }
+        throw new BadRequestException(
+                "Kart numarasi ile kayit desteklenmez. Kart, PayTR odeme ekraninda kaydedilir."
         );
     }
 

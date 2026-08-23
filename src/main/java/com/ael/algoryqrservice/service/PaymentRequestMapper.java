@@ -154,6 +154,54 @@ public class PaymentRequestMapper {
                 .build();
     }
 
+    public PaymentCheckoutFormRequest toPlanChangeCheckoutFormRequest(
+            Purchase purchase,
+            User user,
+            PlanPackage planPackage,
+            String clientIp,
+            AppProperties appProperties,
+            PaymentClientProperties paymentClientProperties,
+            String conversationId,
+            BigDecimal chargeAmount
+    ) {
+        if (purchase.getBillingSnapshot() == null) {
+            throw new BadRequestException("Fatura bilgisi bulunamadı; önce fatura adresi tanımlayın");
+        }
+        Map<String, Object> sourceMetadata = new HashMap<>();
+        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("packageId", planPackage.getId());
+        sourceMetadata.put("packageCode", planPackage.getCode());
+        sourceMetadata.put("purchaseConversationId", conversationId);
+        sourceMetadata.put("purchaseId", purchase.getId());
+        sourceMetadata.put("installmentNumber", 1);
+        sourceMetadata.put("installmentCount", 1);
+        sourceMetadata.put("billingCycleNumber", 1);
+        sourceMetadata.put("paymentStyle", PaymentStyle.ONE_TIME.name());
+        sourceMetadata.put("validityDays", planPackage.getValidityDays());
+        sourceMetadata.put("totalAmount", chargeAmount);
+        sourceMetadata.put("planChange", true);
+        sourceMetadata.put("planChangeDifference", true);
+
+        return PaymentCheckoutFormRequest.builder()
+                .serviceName(appProperties.getServiceName())
+                .sourceReferenceId(String.valueOf(purchase.getId()))
+                .sourceMetadata(sourceMetadata)
+                .conversationId(conversationId)
+                .locale("tr")
+                .price(chargeAmount)
+                .paidPrice(chargeAmount)
+                .currency(planPackage.getCurrency())
+                .paymentStyle(PaymentStyle.ONE_TIME.name())
+                .basketId("qrplanchng" + purchase.getId())
+                .paymentGroup("PRODUCT")
+                .provider(blankToNull(paymentClientProperties.getGatewayProvider()))
+                .buyer(toBuyer(user, purchase.getBillingSnapshot(), clientIp))
+                .shippingAddress(toAddress(purchase.getBillingSnapshot()))
+                .billingAddress(toAddress(purchase.getBillingSnapshot()))
+                .basketItems(List.of(toBasketItem(planPackage, chargeAmount, " (fark)")))
+                .build();
+    }
+
     public PaymentCardVerificationRequest toCardVerificationRequest(
             User user,
             BillingSnapshot billingSnapshot,
@@ -266,9 +314,17 @@ public class PaymentRequestMapper {
             PlanPackage planPackage,
             BigDecimal chargeAmount
     ) {
+        return toBasketItem(planPackage, chargeAmount, "");
+    }
+
+    private PaymentThreeDsRequest.BasketItemPayload toBasketItem(
+            PlanPackage planPackage,
+            BigDecimal chargeAmount,
+            String nameSuffix
+    ) {
         return PaymentThreeDsRequest.BasketItemPayload.builder()
                 .id(String.valueOf(planPackage.getId()))
-                .name(planPackage.getName())
+                .name(planPackage.getName() + nameSuffix)
                 .category1("Digital")
                 .category2("Package")
                 .itemType("VIRTUAL")

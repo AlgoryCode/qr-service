@@ -21,7 +21,7 @@ class PurchaseRequestTest {
     @Test
     void isPaymentPlanValid_whenBillingPeriodMissing_thenReject() {
         PurchaseRequest request = new PurchaseRequest();
-        request.setPaymentMode(PaymentMode.THREE_DS);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
 
         assertThat(request.isPaymentPlanValid()).isFalse();
     }
@@ -29,7 +29,7 @@ class PurchaseRequestTest {
     @Test
     void isPaymentPlanValid_whenMonthly_thenAccept() {
         PurchaseRequest request = new PurchaseRequest();
-        request.setPaymentMode(PaymentMode.THREE_DS);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
         request.setBillingPeriod(BillingPeriod.MONTHLY);
 
         assertThat(request.isPaymentPlanValid()).isTrue();
@@ -39,9 +39,18 @@ class PurchaseRequestTest {
     @Test
     void isPaymentPlanValid_whenYearly_thenAccept() {
         PurchaseRequest request = new PurchaseRequest();
-        request.setPaymentMode(PaymentMode.THREE_DS);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
         request.setBillingPeriod(BillingPeriod.YEARLY);
 
         assertThat(request.isPaymentPlanValid()).isTrue();
+    }
+
+    @Test
+    void isPaymentInstrumentValid_whenCheckoutFormWithSavedCard_thenAccept() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setPaymentMethodId(55L);
+
+        assertThat(request.isPaymentInstrumentValid()).isTrue();
     }
 }

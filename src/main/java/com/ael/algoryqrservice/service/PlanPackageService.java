@@ -433,7 +433,7 @@ public class PlanPackageService {
                 .purchasable(planPackage.isPurchasable())
                 .systemManaged(planPackage.isSystemManaged())
                 .trialEligible(planPackage.isTrialEligible())
-                .allowedPaymentModes(List.of(PaymentMode.DIRECT, PaymentMode.THREE_DS))
+                .allowedPaymentModes(List.of(PaymentMode.CHECKOUT_FORM))
                 .allowedInstallments(List.of())
                 .installmentOptions(List.of())
                 .items(planPackage.getItems().stream()

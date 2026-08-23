@@ -76,9 +76,9 @@ public class Purchase {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_mode", nullable = false, length = 24)
-    @ColumnDefault("'THREE_DS'")
+    @ColumnDefault("'CHECKOUT_FORM'")
     @Builder.Default
-    private PaymentMode paymentMode = PaymentMode.THREE_DS;
+    private PaymentMode paymentMode = PaymentMode.CHECKOUT_FORM;
 
     @Column(name = "installment_count", nullable = false)
     @ColumnDefault("1")

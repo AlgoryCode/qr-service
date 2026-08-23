@@ -483,6 +483,7 @@ class PurchaseServicePaymentEventTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
         assertThat(purchase.getCancellationReason()).isEqualTo(PurchaseCancellationReason.PAYMENT_TIMEOUT);
+        verify(planChangeService).onPurchasePaymentFailed(purchase);
         verify(purchaseFulfillmentService, never()).fulfillPaidInstallment(any(), any(), any(), any());
     }
 

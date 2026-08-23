@@ -5,8 +5,6 @@ import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
-import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
-import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.config.BillingRefundProperties;
 import com.ael.algoryqrservice.config.BillingSubscriptionProperties;
@@ -119,7 +117,7 @@ public class PurchaseService {
                 .packageName(planPackage.getName())
                 .price(chargeAmount)
                 .currency(planPackage.getCurrency())
-                .paymentMode(request.getPaymentMode())
+                .paymentMode(PaymentMode.CHECKOUT_FORM)
                 .paymentStyle(paymentStyle)
                 .billingPeriod(billingPeriod)
                 .billingIntervalMonths(billingPeriod.intervalMonths())
@@ -143,61 +141,36 @@ public class PurchaseService {
         );
 
         try {
-            if (request.getPaymentMode() == PaymentMode.CHECKOUT_FORM) {
-                PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
-                        purchase,
-                        user,
-                        planPackage,
-                        clientIp,
-                        appProperties,
-                        paymentClientProperties,
-                        conversationId,
-                        1
-                );
-                log.info(
-                        "Checkout form provider selected. purchaseId={} provider={}",
-                        purchase.getId(),
-                        checkoutFormRequest.getProvider()
-                );
-                PaymentCheckoutFormResponse checkoutFormResponse =
-                        paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
-                if (checkoutFormResponse.getConversationId() != null
-                        && !checkoutFormResponse.getConversationId().isBlank()) {
-                    purchase.setPaymentConversationId(checkoutFormResponse.getConversationId());
-                    purchaseRepository.save(purchase);
-                }
-
-                return PurchaseInitiateResponse.builder()
-                        .purchaseId(purchase.getId())
-                        .status(purchase.getStatus())
-                        .conversationId(checkoutFormResponse.getConversationId())
-                        .token(checkoutFormResponse.getToken())
-                        .paymentPageUrl(checkoutFormResponse.getPaymentPageUrl())
-                        .checkoutFormContent(checkoutFormResponse.getCheckoutFormContent())
-                        .build();
-            }
-
-            PaymentThreeDsRequest paymentRequest = paymentRequestMapper.toThreeDsRequest(
+            PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
                     purchase,
                     user,
                     planPackage,
-                    request,
                     clientIp,
-                    appProperties
+                    appProperties,
+                    paymentClientProperties,
+                    conversationId,
+                    1
             );
-            PaymentThreeDsResponse paymentResponse = request.getPaymentMode() == PaymentMode.DIRECT
-                    ? paymentServiceClient.createDirectPayment(paymentRequest)
-                    : paymentServiceClient.initializeThreeDsPayment(paymentRequest);
-            if (paymentResponse.getConversationId() != null && !paymentResponse.getConversationId().isBlank()) {
-                purchase.setPaymentConversationId(paymentResponse.getConversationId());
+            log.info(
+                    "PayTR iframe checkout selected. purchaseId={} provider={}",
+                    purchase.getId(),
+                    checkoutFormRequest.getProvider()
+            );
+            PaymentCheckoutFormResponse checkoutFormResponse =
+                    paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
+            if (checkoutFormResponse.getConversationId() != null
+                    && !checkoutFormResponse.getConversationId().isBlank()) {
+                purchase.setPaymentConversationId(checkoutFormResponse.getConversationId());
                 purchaseRepository.save(purchase);
             }
 
             return PurchaseInitiateResponse.builder()
                     .purchaseId(purchase.getId())
                     .status(purchase.getStatus())
-                    .conversationId(paymentResponse.getConversationId())
-                    .paymentHtml(paymentResponse.getHtmlContent())
+                    .conversationId(checkoutFormResponse.getConversationId())
+                    .token(checkoutFormResponse.getToken())
+                    .paymentPageUrl(checkoutFormResponse.getPaymentPageUrl())
+                    .checkoutFormContent(checkoutFormResponse.getCheckoutFormContent())
                     .build();
         } catch (PaymentServiceException exception) {
             purchase.setStatus(PurchaseStatus.FAILED);
@@ -592,6 +565,7 @@ public class PurchaseService {
                     PurchaseLogAction.PURCHASE_CANCELLED,
                     purchase.getPackageName() + " paketi ödeme zaman aşımı nedeniyle iptal edildi"
             );
+            planChangeService.onPurchasePaymentFailed(purchase);
         }
     }
 
@@ -1159,6 +1133,9 @@ public class PurchaseService {
             menuPublicAccessService.deactivateActiveMenusForUser(userId);
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
+        if (previousStatus == PurchaseStatus.PENDING) {
+            planChangeService.onPurchasePaymentFailed(purchase);
+        }
         planChangeService.cancelScheduledForUser(userId);
         packageActivationService.ensureSubscriptionState(userId);
         menuPublicAccessService.syncForUser(userId);
@@ -1260,7 +1237,12 @@ public class PurchaseService {
         if (installmentNumber < 1) {
             throw new InvalidPaymentEventException("Installment metadata does not match purchase");
         }
-        if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
+        if (isPlanChangeDifference(event)) {
+            BigDecimal expected = metadataAmount(event, "totalAmount");
+            if (expected == null || expected.compareTo(event.getAmount()) != 0) {
+                throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
+            }
+        } else if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
             if (purchase.getPrice().compareTo(event.getAmount()) != 0) {
                 throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
             }
@@ -1282,6 +1264,27 @@ public class PurchaseService {
         if (!metadata.periodEnd().isAfter(metadata.periodStart())) {
             throw new InvalidPaymentEventException("Payment period is invalid");
         }
+    }
+
+    private boolean isPlanChangeDifference(PaymentCompletedEventDto event) {
+        Map<String, Object> metadata = event.getSourceMetadata();
+        if (metadata == null) {
+            return false;
+        }
+        Object flag = metadata.get("planChangeDifference");
+        return Boolean.TRUE.equals(flag) || "true".equalsIgnoreCase(String.valueOf(flag));
+    }
+
+    private BigDecimal metadataAmount(PaymentCompletedEventDto event, String key) {
+        Map<String, Object> metadata = event.getSourceMetadata();
+        if (metadata == null || metadata.get(key) == null) {
+            return null;
+        }
+        Object value = metadata.get(key);
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        return new BigDecimal(String.valueOf(value));
     }
 
     private void validateIdentity(

@@ -15,7 +15,7 @@ public class PurchaseRequest {
     private Long packageId;
 
     @NotNull(message = "Ödeme tipi zorunludur")
-    private PaymentMode paymentMode = PaymentMode.THREE_DS;
+    private PaymentMode paymentMode = PaymentMode.CHECKOUT_FORM;
 
     @NotNull(message = "Faturalama periyodu zorunludur")
     private BillingPeriod billingPeriod;
@@ -43,7 +43,7 @@ public class PurchaseRequest {
     @AssertTrue(message = "Kart veya kayıtlı ödeme yöntemi zorunludur")
     public boolean isPaymentInstrumentValid() {
         if (paymentMode == PaymentMode.CHECKOUT_FORM) {
-            return paymentMethodId == null && paymentCard == null;
+            return paymentCard == null;
         }
         return paymentMethodId != null || paymentCard != null;
     }

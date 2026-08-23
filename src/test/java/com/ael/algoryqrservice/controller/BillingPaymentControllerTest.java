@@ -49,7 +49,7 @@ class BillingPaymentControllerTest {
         PaymentCheckoutFormResponse gatewayResponse = new PaymentCheckoutFormResponse();
         gatewayResponse.setConversationId("qr-card-verification-7-abc");
         gatewayResponse.setToken("token-1");
-        gatewayResponse.setPaymentPageUrl("https://sandbox-cpp.iyzipay.com/token-1");
+        gatewayResponse.setPaymentPageUrl("https://www.paytr.com/odeme/guvenli/token-1");
         gatewayResponse.setCheckoutFormContent("<script>...</script>");
         when(paymentServiceClient.initiateCardVerification(7L, mappedRequest)).thenReturn(gatewayResponse);
 
@@ -60,7 +60,7 @@ class BillingPaymentControllerTest {
 
         assertThat(result.conversationId()).isEqualTo("qr-card-verification-7-abc");
         assertThat(result.token()).isEqualTo("token-1");
-        assertThat(result.paymentPageUrl()).isEqualTo("https://sandbox-cpp.iyzipay.com/token-1");
+        assertThat(result.paymentPageUrl()).isEqualTo("https://www.paytr.com/odeme/guvenli/token-1");
         assertThat(result.checkoutFormContent()).isEqualTo("<script>...</script>");
         verify(paymentServiceClient).initiateCardVerification(7L, mappedRequest);
     }

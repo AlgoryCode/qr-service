@@ -53,7 +53,41 @@ public class PaymentServiceClient {
     }
 
     public PaymentThreeDsResponse createDirectPayment(PaymentThreeDsRequest request) {
-        return createPayment(request, "/payments");
+        return createPayment(request, "/payments/stored-card");
+    }
+
+    public BillingPaymentDtos.StoredCardCharge chargeStoredCard(Long userId, PaymentThreeDsRequest request) {
+        try {
+            if (userId == null) {
+                throw new PaymentServiceException("Ödeme için kullanıcı kimliği zorunludur");
+            }
+            Map<?, ?> response = restClient.post()
+                    .uri("/payments/stored-card")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(authHeaders(userId))
+                    .body(request)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            if (response == null) {
+                throw new PaymentServiceException("Kayitli kart odemesi yaniti bos");
+            }
+            return new BillingPaymentDtos.StoredCardCharge(
+                    stringValue(response.get("conversationId")),
+                    stringValue(response.get("status"))
+            );
+        } catch (PaymentServiceException exception) {
+            throw exception;
+        } catch (RestClientResponseException exception) {
+            String detail = extractErrorMessage(exception);
+            throw new PaymentServiceException(
+                    detail == null || detail.isBlank()
+                            ? "Kayitli kart odemesi basarisiz: " + exception.getStatusCode()
+                            : "Kayitli kart odemesi basarisiz: " + detail
+            );
+        } catch (Exception exception) {
+            throw new PaymentServiceException("Odeme servisine ulasilamadi");
+        }
     }
 
     public PaymentCheckoutFormResponse initializeCheckoutForm(Long userId, PaymentCheckoutFormRequest request) {

@@ -2,9 +2,12 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
+import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
+import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
-import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.AppProperties;
+import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
@@ -71,6 +74,7 @@ public class PlanChangeService {
     private final MenuPublicAccessService menuPublicAccessService;
     private final PurchaseLogService purchaseLogService;
     private final AppProperties appProperties;
+    private final PaymentClientProperties paymentClientProperties;
 
     private static final String DOWNGRADE_NEXT_PERIOD_ONLY =
             "Paket dusurme yalnizca donem sonunda yapilabilir.";
@@ -269,7 +273,7 @@ public class PlanChangeService {
             planChange.setChargeAmount(toPeriodPrice);
             planChangeRepository.save(planChange);
 
-            chargeDirect(
+            BillingPaymentDtos.StoredCardCharge charge = chargeStoredCard(
                     user,
                     newPurchase,
                     toPackage,
@@ -277,6 +281,9 @@ public class PlanChangeService {
                     planChange.getPaymentMethodId(),
                     "127.0.0.1"
             );
+            if (charge != null && charge.isInitiated()) {
+                return;
+            }
             activatePurchaseNow(newPurchase, toPackage, current, true);
             bootstrapSubscriptionAfterPlanChange(user, newPurchase, toPackage, planChange.getPaymentMethodId());
             completePlanChange(planChange, newPurchase, current);
@@ -295,6 +302,11 @@ public class PlanChangeService {
                 return;
             }
             Purchase fromPurchase = purchaseRepository.findById(planChange.getFromPurchaseId()).orElse(null);
+            User user = userRepository.findById(planChange.getUserId()).orElse(null);
+            PlanPackage toPackage = planPackageRepository.findById(planChange.getToPackageId()).orElse(null);
+            if (user != null && toPackage != null) {
+                bootstrapSubscriptionAfterPlanChange(user, purchase, toPackage, planChange.getPaymentMethodId());
+            }
             completePlanChange(planChange, purchase, fromPurchase);
         });
     }
@@ -394,17 +406,11 @@ public class PlanChangeService {
         } else {
             delta = resolveProratedUpgradeDelta(fromPeriodPrice, toPeriodPrice, fraction);
         }
-        if (delta.chargeAmount().signum() > 0) {
-            if (request.getPaymentMethodId() == null) {
-                throw new BadRequestException("Fark odemesi icin kayitli kart zorunludur");
-            }
-            ensurePaymentMethodExists(user.getId(), request.getPaymentMethodId());
-        }
         Long paymentMethodId = request.getPaymentMethodId() != null
                 ? request.getPaymentMethodId()
                 : current.getPaymentMethodId();
-        if (paymentMethodId == null) {
-            throw new BadRequestException("Abonelik icin kayitli kart zorunludur");
+        if (paymentMethodId != null) {
+            ensurePaymentMethodExists(user.getId(), paymentMethodId);
         }
 
         PlanChange planChange = planChangeRepository.save(PlanChange.builder()
@@ -444,14 +450,16 @@ public class PlanChangeService {
                         toPackage.getCode() + " paket gecisi icin fark odemesi baslatildi: "
                                 + delta.chargeAmount()
                 );
-                chargeDirect(
+                PaymentCheckoutFormResponse checkout = startCheckoutForm(
                         user,
                         newPurchase,
                         toPackage,
                         delta.chargeAmount(),
-                        paymentMethodId,
                         clientIp
                 );
+                planChange.setPaymentConversationId(newPurchase.getPaymentConversationId());
+                planChangeRepository.save(planChange);
+                return toResponse(planChange, checkout);
             }
 
             activatePurchaseNow(newPurchase, toPackage, current, resetAnchor);
@@ -475,7 +483,8 @@ public class PlanChangeService {
             paymentMethodId = purchase.getPaymentMethodId();
         }
         if (paymentMethodId == null) {
-            throw new BadRequestException("Abonelik icin kayitli kart zorunludur");
+            log.info("Subscription bootstrap skipped; no saved card. purchaseId={}", purchase.getId());
+            return;
         }
         Map<String, Object> sourceMetadata = new HashMap<>();
         sourceMetadata.put("userId", user.getId());
@@ -563,7 +572,7 @@ public class PlanChangeService {
                 .packageName(toPackage.getName())
                 .price(periodPrice)
                 .currency(toPackage.getCurrency())
-                .paymentMode(PaymentMode.DIRECT)
+                .paymentMode(PaymentMode.CHECKOUT_FORM)
                 .paymentStyle(PaymentStyle.SUBSCRIPTION)
                 .billingPeriod(billingPeriod)
                 .billingIntervalMonths(billingPeriod.intervalMonths())
@@ -582,7 +591,45 @@ public class PlanChangeService {
         return purchase;
     }
 
-    private void chargeDirect(
+    private PaymentCheckoutFormResponse startCheckoutForm(
+            User user,
+            Purchase purchase,
+            PlanPackage planPackage,
+            BigDecimal chargeAmount,
+            String clientIp
+    ) {
+        PaymentCheckoutFormRequest checkoutRequest = paymentRequestMapper.toPlanChangeCheckoutFormRequest(
+                purchase,
+                user,
+                planPackage,
+                clientIp,
+                appProperties,
+                paymentClientProperties,
+                purchase.getPaymentConversationId(),
+                chargeAmount
+        );
+        try {
+            PaymentCheckoutFormResponse response =
+                    paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutRequest);
+            if (response.getConversationId() != null && !response.getConversationId().isBlank()) {
+                purchase.setPaymentConversationId(response.getConversationId());
+                purchaseRepository.save(purchase);
+            }
+            return response;
+        } catch (PaymentServiceException exception) {
+            purchase.setStatus(PurchaseStatus.FAILED);
+            purchaseRepository.save(purchase);
+            purchaseLogService.log(
+                    purchase.getId(),
+                    user.getId(),
+                    PurchaseLogAction.PLAN_CHANGE_PAYMENT_FAILED,
+                    "Paket gecisi odemesi basarisiz: " + exception.getMessage()
+            );
+            throw exception;
+        }
+    }
+
+    private BillingPaymentDtos.StoredCardCharge chargeStoredCard(
             User user,
             Purchase purchase,
             PlanPackage planPackage,
@@ -590,12 +637,9 @@ public class PlanChangeService {
             Long paymentMethodId,
             String clientIp
     ) {
-        if (purchase.getBillingSnapshot() == null) {
-            throw new BadRequestException("Fatura bilgisi bulunamadı; önce fatura adresi tanımlayın");
-        }
         BigDecimal amount = chargeAmount == null ? BigDecimal.ZERO : chargeAmount;
         if (amount.signum() <= 0) {
-            return;
+            return null;
         }
         Map<String, Object> sourceMetadata = new HashMap<>();
         sourceMetadata.put("userId", user.getId());
@@ -620,13 +664,11 @@ public class PlanChangeService {
                 .price(amount)
                 .paidPrice(amount)
                 .currency(planPackage.getCurrency())
-                .paymentMode(PaymentMode.DIRECT.name())
+                .paymentMode(PaymentMode.CHECKOUT_FORM.name())
                 .paymentStyle(PaymentStyle.ONE_TIME.name())
                 .installmentCount(1)
-                .subscriptionCycleCount(null)
-                .billingIntervalMonths(null)
                 .installment(1)
-                .basketId("qr-plan-change-" + purchase.getId())
+                .basketId("qrplanchng" + purchase.getId())
                 .paymentChannel("WEB")
                 .paymentGroup("PRODUCT")
                 .paymentMethodId(paymentMethodId)
@@ -637,18 +679,19 @@ public class PlanChangeService {
                         .id(String.valueOf(planPackage.getId()))
                         .name(planPackage.getName() + " (fark)")
                         .category1("Digital")
-                        .category2("Package")
                         .itemType("VIRTUAL")
                         .price(amount)
                         .build()))
                 .build();
 
         try {
-            PaymentThreeDsResponse response = paymentServiceClient.createDirectPayment(paymentRequest);
-            if (response != null && response.getConversationId() != null) {
-                purchase.setPaymentConversationId(response.getConversationId());
+            BillingPaymentDtos.StoredCardCharge response =
+                    paymentServiceClient.chargeStoredCard(user.getId(), paymentRequest);
+            if (response != null && response.conversationId() != null) {
+                purchase.setPaymentConversationId(response.conversationId());
                 purchaseRepository.save(purchase);
             }
+            return response;
         } catch (PaymentServiceException exception) {
             purchase.setStatus(PurchaseStatus.FAILED);
             purchaseRepository.save(purchase);
@@ -1000,6 +1043,10 @@ public class PlanChangeService {
     }
 
     private PlanChangeResponse toResponse(PlanChange planChange) {
+        return toResponse(planChange, null);
+    }
+
+    private PlanChangeResponse toResponse(PlanChange planChange, PaymentCheckoutFormResponse checkout) {
         PlanPackage from = planPackageRepository.findById(planChange.getFromPackageId()).orElse(null);
         PlanPackage to = planPackageRepository.findById(planChange.getToPackageId()).orElse(null);
         return PlanChangeResponse.builder()
@@ -1024,6 +1071,12 @@ public class PlanChangeService {
                 .warningAck(planChange.isWarningAck())
                 .createdAt(planChange.getCreatedAt())
                 .completedAt(planChange.getCompletedAt())
+                .conversationId(checkout != null && checkout.getConversationId() != null
+                        ? checkout.getConversationId()
+                        : planChange.getPaymentConversationId())
+                .token(checkout == null ? null : checkout.getToken())
+                .paymentPageUrl(checkout == null ? null : checkout.getPaymentPageUrl())
+                .checkoutFormContent(checkout == null ? null : checkout.getCheckoutFormContent())
                 .build();
     }
 
