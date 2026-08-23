@@ -54,6 +54,7 @@ import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -130,8 +131,6 @@ public class PurchaseService {
                 .status(PurchaseStatus.PENDING)
                 .build());
 
-        purchase.setPaymentConversationId(paymentRequestMapper.buildConversationId(purchase.getId()));
-        purchaseRepository.save(purchase);
         purchaseFulfillmentService.initializeSchedule(purchase, appProperties.getServiceName());
 
         purchaseLogService.log(
@@ -142,14 +141,17 @@ public class PurchaseService {
         );
 
         try {
+            String conversationId = paymentRequestMapper.buildConversationId(purchase.getId());
             if (request.getPaymentMode() == PaymentMode.CHECKOUT_FORM) {
-                PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toCheckoutFormRequest(
+                PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
                         purchase,
                         user,
                         planPackage,
                         clientIp,
                         appProperties,
-                        paymentClientProperties
+                        paymentClientProperties,
+                        conversationId,
+                        1
                 );
                 log.info(
                         "Checkout form provider selected. purchaseId={} provider={}",
@@ -174,6 +176,7 @@ public class PurchaseService {
                         .build();
             }
 
+            purchase.setPaymentConversationId(conversationId);
             PaymentThreeDsRequest paymentRequest = paymentRequestMapper.toThreeDsRequest(
                     purchase,
                     user,
@@ -185,6 +188,10 @@ public class PurchaseService {
             PaymentThreeDsResponse paymentResponse = request.getPaymentMode() == PaymentMode.DIRECT
                     ? paymentServiceClient.createDirectPayment(paymentRequest)
                     : paymentServiceClient.initializeThreeDsPayment(paymentRequest);
+            if (paymentResponse.getConversationId() != null && !paymentResponse.getConversationId().isBlank()) {
+                purchase.setPaymentConversationId(paymentResponse.getConversationId());
+                purchaseRepository.save(purchase);
+            }
 
             return PurchaseInitiateResponse.builder()
                     .purchaseId(purchase.getId())
@@ -194,6 +201,7 @@ public class PurchaseService {
                     .build();
         } catch (PaymentServiceException exception) {
             purchase.setStatus(PurchaseStatus.FAILED);
+            purchase.setPaymentConversationId(null);
             purchaseRepository.save(purchase);
             purchaseLogService.log(
                     purchase.getId(),
@@ -371,7 +379,6 @@ public class PurchaseService {
         PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
         int nextCycle = resolveNextBillingCycle(purchase);
         String conversationId = paymentRequestMapper.buildConversationId(purchase.getId());
-        purchase.setCurrentPeriodConversationId(conversationId);
         purchase.setPaymentMode(PaymentMode.CHECKOUT_FORM);
         purchaseRepository.save(purchase);
 
@@ -466,7 +473,11 @@ public class PurchaseService {
         }
         validateIdentity(event, metadata, purchase);
         purchaseFulfillmentService.revokeInstallment(purchase, event, metadata);
-        applyExternalRefundSideEffects(purchase);
+        if (purchase.getStatus() == PurchaseStatus.ACTIVE) {
+            applyMqRefundCancel(purchase, event.getAmount());
+        } else {
+            applyExternalRefundSideEffects(purchase);
+        }
         markEventProcessed(event, purchase.getId());
     }
 
@@ -511,21 +522,20 @@ public class PurchaseService {
             return false;
         }
 
-        BillingPaymentDtos.RefundablePayment payment;
-        try {
-            payment = paymentServiceClient.getRefundablePayment(
-                    purchase.getUserId(),
-                    purchase.getPaymentConversationId()
-            );
-        } catch (PaymentServiceException exception) {
+        Optional<BillingPaymentDtos.RefundablePayment> paymentOptional = paymentServiceClient.findPayment(
+                purchase.getUserId(),
+                purchase.getPaymentConversationId()
+        );
+        if (paymentOptional.isEmpty()) {
             log.debug(
-                    "Pending purchase payment lookup skipped. purchaseId={} reason={}",
+                    "Pending purchase payment lookup skipped. purchaseId={} conversationId={}",
                     purchaseId,
-                    exception.getMessage()
+                    purchase.getPaymentConversationId()
             );
             return false;
         }
 
+        BillingPaymentDtos.RefundablePayment payment = paymentOptional.get();
         if (!payment.isSuccess()) {
             return false;
         }
@@ -556,27 +566,19 @@ public class PurchaseService {
             }
 
             if (purchase.getPaymentConversationId() != null && !purchase.getPaymentConversationId().isBlank()) {
-                try {
-                    BillingPaymentDtos.RefundablePayment payment = paymentServiceClient.getRefundablePayment(
-                            purchase.getUserId(),
+                Optional<BillingPaymentDtos.RefundablePayment> paymentOptional = paymentServiceClient.findPayment(
+                        purchase.getUserId(),
+                        purchase.getPaymentConversationId()
+                );
+                if (paymentOptional.isPresent() && paymentOptional.get().isSuccess()) {
+                    PaymentCompletedEventDto event = buildReconcileSuccessEvent(purchase, paymentOptional.get());
+                    handlePaymentSuccess(event);
+                    log.info(
+                            "Expired pending purchase activated instead of cancel. purchaseId={} conversationId={}",
+                            purchase.getId(),
                             purchase.getPaymentConversationId()
                     );
-                    if (payment.isSuccess()) {
-                        PaymentCompletedEventDto event = buildReconcileSuccessEvent(purchase, payment);
-                        handlePaymentSuccess(event);
-                        log.info(
-                                "Expired pending purchase activated instead of cancel. purchaseId={} conversationId={}",
-                                purchase.getId(),
-                                purchase.getPaymentConversationId()
-                        );
-                        continue;
-                    }
-                } catch (PaymentServiceException exception) {
-                    log.warn(
-                            "Expired pending payment lookup failed; cancelling. purchaseId={} reason={}",
-                            purchase.getId(),
-                            exception.getMessage()
-                    );
+                    continue;
                 }
             }
 
@@ -1066,6 +1068,29 @@ public class PurchaseService {
         menuPublicAccessService.deactivateActiveMenusForUser(purchase.getUserId());
         cancelRemoteSubscriptionBestEffort(purchase);
         purchaseRepository.save(purchase);
+    }
+
+    private void applyMqRefundCancel(Purchase purchase, BigDecimal refundedAmount) {
+        if (purchase.getRefundedAt() == null) {
+            purchase.setRefundedAt(LocalDateTime.now());
+        }
+        if (purchase.getRefundStatus() == RefundStatus.NONE
+                || purchase.getRefundStatus() == RefundStatus.PENDING) {
+            purchase.setRefundStatus(RefundStatus.COMPLETED);
+            purchase.setRefundPendingAt(null);
+        }
+        try {
+            cancelRemoteSubscriptionIfRequired(purchase, purchase.getUserId());
+        } catch (PaymentServiceException exception) {
+            log.error(
+                    "Remote subscription cancel failed after external refund; marking NEEDS_RECONCILE. purchaseId={}",
+                    purchase.getId(),
+                    exception
+            );
+            purchase.setRefundStatus(RefundStatus.NEEDS_RECONCILE);
+            purchaseRepository.save(purchase);
+        }
+        applyLocalImmediateCancel(purchase, purchase.getUserId(), refundedAmount);
     }
 
     private void cancelRemoteSubscriptionBestEffort(Purchase purchase) {
