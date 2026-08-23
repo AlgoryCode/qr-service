@@ -95,9 +95,59 @@ public class MenuService {
                 .build();
 
         menu = menuRepository.save(menu);
-        createProductsFromDetails(menu, details.get("products"));
+        Long sourceMenuId = longValue(details.get("sourceMenuId"));
+        if (sourceMenuId != null) {
+            copyProductsFromSourceMenu(menu, sourceMenuId, qr.getUserId());
+        } else {
+            createProductsFromDetails(menu, details.get("products"));
+        }
         menuPublicAccessService.syncForUser(menu.getUserId());
         return menu;
+    }
+
+    private void copyProductsFromSourceMenu(Menu targetMenu, Long sourceMenuId, Long userId) {
+        Menu sourceMenu = menuRepository.findById(sourceMenuId)
+                .filter(menu -> !menu.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Kaynak menü bulunamadı"));
+        if (!userId.equals(sourceMenu.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
+        }
+        if (!sourceMenu.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yalnızca aktif menülerden kopyalama yapılabilir");
+        }
+
+        List<MenuProduct> sourceProducts = menuProductRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(sourceMenuId);
+        if (sourceProducts.isEmpty()) {
+            return;
+        }
+        entitlementService.assertMenuProductCreationAllowed(userId, sourceProducts.size());
+
+        for (MenuProduct source : sourceProducts) {
+            Set<Long> tagIds = source.getTagIds() == null ? new HashSet<>() : new HashSet<>(source.getTagIds());
+            Set<Long> allergenIds = source.getAllergenIds() == null ? new HashSet<>() : new HashSet<>(source.getAllergenIds());
+            MenuProduct copy = MenuProduct.builder()
+                    .menuId(targetMenu.getMenuId())
+                    .name(source.getName())
+                    .description(source.getDescription())
+                    .price(source.getPrice())
+                    .currency(source.getCurrency())
+                    .subCategoryId(source.getSubCategoryId())
+                    .tagIds(tagIds)
+                    .allergenIds(allergenIds)
+                    .chefRecommended(source.isChefRecommended())
+                    .sortOrder(source.getSortOrder())
+                    .imageUrl(resolveProductImageUrl(source.getImageUrl()))
+                    .available(source.isAvailable())
+                    .servesPeopleMin(source.getServesPeopleMin())
+                    .servesPeopleMax(source.getServesPeopleMax())
+                    .nutrition(source.getNutrition())
+                    .ratingAvg(BigDecimal.ZERO)
+                    .ratingCount(0L)
+                    .build();
+            menuProductRepository.save(copy);
+        }
+        entitlementService.syncMenuProductEntitlements(userId);
     }
 
     private void createProductsFromDetails(Menu menu, Object productsRaw) {

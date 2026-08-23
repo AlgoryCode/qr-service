@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,6 +72,14 @@ class MenuServiceTest {
     private AppProperties appProperties;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private ProductImageStorageService productImageStorageService;
+    @Mock
+    private ChefAvatarService chefAvatarService;
+    @Mock
+    private EntitlementService entitlementService;
+    @Mock
+    private MenuQrSoftDeleteService menuQrSoftDeleteService;
 
     @InjectMocks
     private MenuService menuService;
@@ -117,6 +126,8 @@ class MenuServiceTest {
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
         when(nutritionFactsService.parseFromRaw(nutrition)).thenReturn(parsedNutrition);
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
+        doNothing().when(entitlementService).syncMenuProductEntitlements(7L);
 
         Menu saved = menuService.createMenuForQr(qr, request);
 
@@ -156,6 +167,86 @@ class MenuServiceTest {
         assertThatThrownBy(() -> menuService.createMenuForQr(qr, request))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("subCategoryId");
+    }
+
+    @Test
+    void createMenuForQr_whenSourceMenuIdProvided_thenCopyProducts() {
+        Qr qr = Qr.builder().qrId(50L).userId(7L).build();
+        Map<String, Object> details = new HashMap<>();
+        details.put("themeId", "soft");
+        details.put("businessName", "Yeni Şube");
+        details.put("sourceMenuId", 12L);
+        QrRequest request = new QrRequest();
+        request.setDetails(details);
+
+        Menu sourceMenu = Menu.builder().menuId(12L).userId(7L).active(true).deleted(false).build();
+        MenuProduct sourceProduct = MenuProduct.builder()
+                .productId(100L)
+                .menuId(12L)
+                .name("Latte")
+                .description("Sütlü kahve")
+                .price(new BigDecimal("150"))
+                .currency("TRY")
+                .subCategoryId(3L)
+                .sortOrder(0)
+                .available(true)
+                .chefRecommended(true)
+                .tagIds(Set.of(8L))
+                .allergenIds(Set.of(2L))
+                .nutrition(sampleNutrition())
+                .build();
+
+        when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> {
+            Menu menu = invocation.getArgument(0);
+            menu.setMenuId(99L);
+            return menu;
+        });
+        when(menuRepository.findById(12L)).thenReturn(Optional.of(sourceMenu));
+        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
+                .thenReturn(List.of(sourceProduct));
+        when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
+        doNothing().when(entitlementService).syncMenuProductEntitlements(7L);
+
+        Menu saved = menuService.createMenuForQr(qr, request);
+
+        assertThat(saved.getBusinessName()).isEqualTo("Yeni Şube");
+        verify(entitlementService).assertMenuProductCreationAllowed(7L, 1);
+
+        ArgumentCaptor<MenuProduct> productCaptor = ArgumentCaptor.forClass(MenuProduct.class);
+        verify(menuProductRepository, times(1)).save(productCaptor.capture());
+        MenuProduct copied = productCaptor.getValue();
+        assertThat(copied.getMenuId()).isEqualTo(99L);
+        assertThat(copied.getName()).isEqualTo("Latte");
+        assertThat(copied.getSubCategoryId()).isEqualTo(3L);
+        assertThat(copied.getTagIds()).containsExactly(8L);
+        assertThat(copied.getAllergenIds()).containsExactly(2L);
+        assertThat(copied.getRatingAvg()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(copied.getRatingCount()).isZero();
+    }
+
+    @Test
+    void createMenuForQr_whenSourceMenuNotOwned_thenThrow() {
+        Qr qr = Qr.builder().qrId(50L).userId(7L).build();
+        Map<String, Object> details = new HashMap<>();
+        details.put("themeId", "soft");
+        details.put("businessName", "Yeni Şube");
+        details.put("sourceMenuId", 12L);
+        QrRequest request = new QrRequest();
+        request.setDetails(details);
+
+        Menu sourceMenu = Menu.builder().menuId(12L).userId(99L).active(true).deleted(false).build();
+
+        when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> {
+            Menu menu = invocation.getArgument(0);
+            menu.setMenuId(99L);
+            return menu;
+        });
+        when(menuRepository.findById(12L)).thenReturn(Optional.of(sourceMenu));
+
+        assertThatThrownBy(() -> menuService.createMenuForQr(qr, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("erişim");
     }
 
     @Test
