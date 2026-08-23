@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -87,7 +88,15 @@ public class MenuFixedExpenseService {
 
     @Transactional(readOnly = true)
     public BigDecimal totalDailyActiveAmount(Long menuId) {
-        return menuFixedExpenseRepository.findByMenuIdAndActiveTrueOrderByTitleAsc(menuId).stream()
+        return totalDailyActiveAmount(List.of(menuId));
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal totalDailyActiveAmount(Collection<Long> menuIds) {
+        if (menuIds == null || menuIds.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return menuFixedExpenseRepository.findByMenuIdInAndActiveTrueOrderByTitleAsc(menuIds).stream()
                 .map(MenuFixedExpense::getDailyAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

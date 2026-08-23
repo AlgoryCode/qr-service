@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "tbl_waiter_commission_record", indexes = {
         @Index(name = "idx_waiter_commission_waiter_created", columnList = "waiter_id, created_at"),
-        @Index(name = "idx_waiter_commission_menu_created", columnList = "menu_id, created_at")
+        @Index(name = "idx_waiter_commission_menu_created", columnList = "menu_id, created_at"),
+        @Index(name = "idx_waiter_commission_branch_created", columnList = "branch_id, created_at")
 })
 @Getter
 @Setter
@@ -31,6 +32,9 @@ public class WaiterCommissionRecord {
 
     @Column(name = "menu_id", nullable = false)
     private Long menuId;
+
+    @Column(name = "branch_id")
+    private Long branchId;
 
     @Column(name = "bill_id")
     private Long billId;

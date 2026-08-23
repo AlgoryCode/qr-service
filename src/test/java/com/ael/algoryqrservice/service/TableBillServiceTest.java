@@ -154,7 +154,7 @@ class TableBillServiceTest {
 
         MenuWaiter waiter = MenuWaiter.builder()
                 .id(7L)
-                .menuId(1L)
+                .branchId(3L)
                 .commissionEnabled(true)
                 .commissionType(WaiterCommissionType.FIXED)
                 .commissionValue(new BigDecimal("15.00"))
@@ -188,7 +188,7 @@ class TableBillServiceTest {
 
     @Test
     void closeBill_whenPaymentMethodMissing_thenThrows() {
-        MenuWaiter waiter = MenuWaiter.builder().id(7L).menuId(1L).build();
+        MenuWaiter waiter = MenuWaiter.builder().id(7L).branchId(3L).build();
 
         assertThatThrownBy(() -> tableBillService.closeBill(1L, 10L, waiter, null, false, null))
                 .isInstanceOf(BadRequestException.class)
@@ -254,7 +254,7 @@ class TableBillServiceTest {
     @Test
     void payShare_whenDuplicateShare_thenThrows() {
         TableBill bill = openBillWithTotal(new BigDecimal("500.00"));
-        MenuWaiter waiter = MenuWaiter.builder().id(7L).menuId(1L).build();
+        MenuWaiter waiter = MenuWaiter.builder().id(7L).branchId(3L).build();
 
         when(tableBillRepository.findByIdAndMenuIdAndStatus(10L, 1L, TableBillStatus.OPEN))
                 .thenReturn(Optional.of(bill));
@@ -275,7 +275,7 @@ class TableBillServiceTest {
     @Test
     void payShare_whenAllSharesPaid_thenClosesBill() {
         TableBill bill = openBillWithTotal(new BigDecimal("500.00"));
-        MenuWaiter waiter = MenuWaiter.builder().id(7L).menuId(1L).build();
+        MenuWaiter waiter = MenuWaiter.builder().id(7L).branchId(3L).build();
         TableSession session = TableSession.builder()
                 .id(UUID.randomUUID())
                 .tableId(5L)

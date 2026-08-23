@@ -2,7 +2,6 @@ package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -173,7 +172,9 @@ public class AnalyticsDtos {
 
     public record MenuAnalyticsReportResponse(
             Long menuId,
-            @NotBlank String menuName,
+            String menuName,
+            Long branchId,
+            String branchName,
             LocalDate from,
             LocalDate to,
             ReportKpis kpis,
@@ -258,6 +259,8 @@ public class AnalyticsDtos {
     public record MenuRevenueReportResponse(
             Long menuId,
             String menuName,
+            Long branchId,
+            String branchName,
             LocalDate from,
             LocalDate to,
             RevenueKpis kpis,
@@ -334,6 +337,8 @@ public class AnalyticsDtos {
     public record MenuWaiterPerformanceReportResponse(
             Long menuId,
             String menuName,
+            Long branchId,
+            String branchName,
             LocalDate from,
             LocalDate to,
             WaiterPerformanceKpis kpis,

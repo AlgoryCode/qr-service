@@ -75,28 +75,28 @@ class MenuFeedbackServiceTest {
 
     @Test
     void buildReportFeedback_whenPeriodHasData_thenReturnsSummaries() {
-        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(5L))
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L)))
                 .thenReturn(List.of(MenuProduct.builder().productId(11L).menuId(5L).name("Çay").build()));
-        when(menuRatingRepository.averageScoreByMenuIdAndPeriod(eq(5L), any(), any())).thenReturn(4.5);
-        when(menuRatingRepository.countByMenuIdAndPeriod(eq(5L), any(), any())).thenReturn(2L);
-        when(menuRatingRepository.scoreHistogramByMenuIdAndPeriod(eq(5L), any(), any()))
+        when(menuRatingRepository.averageScoreByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(4.5);
+        when(menuRatingRepository.countByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(2L);
+        when(menuRatingRepository.scoreHistogramByMenuIdInAndPeriod(eq(List.of(5L)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{(short) 4, 1L}, new Object[]{(short) 5, 1L}));
-        when(menuRatingRepository.sampleCommentsByMenuIdAndPeriod(eq(5L), any(), any(), any(Pageable.class)))
+        when(menuRatingRepository.sampleCommentsByMenuIdInAndPeriod(eq(List.of(5L)), any(), any(), any(Pageable.class)))
                 .thenReturn(List.of(MenuRating.builder()
                         .score((short) 4)
                         .comment("Genel iyi")
                         .createdAt(LocalDateTime.now())
                         .build()));
 
-        when(menuProductRatingRepository.averageScoreByMenuIdAndPeriod(eq(5L), any(), any())).thenReturn(3.0);
-        when(menuProductRatingRepository.countByMenuIdAndPeriod(eq(5L), any(), any())).thenReturn(1L);
-        when(menuProductRatingRepository.scoreHistogramByMenuIdAndPeriod(eq(5L), any(), any()))
+        when(menuProductRatingRepository.averageScoreByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(3.0);
+        when(menuProductRatingRepository.countByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(1L);
+        when(menuProductRatingRepository.scoreHistogramByMenuIdInAndPeriod(eq(List.of(5L)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{(short) 3, 1L}));
-        when(menuProductRatingRepository.topRatedProductsByPeriod(eq(5L), any(), any(), eq(1L), any(Pageable.class)))
+        when(menuProductRatingRepository.topRatedProductsByMenuIdsAndPeriod(eq(List.of(5L)), any(), any(), eq(1L), any(Pageable.class)))
                 .thenReturn(List.<Object[]>of(new Object[]{11L, 3.0, 1L}));
-        when(menuProductRatingRepository.bottomRatedProductsByPeriod(eq(5L), any(), any(), eq(1L), any(Pageable.class)))
+        when(menuProductRatingRepository.bottomRatedProductsByMenuIdsAndPeriod(eq(List.of(5L)), any(), any(), eq(1L), any(Pageable.class)))
                 .thenReturn(List.<Object[]>of(new Object[]{11L, 3.0, 1L}));
-        when(menuProductRatingRepository.sampleCommentsByMenuIdAndPeriod(eq(5L), any(), any(), any(Pageable.class)))
+        when(menuProductRatingRepository.sampleCommentsByMenuIdInAndPeriod(eq(List.of(5L)), any(), any(), any(Pageable.class)))
                 .thenReturn(List.of(MenuProductRating.builder()
                         .menuProductId(11L)
                         .score((short) 3)

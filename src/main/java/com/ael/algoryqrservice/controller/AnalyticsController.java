@@ -49,6 +49,70 @@ public class AnalyticsController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/branch/{branchId}/report")
+    public ResponseEntity<AnalyticsDtos.MenuAnalyticsReportResponse> getBranchReport(
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(analyticsService.getBranchReport(
+                branchId, menuId, ownerId, effectiveFrom, effectiveTo));
+    }
+
+    @GetMapping("/branch/{branchId}/revenue")
+    public ResponseEntity<AnalyticsDtos.MenuRevenueReportResponse> getBranchRevenueReport(
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        requireOrderAnalyticsScope(ownerId);
+        return ResponseEntity.ok(analyticsService.getBranchRevenueReport(
+                branchId, menuId, ownerId, effectiveFrom, effectiveTo));
+    }
+
+    @GetMapping("/branch/{branchId}/waiter-performance")
+    public ResponseEntity<AnalyticsDtos.MenuWaiterPerformanceReportResponse> getBranchWaiterPerformanceReport(
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        requireOrderAnalyticsScope(ownerId);
+        return ResponseEntity.ok(analyticsService.getBranchWaiterPerformanceReport(
+                branchId, menuId, ownerId, effectiveFrom, effectiveTo));
+    }
+
+    @PostMapping("/branch/{branchId}/smart-reports")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<SmartReportDtos.SmartReportAccepted> createBranchSmartReport(
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long menuId,
+            @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
+    ) {
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        SmartReportDtos.SmartReportAccepted accepted = smartReportService.enqueueForBranch(
+                branchId,
+                menuId,
+                ownerId,
+                body.from(),
+                body.to(),
+                body.locale(),
+                body.options()
+        );
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(accepted);
+    }
+
     @GetMapping("/menu/{menuId}/report")
     public ResponseEntity<AnalyticsDtos.MenuAnalyticsReportResponse> getMenuReport(
             @PathVariable Long menuId,

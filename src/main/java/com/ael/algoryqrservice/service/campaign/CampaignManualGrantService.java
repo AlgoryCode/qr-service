@@ -17,14 +17,11 @@ import com.ael.algoryqrservice.repository.CampaignManualGrantRepository;
 import com.ael.algoryqrservice.repository.CampaignProgressRepository;
 import com.ael.algoryqrservice.repository.CustomerMembershipRepository;
 import com.ael.algoryqrservice.repository.CustomerRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
-import com.ael.algoryqrservice.util.SecurityUtils;
+import com.ael.algoryqrservice.service.WaiterAccessService;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
@@ -37,12 +34,11 @@ public class CampaignManualGrantService {
     private final CampaignProgressRepository campaignProgressRepository;
     private final CustomerRepository customerRepository;
     private final CustomerMembershipRepository customerMembershipRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
     private final CampaignService campaignService;
     private final CampaignEvaluationService campaignEvaluationService;
     private final CampaignRewardService campaignRewardService;
     private final CampaignConfigSupport configSupport;
-    private final SecurityUtils securityUtils;
+    private final WaiterAccessService waiterAccessService;
 
     @Transactional(readOnly = true)
     public CampaignDtos.WaiterCustomerLookupResponse lookupCustomer(Long menuId, String email) {
@@ -132,21 +128,7 @@ public class CampaignManualGrantService {
     }
 
     private MenuWaiter requireWaiterForMenu(Long menuId) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        if (!menuId.equals(waiter.getMenuId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
-        }
-        return waiter;
-    }
-
-    private MenuWaiter requireCurrentWaiter() {
-        Long waiterId = securityUtils.getCurrentWaiterId();
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
-                .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
-        if (!waiter.isActive()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Garson hesabı pasif");
-        }
-        return waiter;
+        return waiterAccessService.requireWaiterForMenu(menuId);
     }
 
     private void ensureMembership(Long customerId, Long menuId, Long businessId) {

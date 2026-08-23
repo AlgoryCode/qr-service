@@ -13,6 +13,7 @@ import com.ael.algoryqrservice.repository.CampaignRewardRepository;
 import com.ael.algoryqrservice.repository.CampaignTemplateRepository;
 import com.ael.algoryqrservice.repository.CustomerRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.service.WaiterAccessService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class CampaignService {
     private final MenuRepository menuRepository;
     private final CampaignConfigSupport configSupport;
     private final SecurityUtils securityUtils;
+    private final WaiterAccessService waiterAccessService;
 
     @Transactional(readOnly = true)
     public List<CampaignDtos.TemplateResponse> listTemplates() {
@@ -67,6 +69,22 @@ public class CampaignService {
         return campaignRepository
                 .findByMenuIdAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThanEqual(
                         menuId, CampaignStatus.ACTIVE, now, now)
+                .stream()
+                .map(this::toActiveCampaignResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CampaignDtos.ActiveCampaignResponse> listActiveCampaignsForCurrentWaiter() {
+        var waiter = waiterAccessService.requireCurrentWaiter();
+        List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
+        if (menuIds.isEmpty()) {
+            return List.of();
+        }
+        LocalDateTime now = LocalDateTime.now();
+        return campaignRepository
+                .findByMenuIdInAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThanEqual(
+                        menuIds, CampaignStatus.ACTIVE, now, now)
                 .stream()
                 .map(this::toActiveCampaignResponse)
                 .toList();
@@ -261,6 +279,7 @@ public class CampaignService {
         }
         return CampaignDtos.ActiveCampaignResponse.builder()
                 .id(campaign.getId())
+                .menuId(campaign.getMenuId())
                 .templateCode(campaign.getTemplateCode())
                 .name(campaign.getName())
                 .slogan(campaign.getSlogan())

@@ -2,21 +2,18 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
-import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
-import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,17 +24,17 @@ import java.util.Locale;
 public class MenuWaiterService {
 
     private final MenuWaiterRepository menuWaiterRepository;
-    private final MenuRepository menuRepository;
     private final UserRepository userRepository;
+    private final BranchService branchService;
     private final PasswordEncoder passwordEncoder;
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
-    public MenuWaiterDtos.UsersPageResponse listWaiters(Long menuId) {
-        Menu menu = requireOwnedMenu(menuId);
-        MenuWaiterDtos.OwnerSummary owner = getOwnerSummary(menu);
+    public MenuWaiterDtos.UsersPageResponse listWaiters(Long branchId) {
+        Branch branch = requireOwnedBranch(branchId);
+        MenuWaiterDtos.OwnerSummary owner = getOwnerSummary(branch);
         List<MenuWaiterDtos.WaiterResponse> waiters = menuWaiterRepository
-                .findByMenuIdOrderByDisplayNameAsc(menu.getMenuId())
+                .findByBranchIdOrderByDisplayNameAsc(branch.getId())
                 .stream()
                 .map(this::toWaiterResponse)
                 .toList();
@@ -48,8 +45,8 @@ public class MenuWaiterService {
     }
 
     @Transactional
-    public MenuWaiterDtos.WaiterResponse createWaiter(Long menuId, MenuWaiterDtos.CreateWaiterRequest request) {
-        Menu menu = requireOwnedMenu(menuId);
+    public MenuWaiterDtos.WaiterResponse createWaiter(Long branchId, MenuWaiterDtos.CreateWaiterRequest request) {
+        Branch branch = requireOwnedBranch(branchId);
         if (request == null) {
             throw new BadRequestException("İstek gövdesi zorunludur");
         }
@@ -63,8 +60,8 @@ public class MenuWaiterService {
         LocalDateTime now = LocalDateTime.now();
 
         MenuWaiter waiter = MenuWaiter.builder()
-                .ownerUserId(menu.getUserId())
-                .menuId(menu.getMenuId())
+                .ownerUserId(branch.getUserId())
+                .branchId(branch.getId())
                 .username(username)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .displayName(displayName)
@@ -78,12 +75,12 @@ public class MenuWaiterService {
 
     @Transactional
     public MenuWaiterDtos.WaiterResponse updateWaiter(
-            Long menuId,
+            Long branchId,
             Long waiterId,
             MenuWaiterDtos.UpdateWaiterRequest request
     ) {
-        requireOwnedMenu(menuId);
-        MenuWaiter waiter = requireWaiter(menuId, waiterId);
+        requireOwnedBranch(branchId);
+        MenuWaiter waiter = requireWaiter(branchId, waiterId);
 
         if (request != null) {
             if (request.getDisplayName() != null) {
@@ -116,22 +113,16 @@ public class MenuWaiterService {
     }
 
     @Transactional
-    public void deleteWaiter(Long menuId, Long waiterId) {
-        requireOwnedMenu(menuId);
-        MenuWaiter waiter = requireWaiter(menuId, waiterId);
+    public void deleteWaiter(Long branchId, Long waiterId) {
+        requireOwnedBranch(branchId);
+        MenuWaiter waiter = requireWaiter(branchId, waiterId);
         waiter.setActive(false);
         waiter.setUpdatedAt(LocalDateTime.now());
         menuWaiterRepository.save(waiter);
     }
 
-    @Transactional(readOnly = true)
-    public MenuWaiterDtos.OwnerSummary getOwnerSummary(Long menuId) {
-        Menu menu = requireOwnedMenu(menuId);
-        return getOwnerSummary(menu);
-    }
-
-    private MenuWaiterDtos.OwnerSummary getOwnerSummary(Menu menu) {
-        User owner = userRepository.findById(menu.getUserId())
+    private MenuWaiterDtos.OwnerSummary getOwnerSummary(Branch branch) {
+        User owner = userRepository.findById(branch.getUserId())
                 .orElseThrow(() -> new NotFoundException("İşletme sahibi bulunamadı"));
         return MenuWaiterDtos.OwnerSummary.builder()
                 .id(owner.getId())
@@ -141,26 +132,19 @@ public class MenuWaiterService {
                 .build();
     }
 
-    private Menu requireOwnedMenu(Long menuId) {
-        Menu menu = menuRepository.findById(menuId)
-                .filter(m -> !m.isDeleted())
-                .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        Long currentUserId = securityUtils.getCurrentUserId();
-        if (!currentUserId.equals(menu.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
-        }
-        return menu;
+    private Branch requireOwnedBranch(Long branchId) {
+        return branchService.requireOwnedForUser(branchId, securityUtils.getCurrentUserId());
     }
 
-    private MenuWaiter requireWaiter(Long menuId, Long waiterId) {
-        return menuWaiterRepository.findByIdAndMenuId(waiterId, menuId)
+    private MenuWaiter requireWaiter(Long branchId, Long waiterId) {
+        return menuWaiterRepository.findByIdAndBranchId(waiterId, branchId)
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
     }
 
     private MenuWaiterDtos.WaiterResponse toWaiterResponse(MenuWaiter waiter) {
         return MenuWaiterDtos.WaiterResponse.builder()
                 .id(waiter.getId())
-                .menuId(waiter.getMenuId())
+                .branchId(waiter.getBranchId())
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())
                 .active(waiter.isActive())

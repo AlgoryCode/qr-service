@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.model.RestaurantTable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +12,8 @@ import java.util.Optional;
 public interface RestaurantTableRepository extends JpaRepository<RestaurantTable, Long> {
 
     List<RestaurantTable> findByMenuIdOrderByTableNumberAscNameAsc(Long menuId);
+
+    List<RestaurantTable> findByMenuIdInOrderByTableNumberAscNameAsc(Collection<Long> menuIds);
 
     Optional<RestaurantTable> findByPublicTokenAndActiveTrue(String publicToken);
 

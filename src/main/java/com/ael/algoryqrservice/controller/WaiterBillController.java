@@ -1,9 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
-import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.TableBillDtos;
 import com.ael.algoryqrservice.service.MenuWaiterBillService;
-import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,18 +20,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class WaiterBillController {
 
     private final MenuWaiterBillService menuWaiterBillService;
-    private final SecurityUtils securityUtils;
 
     @GetMapping("/tables/{tableId}/open")
     public ResponseEntity<TableBillDtos.BillResponse> getOpenBillForTable(@PathVariable Long tableId) {
-        Long menuId = securityUtils.getCurrentWaiterMenuId();
-        return ResponseEntity.ok(menuWaiterBillService.getOpenBillForTable(menuId, tableId));
+        return ResponseEntity.ok(menuWaiterBillService.getOpenBillForTable(tableId));
     }
 
     @GetMapping("/{billId}")
     public ResponseEntity<TableBillDtos.BillResponse> getBill(@PathVariable Long billId) {
-        Long menuId = securityUtils.getCurrentWaiterMenuId();
-        return ResponseEntity.ok(menuWaiterBillService.getBill(menuId, billId));
+        return ResponseEntity.ok(menuWaiterBillService.getBill(billId));
     }
 
     @PutMapping("/{billId}/items")

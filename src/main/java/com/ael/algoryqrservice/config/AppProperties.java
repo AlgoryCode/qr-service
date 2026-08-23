@@ -36,6 +36,7 @@ public class AppProperties {
         private boolean packageCatalog = false;
         private boolean publicAccessBackfill = false;
         private boolean branchBackfill = true;
+        private boolean waiterBranchBackfill = true;
         private boolean chefAvatars = false;
         private MenuProductsSeed menuProducts = new MenuProductsSeed();
     }
