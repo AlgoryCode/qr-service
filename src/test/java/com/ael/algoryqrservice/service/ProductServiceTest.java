@@ -17,6 +17,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,5 +80,47 @@ class ProductServiceTest {
                 .hasMessageContaining("haklarinda");
 
         verify(productRepository, never()).delete(any());
+    }
+
+    @Test
+    void getActive_whenProductsExist_thenReturnActive() {
+        Product product = Product.builder()
+                .id(2L)
+                .code("QR_MENU")
+                .name("QR Menu")
+                .unitPrice(new BigDecimal("29.00"))
+                .active(true)
+                .build();
+        when(productRepository.findByActiveTrueOrderByCodeAsc()).thenReturn(List.of(product));
+
+        assertThat(productService.getActive()).hasSize(1).first().extracting("code").isEqualTo("QR_MENU");
+    }
+
+    @Test
+    void getByCode_whenActive_thenReturnProduct() {
+        Product product = Product.builder()
+                .id(2L)
+                .code("QR_MENU")
+                .name("QR Menu")
+                .unitPrice(new BigDecimal("29.00"))
+                .vatRate(new BigDecimal("20.00"))
+                .active(true)
+                .build();
+        when(productRepository.findByCode("QR_MENU")).thenReturn(Optional.of(product));
+
+        var response = productService.getByCode("QR_MENU");
+
+        assertThat(response.getCode()).isEqualTo("QR_MENU");
+        assertThat(response.getUnitPrice()).isEqualByComparingTo("29.00");
+    }
+
+    @Test
+    void getByCode_whenInactive_thenReject() {
+        Product product = Product.builder().id(2L).code("QR_MENU").name("QR Menu").active(false).build();
+        when(productRepository.findByCode("QR_MENU")).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.getByCode("QR_MENU"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("aktif degil");
     }
 }

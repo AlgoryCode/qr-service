@@ -29,6 +29,9 @@ public class Menu extends QrBaseModel {
     @Column(nullable = false)
     private Long userId;
 
+    @Column(name = "branch_id")
+    private Long branchId;
+
     @Column(nullable = false)
     private String themeId;
 

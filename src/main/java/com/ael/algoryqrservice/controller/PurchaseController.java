@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.*;
+import com.ael.algoryqrservice.service.AddonPurchaseService;
 import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.service.PurchaseService;
@@ -20,6 +21,7 @@ import java.util.List;
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
+    private final AddonPurchaseService addonPurchaseService;
     private final PurchaseLogService purchaseLogService;
     private final EntitlementService entitlementService;
     private final SecurityUtils securityUtils;
@@ -32,6 +34,17 @@ public class PurchaseController {
         String clientIp = resolveClientIp(httpServletRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 purchaseService.purchase(securityUtils.getCurrentUser(), request, clientIp)
+        );
+    }
+
+    @PostMapping("/addons")
+    public ResponseEntity<PurchaseInitiateResponse> purchaseAddon(
+            @Valid @RequestBody AddonPurchaseRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        String clientIp = resolveClientIp(httpServletRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                addonPurchaseService.purchase(securityUtils.getCurrentUser(), request, clientIp)
         );
     }
 

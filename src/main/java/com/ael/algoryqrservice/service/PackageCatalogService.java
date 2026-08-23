@@ -1,29 +1,110 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class PackageCatalogService {
 
+    private static final BigDecimal BRANCH_PRICE = new BigDecimal("600.00");
+    private static final BigDecimal MENU_PRICE = new BigDecimal("200.00");
+    private static final BigDecimal VAT = new BigDecimal("20.00");
+
     private final ProductRepository productRepository;
+    private final PlanPackageRepository planPackageRepository;
 
     @Transactional
     public void ensureCatalogProducts() {
         ensureProduct(CatalogProducts.QR_CREATE, "QR Olusturma", CatalogScopes.QR_CREATE_OWNER, true);
         ensureProduct(CatalogProducts.QR_MENU, "QR Menu", CatalogScopes.QR_MENU_OWNER, true);
+        ensureProduct(CatalogProducts.QR_BRANCH, "Ek Sube", CatalogScopes.QR_BRANCH_OWNER, true);
         ensureProduct(CatalogProducts.MENU_PRODUCT, "Menu Urun Hakki", CatalogScopes.MENU_PRODUCT_OWNER, true);
         ensureProduct(CatalogProducts.SMART_ASSISTANT, "Akilli Asistan", CatalogScopes.SMART_ASSISTANT_OWNER, false);
         ensureProduct(CatalogProducts.SMART_SUMMARY, "Akilli Ozet", CatalogScopes.SMART_SUMMARY_OWNER, false);
         ensureProduct(CatalogProducts.SMART_REPORTING, "Akilli Raporlama", CatalogScopes.SMART_REPORTING_OWNER, false);
         ensureProduct(CatalogProducts.CUSTOM_DESIGN, "Ozel Tasarim Menu", CatalogScopes.CUSTOM_DESIGN_OWNER, false);
         ensureProduct(CatalogProducts.WAITER_PANEL, "Garson Paneli", CatalogScopes.WAITER_PANEL_OWNER, false);
+        ensureBranchBilling();
+    }
+
+    @Transactional
+    public void ensureBranchBilling() {
+        upsertPrice(CatalogProducts.QR_BRANCH, "Ek Sube", "Ek sube olusturma hakki", CatalogScopes.QR_BRANCH_OWNER, true, BRANCH_PRICE);
+        upsertPrice(CatalogProducts.QR_MENU, "QR Menu", "Ek dijital menu olusturma hakki", CatalogScopes.QR_MENU_OWNER, true, MENU_PRICE);
+        syncPackage(CatalogPackages.STARTER_PACKAGE, List.of("50 urun hakki", "1 ucretsiz sube", "Sube basi 1 ucretsiz menu", "Standart sablonlar"));
+        syncPackage(CatalogPackages.PRO_PACKAGE, List.of("Sinirsiz urun hakki", "1 ucretsiz sube", "Sube basi 1 ucretsiz menu", "Ciro takibi ve gelir raporlamasi"));
+        syncPackage(CatalogPackages.ULTIMATE_PACKAGE, List.of(
+                "1 ucretsiz sube",
+                "Sube basi 1 ucretsiz menu",
+                "Garson siparis ve adisyon modulu",
+                "Ciro takibi ve gelismis raporlar",
+                "Haftalik akilli raporlama",
+                "Akilli asistan",
+                "Akilli ozet",
+                "Ozel tasarim menu"
+        ));
+    }
+
+    private void syncPackage(String packageCode, List<String> features) {
+        PlanPackage planPackage = planPackageRepository.findByCode(packageCode)
+                .flatMap(existing -> planPackageRepository.findByIdWithItems(existing.getId()))
+                .orElse(null);
+        if (planPackage == null) {
+            return;
+        }
+        planPackage.setFeatures(new ArrayList<>(features));
+        Product branch = productRepository.findByCode(CatalogProducts.QR_BRANCH).orElse(null);
+        if (branch != null && planPackage.getItems().stream().noneMatch(item -> CatalogProducts.QR_BRANCH.equals(item.getProduct().getCode()))) {
+            planPackage.getItems().add(PlanPackageItem.builder()
+                    .planPackage(planPackage)
+                    .product(branch)
+                    .quantity(1)
+                    .unlimited(false)
+                    .build());
+        }
+        for (PlanPackageItem item : planPackage.getItems()) {
+            if (CatalogProducts.QR_MENU.equals(item.getProduct().getCode()) && item.isUnlimited()) {
+                item.setUnlimited(false);
+                item.setQuantity(1);
+            }
+        }
+        planPackageRepository.save(planPackage);
+    }
+
+    private void upsertPrice(
+            String code,
+            String name,
+            String description,
+            String scopeCode,
+            boolean consumable,
+            BigDecimal unitPrice
+    ) {
+        Product product = productRepository.findByCode(code).orElseGet(() -> Product.builder()
+                .code(code)
+                .active(true)
+                .build());
+        product.setName(name);
+        product.setDescription(description);
+        product.setScopeCode(scopeCode);
+        product.setConsumable(consumable);
+        product.setActive(true);
+        product.setUnitPrice(unitPrice);
+        product.setVatRate(VAT);
+        productRepository.save(product);
     }
 
     private Product ensureProduct(String code, String name, String scopeCode, boolean consumable) {

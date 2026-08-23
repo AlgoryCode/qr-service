@@ -210,7 +210,16 @@ public class EntitlementService {
     }
 
     @Transactional
+    public ConsumedEntitlement consumeAddon(Long userId, String productCode, int amount) {
+        return consumeInternal(userId, productCode, amount, true);
+    }
+
+    @Transactional
     public ConsumedEntitlement consume(Long userId, String productCode, int amount) {
+        return consumeInternal(userId, productCode, amount, false);
+    }
+
+    private ConsumedEntitlement consumeInternal(Long userId, String productCode, int amount, boolean addonOnly) {
         expireDuePurchasesForUser(userId);
 
         if (Objects.equals(productCode, CatalogProducts.QR_CREATE)) {
@@ -241,6 +250,9 @@ public class EntitlementService {
             if (purchase == null || !entitlement.isUsable(purchase)) {
                 continue;
             }
+            if (addonOnly && purchase.getPurchaseType() != PurchaseType.ADD_ON) {
+                continue;
+            }
 
             if (remainingToConsume <= 0) {
                 break;
@@ -266,6 +278,7 @@ public class EntitlementService {
         if (remainingToConsume > 0) {
             if (Objects.equals(productCode, CatalogProducts.QR_MENU)) {
                 throw new ForbiddenException(
+                        addonOnly ? "EXTRA_MENU_REQUIRED" : null,
                         "Yetersiz dijital menü hakkı. Lütfen paket satın alın veya mevcut bir menüyü pasif yaparak slot açın."
                 );
             }
@@ -541,17 +554,20 @@ public class EntitlementService {
             return;
         }
 
-        long activeMenus = menuRepository.countActiveLiveMenusForUser(userId);
+        int extraMenus = 0;
+        for (Object[] row : menuRepository.countActiveLiveMenusGroupedByBranch(userId)) {
+            extraMenus += (int) Math.max(0, ((Number) row[1]).longValue() - 1);
+        }
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtAsc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
 
-        int remainingActive = (int) Math.min(activeMenus, Integer.MAX_VALUE);
+        int remainingActive = extraMenus;
         for (UserEntitlement entitlement : entitlements) {
             if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU) || entitlement.isUnlimited()) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
-            if (purchase == null || !entitlement.isUsable(purchase)) {
+            if (purchase == null || !entitlement.isUsable(purchase) || purchase.getPurchaseType() != PurchaseType.ADD_ON) {
                 continue;
             }
 

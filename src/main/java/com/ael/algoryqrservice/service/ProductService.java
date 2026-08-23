@@ -60,6 +60,23 @@ public class ProductService {
         return toResponse(findProduct(id));
     }
 
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getActive() {
+        return productRepository.findByActiveTrueOrderByCodeAsc().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProductResponse getByCode(String code) {
+        Product product = productRepository.findByCode(code)
+                .orElseThrow(() -> new BadRequestException("Urun bulunamadi: " + code));
+        if (!product.isActive()) {
+            throw new BadRequestException("Urun aktif degil: " + code);
+        }
+        return toResponse(product);
+    }
+
     @Transactional
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = findProduct(id);

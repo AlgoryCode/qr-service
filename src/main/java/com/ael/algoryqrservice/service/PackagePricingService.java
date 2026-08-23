@@ -46,6 +46,26 @@ public class PackagePricingService {
         planPackage.setPrice(breakdown.total());
     }
 
+    public LinePrice calculateProduct(Product product, int quantity) {
+        int billableQuantity = Math.max(quantity, 1);
+        BigDecimal unitPrice = normalizeMoney(product.getUnitPrice());
+        BigDecimal vatRate = product.getVatRate() == null ? DEFAULT_VAT_RATE : normalizeRate(product.getVatRate());
+        BigDecimal lineSubtotal = unitPrice.multiply(BigDecimal.valueOf(billableQuantity)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal lineVat = lineSubtotal.multiply(vatRate)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return new LinePrice(
+                product.getId(),
+                product.getCode(),
+                product.getName(),
+                unitPrice,
+                vatRate,
+                billableQuantity,
+                lineSubtotal,
+                lineVat,
+                lineSubtotal.add(lineVat)
+        );
+    }
+
     public PriceBreakdown calculate(List<PlanPackageItem> items) {
         if (items == null || items.isEmpty()) {
             return PriceBreakdown.zero();

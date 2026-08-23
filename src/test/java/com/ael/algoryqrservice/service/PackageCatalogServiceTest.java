@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.Product;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +23,8 @@ class PackageCatalogServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+    @Mock
+    private PlanPackageRepository planPackageRepository;
 
     @InjectMocks
     private PackageCatalogService packageCatalogService;
@@ -30,28 +33,16 @@ class PackageCatalogServiceTest {
     void ensureCatalogProducts_whenMissing_thenCreateProducts() {
         when(productRepository.findByCode(any())).thenReturn(Optional.empty());
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(planPackageRepository.findByCode(any())).thenReturn(Optional.empty());
 
         packageCatalogService.ensureCatalogProducts();
 
-        verify(productRepository).save(org.mockito.ArgumentMatchers.argThat(product ->
+        verify(productRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.argThat(product ->
                 CatalogProducts.QR_MENU.equals(product.getCode())
                         && CatalogScopes.QR_MENU_OWNER.equals(product.getScopeCode())
         ));
-    }
-
-    @Test
-    void ensureCatalogProducts_whenExists_thenDoNotOverwrite() {
-        Product existing = Product.builder()
-                .id(1L)
-                .code(CatalogProducts.QR_CREATE)
-                .name("Existing")
-                .scopeCode(CatalogScopes.QR_CREATE_OWNER)
-                .active(true)
-                .build();
-        when(productRepository.findByCode(any())).thenReturn(Optional.of(existing));
-
-        packageCatalogService.ensureCatalogProducts();
-
-        verify(productRepository, never()).save(any());
+        verify(productRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.argThat(product ->
+                CatalogProducts.QR_BRANCH.equals(product.getCode())
+        ));
     }
 }

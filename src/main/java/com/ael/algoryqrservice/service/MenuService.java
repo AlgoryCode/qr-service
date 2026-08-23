@@ -16,6 +16,8 @@ import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.ael.algoryqrservice.model.Branch;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductSpecifications;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -67,6 +69,9 @@ public class MenuService {
     private final ChefAvatarService chefAvatarService;
     private final EntitlementService entitlementService;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
+    private final BranchService branchService;
+    private final BranchQuotaService branchQuotaService;
+    private final BranchRepository branchRepository;
 
     @Transactional(readOnly = true)
     public void requireOwnedMenu(Long menuId) {
@@ -79,10 +84,16 @@ public class MenuService {
         String themeId = requireNonBlank(stringValue(details.get("themeId")), "themeId zorunludur");
         requireAllowedTheme(qr.getUserId(), themeId);
         String businessName = requireNonBlank(stringValue(details.get("businessName")), "businessName zorunludur");
+        Long branchId = longValue(details.get("branchId"));
+        if (branchId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
+        }
+        branchService.requireOwnedForUser(branchId, qr.getUserId());
 
         Menu menu = Menu.builder()
                 .qrId(qr.getQrId())
                 .userId(qr.getUserId())
+                .branchId(branchId)
                 .themeId(themeId)
                 .businessName(businessName)
                 .slogan(trimToNull(stringValue(details.get("slogan"))))
@@ -686,7 +697,7 @@ public class MenuService {
         if (request.getActive() != null) {
             boolean nextActive = request.getActive();
             if (nextActive && !menu.isActive()) {
-                entitlementService.assertMenuActivationAllowed(menu.getUserId());
+                branchQuotaService.assertMenuActivationAllowed(menu.getUserId(), menu.getBranchId());
             }
             menu.setActive(nextActive);
             qr.setActive(nextActive);
@@ -777,6 +788,7 @@ public class MenuService {
                     return MenuDtos.ActiveMenuSummary.builder()
                             .menuId(menu.getMenuId())
                             .qrId(menu.getQrId())
+                            .branchId(menu.getBranchId())
                             .businessName(menu.getBusinessName())
                             .themeId(menu.getThemeId())
                             .publicUrl(buildPublicUrl(menu))
@@ -1170,9 +1182,13 @@ public class MenuService {
             String publicUrl,
             MenuDtos.QrBrief qrBrief
     ) {
+        Branch branch = menu.getBranchId() == null
+                ? null
+                : branchRepository.findById(menu.getBranchId()).orElse(null);
         return MenuDtos.MenuProfileResponse.builder()
                 .menuId(menu.getMenuId())
                 .qrId(menu.getQrId())
+                .branchId(menu.getBranchId())
                 .userId(menu.getUserId())
                 .themeId(menu.getThemeId())
                 .businessName(menu.getBusinessName())
@@ -1182,9 +1198,9 @@ public class MenuService {
                 .chefAvatarKey(menu.getChefAvatarKey())
                 .chefAvatarUrl(chefAvatarService.resolveImageUrl(menu.getChefAvatarKey()))
                 .logoUrl(menu.getLogoUrl())
-                .phone(menu.getPhone())
-                .email(menu.getEmail())
-                .address(menu.getAddress())
+                .phone(branch != null && branch.getPhone() != null ? branch.getPhone() : menu.getPhone())
+                .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
+                .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
                 .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())

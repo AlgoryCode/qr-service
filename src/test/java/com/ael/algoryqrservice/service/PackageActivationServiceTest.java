@@ -120,4 +120,29 @@ class PackageActivationServiceTest {
         assertThat(captor.getValue().getStatus()).isEqualTo(PurchaseStatus.SUPERSEDED);
         verify(menuPublicAccessService).syncForUser(20L);
     }
+
+    @Test
+    void activatePurchasedPackage_whenAddon_thenKeepExistingActive() {
+        Purchase host = Purchase.builder()
+                .id(1L)
+                .userId(20L)
+                .packageCode(CatalogPackages.ULTIMATE_PACKAGE)
+                .purchaseType(PurchaseType.SYSTEM_GRANT)
+                .status(PurchaseStatus.ACTIVE)
+                .build();
+        Purchase addon = Purchase.builder()
+                .id(2L)
+                .userId(20L)
+                .packageCode("QR_MENU")
+                .purchaseType(PurchaseType.ADD_ON)
+                .status(PurchaseStatus.ACTIVE)
+                .build();
+        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
+                .thenReturn(List.of(host, addon));
+
+        packageActivationService.activatePurchasedPackage(addon);
+
+        verify(purchaseRepository, never()).save(any());
+        verify(menuPublicAccessService).syncForUser(20L);
+    }
 }

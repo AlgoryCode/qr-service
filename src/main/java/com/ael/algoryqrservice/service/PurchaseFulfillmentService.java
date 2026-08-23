@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
+import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseFulfillment;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
@@ -10,8 +11,10 @@ import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
+import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class PurchaseFulfillmentService {
     private final PurchaseFulfillmentRepository fulfillmentRepository;
     private final PurchaseRepository purchaseRepository;
     private final PlanPackageRepository planPackageRepository;
+    private final ProductRepository productRepository;
     private final EntitlementService entitlementService;
     private final PackageActivationService packageActivationService;
     private final MenuPublicAccessService menuPublicAccessService;
@@ -104,8 +108,13 @@ public class PurchaseFulfillmentService {
         if (firstPaidInstallment) {
             purchase.setStartsAt(periodStart);
             purchase.setStatus(PurchaseStatus.ACTIVE);
-            grantEntitlements(purchase, planPackage);
-            packageActivationService.activatePurchasedPackage(purchase);
+            if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+                grantAddonEntitlement(purchase);
+                menuPublicAccessService.syncForUser(purchase.getUserId());
+            } else {
+                grantEntitlements(purchase, planPackage);
+                packageActivationService.activatePurchasedPackage(purchase);
+            }
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
         purchase.setPaymentId(event.getPaymentId());
@@ -241,6 +250,15 @@ public class PurchaseFulfillmentService {
                 .amount(event.getAmount())
                 .currency(event.getCurrency())
                 .build();
+    }
+
+    private void grantAddonEntitlement(Purchase purchase) {
+        Product product = productRepository.findByCode(purchase.getPackageCode())
+                .orElseThrow(() -> new IllegalStateException("Urun bulunamadi: " + purchase.getPackageCode()));
+        int quantity = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
+                ? 1
+                : purchase.getInstallmentCount();
+        entitlementService.grant(purchase, product.getId(), product.getCode(), quantity, false);
     }
 
     private void grantEntitlements(Purchase purchase, PlanPackage planPackage) {

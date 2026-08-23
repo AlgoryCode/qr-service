@@ -16,10 +16,12 @@ import com.ael.algoryqrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.model.nutrition.NutritionNutrientEntry;
 import com.ael.algoryqrservice.model.User;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -80,15 +82,28 @@ class MenuServiceTest {
     private EntitlementService entitlementService;
     @Mock
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
+    @Mock
+    private BranchService branchService;
+    @Mock
+    private BranchQuotaService branchQuotaService;
+    @Mock
+    private BranchRepository branchRepository;
 
     @InjectMocks
     private MenuService menuService;
+
+    @BeforeEach
+    void stubCurrentUser() {
+        org.mockito.Mockito.lenient().when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        org.mockito.Mockito.lenient().when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
+    }
 
     @Test
     void createMenuForQr_whenSloganAndProductsProvided_thenPersistAll() {
         Qr qr = Qr.builder().qrId(42L).userId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
+        details.put("branchId", 3L);
         details.put("businessName", "Kafe İstanbul");
         details.put("slogan", "Lezzetin adresi");
         Map<String, Object> nutrition = Map.of(
@@ -153,6 +168,7 @@ class MenuServiceTest {
         Qr qr = Qr.builder().qrId(42L).userId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
+        details.put("branchId", 3L);
         details.put("businessName", "Kafe");
         details.put("products", List.of(Map.of("name", "Espresso", "nutrition", Map.of("basis", "PER_100G"))));
         QrRequest request = new QrRequest();
@@ -174,6 +190,7 @@ class MenuServiceTest {
         Qr qr = Qr.builder().qrId(50L).userId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
+        details.put("branchId", 3L);
         details.put("businessName", "Yeni Şube");
         details.put("sourceMenuId", 12L);
         QrRequest request = new QrRequest();
@@ -230,6 +247,7 @@ class MenuServiceTest {
         Qr qr = Qr.builder().qrId(50L).userId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
+        details.put("branchId", 3L);
         details.put("businessName", "Yeni Şube");
         details.put("sourceMenuId", 12L);
         QrRequest request = new QrRequest();
@@ -318,18 +336,12 @@ class MenuServiceTest {
     void createProduct_whenNutritionMissing_thenThrow() {
         Menu menu = Menu.builder().menuId(10L).userId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
 
         MenuDtos.MenuProductRequest request = MenuDtos.MenuProductRequest.builder()
                 .name("Köfte")
                 .subCategoryId(16L)
                 .build();
 
-        when(menuTaxonomyService.requireSubCategory(16L))
-                .thenReturn(SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
-        when(menuTaxonomyService.requireTags(any())).thenReturn(List.of());
-        when(menuTaxonomyService.requireAllergens(any())).thenReturn(List.of());
-        when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
         org.mockito.Mockito.doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Besin ögesi bilgisi zorunludur"))
                 .when(nutritionFactsService).validateForCreate(null);
 
@@ -342,7 +354,6 @@ class MenuServiceTest {
     void createProduct_whenSubCategoryIdMissing_thenThrow() {
         Menu menu = Menu.builder().menuId(10L).userId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
 
         MenuDtos.MenuProductRequest request = MenuDtos.MenuProductRequest.builder()
                 .name("Köfte")
@@ -379,7 +390,6 @@ class MenuServiceTest {
 
         when(menuProductRepository.findByProductIdAndDeletedFalse(5L)).thenReturn(Optional.of(product));
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
         when(nutritionFactsService.merge(existing, patch)).thenReturn(merged);
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(
@@ -477,7 +487,6 @@ class MenuServiceTest {
     void listProducts_whenMoreThanPageSize_thenReturnHasNext() {
         Menu menu = Menu.builder().menuId(10L).userId(7L).active(true).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
         when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());

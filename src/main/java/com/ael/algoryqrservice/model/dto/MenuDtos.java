@@ -301,6 +301,7 @@ public final class MenuDtos {
     public static class MenuProfileResponse {
         private Long menuId;
         private Long qrId;
+        private Long branchId;
         private Long userId;
         private String themeId;
         private String businessName;
@@ -347,6 +348,7 @@ public final class MenuDtos {
     public static class ActiveMenuSummary {
         private Long menuId;
         private Long qrId;
+        private Long branchId;
         private String businessName;
         private String themeId;
         private String publicUrl;

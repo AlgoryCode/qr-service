@@ -60,4 +60,21 @@ class PackagePricingServiceTest {
         assertThat(planPackage.getVatAmount()).isEqualByComparingTo("20.00");
         assertThat(planPackage.getPrice()).isEqualByComparingTo("120.00");
     }
+
+    @Test
+    void calculateProduct_whenQuantityOne_thenIncludeVat() {
+        Product product = Product.builder()
+                .id(2L)
+                .code("QR_MENU")
+                .name("QR Menu")
+                .unitPrice(new BigDecimal("29.00"))
+                .vatRate(new BigDecimal("20.00"))
+                .build();
+
+        PackagePricingService.LinePrice line = pricingService.calculateProduct(product, 1);
+
+        assertThat(line.unitPrice()).isEqualByComparingTo("29.00");
+        assertThat(line.lineVat()).isEqualByComparingTo("5.80");
+        assertThat(line.lineTotal()).isEqualByComparingTo("34.80");
+    }
 }

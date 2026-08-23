@@ -53,11 +53,19 @@ public class PackageActivationService {
                 purchasedPackage.getUserId(),
                 PurchaseStatus.ACTIVE
         );
+        if (purchasedPackage.getPurchaseType() == PurchaseType.ADD_ON) {
+            menuPublicAccessService.syncForUser(purchasedPackage.getUserId());
+            return;
+        }
         for (Purchase purchase : active) {
-            if (!purchase.getId().equals(purchasedPackage.getId())) {
-                purchase.setStatus(PurchaseStatus.SUPERSEDED);
-                purchaseRepository.save(purchase);
+            if (purchase.getId().equals(purchasedPackage.getId())) {
+                continue;
             }
+            if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+                continue;
+            }
+            purchase.setStatus(PurchaseStatus.SUPERSEDED);
+            purchaseRepository.save(purchase);
         }
         menuPublicAccessService.syncForUser(purchasedPackage.getUserId());
     }
@@ -84,7 +92,8 @@ public class PackageActivationService {
         }
         return purchase.getPurchaseType() == PurchaseType.PAID
                 || purchase.getPurchaseType() == PurchaseType.TRIAL
-                || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT;
+                || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT
+                || purchase.getPurchaseType() == PurchaseType.ADD_ON;
     }
 
     private Purchase selectHighestPackage(List<Purchase> purchases) {
