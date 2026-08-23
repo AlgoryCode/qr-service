@@ -17,16 +17,36 @@ import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.util.IdentityNumbers;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PaymentRequestMapperTest {
     private final PaymentRequestMapper mapper = new PaymentRequestMapper();
+
+    @AfterEach
+    void resetClock() {
+        AppTime.resetClock();
+    }
+
+    @Test
+    void newPaymentAttemptId_whenUserIdGiven_thenQrUserIdTimestampFormat() {
+        AppTime.setClock(Clock.fixed(Instant.parse("2026-08-23T15:07:45Z"), ZoneId.of("Europe/Istanbul")));
+
+        String attemptId = mapper.newPaymentAttemptId(421L);
+
+        assertThat(attemptId).matches("^qr42120260823180745[a-f0-9]{4}$");
+        assertThat(attemptId).hasSizeLessThanOrEqualTo(64);
+    }
 
     @Test
     void toThreeDsRequest_whenMonthlySubscription_thenChargeEffectivePrice() {
@@ -221,8 +241,8 @@ class PaymentRequestMapperTest {
         String first = mapper.buildCardVerificationConversationId(7L);
         String second = mapper.buildCardVerificationConversationId(7L);
 
-        assertThat(first).startsWith("qrcardverification7");
-        assertThat(second).startsWith("qrcardverification7");
+        assertThat(first).matches("^qr7\\d{14}[a-f0-9]{4}$");
+        assertThat(second).matches("^qr7\\d{14}[a-f0-9]{4}$");
         assertThat(first).isNotEqualTo(second);
     }
 

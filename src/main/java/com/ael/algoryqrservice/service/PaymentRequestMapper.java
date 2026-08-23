@@ -13,10 +13,12 @@ import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCardDto;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.util.IdentityNumbers;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -171,12 +173,21 @@ public class PaymentRequestMapper {
                 .build();
     }
 
+    private static final DateTimeFormatter PAYMENT_ATTEMPT_TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+    public String newPaymentAttemptId(Long userId) {
+        long safeUserId = userId == null ? 0L : userId;
+        String timestamp = AppTime.nowLocal().format(PAYMENT_ATTEMPT_TS);
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4);
+        return "qr" + safeUserId + timestamp + suffix;
+    }
+
     public String buildConversationId(Long purchaseId) {
-        return "qrpurchase" + purchaseId + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return newPaymentAttemptId(purchaseId);
     }
 
     public String buildCardVerificationConversationId(Long userId) {
-        return "qrcardverification" + userId + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return newPaymentAttemptId(userId);
     }
 
     private PaymentThreeDsRequest.PaymentCardPayload toPaymentCard(PaymentCardDto card) {

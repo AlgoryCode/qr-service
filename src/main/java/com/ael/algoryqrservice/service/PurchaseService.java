@@ -111,6 +111,7 @@ public class PurchaseService {
             throw new BadRequestException("Paket fiyati gecersiz");
         }
         CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), request.getPaymentMethodId());
+        String conversationId = paymentRequestMapper.newPaymentAttemptId(user.getId());
         Purchase purchase = purchaseRepository.save(Purchase.builder()
                 .userId(user.getId())
                 .packageId(planPackage.getId())
@@ -128,6 +129,7 @@ public class PurchaseService {
                 .cardBrand(cardSnapshot.brand())
                 .cardLastFour(cardSnapshot.lastFour())
                 .billingSnapshot(billingSnapshot)
+                .paymentConversationId(conversationId)
                 .status(PurchaseStatus.PENDING)
                 .build());
 
@@ -141,7 +143,6 @@ public class PurchaseService {
         );
 
         try {
-            String conversationId = paymentRequestMapper.buildConversationId(purchase.getId());
             if (request.getPaymentMode() == PaymentMode.CHECKOUT_FORM) {
                 PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
                         purchase,
@@ -176,7 +177,6 @@ public class PurchaseService {
                         .build();
             }
 
-            purchase.setPaymentConversationId(conversationId);
             PaymentThreeDsRequest paymentRequest = paymentRequestMapper.toThreeDsRequest(
                     purchase,
                     user,
@@ -378,8 +378,9 @@ public class PurchaseService {
 
         PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
         int nextCycle = resolveNextBillingCycle(purchase);
-        String conversationId = paymentRequestMapper.buildConversationId(purchase.getId());
+        String conversationId = paymentRequestMapper.newPaymentAttemptId(user.getId());
         purchase.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        purchase.setCurrentPeriodConversationId(conversationId);
         purchaseRepository.save(purchase);
 
         PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
