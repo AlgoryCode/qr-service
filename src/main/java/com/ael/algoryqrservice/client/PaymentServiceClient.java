@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 @Component
@@ -350,6 +351,38 @@ public class PaymentServiceClient {
         }
     }
 
+    public Optional<BillingPaymentDtos.RefundablePayment> findPayment(Long userId, String conversationId) {
+        try {
+            Map<?, ?> response = restClient.get()
+                    .uri("/payments/{conversationId}", conversationId)
+                    .headers(authHeaders(userId))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            if (response == null) {
+                return Optional.empty();
+            }
+            return Optional.of(mapRefundablePayment(response));
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) {
+                log.debug("Payment not found. conversationId={}", conversationId);
+                return Optional.empty();
+            }
+            String detail = extractErrorMessage(exception);
+            log.error(
+                    "Payment retrieve failed. conversationId={} status={} body={}",
+                    conversationId,
+                    exception.getStatusCode(),
+                    exception.getResponseBodyAsString()
+            );
+            throw new PaymentServiceException(
+                    detail == null || detail.isBlank()
+                            ? "Odeme kaydi alinamadi: " + exception.getStatusCode()
+                            : "Odeme kaydi alinamadi: " + detail
+            );
+        }
+    }
+
     public BillingPaymentDtos.RefundablePayment getRefundablePayment(Long userId, String conversationId) {
         try {
             Map<?, ?> response = restClient.get()
@@ -361,24 +394,7 @@ public class PaymentServiceClient {
             if (response == null) {
                 throw new PaymentServiceException("Odeme kaydi bulunamadi");
             }
-            BigDecimal paidPrice = decimalValue(response.get("paidPrice"));
-            BigDecimal refundedAmount = decimalValue(response.get("refundedAmount"));
-            if (paidPrice == null) {
-                paidPrice = BigDecimal.ZERO;
-            }
-            if (refundedAmount == null) {
-                refundedAmount = BigDecimal.ZERO;
-            }
-            BigDecimal remaining = paidPrice.subtract(refundedAmount).max(BigDecimal.ZERO);
-            return new BillingPaymentDtos.RefundablePayment(
-                    stringValue(response.get("conversationId")),
-                    stringValue(response.get("paymentId")),
-                    stringValue(response.get("paymentTransactionId")),
-                    stringValue(response.get("status")),
-                    paidPrice,
-                    refundedAmount,
-                    remaining
-            );
+            return mapRefundablePayment(response);
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
@@ -395,6 +411,27 @@ public class PaymentServiceClient {
                             : "Odeme kaydi alinamadi: " + detail
             );
         }
+    }
+
+    private BillingPaymentDtos.RefundablePayment mapRefundablePayment(Map<?, ?> response) {
+        BigDecimal paidPrice = decimalValue(response.get("paidPrice"));
+        BigDecimal refundedAmount = decimalValue(response.get("refundedAmount"));
+        if (paidPrice == null) {
+            paidPrice = BigDecimal.ZERO;
+        }
+        if (refundedAmount == null) {
+            refundedAmount = BigDecimal.ZERO;
+        }
+        BigDecimal remaining = paidPrice.subtract(refundedAmount).max(BigDecimal.ZERO);
+        return new BillingPaymentDtos.RefundablePayment(
+                stringValue(response.get("conversationId")),
+                stringValue(response.get("paymentId")),
+                stringValue(response.get("paymentTransactionId")),
+                stringValue(response.get("status")),
+                paidPrice,
+                refundedAmount,
+                remaining
+        );
     }
 
     public BillingPaymentDtos.RefundResult refundPayment(

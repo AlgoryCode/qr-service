@@ -6,20 +6,26 @@ import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.config.BillingSubscriptionProperties;
+import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
+import com.ael.algoryqrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseInitiateResponse;
+import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
@@ -42,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -80,6 +87,8 @@ class PurchaseServicePaymentEventTest {
     private SubscriptionRefundPolicy subscriptionRefundPolicy;
     @Mock
     private BillingSubscriptionProperties billingSubscriptionProperties;
+    @Mock
+    private PaymentClientProperties paymentClientProperties;
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -373,8 +382,8 @@ class PurchaseServicePaymentEventTest {
         purchase.setInstallmentCount(1);
         purchase.setPaymentStyle(PaymentStyle.ONE_TIME);
         when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
-        when(paymentServiceClient.getRefundablePayment(20L, "conversation-10"))
-                .thenReturn(new BillingPaymentDtos.RefundablePayment(
+        when(paymentServiceClient.findPayment(20L, "conversation-10"))
+                .thenReturn(Optional.of(new BillingPaymentDtos.RefundablePayment(
                         "conversation-10",
                         "payment-99",
                         "tx-99",
@@ -382,7 +391,7 @@ class PurchaseServicePaymentEventTest {
                         new BigDecimal("100.00"),
                         BigDecimal.ZERO,
                         new BigDecimal("100.00")
-                ));
+                )));
         when(planPackageService.findPackage(30L)).thenReturn(planPackage);
 
         boolean activated = purchaseService.reconcilePaidPendingPurchase(10L);
@@ -404,8 +413,8 @@ class PurchaseServicePaymentEventTest {
     void reconcilePaidPendingPurchase_whenPaymentNotSuccess_thenSkip() {
         purchase.setInstallmentCount(1);
         when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
-        when(paymentServiceClient.getRefundablePayment(20L, "conversation-10"))
-                .thenReturn(new BillingPaymentDtos.RefundablePayment(
+        when(paymentServiceClient.findPayment(20L, "conversation-10"))
+                .thenReturn(Optional.of(new BillingPaymentDtos.RefundablePayment(
                         "conversation-10",
                         null,
                         null,
@@ -413,7 +422,7 @@ class PurchaseServicePaymentEventTest {
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO
-                ));
+                )));
 
         boolean activated = purchaseService.reconcilePaidPendingPurchase(10L);
 
@@ -429,8 +438,8 @@ class PurchaseServicePaymentEventTest {
         when(purchaseRepository.findByStatusAndPurchasedAtBefore(eq(PurchaseStatus.PENDING), any()))
                 .thenReturn(List.of(purchase));
         when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
-        when(paymentServiceClient.getRefundablePayment(20L, "conversation-10"))
-                .thenReturn(new BillingPaymentDtos.RefundablePayment(
+        when(paymentServiceClient.findPayment(20L, "conversation-10"))
+                .thenReturn(Optional.of(new BillingPaymentDtos.RefundablePayment(
                         "conversation-10",
                         "payment-99",
                         "tx-99",
@@ -438,7 +447,7 @@ class PurchaseServicePaymentEventTest {
                         new BigDecimal("100.00"),
                         BigDecimal.ZERO,
                         new BigDecimal("100.00")
-                ));
+                )));
         when(planPackageService.findPackage(30L)).thenReturn(planPackage);
 
         purchaseService.cancelExpiredPendingPurchases(30);
@@ -446,6 +455,120 @@ class PurchaseServicePaymentEventTest {
         verify(purchaseFulfillmentService).fulfillPaidInstallment(eq(purchase), eq(planPackage), any(), any());
         verify(purchaseRepository, never()).save(purchase);
         assertThat(purchase.getCancellationReason()).isNull();
+    }
+
+    @Test
+    void reconcilePaidPendingPurchase_whenPaymentNotFound_thenSkip() {
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(paymentServiceClient.findPayment(20L, "conversation-10")).thenReturn(Optional.empty());
+
+        boolean activated = purchaseService.reconcilePaidPendingPurchase(10L);
+
+        assertThat(activated).isFalse();
+        verify(paymentServiceClient, never()).getRefundablePayment(any(), any());
+        verify(purchaseFulfillmentService, never()).fulfillPaidInstallment(any(), any(), any(), any());
+    }
+
+    @Test
+    void cancelExpiredPendingPurchases_whenPaymentNotFound_thenCancelWithTimeout() {
+        purchase.setPurchasedAt(LocalDateTime.now().minusHours(2));
+        when(purchaseRepository.findByStatusAndPurchasedAtBefore(eq(PurchaseStatus.PENDING), any()))
+                .thenReturn(List.of(purchase));
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(purchase)).thenReturn(purchase);
+        when(paymentServiceClient.findPayment(20L, "conversation-10")).thenReturn(Optional.empty());
+
+        purchaseService.cancelExpiredPendingPurchases(30);
+
+        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
+        assertThat(purchase.getCancellationReason()).isEqualTo(PurchaseCancellationReason.PAYMENT_TIMEOUT);
+        verify(purchaseFulfillmentService, never()).fulfillPaidInstallment(any(), any(), any(), any());
+    }
+
+    @Test
+    void handlePaymentRefunded_whenActiveSubscription_thenCancelAndRevoke() {
+        PaymentCompletedEventDto event = refundedEvent();
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        purchase.setPurchaseType(PurchaseType.PAID);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(purchase)).thenReturn(purchase);
+
+        purchaseService.handlePaymentRefunded(event);
+
+        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
+        assertThat(purchase.getRefundStatus()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(purchase.getRefundedAt()).isNotNull();
+        verify(paymentServiceClient).cancelSubscription(20L, "sub-1");
+        verify(entitlementService).revokeForCancelledPurchase(purchase);
+        verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
+        verify(paymentEventInboxRepository).save(any());
+    }
+
+    @Test
+    void purchase_whenCheckoutInitFails_thenFailedWithoutConversationId() {
+        User user = User.builder().id(20L).firstName("A").email("a@test.com").build();
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPackageId(30L);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setBillingPeriod(BillingPeriod.MONTHLY);
+        request.setBillingAddressId(1L);
+        planPackage.setPurchasable(true);
+        planPackage.setSystemManaged(false);
+        planPackage.setPrice(new BigDecimal("100.00"));
+        planPackage.setYearlyPrice(new BigDecimal("1000.00"));
+        when(planPackageService.findActivePackage(30L)).thenReturn(planPackage);
+        when(billingAddressService.resolveSnapshot(eq(20L), eq(1L), any())).thenReturn(null);
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
+            Purchase saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(10L);
+            }
+            return saved;
+        });
+        when(paymentRequestMapper.buildConversationId(10L)).thenReturn("conversation-10");
+        when(paymentRequestMapper.toDebtCheckoutFormRequest(
+                any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
+                eq("conversation-10"), eq(1)
+        )).thenReturn(PaymentCheckoutFormRequest.builder().build());
+        when(paymentServiceClient.initializeCheckoutForm(eq(20L), any()))
+                .thenThrow(new PaymentServiceException("Checkout basarisiz"));
+
+        assertThatThrownBy(() -> purchaseService.purchase(user, request, "127.0.0.1"))
+                .isInstanceOf(PaymentServiceException.class);
+
+        ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseRepository, atLeastOnce()).save(captor.capture());
+        Purchase lastSaved = captor.getAllValues().get(captor.getAllValues().size() - 1);
+        assertThat(lastSaved.getStatus()).isEqualTo(PurchaseStatus.FAILED);
+        assertThat(lastSaved.getPaymentConversationId()).isNull();
+    }
+
+    private PaymentCompletedEventDto refundedEvent() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("purchaseId", 10L);
+        metadata.put("userId", 20L);
+        metadata.put("packageId", 30L);
+        metadata.put("packageCode", "PRO_PACKAGE");
+        metadata.put("purchaseConversationId", "conversation-10");
+        metadata.put("installmentCount", 1);
+        metadata.put("installmentNumber", 1);
+
+        PaymentCompletedEventDto event = new PaymentCompletedEventDto();
+        event.setEventId("event-refunded");
+        event.setEventType("payment.refunded");
+        event.setPaymentId("payment-refund");
+        event.setConversationId("conversation-10");
+        event.setServiceName("qr-service");
+        event.setSourceReferenceId("10");
+        event.setSourceMetadata(metadata);
+        event.setAmount(new BigDecimal("100.00"));
+        event.setCurrency("TRY");
+        event.setPeriodStart("2026-07-16");
+        event.setPeriodEnd("2026-08-14");
+        return event;
     }
 
     private PaymentCompletedEventDto pastDueEvent() {
