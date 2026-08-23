@@ -13,9 +13,19 @@
     {
       "code": "QR_MENU",
       "name": "QR Menu",
-      "description": "QR menu olusturma hakki",
+      "description": "Ek dijital menu olusturma hakki",
       "scopeCode": "QR_MENU_OWNER",
-      "unitPrice": 29.00,
+      "unitPrice": 200.00,
+      "vatRate": 20.00,
+      "countable": true,
+      "active": true
+    },
+    {
+      "code": "QR_BRANCH",
+      "name": "Ek Sube",
+      "description": "Ek sube olusturma hakki",
+      "scopeCode": "QR_BRANCH_OWNER",
+      "unitPrice": 600.00,
       "vatRate": 20.00,
       "countable": true,
       "active": true
@@ -88,7 +98,8 @@
       "description": "Kucuk kafeler ve tatlicilar icin operasyonel giris paketi",
       "features": [
         "50 urun hakki",
-        "1 aktif dijital menu",
+        "1 ucretsiz sube",
+        "Sube basi 1 ucretsiz menu",
         "Standart sablonlar"
       ],
       "currency": "TRY",
@@ -103,6 +114,7 @@
       "yearlyPrice": 2988.00,
       "items": [
         { "productCode": "QR_CREATE", "quantity": 5, "unlimited": false },
+        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
         { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
         { "productCode": "MENU_PRODUCT", "quantity": 50, "unlimited": false }
       ]
@@ -113,7 +125,8 @@
       "description": "Sinirsiz urun, QR ve menu ile ciro takibi",
       "features": [
         "Sinirsiz urun hakki",
-        "Sinirsiz QR ve dijital menu",
+        "1 ucretsiz sube",
+        "Sube basi 1 ucretsiz menu",
         "Ciro takibi ve gelir raporlamasi"
       ],
       "currency": "TRY",
@@ -128,7 +141,8 @@
       "yearlyPrice": 5643.00,
       "items": [
         { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": true },
+        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
         { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
         { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true }
       ]
@@ -138,7 +152,8 @@
       "name": "Ultimate",
       "description": "Pro ozellikleri, ozel tasarim ve yapay zeka araclari",
       "features": [
-        "Sinirsiz urun, QR ve dijital menu",
+        "1 ucretsiz sube",
+        "Sube basi 1 ucretsiz menu",
         "Garson siparis ve adisyon modulu",
         "Ciro takibi ve gelismis raporlar",
         "Haftalik akilli raporlama",
@@ -158,7 +173,8 @@
       "yearlyPrice": 9215.00,
       "items": [
         { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": true },
+        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
+        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
         { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
         { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true },
         { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true },

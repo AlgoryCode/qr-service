@@ -5,8 +5,12 @@ SELECT 'QR_CREATE', 'QR Olusturma', 'QR kod olusturma hakki', TRUE, 'QR_CREATE_O
 WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'QR_CREATE');
 
 INSERT INTO tbl_product (code, name, description, active, scope_code, consumable, unit_price, vat_rate, created_at, updated_at)
-SELECT 'QR_MENU', 'QR Menu', 'QR menu olusturma hakki', TRUE, 'QR_MENU_OWNER', TRUE, 29.00, 20.00, NOW(), NOW()
+SELECT 'QR_MENU', 'QR Menu', 'Ek dijital menu olusturma hakki', TRUE, 'QR_MENU_OWNER', TRUE, 200.00, 20.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'QR_MENU');
+
+INSERT INTO tbl_product (code, name, description, active, scope_code, consumable, unit_price, vat_rate, created_at, updated_at)
+SELECT 'QR_BRANCH', 'Ek Sube', 'Ek sube olusturma hakki', TRUE, 'QR_BRANCH_OWNER', TRUE, 600.00, 20.00, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'QR_BRANCH');
 
 INSERT INTO tbl_product (code, name, description, active, scope_code, consumable, unit_price, vat_rate, created_at, updated_at)
 SELECT 'MENU_PRODUCT', 'Menu Urun Hakki', 'Dijital menude tanimlanabilecek urun sayisi', TRUE, 'MENU_PRODUCT_OWNER', TRUE, 2.00, 20.00, NOW(), NOW()
@@ -34,7 +38,9 @@ WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'WAITER_PANEL');
 
 UPDATE tbl_product SET unit_price = 4.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_CREATE';
 UPDATE tbl_product SET name = 'QR Menu', description = 'QR menu olusturma hakki', scope_code = 'QR_MENU_OWNER',
-    unit_price = 29.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_MENU';
+    unit_price = 200.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_MENU';
+UPDATE tbl_product SET name = 'Ek Sube', description = 'Ek sube olusturma hakki', scope_code = 'QR_BRANCH_OWNER',
+    unit_price = 600.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_BRANCH';
 UPDATE tbl_product SET name = 'Menu Urun Hakki', description = 'Dijital menude tanimlanabilecek urun sayisi', scope_code = 'MENU_PRODUCT_OWNER',
     unit_price = 2.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'MENU_PRODUCT';
 UPDATE tbl_product SET name = 'Akilli Asistan', description = 'Akilli asistan erisimi', scope_code = 'SMART_ASSISTANT_OWNER',
@@ -53,27 +59,27 @@ WHERE code IN ('FREE_PACKAGE', 'CORPORATE_PACKAGE');
 
 INSERT INTO tbl_plan_package (code, name, description, features, price, subtotal, vat_amount, currency, active, validity_days, trial_days, priority, purchasable, system_managed, trial_eligible, yearly_price, created_at, updated_at)
 SELECT 'STARTER_PACKAGE', 'Baslangic', 'Kucuk kafeler icin operasyonel giris paketi',
-       '["50 urun hakki","1 aktif dijital menu","Standart sablonlar"]'::jsonb,
+       '["50 urun hakki","1 ucretsiz sube","Sube basi 1 ucretsiz menu","Standart sablonlar"]'::jsonb,
        299.00, 249.17, 49.83, 'TRY', TRUE, 30, 7, 50, TRUE, FALSE, TRUE, 2988.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_plan_package WHERE code = 'STARTER_PACKAGE');
 
 UPDATE tbl_plan_package SET
     name = 'Baslangic', description = 'Kucuk kafeler icin operasyonel giris paketi',
-    features = '["50 urun hakki","1 aktif dijital menu","Standart sablonlar"]'::jsonb,
+    features = '["50 urun hakki","1 ucretsiz sube","Sube basi 1 ucretsiz menu","Standart sablonlar"]'::jsonb,
     price = 299.00, subtotal = 249.17, vat_amount = 49.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 50,
     purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 2988.00, updated_at = NOW()
 WHERE code = 'STARTER_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Pro', description = 'Sinirsiz urun, QR ve menu ile ciro takibi',
-    features = '["Sinirsiz urun hakki","Sinirsiz QR ve dijital menu","Ciro takibi ve gelir raporlamasi"]'::jsonb,
+    features = '["Sinirsiz urun hakki","1 ucretsiz sube","Sube basi 1 ucretsiz menu","Ciro takibi ve gelir raporlamasi"]'::jsonb,
     price = 599.00, subtotal = 499.17, vat_amount = 99.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 100,
     purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 5643.00, updated_at = NOW()
 WHERE code = 'PRO_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Ultimate', description = 'Pro ozellikleri, ozel tasarim ve yapay zeka araclari',
-    features = '["Sinirsiz urun, QR ve dijital menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu"]'::jsonb,
+    features = '["1 ucretsiz sube","Sube basi 1 ucretsiz menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu"]'::jsonb,
     price = 999.00, subtotal = 832.50, vat_amount = 166.50, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 30, priority = 200,
     purchasable = TRUE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = 9215.00, updated_at = NOW()
 WHERE code = 'ULTIMATE_PACKAGE';
@@ -84,6 +90,8 @@ WHERE package_id IN (SELECT id FROM tbl_plan_package WHERE code IN ('STARTER_PAC
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 5, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_CREATE' WHERE p.code = 'STARTER_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
+SELECT p.id, pr.id, 1, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_BRANCH' WHERE p.code = 'STARTER_PACKAGE';
+INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_MENU' WHERE p.code = 'STARTER_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 50, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'MENU_PRODUCT' WHERE p.code = 'STARTER_PACKAGE';
@@ -91,7 +99,9 @@ SELECT p.id, pr.id, 50, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_CREATE' WHERE p.code = 'PRO_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
-SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_MENU' WHERE p.code = 'PRO_PACKAGE';
+SELECT p.id, pr.id, 1, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_BRANCH' WHERE p.code = 'PRO_PACKAGE';
+INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
+SELECT p.id, pr.id, 1, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_MENU' WHERE p.code = 'PRO_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'MENU_PRODUCT' WHERE p.code = 'PRO_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
@@ -100,7 +110,9 @@ SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.co
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_CREATE' WHERE p.code = 'ULTIMATE_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
-SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_MENU' WHERE p.code = 'ULTIMATE_PACKAGE';
+SELECT p.id, pr.id, 1, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_BRANCH' WHERE p.code = 'ULTIMATE_PACKAGE';
+INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
+SELECT p.id, pr.id, 1, FALSE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_MENU' WHERE p.code = 'ULTIMATE_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'MENU_PRODUCT' WHERE p.code = 'ULTIMATE_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)

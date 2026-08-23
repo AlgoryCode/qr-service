@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
+import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,8 @@ class PurchaseFulfillmentServiceTest {
     private PurchaseRepository purchaseRepository;
     @Mock
     private PlanPackageRepository planPackageRepository;
+    @Mock
+    private ProductRepository productRepository;
     @Mock
     private EntitlementService entitlementService;
     @Mock

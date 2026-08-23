@@ -74,6 +74,7 @@ public class SecurityConfig {
                         .requestMatchers("/healthcheck").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/packages/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/products/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/events").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()

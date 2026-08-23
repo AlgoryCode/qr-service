@@ -72,6 +72,36 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     long countActiveLiveMenusForUser(@Param("userId") Long userId);
 
     @Query("""
+            select count(menu)
+            from Menu menu, Qr qr
+            where menu.branchId = :branchId
+              and menu.qrId = qr.qrId
+              and menu.active = true
+              and menu.deleted = false
+              and qr.deleted = false
+            """)
+    long countActiveLiveMenusForBranch(@Param("branchId") Long branchId);
+
+    @Query("""
+            select menu.branchId, count(menu)
+            from Menu menu, Qr qr
+            where menu.userId = :userId
+              and menu.qrId = qr.qrId
+              and menu.active = true
+              and menu.deleted = false
+              and qr.deleted = false
+              and menu.branchId is not null
+            group by menu.branchId
+            """)
+    List<Object[]> countActiveLiveMenusGroupedByBranch(@Param("userId") Long userId);
+
+    List<Menu> findByUserIdAndDeletedFalseOrderByMenuIdAsc(Long userId);
+
+    List<Menu> findByBranchIdAndDeletedFalse(Long branchId);
+
+    List<Menu> findByUserIdAndBranchIdIsNullAndDeletedFalse(Long userId);
+
+    @Query("""
             select distinct menu.userId
             from Menu menu
             where menu.deleted = false

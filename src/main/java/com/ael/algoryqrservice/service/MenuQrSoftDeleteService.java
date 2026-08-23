@@ -26,9 +26,16 @@ public class MenuQrSoftDeleteService {
         qr.setDeleted(true);
         qrRepository.save(qr);
 
-        menuRepository.findByQrIdAndDeletedFalse(qr.getQrId()).ifPresent(menu -> softDeleteMenu(menu));
-
-        entitlementService.release(qr.getUserId(), CatalogProducts.QR_MENU, 1);
+        menuRepository.findByQrIdAndDeletedFalse(qr.getQrId()).ifPresent(menu -> {
+            Long branchId = menu.getBranchId();
+            softDeleteMenu(menu);
+            if (branchId != null) {
+                long remaining = menuRepository.countActiveLiveMenusForBranch(branchId);
+                if (remaining >= 1) {
+                    entitlementService.release(qr.getUserId(), CatalogProducts.QR_MENU, 1);
+                }
+            }
+        });
         entitlementService.syncMenuEntitlements(qr.getUserId());
         entitlementService.syncQrCreateEntitlements(qr.getUserId());
     }

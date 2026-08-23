@@ -56,6 +56,10 @@ public class ProductImageStorageService {
         return uploadWithPrefix(menuId, file, "menus/" + menuId + "/logo/");
     }
 
+    public ProductImageDtos.UploadResponse uploadBranchPhoto(Long branchId, MultipartFile file) {
+        return uploadWithPrefix(branchId, file, "branches/" + branchId + "/photo/");
+    }
+
     public ProductImageDtos.UploadResponse uploadFeedbackScreenshot(Long userId, MultipartFile file) {
         return uploadWithPrefix(userId, file, "platform-feedback/" + userId + "/");
     }

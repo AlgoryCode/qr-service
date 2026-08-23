@@ -52,6 +52,8 @@ public class QrService {
     private final ObjectMapper objectMapper;
     private final EntitlementService entitlementService;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
+    private final BranchService branchService;
+    private final BranchQuotaService branchQuotaService;
     private final SecurityUtils securityUtils;
 
     public <T extends QrRequest> QrResponse createQR(T req, Long userId) throws IOException, WriterException {
@@ -59,7 +61,9 @@ public class QrService {
         Type qrType = Type.from(req.getType());
         if (qrType == Type.MENU) {
             entitlementService.requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-            entitlementService.consume(userId, CatalogProducts.QR_MENU, 1);
+            Long branchId = resolveBranchId(req);
+            branchService.requireOwnedForUser(branchId, userId);
+            branchQuotaService.assertAndConsumeMenuCreation(userId, branchId);
         }
         ConsumedEntitlement consumed = entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
         if (consumed != null && consumed.purchaseId() != null) {
@@ -258,7 +262,7 @@ public class QrService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
 
         if (nextActive) {
-            entitlementService.assertMenuActivationAllowed(qr.getUserId());
+            branchQuotaService.assertMenuActivationAllowed(qr.getUserId(), menu.getBranchId());
         }
 
         qr.setActive(nextActive);
@@ -335,5 +339,24 @@ public class QrService {
         if (!currentUserId.equals(qr.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu QR kaydına erişim yetkiniz yok");
         }
+    }
+
+    private Long resolveBranchId(QrRequest request) {
+        Map<String, Object> details = request.getDetails();
+        if (details == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
+        }
+        Object raw = details.get("branchId");
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        if (raw != null) {
+            try {
+                return Long.parseLong(raw.toString().trim());
+            } catch (NumberFormatException ignored) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
     }
 }

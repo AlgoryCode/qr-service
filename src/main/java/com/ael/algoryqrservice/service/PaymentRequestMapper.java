@@ -18,6 +18,7 @@ import com.ael.algoryqrservice.util.IdentityNumbers;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
@@ -199,6 +200,65 @@ public class PaymentRequestMapper {
                 .shippingAddress(toAddress(purchase.getBillingSnapshot()))
                 .billingAddress(toAddress(purchase.getBillingSnapshot()))
                 .basketItems(List.of(toBasketItem(planPackage, chargeAmount, " (fark)")))
+                .build();
+    }
+
+    public PaymentCheckoutFormRequest toAddonCheckoutFormRequest(
+            Purchase purchase,
+            User user,
+            String productCode,
+            String productName,
+            String clientIp,
+            AppProperties appProperties,
+            PaymentClientProperties paymentClientProperties,
+            String conversationId,
+            LocalDateTime periodStart,
+            LocalDateTime periodEnd
+    ) {
+        if (purchase.getBillingSnapshot() == null) {
+            throw new BadRequestException("Fatura bilgisi bulunamadı; önce fatura adresi tanımlayın");
+        }
+        BigDecimal chargeAmount = purchase.getPrice();
+        Map<String, Object> sourceMetadata = new HashMap<>();
+        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("packageId", purchase.getPackageId());
+        sourceMetadata.put("packageCode", purchase.getPackageCode());
+        sourceMetadata.put("productCode", productCode);
+        sourceMetadata.put("purchaseConversationId", conversationId);
+        sourceMetadata.put("purchaseId", purchase.getId());
+        sourceMetadata.put("installmentNumber", 1);
+        sourceMetadata.put("installmentCount", 1);
+        sourceMetadata.put("billingCycleNumber", 1);
+        sourceMetadata.put("paymentStyle", PaymentStyle.ONE_TIME.name());
+        sourceMetadata.put("totalAmount", chargeAmount);
+        sourceMetadata.put("addon", true);
+        sourceMetadata.put("periodStart", periodStart.toString());
+        sourceMetadata.put("periodEnd", periodEnd.toString());
+
+        return PaymentCheckoutFormRequest.builder()
+                .serviceName(appProperties.getServiceName())
+                .sourceReferenceId(String.valueOf(purchase.getId()))
+                .sourceMetadata(sourceMetadata)
+                .conversationId(conversationId)
+                .locale("tr")
+                .price(chargeAmount)
+                .paidPrice(chargeAmount)
+                .currency(purchase.getCurrency())
+                .paymentStyle(PaymentStyle.ONE_TIME.name())
+                .basketId("qradon" + purchase.getId())
+                .paymentGroup("PRODUCT")
+                .provider(blankToNull(paymentClientProperties.getGatewayProvider()))
+                .buyer(toBuyer(user, purchase.getBillingSnapshot(), clientIp))
+                .shippingAddress(toAddress(purchase.getBillingSnapshot()))
+                .billingAddress(toAddress(purchase.getBillingSnapshot()))
+                .basketItems(List.of(PaymentThreeDsRequest.BasketItemPayload.builder()
+                        .id(productCode)
+                        .name(productName)
+                        .category1("Digital")
+                        .category2("Product")
+                        .itemType("VIRTUAL")
+                        .price(chargeAmount)
+                        .build()))
                 .build();
     }
 

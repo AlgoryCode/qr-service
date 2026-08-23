@@ -102,6 +102,7 @@ app:
     taxonomy: ${APP_SEED_TAXONOMY_ENABLED:false}
     package-catalog: ${APP_SEED_PACKAGE_CATALOG_ENABLED:false}
     public-access-backfill: ${APP_SEED_PUBLIC_ACCESS_BACKFILL_ENABLED:false}
+    branch-backfill: ${APP_SEED_BRANCH_BACKFILL_ENABLED:true}
     chef-avatars: ${APP_SEED_CHEF_AVATARS_ENABLED:false}
     menu-products:
       enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:false}

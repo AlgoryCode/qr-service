@@ -15,4 +15,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsByCode(String code);
 
     List<Product> findByCodeIn(List<String> codes);
+
+    List<Product> findByActiveTrueOrderByCodeAsc();
 }
