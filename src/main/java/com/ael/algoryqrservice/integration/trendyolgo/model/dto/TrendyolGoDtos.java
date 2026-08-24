@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -99,6 +100,7 @@ public final class TrendyolGoDtos {
         private int quantity;
         private BigDecimal unitPrice;
         private String options;
+        private String detail;
     }
 
     @Data
@@ -108,6 +110,9 @@ public final class TrendyolGoDtos {
     public static class OrderResponse {
         private Long id;
         private String externalOrderId;
+        private String orderNumber;
+        private String deliveryType;
+        private String paymentMethod;
         private String packageStatus;
         private BigDecimal totalAmount;
         private String currency;
@@ -131,6 +136,17 @@ public final class TrendyolGoDtos {
         private int size;
         private long totalElements;
         private int totalPages;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SyncOrdersResponse {
+        private int upserted;
+        private int lookbackHours;
+        private LocalDate from;
+        private LocalDate to;
     }
 
     @Data

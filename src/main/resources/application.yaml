@@ -6,9 +6,9 @@ spring:
       max-file-size: ${STORAGE_MAX_FILE_SIZE:5MB}
       max-request-size: ${STORAGE_MAX_FILE_SIZE:5MB}
   datasource:
-    url: ${DB_URL:jdbc:postgresql://185.184.210.52:5432/algoryqrdb}
+    url: ${DB_URL:jdbc:postgresql://185.184.210.52:5433/algoryqrdb-stage}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:AdHqvxNc8MLBsMjOi82TjDzSMSuUDptBNjFVwpsvtVoaf6YOciJxqT84KgmBgc39}
+    password: ${DB_PASSWORD:postgres_stage}
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 30000
@@ -148,7 +148,8 @@ trendyol-go:
   read-timeout: ${TGO_READ_TIMEOUT:20s}
   max-attempts: ${TGO_MAX_ATTEMPTS:3}
   poll-enabled: ${TGO_POLL_ENABLED:true}
-  poll-lookback-hours: ${TGO_POLL_LOOKBACK_HOURS:24}
+  poll-lookback-hours: ${TGO_POLL_LOOKBACK_HOURS:168}
+  poll-page-size: ${TGO_POLL_PAGE_SIZE:50}
   webhook-api-key: ${TGO_WEBHOOK_API_KEY:}
 
 odeal:

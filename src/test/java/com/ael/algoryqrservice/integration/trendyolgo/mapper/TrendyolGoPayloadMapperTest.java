@@ -61,24 +61,48 @@ class TrendyolGoPayloadMapperTest {
         JsonNode root = objectMapper.readTree("""
                 {
                   "id": "ord-9",
+                  "orderCode": "TGO-12345",
                   "restaurantId": "r-1",
                   "packageStatus": "Created",
+                  "deliveryType": "STORE",
+                  "paymentMethodText": "Online Ödeme",
                   "totalPrice": 150.50,
                   "customer": { "firstName": "Ayşe", "lastName": "Yılmaz", "phone": "0555" },
-                  "deliveryAddress": { "address1": "Bağdat Cd.", "district": "Kadıköy" },
+                  "address": {
+                    "neighborhood": "Kadıköy",
+                    "address1": "Bağdat Cd.",
+                    "phone": "05551234567"
+                  },
+                  "customerNote": "Acısız",
                   "lines": [
-                    { "productId": "p-1", "productName": "Ayran", "quantity": 2, "price": 20 }
+                    {
+                      "productId": "p-1",
+                      "name": "Ayran",
+                      "price": 20,
+                      "unitSellingPrice": 25,
+                      "items": [{}, {}],
+                      "extraIngredients": [{ "name": "Limon" }],
+                      "removedIngredients": [{ "name": "Soğan" }]
+                    }
                   ]
                 }
                 """);
 
         assertThat(mapper.externalOrderId(root)).isEqualTo("ord-9");
+        assertThat(mapper.orderNumber(root)).isEqualTo("TGO-12345");
+        assertThat(mapper.deliveryType(root)).isEqualTo("STORE");
+        assertThat(mapper.paymentMethod(root)).isEqualTo("Online Ödeme");
         assertThat(mapper.restaurantId(root)).isEqualTo("r-1");
         assertThat(mapper.packageStatus(root)).isEqualTo("Created");
         assertThat(mapper.totalAmount(root)).isEqualByComparingTo(new BigDecimal("150.50"));
         assertThat(mapper.customerName(root)).isEqualTo("Ayşe Yılmaz");
+        assertThat(mapper.customerPhone(root)).isEqualTo("0555");
         assertThat(mapper.deliveryAddress(root)).contains("Bağdat Cd.");
+        assertThat(mapper.note(root)).isEqualTo("Acısız");
         assertThat(mapper.toOrderItems(root)).hasSize(1);
+        assertThat(mapper.toOrderItems(root).getFirst().getProductName()).isEqualTo("Ayran");
+        assertThat(mapper.toOrderItems(root).getFirst().getQuantity()).isEqualTo(2);
+        assertThat(mapper.toOrderItems(root).getFirst().getDetail()).contains("Limon");
         assertThat(mapper.toOrderNodes(root)).hasSize(1);
     }
 }

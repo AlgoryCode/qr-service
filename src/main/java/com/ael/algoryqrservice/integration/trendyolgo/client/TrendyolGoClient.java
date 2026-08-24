@@ -16,8 +16,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -48,17 +50,86 @@ public class TrendyolGoClient {
     }
 
     public JsonNode listOrders(TrendyolGoDtos.Credentials credentials, Instant start, Instant end) {
+        return listOrdersPage(credentials, start, end, 0, properties.getPollPageSize());
+    }
+
+    public List<JsonNode> listAllOrders(TrendyolGoDtos.Credentials credentials, Instant start, Instant end) {
+        int pageSize = Math.max(1, Math.min(properties.getPollPageSize(), 200));
+        List<JsonNode> orders = new ArrayList<>();
+        int page = 0;
+        int totalPages = 1;
+        while (page < totalPages) {
+            JsonNode payload = listOrdersPage(credentials, start, end, page, pageSize);
+            List<JsonNode> nodes = new ArrayList<>();
+            for (JsonNode node : extractOrderNodes(payload)) {
+                nodes.add(node);
+            }
+            orders.addAll(nodes);
+            totalPages = Math.max(1, readTotalPages(payload, nodes.isEmpty()));
+            page++;
+            if (nodes.isEmpty()) {
+                break;
+            }
+        }
+        return orders;
+    }
+
+    private JsonNode listOrdersPage(
+            TrendyolGoDtos.Credentials credentials,
+            Instant start,
+            Instant end,
+            int page,
+            int size
+    ) {
         String path = expand(properties.getPaths().getOrders(), credentials, null);
         UriComponentsBuilder builder = UriComponentsBuilder.fromPath(path)
                 .queryParam("startDate", start.toEpochMilli())
                 .queryParam("endDate", end.toEpochMilli())
-                .queryParam("page", 0)
-                .queryParam("size", 50);
+                .queryParam("page", Math.max(0, page))
+                .queryParam("size", Math.max(1, size));
         if (credentials.getRestaurantId() != null && !credentials.getRestaurantId().isBlank()) {
             builder.queryParam("restaurantId", credentials.getRestaurantId());
             builder.queryParam("storeId", credentials.getRestaurantId());
         }
         return exchange(HttpMethod.GET, builder.build(true).toUriString(), credentials, null);
+    }
+
+    private Iterable<JsonNode> extractOrderNodes(JsonNode payload) {
+        List<JsonNode> nodes = new ArrayList<>();
+        if (payload == null || payload.isNull()) {
+            return nodes;
+        }
+        if (payload.isArray()) {
+            payload.forEach(nodes::add);
+            return nodes;
+        }
+        JsonNode content = payload.get("content");
+        if (content != null && content.isArray()) {
+            content.forEach(nodes::add);
+            return nodes;
+        }
+        JsonNode packages = payload.get("packages");
+        if (packages != null && packages.isArray()) {
+            packages.forEach(nodes::add);
+            return nodes;
+        }
+        if (payload.has("id")) {
+            nodes.add(payload);
+        }
+        return nodes;
+    }
+
+    private int readTotalPages(JsonNode payload, boolean emptyPage) {
+        if (payload == null || payload.isNull()) {
+            return emptyPage ? 0 : 1;
+        }
+        if (payload.has("totalPages")) {
+            return Math.max(0, payload.get("totalPages").asInt(0));
+        }
+        if (payload.has("pageCount")) {
+            return Math.max(0, payload.get("pageCount").asInt(0));
+        }
+        return emptyPage ? 0 : 1;
     }
 
     public void acceptOrder(TrendyolGoDtos.Credentials credentials, String orderId) {
