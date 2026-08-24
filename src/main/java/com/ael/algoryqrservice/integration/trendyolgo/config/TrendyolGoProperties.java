@@ -13,7 +13,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "trendyol-go")
 public class TrendyolGoProperties {
 
-    private String baseUrl = "https://api.tgoapps.com";
+    private String baseUrl = "https://api.tgoapis.com";
     private String userAgentName = "AlgoryQR";
     private String encryptKey = "";
     private Duration connectTimeout = Duration.ofSeconds(5);
@@ -22,17 +22,19 @@ public class TrendyolGoProperties {
     private boolean pollEnabled = true;
     private int pollLookbackHours = 24;
     private String webhookApiKey = "";
+    private int defaultPreparationMinutes = 30;
+    private int defaultCancelReasonId = 661;
     private final Paths paths = new Paths();
 
     @Getter
     @Setter
     public static class Paths {
-        private String restaurants = "/meal/sellers/{sellerId}/restaurants";
-        private String restaurantMenu = "/meal/sellers/{sellerId}/restaurants/{restaurantId}/menu";
-        private String orders = "/meal/sellers/{sellerId}/orders";
-        private String orderAccept = "/meal/sellers/{sellerId}/orders/{orderId}/accepted";
-        private String orderReject = "/meal/sellers/{sellerId}/orders/{orderId}/rejected";
-        private String orderCancel = "/meal/sellers/{sellerId}/orders/{orderId}/cancelled";
-        private String orderReady = "/meal/sellers/{sellerId}/orders/{orderId}/prepared";
+        private String restaurants = "/integrator/store/meal/suppliers/{sellerId}/restaurants";
+        private String restaurantMenu = "/integrator/product/meal/suppliers/{sellerId}/restaurants/{restaurantId}/products";
+        private String orders = "/integrator/order/meal/suppliers/{sellerId}/packages";
+        private String orderAccept = "/integrator/order/meal/suppliers/{sellerId}/packages/picked";
+        private String orderReject = "/integrator/order/meal/suppliers/{sellerId}/packages/unsupplied";
+        private String orderCancel = "/integrator/order/meal/suppliers/{sellerId}/packages/unsupplied";
+        private String orderReady = "/integrator/order/meal/suppliers/{sellerId}/packages/invoiced";
     }
 }
