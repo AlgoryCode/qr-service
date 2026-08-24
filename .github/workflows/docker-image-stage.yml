@@ -51,3 +51,4 @@ jobs:
         run: |
           curl -f "http://185.184.210.52:8000/api/v1/deploy?uuid=qhtkkldcm5dyab07cmleow37&force=true" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"
+            
