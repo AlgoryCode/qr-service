@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
 import com.ael.algoryqrservice.model.dto.TrialDtos;
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
@@ -59,6 +60,8 @@ public class TrialService {
                     .currency(planPackage.getCurrency())
                     .purchaseType(PurchaseType.TRIAL)
                     .paymentStyle(PaymentStyle.ONE_TIME)
+                    .billingPeriod(BillingPeriod.MONTHLY)
+                    .billingIntervalMonths(BillingPeriod.MONTHLY.intervalMonths())
                     .status(PurchaseStatus.ACTIVE)
                     .startsAt(startsAt)
                     .expiresAt(startsAt.plusDays(resolvedTrialDays(planPackage)))

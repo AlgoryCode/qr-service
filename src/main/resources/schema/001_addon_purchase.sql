@@ -1,6 +1,3 @@
--- Manual fallback. Preferred: python scripts/apply_schema_migrations.py
--- Same content as src/main/resources/schema/001_addon_purchase.sql
-
 ALTER TABLE tbl_purchase DROP CONSTRAINT IF EXISTS tbl_purchase_purchase_type_check;
 
 ALTER TABLE tbl_purchase
