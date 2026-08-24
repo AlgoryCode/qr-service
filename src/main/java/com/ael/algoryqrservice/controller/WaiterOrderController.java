@@ -3,7 +3,6 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.service.MenuWaiterOrderService;
-import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,27 +23,20 @@ import java.util.List;
 public class WaiterOrderController {
 
     private final MenuWaiterOrderService menuWaiterOrderService;
-    private final SecurityUtils securityUtils;
 
     @GetMapping("/pending")
-    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listPending(
-            @RequestParam(required = false) Long menuId
-    ) {
-        Long resolvedMenuId = menuId != null ? menuId : securityUtils.getCurrentWaiterMenuId();
-        return ResponseEntity.ok(menuWaiterOrderService.listPending(resolvedMenuId));
+    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listPending() {
+        return ResponseEntity.ok(menuWaiterOrderService.listPending());
     }
 
     @GetMapping("/today")
-    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listToday(
-            @RequestParam(required = false) Long menuId
-    ) {
-        Long resolvedMenuId = menuId != null ? menuId : securityUtils.getCurrentWaiterMenuId();
-        return ResponseEntity.ok(menuWaiterOrderService.listTodayHistory(resolvedMenuId));
+    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listToday() {
+        return ResponseEntity.ok(menuWaiterOrderService.listTodayHistory());
     }
 
     @GetMapping("/catalog")
-    public ResponseEntity<MenuWaiterDtos.CatalogResponse> listCatalog() {
-        return ResponseEntity.ok(menuWaiterOrderService.listCatalog());
+    public ResponseEntity<MenuWaiterDtos.CatalogResponse> listCatalog(@RequestParam Long tableId) {
+        return ResponseEntity.ok(menuWaiterOrderService.listCatalog(tableId));
     }
 
     @PostMapping
@@ -55,11 +47,8 @@ public class WaiterOrderController {
     }
 
     @GetMapping("/tables")
-    public ResponseEntity<List<MenuWaiterDtos.TableOrderSummary>> listTables(
-            @RequestParam(required = false) Long menuId
-    ) {
-        Long resolvedMenuId = menuId != null ? menuId : securityUtils.getCurrentWaiterMenuId();
-        return ResponseEntity.ok(menuWaiterOrderService.listTables(resolvedMenuId));
+    public ResponseEntity<List<MenuWaiterDtos.TableOrderSummary>> listTables() {
+        return ResponseEntity.ok(menuWaiterOrderService.listTables());
     }
 
     @GetMapping("/tables/{tableId}/today")

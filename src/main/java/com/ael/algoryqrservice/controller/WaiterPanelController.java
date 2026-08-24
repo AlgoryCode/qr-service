@@ -40,34 +40,34 @@ public class WaiterPanelController {
         return ResponseEntity.ok(merchantCustomerService.listCustomersForCurrentBusiness());
     }
 
-    @GetMapping("/menu/{menuId}/waiters")
-    public ResponseEntity<MenuWaiterDtos.UsersPageResponse> listWaiters(@PathVariable Long menuId) {
-        return ResponseEntity.ok(menuWaiterService.listWaiters(menuId));
+    @GetMapping("/branch/{branchId}/waiters")
+    public ResponseEntity<MenuWaiterDtos.UsersPageResponse> listWaiters(@PathVariable Long branchId) {
+        return ResponseEntity.ok(menuWaiterService.listWaiters(branchId));
     }
 
-    @PostMapping("/menu/{menuId}/waiters")
+    @PostMapping("/branch/{branchId}/waiters")
     public ResponseEntity<MenuWaiterDtos.WaiterResponse> createWaiter(
-            @PathVariable Long menuId,
+            @PathVariable Long branchId,
             @Valid @RequestBody MenuWaiterDtos.CreateWaiterRequest request
     ) {
-        return ResponseEntity.status(201).body(menuWaiterService.createWaiter(menuId, request));
+        return ResponseEntity.status(201).body(menuWaiterService.createWaiter(branchId, request));
     }
 
-    @PatchMapping("/menu/{menuId}/waiters/{waiterId}")
+    @PatchMapping("/branch/{branchId}/waiters/{waiterId}")
     public ResponseEntity<MenuWaiterDtos.WaiterResponse> updateWaiter(
-            @PathVariable Long menuId,
+            @PathVariable Long branchId,
             @PathVariable Long waiterId,
             @RequestBody MenuWaiterDtos.UpdateWaiterRequest request
     ) {
-        return ResponseEntity.ok(menuWaiterService.updateWaiter(menuId, waiterId, request));
+        return ResponseEntity.ok(menuWaiterService.updateWaiter(branchId, waiterId, request));
     }
 
-    @DeleteMapping("/menu/{menuId}/waiters/{waiterId}")
+    @DeleteMapping("/branch/{branchId}/waiters/{waiterId}")
     public ResponseEntity<Void> deleteWaiter(
-            @PathVariable Long menuId,
+            @PathVariable Long branchId,
             @PathVariable Long waiterId
     ) {
-        menuWaiterService.deleteWaiter(menuId, waiterId);
+        menuWaiterService.deleteWaiter(branchId, waiterId);
         return ResponseEntity.noContent().build();
     }
 

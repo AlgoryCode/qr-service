@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -23,6 +24,21 @@ public interface BillPaymentRepository extends JpaRepository<BillPayment, Long> 
             """)
     List<BillPayment> findByMenuIdAndPaidAtBetween(
             @Param("menuId") Long menuId,
+            @Param("fromDt") LocalDateTime fromDt,
+            @Param("toDt") LocalDateTime toDt
+    );
+
+    @Query("""
+            SELECT p FROM BillPayment p
+            JOIN FETCH p.bill b
+            LEFT JOIN FETCH p.billItem
+            WHERE b.menuId in :menuIds
+              AND p.paidAt >= :fromDt
+              AND p.paidAt <= :toDt
+            ORDER BY p.paidAt ASC
+            """)
+    List<BillPayment> findByMenuIdInAndPaidAtBetween(
+            @Param("menuIds") Collection<Long> menuIds,
             @Param("fromDt") LocalDateTime fromDt,
             @Param("toDt") LocalDateTime toDt
     );

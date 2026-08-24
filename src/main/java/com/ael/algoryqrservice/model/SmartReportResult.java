@@ -32,7 +32,7 @@ public class SmartReportResult {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "menu_id", nullable = false)
+    @Column(name = "menu_id")
     private Long menuId;
 
     @Column(name = "process_id", nullable = false, unique = true)

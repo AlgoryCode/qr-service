@@ -17,6 +17,8 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
 
     List<MenuOrder> findByMenuIdAndStatusOrderBySubmittedAtDesc(Long menuId, MenuOrderStatus status);
 
+    List<MenuOrder> findByMenuIdInAndStatusOrderBySubmittedAtDesc(Collection<Long> menuIds, MenuOrderStatus status);
+
     List<MenuOrder> findByCustomerIdAndMenuIdOrderByCreatedAtDesc(Long customerId, Long menuId);
 
     Optional<MenuOrder> findByIdAndCustomerId(Long id, Long customerId);
@@ -29,6 +31,13 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
 
     List<MenuOrder> findByMenuIdAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
             Long menuId,
+            Collection<MenuOrderStatus> statuses,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    List<MenuOrder> findByMenuIdInAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+            Collection<Long> menuIds,
             Collection<MenuOrderStatus> statuses,
             LocalDateTime start,
             LocalDateTime end
@@ -55,6 +64,14 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
     @EntityGraph(attributePaths = "items")
     List<MenuOrder> findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
             Long menuId,
+            MenuOrderStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    @EntityGraph(attributePaths = "items")
+    List<MenuOrder> findByMenuIdInAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
+            Collection<Long> menuIds,
             MenuOrderStatus status,
             LocalDateTime start,
             LocalDateTime end

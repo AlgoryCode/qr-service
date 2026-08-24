@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.exception;
 
+import com.ael.algoryqrservice.integration.trendyolgo.client.TrendyolGoClientException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PaymentServiceException.class)
     public ResponseEntity<Map<String, String>> handlePaymentService(PaymentServiceException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(TrendyolGoClientException.class)
+    public ResponseEntity<Map<String, String>> handleTrendyolGo(TrendyolGoClientException ex) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("message", ex.getMessage()));
     }

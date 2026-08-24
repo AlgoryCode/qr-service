@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.MainCategory;
+import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuWaiter;
@@ -15,15 +16,11 @@ import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.service.campaign.CampaignEvaluationService;
-import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,6 +30,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,7 +40,6 @@ public class MenuWaiterOrderService {
     private static final ZoneId MENU_ZONE = ZoneId.of("Europe/Istanbul");
 
     private final MenuOrderRepository menuOrderRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
     private final RestaurantTableRepository restaurantTableRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuOrderService menuOrderService;
@@ -50,31 +47,44 @@ public class MenuWaiterOrderService {
     private final TableBillService tableBillService;
     private final WaiterCommissionService waiterCommissionService;
     private final CampaignEvaluationService campaignEvaluationService;
-    private final SecurityUtils securityUtils;
+    private final WaiterAccessService waiterAccessService;
 
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listPending(Long menuId) {
-        MenuWaiter waiter = requireWaiterForMenu(menuId);
+    public List<MenuOrderDtos.OrderResponse> listPending() {
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
+        if (menuIds.isEmpty()) {
+            return List.of();
+        }
         return menuOrderRepository
-                .findByMenuIdAndStatusOrderBySubmittedAtDesc(waiter.getMenuId(), MenuOrderStatus.SUBMITTED)
+                .findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.SUBMITTED)
                 .stream()
                 .map(menuOrderService::toOrderResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<MenuWaiterDtos.TableOrderSummary> listTables(Long menuId) {
-        MenuWaiter waiter = requireWaiterForMenu(menuId);
+    public List<MenuWaiterDtos.TableOrderSummary> listTables() {
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        List<Menu> menus = waiterAccessService.menusForWaiter(waiter);
+        if (menus.isEmpty()) {
+            return List.of();
+        }
+        List<Long> menuIds = menus.stream().map(Menu::getMenuId).toList();
+        Map<Long, Menu> menusById = menus.stream()
+                .collect(Collectors.toMap(Menu::getMenuId, Function.identity(), (a, b) -> a));
+        boolean showMenuName = menus.size() > 1;
+
         List<RestaurantTable> tables = restaurantTableRepository
-                .findByMenuIdOrderByTableNumberAscNameAsc(waiter.getMenuId());
+                .findByMenuIdInOrderByTableNumberAscNameAsc(menuIds);
 
         List<MenuOrder> pendingOrders = menuOrderRepository
-                .findByMenuIdAndStatusOrderBySubmittedAtDesc(waiter.getMenuId(), MenuOrderStatus.SUBMITTED);
+                .findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.SUBMITTED);
 
         Map<Long, List<MenuOrder>> pendingByTable = pendingOrders.stream()
                 .collect(Collectors.groupingBy(MenuOrder::getTableId));
 
-        Map<Long, TableBill> openBillsByTable = tableBillService.findOpenBillsByMenuId(waiter.getMenuId());
+        Map<Long, TableBill> openBillsByTable = tableBillService.findOpenBillsByMenuIds(menuIds);
 
         return tables.stream()
                 .map(table -> {
@@ -90,9 +100,12 @@ public class MenuWaiterOrderService {
                     TableBillStatus billStatus = openBill != null
                             ? TableBillStatus.OPEN
                             : TableBillStatus.EMPTY;
+                    Menu menu = menusById.get(table.getMenuId());
 
                     return MenuWaiterDtos.TableOrderSummary.builder()
                             .tableId(table.getId())
+                            .menuId(table.getMenuId())
+                            .menuName(showMenuName && menu != null ? menu.getBusinessName() : null)
                             .tableName(table.getName())
                             .tableNumber(table.getTableNumber())
                             .active(table.isActive())
@@ -113,11 +126,15 @@ public class MenuWaiterOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listTodayHistory(Long menuId) {
-        MenuWaiter waiter = requireWaiterForMenu(menuId);
+    public List<MenuOrderDtos.OrderResponse> listTodayHistory() {
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
+        if (menuIds.isEmpty()) {
+            return List.of();
+        }
         LocalDateTime[] dayRange = todayRange();
-        return menuOrderRepository.findByMenuIdAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
-                        waiter.getMenuId(),
+        return menuOrderRepository.findByMenuIdInAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        menuIds,
                         EnumSet.of(
                                 MenuOrderStatus.SUBMITTED,
                                 MenuOrderStatus.CONFIRMED,
@@ -133,8 +150,8 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse confirm(Long orderId) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        MenuOrder order = requireOrderForWaiterMenu(orderId, waiter);
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
             throw new BadRequestException("Sadece gönderilmiş siparişler onaylanabilir");
         }
@@ -143,7 +160,7 @@ public class MenuWaiterOrderService {
         order.setWaiterId(waiter.getId());
         order.setUpdatedAt(LocalDateTime.now());
 
-        TableBill bill = tableBillService.getOrOpenBill(waiter.getMenuId(), order.getTableId(), waiter.getId());
+        TableBill bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), waiter.getId());
         order.setBillId(bill.getId());
         MenuOrder saved = menuOrderRepository.save(order);
         tableBillService.addItemsFromOrder(bill, saved, waiter.getId());
@@ -155,8 +172,8 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse reject(Long orderId) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        MenuOrder order = requireOrderForWaiterMenu(orderId, waiter);
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
             throw new BadRequestException("Sadece gönderilmiş siparişler reddedilebilir");
         }
@@ -168,8 +185,8 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse cancel(Long orderId) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        MenuOrder order = requireOrderForWaiterMenu(orderId, waiter);
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (order.getStatus() != MenuOrderStatus.CONFIRMED && order.getStatus() != MenuOrderStatus.SUBMITTED) {
             throw new BadRequestException("Bu sipariş iptal edilemez");
         }
@@ -182,27 +199,28 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public MenuOrderDtos.OrderResponse getOrder(Long orderId) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        return menuOrderService.toOrderResponse(requireOrderForWaiterMenu(orderId, waiter));
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        return menuOrderService.toOrderResponse(requireOrderForWaiter(orderId, waiter));
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse updateWaiterNote(Long orderId, String note) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        MenuOrder order = requireOrderForWaiterMenu(orderId, waiter);
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
         order.setWaiterNote(trimToNull(note));
         order.setUpdatedAt(LocalDateTime.now());
         return menuOrderService.toOrderResponse(menuOrderRepository.save(order));
     }
 
     @Transactional(readOnly = true)
-    public MenuWaiterDtos.CatalogResponse listCatalog() {
-        MenuWaiter waiter = requireCurrentWaiter();
+    public MenuWaiterDtos.CatalogResponse listCatalog(Long tableId) {
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        RestaurantTable table = requireTableForWaiter(tableId, waiter);
         Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
         Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
 
         List<MenuWaiterDtos.CatalogProduct> products = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(waiter.getMenuId())
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(table.getMenuId())
                 .stream()
                 .map(product -> toCatalogProduct(product, subMap, mainMap))
                 .toList();
@@ -217,15 +235,18 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse createOrder(MenuOrderDtos.WaiterCreateOrderRequest request) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        return menuOrderService.placeWaiterOrder(waiter.getMenuId(), waiter.getId(), request);
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        if (request == null || request.getTableId() == null) {
+            throw new BadRequestException("Masa zorunludur");
+        }
+        RestaurantTable table = requireTableForWaiter(request.getTableId(), waiter);
+        return menuOrderService.placeWaiterOrder(table.getMenuId(), waiter.getId(), request);
     }
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> getTableTodayOrders(Long tableId) {
-        MenuWaiter waiter = requireCurrentWaiter();
-        RestaurantTable table = restaurantTableRepository.findByIdAndMenuId(tableId, waiter.getMenuId())
-                .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        RestaurantTable table = requireTableForWaiter(tableId, waiter);
 
         LocalDateTime[] dayRange = todayRange();
         return menuOrderRepository
@@ -235,34 +256,18 @@ public class MenuWaiterOrderService {
                 .toList();
     }
 
-    private MenuWaiter requireWaiterForMenu(Long menuId) {
-        if (menuId == null) {
-            throw new BadRequestException("menuId zorunludur");
-        }
-        MenuWaiter waiter = requireCurrentWaiter();
-        if (!menuId.equals(waiter.getMenuId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
-        }
-        return waiter;
+    private RestaurantTable requireTableForWaiter(Long tableId, MenuWaiter waiter) {
+        RestaurantTable table = restaurantTableRepository.findById(tableId)
+                .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
+        waiterAccessService.requireMenuInWaiterBranch(table.getMenuId(), waiter);
+        return table;
     }
 
-    private MenuWaiter requireCurrentWaiter() {
-        Long waiterId = securityUtils.getCurrentWaiterId();
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
-                .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
-        if (!waiter.isActive()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Garson hesabı pasif");
-        }
-        Long tokenMenuId = securityUtils.getCurrentWaiterMenuId();
-        if (!tokenMenuId.equals(waiter.getMenuId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
-        }
-        return waiter;
-    }
-
-    private MenuOrder requireOrderForWaiterMenu(Long orderId, MenuWaiter waiter) {
-        return menuOrderRepository.findByIdAndMenuId(orderId, waiter.getMenuId())
+    private MenuOrder requireOrderForWaiter(Long orderId, MenuWaiter waiter) {
+        MenuOrder order = menuOrderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Sipariş bulunamadı"));
+        waiterAccessService.requireMenuInWaiterBranch(order.getMenuId(), waiter);
+        return order;
     }
 
     private LocalDateTime[] todayRange() {

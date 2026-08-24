@@ -17,7 +17,9 @@ import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
@@ -79,6 +81,10 @@ class AnalyticsServiceTest {
     private TableBillRepository tableBillRepository;
     @Mock
     private MenuFixedExpenseService menuFixedExpenseService;
+    @Mock
+    private BranchService branchService;
+    @Mock
+    private BranchRepository branchRepository;
 
     private AnalyticsService service;
 
@@ -97,7 +103,9 @@ class AnalyticsServiceTest {
                 menuWaiterRepository,
                 billPaymentRepository,
                 tableBillRepository,
-                menuFixedExpenseService
+                menuFixedExpenseService,
+                branchService,
+                branchRepository
         );
     }
 
@@ -212,35 +220,35 @@ class AnalyticsServiceTest {
         LocalDate from = LocalDate.of(2026, 7, 1);
         LocalDate to = LocalDate.of(2026, 7, 2);
         when(menuRepository.findById(menuId)).thenReturn(Optional.of(publicMenu(menuId, ownerId)));
-        when(sessionRepository.countByMenuIdAndPeriod(eq(menuId), any(), any())).thenReturn(4L);
-        when(eventRepository.countByMenuIdAndEventTypeAndOccurredAtBetween(
-                eq(menuId), eq(MenuAnalyticsEventType.MENU_OPEN), any(), any())).thenReturn(5L);
-        when(eventRepository.countByMenuIdAndEventTypeAndOccurredAtBetween(
-                eq(menuId), eq(MenuAnalyticsEventType.PRODUCT_VIEW), any(), any())).thenReturn(8L);
-        when(eventRepository.countByMenuIdAndEventTypeAndOccurredAtBetween(
-                eq(menuId), eq(MenuAnalyticsEventType.CATEGORY_VIEW), any(), any())).thenReturn(6L);
-        when(eventRepository.avgProductsPerSession(eq(menuId), any(), any())).thenReturn(2.0);
-        when(sessionRepository.countDailyByMenuIdAndPeriod(eq(menuId), any(), any()))
+        when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(menuId)), any(), any())).thenReturn(4L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                eq(List.of(menuId)), eq(MenuAnalyticsEventType.MENU_OPEN), any(), any())).thenReturn(5L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                eq(List.of(menuId)), eq(MenuAnalyticsEventType.PRODUCT_VIEW), any(), any())).thenReturn(8L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                eq(List.of(menuId)), eq(MenuAnalyticsEventType.CATEGORY_VIEW), any(), any())).thenReturn(6L);
+        when(eventRepository.avgProductsPerSessionByMenuIds(eq(List.of(menuId)), any(), any())).thenReturn(2.0);
+        when(sessionRepository.countDailyByMenuIdInAndPeriod(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{java.sql.Date.valueOf(from), 2L}));
-        when(eventRepository.countDailyOpenAndProductByMenuId(eq(menuId), any(), any()))
+        when(eventRepository.countDailyOpenAndProductByMenuIdIn(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{java.sql.Date.valueOf(from), 3L, 4L}));
-        when(eventRepository.countHourlyByMenuId(eq(menuId), any(), any()))
+        when(eventRepository.countHourlyByMenuIdIn(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{12, 7L}));
-        when(sessionRepository.countByDeviceTypeAndPeriod(eq(menuId), any(), any()))
+        when(sessionRepository.countByDeviceTypeAndPeriodForMenuIds(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{"MOBILE", 3L}, new Object[]{"DESKTOP", 1L}));
-        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId))
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(menuId)))
                 .thenReturn(List.of(cayProduct(menuId)));
         when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc())
                 .thenReturn(List.of(SubCategory.builder().id(3L).mainCategoryId(1L).slug("icecek").name("Icecek").sortOrder(1).build()));
-        when(eventRepository.topProducts(eq(menuId), any(), any()))
+        when(eventRepository.topProductsByMenuIds(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{11L, 8L}));
-        when(eventRepository.topCategories(eq(menuId), any(), any()))
+        when(eventRepository.topCategoriesByMenuIds(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{3L, 6L}));
-        when(eventRepository.productViewsByCategory(eq(menuId), any(), any()))
+        when(eventRepository.productViewsByCategoryForMenuIds(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{3L, 11L, 8L}));
-        when(sessionRepository.findRecentByMenuIdAndPeriod(eq(menuId), any(), any()))
+        when(sessionRepository.findRecentByMenuIdInAndPeriod(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.of());
-        when(menuFeedbackService.buildReportFeedback(eq(menuId), eq(from), eq(to)))
+        when(menuFeedbackService.buildReportFeedback(eq(List.of(menuId)), eq(from), eq(to)))
                 .thenReturn(new AnalyticsDtos.ReportFeedback(
                         new AnalyticsDtos.MenuFeedbackSummary(
                                 java.math.BigDecimal.valueOf(4.5),
@@ -279,8 +287,10 @@ class AnalyticsServiceTest {
         Long menuId = 5L;
         Long ownerId = 9L;
         LocalDate day = LocalDate.of(2026, 8, 13);
-        when(menuRepository.findById(menuId)).thenReturn(Optional.of(publicMenu(menuId, ownerId)));
-        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId))
+        Menu menu = publicMenu(menuId, ownerId);
+        menu.setBranchId(2L);
+        when(menuRepository.findById(menuId)).thenReturn(Optional.of(menu));
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(menuId)))
                 .thenReturn(List.of(
                         catalogProduct(menuId, 1L, "Ayran", 0),
                         catalogProduct(menuId, 2L, "Izgara", 1),
@@ -295,8 +305,8 @@ class AnalyticsServiceTest {
                         .name("Icecek")
                         .sortOrder(1)
                         .build()));
-        when(menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId)).thenReturn(List.of());
-        when(menuFixedExpenseService.totalDailyActiveAmount(menuId)).thenReturn(BigDecimal.ZERO);
+        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
 
         TableBill bill = TableBill.builder().id(20L).menuId(menuId).currency("TRY").build();
         TableBillItem ayran = TableBillItem.builder()
@@ -307,7 +317,7 @@ class AnalyticsServiceTest {
                 .id(3L).productId(3L).productName("Cay").quantity(1).paidQuantity(1).build();
         LocalDateTime paidAt = LocalDateTime.of(2026, 8, 13, 14, 30);
 
-        when(billPaymentRepository.findByMenuIdAndPaidAtBetween(eq(menuId), any(), any()))
+        when(billPaymentRepository.findByMenuIdInAndPaidAtBetween(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.of(
                         payment(bill, ayran, new BigDecimal("50.00"), 10, paidAt),
                         payment(bill, izgara, new BigDecimal("200.00"), 2, paidAt),
@@ -353,12 +363,14 @@ class AnalyticsServiceTest {
         Long menuId = 5L;
         Long ownerId = 9L;
         LocalDate day = LocalDate.of(2026, 8, 13);
-        when(menuRepository.findById(menuId)).thenReturn(Optional.of(publicMenu(menuId, ownerId)));
+        Menu menu = publicMenu(menuId, ownerId);
+        menu.setBranchId(2L);
+        when(menuRepository.findById(menuId)).thenReturn(Optional.of(menu));
 
         MenuWaiter ali = MenuWaiter.builder()
                 .id(101L)
                 .ownerUserId(ownerId)
-                .menuId(menuId)
+                .branchId(2L)
                 .username("ali")
                 .passwordHash("hash")
                 .displayName("Ali")
@@ -369,7 +381,7 @@ class AnalyticsServiceTest {
         MenuWaiter ayse = MenuWaiter.builder()
                 .id(102L)
                 .ownerUserId(ownerId)
-                .menuId(menuId)
+                .branchId(2L)
                 .username("ayse")
                 .passwordHash("hash")
                 .displayName("Ayse")
@@ -377,9 +389,9 @@ class AnalyticsServiceTest {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
-        when(menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId)).thenReturn(List.of(ali, ayse));
-        when(tableBillRepository.findByMenuIdAndStatusAndClosedAtBetween(
-                eq(menuId), eq(TableBillStatus.CLOSED), any(), any()
+        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of(ali, ayse));
+        when(tableBillRepository.findByMenuIdInAndStatusAndClosedAtBetween(
+                eq(List.of(menuId)), eq(TableBillStatus.CLOSED), any(), any()
         )).thenReturn(List.of(
                 TableBill.builder()
                         .id(10L)
@@ -395,8 +407,8 @@ class AnalyticsServiceTest {
         MenuOrder ayseOrder = confirmedOrder(menuId, 2L, new BigDecimal("90.00"), 102L, 1, new BigDecimal("9.00"));
         MenuOrder unassignedOrder = confirmedOrder(menuId, 3L, new BigDecimal("20.00"), null, 1, BigDecimal.ZERO);
 
-        when(menuOrderRepository.findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
-                eq(menuId), eq(MenuOrderStatus.CONFIRMED), any(), any()
+        when(menuOrderRepository.findByMenuIdInAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
+                eq(List.of(menuId)), eq(MenuOrderStatus.CONFIRMED), any(), any()
         )).thenReturn(List.of(aliOrder, ayseOrder, unassignedOrder));
 
         AnalyticsDtos.MenuWaiterPerformanceReportResponse report =
@@ -420,6 +432,151 @@ class AnalyticsServiceTest {
         assertThat(report.products()).isNotEmpty();
         assertThat(report.daily()).hasSize(1);
         assertThat(report.hourly()).hasSize(24);
+    }
+
+    @Test
+    void getBranchReport_whenTwoMenus_thenAggregatesKpis() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        LocalDate from = LocalDate.of(2026, 7, 1);
+        LocalDate to = LocalDate.of(2026, 7, 1);
+        Menu first = publicMenu(5L, ownerId);
+        first.setBranchId(branchId);
+        first.setBusinessName("Ogle");
+        Menu second = publicMenu(6L, ownerId);
+        second.setBranchId(branchId);
+        second.setBusinessName("Aksam");
+        when(branchService.requireOwnedForUser(branchId, ownerId))
+                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
+        when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L, 6L)), any(), any())).thenReturn(10L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                eq(List.of(5L, 6L)), eq(MenuAnalyticsEventType.MENU_OPEN), any(), any())).thenReturn(12L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                eq(List.of(5L, 6L)), eq(MenuAnalyticsEventType.PRODUCT_VIEW), any(), any())).thenReturn(20L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                eq(List.of(5L, 6L)), eq(MenuAnalyticsEventType.CATEGORY_VIEW), any(), any())).thenReturn(8L);
+        when(eventRepository.avgProductsPerSessionByMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(1.5);
+        when(sessionRepository.countDailyByMenuIdInAndPeriod(eq(List.of(5L, 6L)), any(), any()))
+                .thenReturn(List.of());
+        when(eventRepository.countDailyOpenAndProductByMenuIdIn(eq(List.of(5L, 6L)), any(), any()))
+                .thenReturn(List.of());
+        when(eventRepository.countHourlyByMenuIdIn(eq(List.of(5L, 6L)), any(), any()))
+                .thenReturn(List.of());
+        when(sessionRepository.countByDeviceTypeAndPeriodForMenuIds(eq(List.of(5L, 6L)), any(), any()))
+                .thenReturn(List.of());
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
+                .thenReturn(List.of());
+        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(eventRepository.topProductsByMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
+        when(eventRepository.topCategoriesByMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
+        when(eventRepository.productViewsByCategoryForMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
+        when(sessionRepository.findRecentByMenuIdInAndPeriod(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
+        when(menuFeedbackService.buildReportFeedback(eq(List.of(5L, 6L)), eq(from), eq(to)))
+                .thenReturn(new AnalyticsDtos.ReportFeedback(
+                        new AnalyticsDtos.MenuFeedbackSummary(BigDecimal.ZERO, 0L, List.of(), List.of()),
+                        new AnalyticsDtos.ProductFeedbackSummary(
+                                BigDecimal.ZERO, 0L, List.of(), List.of(), List.of(), List.of())
+                ));
+
+        AnalyticsDtos.MenuAnalyticsReportResponse report =
+                service.getBranchReport(branchId, null, ownerId, from, to);
+
+        assertThat(report.menuId()).isNull();
+        assertThat(report.branchId()).isEqualTo(branchId);
+        assertThat(report.branchName()).isEqualTo("Kadikoy");
+        assertThat(report.kpis().sessions()).isEqualTo(10L);
+        assertThat(report.kpis().menuOpens()).isEqualTo(12L);
+        assertThat(report.kpis().productViews()).isEqualTo(20L);
+    }
+
+    @Test
+    void getBranchReport_whenMenuFilter_thenUsesSingleMenu() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        LocalDate day = LocalDate.of(2026, 7, 1);
+        Menu first = publicMenu(5L, ownerId);
+        first.setBranchId(branchId);
+        first.setBusinessName("Ogle");
+        Menu second = publicMenu(6L, ownerId);
+        second.setBranchId(branchId);
+        when(branchService.requireOwnedForUser(branchId, ownerId))
+                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
+        when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(3L);
+        when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(any(), any(), any(), any())).thenReturn(0L);
+        when(eventRepository.avgProductsPerSessionByMenuIds(eq(List.of(5L)), any(), any())).thenReturn(0d);
+        when(sessionRepository.countDailyByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(eventRepository.countDailyOpenAndProductByMenuIdIn(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(eventRepository.countHourlyByMenuIdIn(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(sessionRepository.countByDeviceTypeAndPeriodForMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L)))
+                .thenReturn(List.of());
+        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(eventRepository.topProductsByMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(eventRepository.topCategoriesByMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(eventRepository.productViewsByCategoryForMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(sessionRepository.findRecentByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(List.of());
+        when(menuFeedbackService.buildReportFeedback(eq(List.of(5L)), eq(day), eq(day)))
+                .thenReturn(new AnalyticsDtos.ReportFeedback(
+                        new AnalyticsDtos.MenuFeedbackSummary(BigDecimal.ZERO, 0L, List.of(), List.of()),
+                        new AnalyticsDtos.ProductFeedbackSummary(
+                                BigDecimal.ZERO, 0L, List.of(), List.of(), List.of(), List.of())
+                ));
+
+        AnalyticsDtos.MenuAnalyticsReportResponse report =
+                service.getBranchReport(branchId, 5L, ownerId, day, day);
+
+        assertThat(report.menuId()).isEqualTo(5L);
+        assertThat(report.menuName()).isEqualTo("Ogle");
+        assertThat(report.branchId()).isEqualTo(branchId);
+        assertThat(report.kpis().sessions()).isEqualTo(3L);
+    }
+
+    @Test
+    void getBranchReport_whenMenuNotInBranch_thenNotFound() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        when(branchService.requireOwnedForUser(branchId, ownerId))
+                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(publicMenu(5L, ownerId)));
+
+        assertThatThrownBy(() -> service.getBranchReport(
+                branchId, 99L, ownerId, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1)
+        )).isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
+                .isEqualTo(404);
+    }
+
+    @Test
+    void getBranchRevenueReport_whenTwoMenus_thenSumsPayments() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        Menu first = publicMenu(5L, ownerId);
+        first.setBranchId(branchId);
+        Menu second = publicMenu(6L, ownerId);
+        second.setBranchId(branchId);
+        when(branchService.requireOwnedForUser(branchId, ownerId))
+                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
+                .thenReturn(List.of());
+        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
+        when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L, 6L))).thenReturn(BigDecimal.ZERO);
+        TableBill bill = TableBill.builder().id(20L).menuId(5L).currency("TRY").build();
+        TableBillItem item = TableBillItem.builder()
+                .id(1L).productId(1L).productName("Ayran").quantity(1).paidQuantity(1).build();
+        when(billPaymentRepository.findByMenuIdInAndPaidAtBetween(eq(List.of(5L, 6L)), any(), any()))
+                .thenReturn(List.of(payment(bill, item, new BigDecimal("40.00"), 1, LocalDateTime.of(2026, 8, 13, 12, 0))));
+
+        AnalyticsDtos.MenuRevenueReportResponse report =
+                service.getBranchRevenueReport(branchId, null, ownerId, day, day);
+
+        assertThat(report.branchId()).isEqualTo(branchId);
+        assertThat(report.menuId()).isNull();
+        assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("40.00");
     }
 
     private MenuOrder confirmedOrder(

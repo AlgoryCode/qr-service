@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,11 +26,20 @@ public interface TableBillRepository extends JpaRepository<TableBill, Long>, Jpa
 
     List<TableBill> findByMenuIdAndStatus(Long menuId, TableBillStatus status);
 
+    List<TableBill> findByMenuIdInAndStatus(Collection<Long> menuIds, TableBillStatus status);
+
     @EntityGraph(attributePaths = "items")
     Optional<TableBill> findByIdAndMenuIdAndStatus(Long id, Long menuId, TableBillStatus status);
 
     List<TableBill> findByMenuIdAndStatusAndClosedAtBetween(
             Long menuId,
+            TableBillStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    List<TableBill> findByMenuIdInAndStatusAndClosedAtBetween(
+            Collection<Long> menuIds,
             TableBillStatus status,
             LocalDateTime start,
             LocalDateTime end

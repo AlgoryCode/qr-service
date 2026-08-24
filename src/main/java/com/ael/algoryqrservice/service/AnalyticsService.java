@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillPayment;
+import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
@@ -20,6 +21,7 @@ import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
@@ -45,11 +47,13 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -82,6 +86,8 @@ public class AnalyticsService {
     private final BillPaymentRepository billPaymentRepository;
     private final TableBillRepository tableBillRepository;
     private final MenuFixedExpenseService menuFixedExpenseService;
+    private final BranchService branchService;
+    private final BranchRepository branchRepository;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -153,23 +159,45 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to
     ) {
-        Menu menu = requireOwnedMenu(menuId, ownerId);
+        return buildVisitReport(resolveMenuScope(menuId, ownerId), from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuAnalyticsReportResponse getBranchReport(
+            Long branchId,
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        return buildVisitReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
+    }
+
+    private AnalyticsDtos.MenuAnalyticsReportResponse buildVisitReport(
+            ReportScope scope,
+            LocalDate from,
+            LocalDate to
+    ) {
+        if (scope.menuIds().isEmpty()) {
+            return emptyVisitReport(scope, from, to);
+        }
+        Collection<Long> menuIds = scope.menuIds();
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
 
-        long sessions = sessionRepository.countByMenuIdAndPeriod(menuId, fromDt, toDt);
-        long menuOpens = eventRepository.countByMenuIdAndEventTypeAndOccurredAtBetween(
-                menuId, MenuAnalyticsEventType.MENU_OPEN, fromDt, toDt);
-        long productViews = eventRepository.countByMenuIdAndEventTypeAndOccurredAtBetween(
-                menuId, MenuAnalyticsEventType.PRODUCT_VIEW, fromDt, toDt);
-        long categoryViews = eventRepository.countByMenuIdAndEventTypeAndOccurredAtBetween(
-                menuId, MenuAnalyticsEventType.CATEGORY_VIEW, fromDt, toDt);
-        Double avgProducts = eventRepository.avgProductsPerSession(menuId, fromDt, toDt);
+        long sessions = sessionRepository.countByMenuIdInAndPeriod(menuIds, fromDt, toDt);
+        long menuOpens = eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                menuIds, MenuAnalyticsEventType.MENU_OPEN, fromDt, toDt);
+        long productViews = eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                menuIds, MenuAnalyticsEventType.PRODUCT_VIEW, fromDt, toDt);
+        long categoryViews = eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                menuIds, MenuAnalyticsEventType.CATEGORY_VIEW, fromDt, toDt);
+        Double avgProducts = eventRepository.avgProductsPerSessionByMenuIds(menuIds, fromDt, toDt);
 
         Map<LocalDate, Long> sessionsByDay = toDateCountMap(
-                sessionRepository.countDailyByMenuIdAndPeriod(menuId, fromDt, toDt));
+                sessionRepository.countDailyByMenuIdInAndPeriod(menuIds, fromDt, toDt));
         Map<LocalDate, long[]> openProductByDay = new HashMap<>();
-        for (Object[] row : eventRepository.countDailyOpenAndProductByMenuId(menuId, fromDt, toDt)) {
+        for (Object[] row : eventRepository.countDailyOpenAndProductByMenuIdIn(menuIds, fromDt, toDt)) {
             LocalDate day = toLocalDate(row[0]);
             openProductByDay.put(day, new long[]{
                     row[1] == null ? 0L : ((Number) row[1]).longValue(),
@@ -189,7 +217,7 @@ public class AnalyticsService {
         }
 
         Map<Integer, Long> hourlyMap = new HashMap<>();
-        for (Object[] row : eventRepository.countHourlyByMenuId(menuId, fromDt, toDt)) {
+        for (Object[] row : eventRepository.countHourlyByMenuIdIn(menuIds, fromDt, toDt)) {
             hourlyMap.put(((Number) row[0]).intValue(), ((Number) row[1]).longValue());
         }
         List<AnalyticsDtos.HourlyReportPoint> hourly = new ArrayList<>();
@@ -198,21 +226,21 @@ public class AnalyticsService {
         }
 
         Map<String, Long> deviceCounts = toDeviceCountMap(
-                sessionRepository.countByDeviceTypeAndPeriod(menuId, fromDt, toDt));
+                sessionRepository.countByDeviceTypeAndPeriodForMenuIds(menuIds, fromDt, toDt));
         List<AnalyticsDtos.NamedCount> devices = List.of(
                 new AnalyticsDtos.NamedCount("Mobil", deviceCounts.getOrDefault(MOBILE, 0L)),
                 new AnalyticsDtos.NamedCount("Tablet", deviceCounts.getOrDefault(TABLET, 0L)),
                 new AnalyticsDtos.NamedCount("Masaustu", deviceCounts.getOrDefault(DESKTOP, 0L))
         );
 
-        Map<Long, String> productNames = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).stream()
-                .collect(Collectors.toMap(MenuProduct::getProductId, MenuProduct::getName, (a, b) -> a));
+        List<MenuProduct> catalog = menuProductRepository
+                .findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuIds);
+        Map<Long, String> productNames = labeledProductNames(scope, catalog);
         Map<Long, String> categoryNames = subCategoryRepository
                 .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
                 .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
 
-        List<AnalyticsDtos.TopProduct> topProducts = eventRepository.topProducts(menuId, fromDt, toDt).stream()
+        List<AnalyticsDtos.TopProduct> topProducts = eventRepository.topProductsByMenuIds(menuIds, fromDt, toDt).stream()
                 .limit(TOP_LIMIT)
                 .map(row -> {
                     Long productId = ((Number) row[0]).longValue();
@@ -224,7 +252,7 @@ public class AnalyticsService {
                 })
                 .toList();
 
-        List<AnalyticsDtos.TopCategory> topCategories = eventRepository.topCategories(menuId, fromDt, toDt).stream()
+        List<AnalyticsDtos.TopCategory> topCategories = eventRepository.topCategoriesByMenuIds(menuIds, fromDt, toDt).stream()
                 .limit(TOP_LIMIT)
                 .map(row -> {
                     Long categoryId = ((Number) row[0]).longValue();
@@ -237,13 +265,13 @@ public class AnalyticsService {
                 .toList();
 
         List<AnalyticsDtos.TreemapNode> tree = buildCategoryProductTree(
-                eventRepository.productViewsByCategory(menuId, fromDt, toDt),
+                eventRepository.productViewsByCategoryForMenuIds(menuIds, fromDt, toDt),
                 productNames,
                 categoryNames
         );
 
         List<MenuAnalyticsSession> recentSessions = sessionRepository
-                .findRecentByMenuIdAndPeriod(menuId, fromDt, toDt).stream()
+                .findRecentByMenuIdInAndPeriod(menuIds, fromDt, toDt).stream()
                 .limit(SAMPLE_JOURNEYS)
                 .toList();
         List<AnalyticsDtos.SampleJourney> journeys = buildSampleJourneys(
@@ -252,11 +280,13 @@ public class AnalyticsService {
                 categoryNames
         );
 
-        AnalyticsDtos.ReportFeedback feedback = menuFeedbackService.buildReportFeedback(menuId, from, to);
+        AnalyticsDtos.ReportFeedback feedback = menuFeedbackService.buildReportFeedback(menuIds, from, to);
 
         return new AnalyticsDtos.MenuAnalyticsReportResponse(
-                menu.getMenuId(),
-                menu.getBusinessName(),
+                scope.menuId(),
+                scope.menuName(),
+                scope.branchId(),
+                scope.branchName(),
                 from,
                 to,
                 new AnalyticsDtos.ReportKpis(
@@ -285,20 +315,46 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to
     ) {
-        Menu menu = requireOwnedMenu(menuId, ownerId);
+        return buildRevenueReport(resolveMenuScope(menuId, ownerId), from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuRevenueReportResponse getBranchRevenueReport(
+            Long branchId,
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        return buildRevenueReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
+    }
+
+    private AnalyticsDtos.MenuRevenueReportResponse buildRevenueReport(
+            ReportScope scope,
+            LocalDate from,
+            LocalDate to
+    ) {
+        if (scope.menuIds().isEmpty()) {
+            return emptyRevenueReport(scope, from, to);
+        }
+        Collection<Long> menuIds = scope.menuIds();
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
 
-        List<BillPayment> payments = billPaymentRepository.findByMenuIdAndPaidAtBetween(menuId, fromDt, toDt);
+        List<BillPayment> payments = billPaymentRepository.findByMenuIdInAndPaidAtBetween(menuIds, fromDt, toDt);
 
-        Map<Long, MenuProduct> productsById = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuId).stream()
+        List<MenuProduct> catalogProducts = menuProductRepository
+                .findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuIds);
+        Map<Long, MenuProduct> productsById = catalogProducts.stream()
                 .collect(Collectors.toMap(MenuProduct::getProductId, p -> p, (a, b) -> a));
+        Map<Long, String> labeledNames = labeledProductNames(scope, catalogProducts);
         Map<Long, String> categoryNames = subCategoryRepository
                 .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
                 .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
-        Map<Long, MenuWaiter> waitersById = menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId).stream()
+        List<MenuWaiter> waiters = loadWaiters(scope);
+        Map<Long, MenuWaiter> waitersById = waiters.stream()
                 .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
+        Map<Long, String> waiterNames = labeledWaiterNames(scope, waiters);
 
         BigDecimal cashRevenue = BigDecimal.ZERO;
         BigDecimal cardRevenue = BigDecimal.ZERO;
@@ -352,9 +408,10 @@ public class AnalyticsService {
 
                 Long productId = billItem.getProductId();
                 AnalyticsDtos.RevenueProduct existingProduct = products.get(productId);
-                String productName = billItem.getProductName() != null
-                        ? billItem.getProductName()
-                        : "Ürün #" + productId;
+                String productName = labeledNames.getOrDefault(
+                        productId,
+                        billItem.getProductName() != null ? billItem.getProductName() : "Ürün #" + productId
+                );
                 products.put(productId, new AnalyticsDtos.RevenueProduct(
                         productId,
                         productName,
@@ -439,7 +496,7 @@ public class AnalyticsService {
                 : totalRevenue.subtract(tipRevenue).divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
 
         long dayCount = from.until(to).getDays() + 1L;
-        BigDecimal dailyFixedTotal = menuFixedExpenseService.totalDailyActiveAmount(menuId);
+        BigDecimal dailyFixedTotal = menuFixedExpenseService.totalDailyActiveAmount(menuIds);
         BigDecimal fixedExpenseTotal = dailyFixedTotal.multiply(BigDecimal.valueOf(dayCount))
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal grossRevenue = totalRevenue;
@@ -452,7 +509,10 @@ public class AnalyticsService {
             PersonnelPaymentAgg stats = entry.getValue();
             personnelRows.add(new AnalyticsDtos.RevenuePersonnelRow(
                     entry.getKey(),
-                    waiter != null ? waiter.getDisplayName() : "Personel #" + entry.getKey(),
+                    waiterNames.getOrDefault(
+                            entry.getKey(),
+                            waiter != null ? waiter.getDisplayName() : "Personel #" + entry.getKey()
+                    ),
                     stats.total,
                     stats.cash,
                     stats.card,
@@ -473,8 +533,10 @@ public class AnalyticsService {
         );
 
         return new AnalyticsDtos.MenuRevenueReportResponse(
-                menu.getMenuId(),
-                menu.getBusinessName(),
+                scope.menuId(),
+                scope.menuName(),
+                scope.branchId(),
+                scope.branchName(),
                 from,
                 to,
                 new AnalyticsDtos.RevenueKpis(totalRevenue, orderCount, itemCount, avgOrderValue, currency),
@@ -515,26 +577,49 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to
     ) {
-        Menu menu = requireOwnedMenu(menuId, ownerId);
+        return buildWaiterPerformanceReport(resolveMenuScope(menuId, ownerId), from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuWaiterPerformanceReportResponse getBranchWaiterPerformanceReport(
+            Long branchId,
+            Long menuId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        return buildWaiterPerformanceReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
+    }
+
+    private AnalyticsDtos.MenuWaiterPerformanceReportResponse buildWaiterPerformanceReport(
+            ReportScope scope,
+            LocalDate from,
+            LocalDate to
+    ) {
+        if (scope.menuIds().isEmpty()) {
+            return emptyWaiterReport(scope, from, to);
+        }
+        Collection<Long> menuIds = scope.menuIds();
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
 
         List<MenuOrder> orders = menuOrderRepository
-                .findByMenuIdAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
-                        menuId,
+                .findByMenuIdInAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
+                        menuIds,
                         MenuOrderStatus.CONFIRMED,
                         fromDt,
                         toDt
                 );
 
-        List<TableBill> closedBills = tableBillRepository.findByMenuIdAndStatusAndClosedAtBetween(
-                menuId,
+        List<TableBill> closedBills = tableBillRepository.findByMenuIdInAndStatusAndClosedAtBetween(
+                menuIds,
                 TableBillStatus.CLOSED,
                 fromDt,
                 toDt
         );
 
-        List<MenuWaiter> waiters = menuWaiterRepository.findByMenuIdOrderByDisplayNameAsc(menuId);
+        List<MenuWaiter> waiters = loadWaiters(scope);
+        Map<Long, String> waiterNames = labeledWaiterNames(scope, waiters);
         Map<Long, MenuWaiter> waitersById = waiters.stream()
                 .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
 
@@ -625,7 +710,7 @@ public class AnalyticsService {
             WaiterPerformanceAgg stats = statsByWaiterId.getOrDefault(waiter.getId(), new WaiterPerformanceAgg());
             rows.add(buildWaiterPerformanceRow(
                     waiter.getId(),
-                    waiter.getDisplayName(),
+                    waiterNames.getOrDefault(waiter.getId(), waiter.getDisplayName()),
                     waiter.isActive(),
                     stats,
                     totalRevenue,
@@ -639,7 +724,10 @@ public class AnalyticsService {
                 continue;
             }
             MenuWaiter missing = menuWaiterRepository.findById(entry.getKey()).orElse(null);
-            String name = missing != null ? missing.getDisplayName() : "Personel #" + entry.getKey();
+            String name = waiterNames.getOrDefault(
+                    entry.getKey(),
+                    missing != null ? missing.getDisplayName() : "Personel #" + entry.getKey()
+            );
             boolean active = missing != null && missing.isActive();
             rows.add(buildWaiterPerformanceRow(
                     entry.getKey(),
@@ -694,8 +782,10 @@ public class AnalyticsService {
                 .toList();
 
         return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
-                menu.getMenuId(),
-                menu.getBusinessName(),
+                scope.menuId(),
+                scope.menuName(),
+                scope.branchId(),
+                scope.branchName(),
                 from,
                 to,
                 new AnalyticsDtos.WaiterPerformanceKpis(
@@ -1007,6 +1097,236 @@ public class AnalyticsService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Menu herkese acik degil");
         }
         return menu;
+    }
+
+    private List<MenuWaiter> loadWaiters(ReportScope scope) {
+        if (scope.branchId() != null) {
+            return menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(scope.branchId());
+        }
+        return List.of();
+    }
+
+    private ReportScope resolveMenuScope(Long menuId, Long ownerId) {
+        Menu menu = requireOwnedMenu(menuId, ownerId);
+        Long branchId = menu.getBranchId();
+        String branchName = null;
+        if (branchId != null) {
+            branchName = branchRepository.findById(branchId).map(Branch::getName).orElse(null);
+        }
+        return ReportScope.forMenus(
+                branchId,
+                branchName,
+                menu.getMenuId(),
+                menu.getBusinessName(),
+                List.of(menu)
+        );
+    }
+
+    private ReportScope resolveBranchScope(Long branchId, Long menuId, Long ownerId) {
+        Branch branch = branchService.requireOwnedForUser(branchId, ownerId);
+        List<Menu> menus = menuRepository.findByBranchIdAndDeletedFalse(branch.getId());
+        if (menuId != null) {
+            Menu menu = menus.stream()
+                    .filter(item -> menuId.equals(item.getMenuId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+            return ReportScope.forMenus(
+                    branch.getId(),
+                    branch.getName(),
+                    menu.getMenuId(),
+                    menu.getBusinessName(),
+                    List.of(menu)
+            );
+        }
+        return ReportScope.forMenus(branch.getId(), branch.getName(), null, null, menus);
+    }
+
+    private AnalyticsDtos.MenuAnalyticsReportResponse emptyVisitReport(
+            ReportScope scope,
+            LocalDate from,
+            LocalDate to
+    ) {
+        List<AnalyticsDtos.DailyReportPoint> daily = new ArrayList<>();
+        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+            daily.add(new AnalyticsDtos.DailyReportPoint(cursor, 0L, 0L, 0L));
+        }
+        List<AnalyticsDtos.HourlyReportPoint> hourly = new ArrayList<>();
+        for (int h = 0; h < 24; h++) {
+            hourly.add(new AnalyticsDtos.HourlyReportPoint(h, 0L));
+        }
+        return new AnalyticsDtos.MenuAnalyticsReportResponse(
+                scope.menuId(),
+                scope.menuName(),
+                scope.branchId(),
+                scope.branchName(),
+                from,
+                to,
+                new AnalyticsDtos.ReportKpis(0L, 0L, 0L, 0L, 0d),
+                daily,
+                hourly,
+                List.of(
+                        new AnalyticsDtos.NamedCount("Mobil", 0L),
+                        new AnalyticsDtos.NamedCount("Tablet", 0L),
+                        new AnalyticsDtos.NamedCount("Masaustu", 0L)
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                new AnalyticsDtos.FunnelCounts(0L, 0L, 0L),
+                menuFeedbackService.buildReportFeedback(List.of(), from, to)
+        );
+    }
+
+    private AnalyticsDtos.MenuRevenueReportResponse emptyRevenueReport(
+            ReportScope scope,
+            LocalDate from,
+            LocalDate to
+    ) {
+        List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
+        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+            daily.add(new AnalyticsDtos.DailyRevenuePoint(cursor, BigDecimal.ZERO, 0L));
+        }
+        List<AnalyticsDtos.HourlyRevenuePoint> hourly = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            hourly.add(new AnalyticsDtos.HourlyRevenuePoint(hour, BigDecimal.ZERO, 0L));
+        }
+        return new AnalyticsDtos.MenuRevenueReportResponse(
+                scope.menuId(),
+                scope.menuName(),
+                scope.branchId(),
+                scope.branchName(),
+                from,
+                to,
+                new AnalyticsDtos.RevenueKpis(BigDecimal.ZERO, 0L, 0L, BigDecimal.ZERO, "TRY"),
+                daily,
+                List.of(),
+                List.of(),
+                new AnalyticsDtos.RevenueSpotlight(null, null, null),
+                hourly,
+                new AnalyticsDtos.UnsoldCatalog(0L, List.of()),
+                new AnalyticsDtos.RevenuePaymentBreakdown(
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        "TRY"
+                ),
+                List.of()
+        );
+    }
+
+    private AnalyticsDtos.MenuWaiterPerformanceReportResponse emptyWaiterReport(
+            ReportScope scope,
+            LocalDate from,
+            LocalDate to
+    ) {
+        List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
+        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+            daily.add(new AnalyticsDtos.DailyRevenuePoint(cursor, BigDecimal.ZERO, 0L));
+        }
+        List<AnalyticsDtos.HourlyRevenuePoint> hourly = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            hourly.add(new AnalyticsDtos.HourlyRevenuePoint(hour, BigDecimal.ZERO, 0L));
+        }
+        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+                scope.menuId(),
+                scope.menuName(),
+                scope.branchId(),
+                scope.branchName(),
+                from,
+                to,
+                new AnalyticsDtos.WaiterPerformanceKpis(
+                        0L, 0L, 0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO, 0L, "TRY"),
+                List.of(),
+                daily,
+                hourly,
+                List.of()
+        );
+    }
+
+    private Map<Long, String> labeledProductNames(ReportScope scope, List<MenuProduct> products) {
+        Map<String, Long> nameCounts = new HashMap<>();
+        for (MenuProduct product : products) {
+            nameCounts.merge(normalizeLabel(product.getName()), 1L, Long::sum);
+        }
+        Map<Long, String> names = new LinkedHashMap<>();
+        for (MenuProduct product : products) {
+            String name = product.getName() == null || product.getName().isBlank()
+                    ? "Urun #" + product.getProductId()
+                    : product.getName();
+            if (scope.disambiguateNames() && nameCounts.getOrDefault(normalizeLabel(product.getName()), 0L) > 1) {
+                String menuName = scope.menuNamesById().get(product.getMenuId());
+                if (menuName != null && !menuName.isBlank()) {
+                    name = name + " (" + menuName + ")";
+                }
+            }
+            names.put(product.getProductId(), name);
+        }
+        return names;
+    }
+
+    private Map<Long, String> labeledWaiterNames(ReportScope scope, List<MenuWaiter> waiters) {
+        Map<String, Long> nameCounts = new HashMap<>();
+        for (MenuWaiter waiter : waiters) {
+            nameCounts.merge(normalizeLabel(waiter.getDisplayName()), 1L, Long::sum);
+        }
+        Map<Long, String> names = new LinkedHashMap<>();
+        for (MenuWaiter waiter : waiters) {
+            String name = waiter.getDisplayName() == null || waiter.getDisplayName().isBlank()
+                    ? "Personel #" + waiter.getId()
+                    : waiter.getDisplayName();
+            if (scope.disambiguateNames() && nameCounts.getOrDefault(normalizeLabel(waiter.getDisplayName()), 0L) > 1) {
+                name = name + " #" + waiter.getId();
+            }
+            names.put(waiter.getId(), name);
+        }
+        return names;
+    }
+
+    private String normalizeLabel(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private record ReportScope(
+            Long branchId,
+            String branchName,
+            Long menuId,
+            String menuName,
+            List<Long> menuIds,
+            Map<Long, String> menuNamesById,
+            boolean disambiguateNames
+    ) {
+        private static ReportScope forMenus(
+                Long branchId,
+                String branchName,
+                Long menuId,
+                String menuName,
+                List<Menu> menus
+        ) {
+            List<Long> ids = menus.stream().map(Menu::getMenuId).toList();
+            Map<Long, String> names = menus.stream()
+                    .collect(Collectors.toMap(
+                            Menu::getMenuId,
+                            menu -> menu.getBusinessName() == null ? "" : menu.getBusinessName(),
+                            (a, b) -> a,
+                            LinkedHashMap::new
+                    ));
+            return new ReportScope(
+                    branchId,
+                    branchName,
+                    menuId,
+                    menuName,
+                    ids,
+                    names,
+                    menuId == null && ids.size() > 1
+            );
+        }
     }
 
     private Menu requireOwnedMenu(Long menuId, Long ownerId) {

@@ -63,7 +63,7 @@ public final class MenuWaiterDtos {
     @AllArgsConstructor
     public static class WaiterResponse {
         private Long id;
-        private Long menuId;
+        private Long branchId;
         private String username;
         private String displayName;
         private boolean active;
@@ -114,7 +114,7 @@ public final class MenuWaiterDtos {
         private String accessToken;
         private String refreshToken;
         private Long waiterId;
-        private Long menuId;
+        private Long branchId;
         private String displayName;
     }
 
@@ -124,7 +124,7 @@ public final class MenuWaiterDtos {
     @AllArgsConstructor
     public static class WaiterMeResponse {
         private Long waiterId;
-        private Long menuId;
+        private Long branchId;
         private Long ownerUserId;
         private String username;
         private String displayName;
@@ -180,6 +180,8 @@ public final class MenuWaiterDtos {
     @AllArgsConstructor
     public static class TableOrderSummary {
         private Long tableId;
+        private Long menuId;
+        private String menuName;
         private String tableName;
         private Integer tableNumber;
         private boolean active;
