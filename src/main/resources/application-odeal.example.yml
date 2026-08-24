@@ -1,0 +1,9 @@
+# Local Ödeal test overrides. Copy values into env vars or a local, gitignored profile file.
+odeal:
+  enabled: true
+  base-url: https://stage.odealapp.com/api/v1
+  merchant-key: ${ODEAL_MERCHANT_KEY}
+  secret-key: ${ODEAL_SECRET_KEY}
+  external-device-key: ${ODEAL_EXTERNAL_DEVICE_KEY}
+  default-vat-ratio: 10
+  test-api-key: odeal-test-local
