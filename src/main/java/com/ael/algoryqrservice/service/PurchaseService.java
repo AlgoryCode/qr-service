@@ -77,6 +77,7 @@ public class PurchaseService {
     private final BillingRefundProperties billingRefundProperties;
     private final BillingSubscriptionProperties billingSubscriptionProperties;
     private final PlatformTransactionManager transactionManager;
+    private final BranchQuotaService branchQuotaService;
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -674,9 +675,20 @@ public class PurchaseService {
                     .orElse(null);
         }
 
+        List<PurchaseSummaryResponse> addonPurchases = purchaseRepository
+                .findByUserIdOrderByPurchasedAtDesc(userId)
+                .stream()
+                .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
+                .filter(Purchase::isUsable)
+                .map(this::toSummary)
+                .toList();
+
         return SubscriptionOverviewResponse.builder()
                 .activePackage(activePackage)
                 .entitlements(entitlements)
+                .addonPurchases(addonPurchases)
+                .branchQuota(branchQuotaService.branchQuota(userId))
+                .menuQuota(branchQuotaService.menuQuota(userId))
                 .build();
     }
 

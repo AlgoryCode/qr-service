@@ -11,4 +11,7 @@ public class SubscriptionOverviewResponse {
 
     private PurchaseSummaryResponse activePackage;
     private List<UserEntitlementResponse> entitlements;
+    private List<PurchaseSummaryResponse> addonPurchases;
+    private BranchDtos.Quota branchQuota;
+    private BranchDtos.MenuQuota menuQuota;
 }

@@ -145,4 +145,62 @@ class PackageActivationServiceTest {
         verify(purchaseRepository, never()).save(any());
         verify(menuPublicAccessService).syncForUser(20L);
     }
+
+    @Test
+    void ensureSubscriptionState_whenAddonAndPaidExist_thenReturnPaid() {
+        Purchase paid = Purchase.builder()
+                .id(1L)
+                .userId(20L)
+                .packageId(4L)
+                .packageCode(CatalogPackages.ULTIMATE_PACKAGE)
+                .purchaseType(PurchaseType.PAID)
+                .status(PurchaseStatus.ACTIVE)
+                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
+                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
+                .build();
+        Purchase addon = Purchase.builder()
+                .id(2L)
+                .userId(20L)
+                .packageId(4L)
+                .packageCode("QR_MENU")
+                .purchaseType(PurchaseType.ADD_ON)
+                .status(PurchaseStatus.ACTIVE)
+                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
+                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
+                .build();
+        PlanPackage ultimate = PlanPackage.builder()
+                .id(4L)
+                .code(CatalogPackages.ULTIMATE_PACKAGE)
+                .priority(300)
+                .build();
+
+        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
+                .thenReturn(List.of(paid, addon));
+        when(planPackageRepository.findAllById(List.of(4L))).thenReturn(List.of(ultimate));
+
+        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(20L);
+
+        assertThat(result).contains(paid);
+    }
+
+    @Test
+    void ensureSubscriptionState_whenOnlyAddonExists_thenReturnEmpty() {
+        Purchase addon = Purchase.builder()
+                .id(2L)
+                .userId(20L)
+                .packageId(4L)
+                .packageCode("QR_MENU")
+                .purchaseType(PurchaseType.ADD_ON)
+                .status(PurchaseStatus.ACTIVE)
+                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
+                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
+                .build();
+
+        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
+                .thenReturn(List.of(addon));
+
+        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(20L);
+
+        assertThat(result).isEmpty();
+    }
 }
