@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
@@ -61,19 +62,30 @@ public class TrendyolGoClient {
     }
 
     public void acceptOrder(TrendyolGoDtos.Credentials credentials, String orderId) {
-        exchange(HttpMethod.POST, expand(properties.getPaths().getOrderAccept(), credentials, orderId), credentials, Map.of());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        body.put("preparationTime", properties.getDefaultPreparationMinutes());
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderAccept(), credentials, null), credentials, body);
     }
 
     public void rejectOrder(TrendyolGoDtos.Credentials credentials, String orderId) {
-        exchange(HttpMethod.POST, expand(properties.getPaths().getOrderReject(), credentials, orderId), credentials, Map.of());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        body.put("reasonId", properties.getDefaultCancelReasonId());
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderReject(), credentials, null), credentials, body);
     }
 
     public void cancelOrder(TrendyolGoDtos.Credentials credentials, String orderId) {
-        exchange(HttpMethod.POST, expand(properties.getPaths().getOrderCancel(), credentials, orderId), credentials, Map.of());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        body.put("reasonId", properties.getDefaultCancelReasonId());
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderCancel(), credentials, null), credentials, body);
     }
 
     public void markReady(TrendyolGoDtos.Credentials credentials, String orderId) {
-        exchange(HttpMethod.POST, expand(properties.getPaths().getOrderReady(), credentials, orderId), credentials, Map.of());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderReady(), credentials, null), credentials, body);
     }
 
     private JsonNode exchange(HttpMethod method, String path, TrendyolGoDtos.Credentials credentials, Object body) {
@@ -125,9 +137,7 @@ public class TrendyolGoClient {
         if (status == 401 || status == 403) {
             return new TrendyolGoClientException("TGO kimlik bilgileri reddedildi");
         }
-        if (log.isDebugEnabled()) {
-            log.debug("TGO HTTP {} {}", status, exception.getResponseBodyAsString());
-        }
+        log.warn("TGO HTTP {} {}", status, exception.getResponseBodyAsString());
         return new TrendyolGoClientException("Uber Eats Trendyol Go isteği başarısız oldu");
     }
 

@@ -141,7 +141,7 @@ billing:
     manual-payment-grace-days: ${BILLING_SUBSCRIPTION_GRACE_DAYS:7}
 
 trendyol-go:
-  base-url: ${TGO_BASE_URL:https://api.tgoapps.com}
+  base-url: ${TGO_BASE_URL:https://api.tgoapis.com}
   user-agent-name: ${TGO_USER_AGENT_NAME:AlgoryQR}
   encrypt-key: ${TGO_CREDENTIALS_ENCRYPT_KEY:}
   connect-timeout: ${TGO_CONNECT_TIMEOUT:5s}
