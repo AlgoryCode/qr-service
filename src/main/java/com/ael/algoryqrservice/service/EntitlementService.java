@@ -427,6 +427,7 @@ public class EntitlementService {
         List<Purchase> usablePurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
+                .filter(purchase -> purchase.getPurchaseType() != PurchaseType.ADD_ON)
                 .filter(purchase -> !CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()))
                 .toList();
         for (Purchase purchase : usablePurchases) {
@@ -436,9 +437,59 @@ public class EntitlementService {
             planPackageRepository.findByIdWithItems(purchase.getPackageId())
                     .ifPresent(planPackage -> ensureEntitlementsForPackage(purchase, planPackage));
         }
+        repairAddonEntitlements(userId);
         syncQrMenuUsageFromActiveMenus(userId);
         syncQrCreateEntitlements(userId);
         syncMenuProductUsageFromActiveProducts(userId);
+    }
+
+    @Transactional
+    public void repairAddonEntitlements(Long userId) {
+        List<Purchase> addonPurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+                .filter(Purchase::isUsable)
+                .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
+                .toList();
+        for (Purchase purchase : addonPurchases) {
+            Product product = productRepository.findByCode(purchase.getPackageCode()).orElse(null);
+            if (product == null) {
+                continue;
+            }
+            int quantity = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
+                    ? 1
+                    : purchase.getInstallmentCount();
+            List<UserEntitlement> entitlements = entitlementRepository
+                    .findByPurchaseIdOrderByProductCodeAsc(purchase.getId());
+            UserEntitlement matched = null;
+            for (UserEntitlement entitlement : entitlements) {
+                if (Objects.equals(entitlement.getProductId(), product.getId())
+                        || Objects.equals(entitlement.getProductCode(), product.getCode())) {
+                    matched = entitlement;
+                    continue;
+                }
+                entitlement.setRemainingQuantity(0);
+                entitlement.setExpiresAt(purchase.getExpiresAt() != null
+                        ? purchase.getExpiresAt()
+                        : LocalDateTime.now());
+                entitlementRepository.save(entitlement);
+            }
+            if (matched == null) {
+                grant(purchase, product.getId(), product.getCode(), quantity, false);
+                continue;
+            }
+            matched.setProductId(product.getId());
+            matched.setProductCode(product.getCode());
+            matched.setUnlimited(false);
+            matched.setStartsAt(purchase.getStartsAt());
+            matched.setExpiresAt(purchase.getExpiresAt());
+            int used = matched.getUsedQuantity() != null ? matched.getUsedQuantity() : 0;
+            if (used > quantity) {
+                used = quantity;
+                matched.setUsedQuantity(used);
+            }
+            matched.setTotalQuantity(quantity);
+            matched.setRemainingQuantity(Math.max(0, quantity - used));
+            entitlementRepository.save(matched);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -455,6 +506,7 @@ public class EntitlementService {
         }
         List<Purchase> paidOrTrial = activePurchases.stream()
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
+                .filter(purchase -> purchase.getPurchaseType() != PurchaseType.ADD_ON)
                 .filter(purchase -> !CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()))
                 .toList();
         if (!paidOrTrial.isEmpty()) {

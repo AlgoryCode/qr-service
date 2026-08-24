@@ -92,8 +92,7 @@ public class PackageActivationService {
         }
         return purchase.getPurchaseType() == PurchaseType.PAID
                 || purchase.getPurchaseType() == PurchaseType.TRIAL
-                || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT
-                || purchase.getPurchaseType() == PurchaseType.ADD_ON;
+                || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT;
     }
 
     private Purchase selectHighestPackage(List<Purchase> purchases) {
