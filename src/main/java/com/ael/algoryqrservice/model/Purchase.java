@@ -96,7 +96,7 @@ public class Purchase {
     private PaymentStyle paymentStyle = PaymentStyle.ONE_TIME;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "billing_period", length = 16)
+    @Column(name = "billing_period", nullable = false, length = 16)
     private com.ael.algoryqrservice.model.enums.BillingPeriod billingPeriod;
 
     @Column(name = "billing_interval_months")
