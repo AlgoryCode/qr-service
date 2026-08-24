@@ -35,6 +35,7 @@ import com.ael.algoryqrservice.repository.PlanChangeRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.util.BillingPeriodResolver;
 import com.ael.algoryqrservice.util.IdentityNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,7 +85,7 @@ public class PlanChangeService {
         Purchase current = requireUsablePaidPurchase(userId);
         PlanPackage fromPackage = planPackageService.findPackage(current.getPackageId());
         PlanPackage toPackage = requireTargetPackage(toPackageId, current.getPackageId());
-        BillingPeriod currentPeriod = resolveBillingPeriod(current);
+        BillingPeriod currentPeriod = BillingPeriodResolver.resolve(current);
         BigDecimal fromPeriodPrice = periodPrice(fromPackage, currentPeriod);
         BigDecimal toPeriodPrice = periodPrice(toPackage, currentPeriod);
         PlanChangeDirection direction = resolveDirection(fromPeriodPrice, toPeriodPrice);
@@ -139,7 +140,7 @@ public class PlanChangeService {
         Purchase current = requireUsablePaidPurchase(user.getId());
         PlanPackage fromPackage = planPackageService.findPackage(current.getPackageId());
         PlanPackage toPackage = requireTargetPackage(request.getToPackageId(), current.getPackageId());
-        BillingPeriod fromPeriod = resolveBillingPeriod(current);
+        BillingPeriod fromPeriod = BillingPeriodResolver.resolve(current);
         BillingPeriod toPeriod = request.getBillingPeriod() != null ? request.getBillingPeriod() : fromPeriod;
         if (fromPeriod == BillingPeriod.YEARLY && toPeriod == BillingPeriod.MONTHLY
                 && request.getTiming() == PlanChangeTiming.IMMEDIATE) {
@@ -258,7 +259,7 @@ public class PlanChangeService {
         planChangeRepository.save(planChange);
 
         try {
-            BillingPeriod toPeriod = current != null ? resolveBillingPeriod(current) : BillingPeriod.MONTHLY;
+            BillingPeriod toPeriod = current != null ? BillingPeriodResolver.resolve(current) : BillingPeriod.MONTHLY;
             BigDecimal toPeriodPrice = periodPrice(toPackage, toPeriod);
             Purchase newPurchase = createPendingPurchase(
                     user,
@@ -904,16 +905,6 @@ public class PlanChangeService {
             throw new BadRequestException("Hedef paket fiyati gecersiz");
         }
         return toPackage;
-    }
-
-    private BillingPeriod resolveBillingPeriod(Purchase purchase) {
-        if (purchase.getBillingPeriod() != null) {
-            return purchase.getBillingPeriod();
-        }
-        if (purchase.getBillingIntervalMonths() != null && purchase.getBillingIntervalMonths() >= 12) {
-            return BillingPeriod.YEARLY;
-        }
-        return BillingPeriod.MONTHLY;
     }
 
     private BigDecimal periodPrice(PlanPackage planPackage, BillingPeriod period) {

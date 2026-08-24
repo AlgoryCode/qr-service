@@ -230,6 +230,7 @@ public class PaymentRequestMapper {
         sourceMetadata.put("installmentCount", 1);
         sourceMetadata.put("billingCycleNumber", 1);
         sourceMetadata.put("paymentStyle", PaymentStyle.ONE_TIME.name());
+        sourceMetadata.put("billingPeriod", purchase.getBillingPeriod() == null ? null : purchase.getBillingPeriod().name());
         sourceMetadata.put("totalAmount", chargeAmount);
         sourceMetadata.put("addon", true);
         sourceMetadata.put("periodStart", periodStart.toString());
