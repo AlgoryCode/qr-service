@@ -29,8 +29,8 @@ public class TrendyolGoProperties {
     @Getter
     @Setter
     public static class Paths {
-        private String restaurants = "/integrator/store/meal/suppliers/{sellerId}/restaurants";
-        private String restaurantMenu = "/integrator/product/meal/suppliers/{sellerId}/restaurants/{restaurantId}/products";
+        private String restaurants = "/integrator/store/meal/suppliers/{sellerId}/stores";
+        private String restaurantMenu = "/integrator/product/meal/suppliers/{sellerId}/stores/{restaurantId}/products";
         private String orders = "/integrator/order/meal/suppliers/{sellerId}/packages";
         private String orderAccept = "/integrator/order/meal/suppliers/{sellerId}/packages/picked";
         private String orderReject = "/integrator/order/meal/suppliers/{sellerId}/packages/unsupplied";
