@@ -14,9 +14,11 @@ import com.ael.algoryqrservice.model.dto.PaymentCardDto;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.enums.BillingAddressType;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.util.IdentityNumbers;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -280,6 +283,45 @@ class PaymentRequestMapperTest {
         assertThat(first).matches("^qr7\\d{14}[a-f0-9]{4}$");
         assertThat(second).matches("^qr7\\d{14}[a-f0-9]{4}$");
         assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void toAddonCheckoutFormRequest_whenBillingPeriodPresent_thenIncludeInMetadata() {
+        BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
+                .name("Ada").surname("Lovelace").country("TR").city("Istanbul")
+                .address("Adres").postcode("34000").tckn("12345678901").build();
+        Purchase purchase = Purchase.builder()
+                .id(10L)
+                .packageId(22L)
+                .packageCode(CatalogProducts.QR_MENU)
+                .price(new BigDecimal("240.00"))
+                .currency("TRY")
+                .paymentStyle(PaymentStyle.ONE_TIME)
+                .purchaseType(PurchaseType.ADD_ON)
+                .billingPeriod(BillingPeriod.YEARLY)
+                .billingIntervalMonths(12)
+                .billingSnapshot(snapshot)
+                .build();
+        User user = User.builder().id(7L).firstName("Ada").lastName("Lovelace")
+                .email("ada@example.com").phone("5551112233").build();
+        LocalDateTime periodStart = LocalDateTime.of(2026, 8, 24, 1, 0);
+        LocalDateTime periodEnd = LocalDateTime.of(2027, 8, 24, 1, 0);
+
+        PaymentCheckoutFormRequest result = mapper.toAddonCheckoutFormRequest(
+                purchase,
+                user,
+                CatalogProducts.QR_MENU,
+                "QR Menu",
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conv-addon",
+                periodStart,
+                periodEnd
+        );
+
+        assertThat(result.getSourceMetadata().get("billingPeriod")).isEqualTo("YEARLY");
+        assertThat(result.getSourceMetadata().get("addon")).isEqualTo(true);
     }
 
     private PaymentThreeDsRequest map(BillingPeriod period) {

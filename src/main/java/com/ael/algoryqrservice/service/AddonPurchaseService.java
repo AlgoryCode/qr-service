@@ -14,6 +14,7 @@ import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AddonPurchaseRequest;
 import com.ael.algoryqrservice.model.dto.PurchaseInitiateResponse;
+import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
@@ -22,6 +23,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.util.AppTime;
+import com.ael.algoryqrservice.util.BillingPeriodResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -62,6 +64,7 @@ public class AddonPurchaseService {
 
         entitlementService.expireDuePurchasesForUser(user.getId());
         Purchase host = findHostPurchase(user.getId());
+        BillingPeriod billingPeriod = BillingPeriodResolver.resolve(host);
         PackagePricingService.LinePrice line = packagePricingService.calculateProduct(
                 product,
                 request.resolvedQuantity()
@@ -91,6 +94,8 @@ public class AddonPurchaseService {
                 .paymentMode(PaymentMode.CHECKOUT_FORM)
                 .paymentStyle(PaymentStyle.ONE_TIME)
                 .purchaseType(PurchaseType.ADD_ON)
+                .billingPeriod(billingPeriod)
+                .billingIntervalMonths(billingPeriod.intervalMonths())
                 .installmentCount(request.resolvedQuantity())
                 .paymentMethodId(request.getPaymentMethodId())
                 .billingSnapshot(billingSnapshot)
