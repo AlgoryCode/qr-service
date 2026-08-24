@@ -151,6 +151,15 @@ trendyol-go:
   poll-lookback-hours: ${TGO_POLL_LOOKBACK_HOURS:24}
   webhook-api-key: ${TGO_WEBHOOK_API_KEY:}
 
+odeal:
+  enabled: ${ODEAL_ENABLED:true}
+  base-url: ${ODEAL_BASE_URL:https://stage.odealapp.com/api/v1}
+  merchant-key: ${ODEAL_MERCHANT_KEY:}
+  secret-key: ${ODEAL_SECRET_KEY:}
+  external-device-key: ${ODEAL_EXTERNAL_DEVICE_KEY:}
+  default-vat-ratio: ${ODEAL_DEFAULT_VAT_RATIO:10}
+  test-api-key: ${ODEAL_TEST_API_KEY:odeal-test-local}
+
 jwt:
   secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}

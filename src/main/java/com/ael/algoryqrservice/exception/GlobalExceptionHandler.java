@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.exception;
 
+import com.ael.algoryqrservice.integration.odeal.client.OdealClientException;
 import com.ael.algoryqrservice.integration.trendyolgo.client.TrendyolGoClientException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,6 +41,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TrendyolGoClientException.class)
     public ResponseEntity<Map<String, String>> handleTrendyolGo(TrendyolGoClientException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(OdealClientException.class)
+    public ResponseEntity<Map<String, String>> handleOdeal(OdealClientException ex) {
+        log.warn("Odeal client error: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("message", ex.getMessage()));
     }
@@ -91,6 +100,16 @@ public class GlobalExceptionHandler {
         log.error("Data integrity violation", ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "Veri kaydı tamamlanamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin."));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        String message = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
+        return ResponseEntity.status(status).body(Map.of("message", message));
     }
 
     @ExceptionHandler(Exception.class)
