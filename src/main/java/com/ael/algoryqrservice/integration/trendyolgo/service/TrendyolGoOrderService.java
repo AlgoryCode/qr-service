@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.integration.trendyolgo.model.TrendyolGoOrder;
 import com.ael.algoryqrservice.integration.trendyolgo.model.dto.TrendyolGoDtos;
 import com.ael.algoryqrservice.integration.trendyolgo.repository.TrendyolGoConnectionRepository;
 import com.ael.algoryqrservice.integration.trendyolgo.repository.TrendyolGoOrderRepository;
+import com.ael.algoryqrservice.integration.trendyolgo.repository.TrendyolGoOrderSpecifications;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,13 +25,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TrendyolGoOrderService {
+
+    private static final ZoneId ZONE = ZoneId.of("Europe/Istanbul");
 
     private final TrendyolGoConnectionService connectionService;
     private final TrendyolGoConnectionRepository connectionRepository;
@@ -41,15 +46,28 @@ public class TrendyolGoOrderService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public TrendyolGoDtos.OrderPageResponse listOrders(Long branchId, String status, int page, int size) {
+    public TrendyolGoDtos.OrderPageResponse listOrders(
+            Long branchId,
+            String status,
+            LocalDate from,
+            LocalDate to,
+            int page,
+            int size
+    ) {
         TrendyolGoConnection connection = connectionService.requireConnected(branchId);
         int safeSize = Math.max(1, Math.min(size, 50));
         int safePage = Math.max(0, page);
-        Page<TrendyolGoOrder> result = hasText(status)
-                ? orderRepository.findByConnectionIdAndPackageStatusIgnoreCaseOrderByPackageCreatedAtDesc(
-                connection.getId(), status.trim(), PageRequest.of(safePage, safeSize))
-                : orderRepository.findByConnectionIdOrderByPackageCreatedAtDesc(
-                connection.getId(), PageRequest.of(safePage, safeSize));
+        LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
+        LocalDateTime toDt = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
+        Page<TrendyolGoOrder> result = orderRepository.findAll(
+                TrendyolGoOrderSpecifications.forConnectionListed(
+                        connection.getId(),
+                        hasText(status) ? status.trim() : null,
+                        fromDt,
+                        toDt
+                ),
+                PageRequest.of(safePage, safeSize)
+        );
         return TrendyolGoDtos.OrderPageResponse.builder()
                 .content(result.getContent().stream().map(this::toResponse).toList())
                 .page(result.getNumber())
@@ -109,16 +127,11 @@ public class TrendyolGoOrderService {
             return 0;
         }
         Instant end = Instant.now();
-        Instant start = end.minusSeconds(properties.getPollLookbackHours() * 3600L);
+        Instant start = end.minusSeconds((long) properties.getPollLookbackHours() * 3600L);
         int upserted = 0;
         for (TrendyolGoConnection connection : connectionRepository.findByStatus(TrendyolGoConnectionStatus.CONNECTED)) {
             try {
-                JsonNode payload = trendyolGoClient.listOrders(connectionService.decrypt(connection), start, end);
-                for (JsonNode node : payloadMapper.toOrderNodes(payload)) {
-                    if (upsertOrder(connection, node) != null) {
-                        upserted++;
-                    }
-                }
+                upserted += syncConnection(connection, start, end);
                 connection.setLastSyncedAt(LocalDateTime.now());
                 connection.setLastError(null);
                 connectionRepository.save(connection);
@@ -127,6 +140,56 @@ public class TrendyolGoOrderService {
                 connection.setLastError(exception.getMessage());
                 connectionRepository.save(connection);
                 log.warn("TGO sipariş senkronu başarısız connectionId={}", connection.getId());
+            }
+        }
+        return upserted;
+    }
+
+    @Transactional(readOnly = true)
+    public int syncLookbackHours() {
+        return properties.getPollLookbackHours();
+    }
+
+    @Transactional
+    public TrendyolGoDtos.SyncOrdersResponse syncBranchOrders(Long branchId, LocalDate from, LocalDate to) {
+        TrendyolGoConnection connection = connectionService.requireConnected(branchId);
+        InstantRange range = resolveSyncRange(from, to);
+        int upserted = syncConnection(connection, range.start(), range.end());
+        connection.setLastSyncedAt(LocalDateTime.now());
+        connection.setLastError(null);
+        connectionRepository.save(connection);
+        return TrendyolGoDtos.SyncOrdersResponse.builder()
+                .upserted(upserted)
+                .lookbackHours(properties.getPollLookbackHours())
+                .from(from)
+                .to(to)
+                .build();
+    }
+
+    private InstantRange resolveSyncRange(LocalDate from, LocalDate to) {
+        if (from != null || to != null) {
+            LocalDate endDate = to != null ? to : LocalDate.now(ZONE);
+            LocalDate startDate = from != null ? from : endDate.minusDays(29);
+            if (startDate.isAfter(endDate)) {
+                throw new BadRequestException("Başlangıç tarihi bitiş tarihinden sonra olamaz");
+            }
+            return new InstantRange(
+                    startDate.atStartOfDay(ZONE).toInstant(),
+                    endDate.plusDays(1).atStartOfDay(ZONE).toInstant().minusMillis(1)
+            );
+        }
+        Instant end = Instant.now();
+        return new InstantRange(end.minusSeconds((long) properties.getPollLookbackHours() * 3600L), end);
+    }
+
+    private record InstantRange(Instant start, Instant end) {
+    }
+
+    private int syncConnection(TrendyolGoConnection connection, Instant start, Instant end) {
+        int upserted = 0;
+        for (JsonNode node : trendyolGoClient.listAllOrders(connectionService.decrypt(connection), start, end)) {
+            if (upsertOrder(connection, node) != null) {
+                upserted++;
             }
         }
         return upserted;
@@ -199,9 +262,24 @@ public class TrendyolGoOrderService {
     }
 
     private TrendyolGoDtos.OrderResponse toResponse(TrendyolGoOrder order) {
+        JsonNode rawPayload = readRawPayload(order.getRawPayload());
+        List<TrendyolGoDtos.OrderItemResponse> items = readItems(order.getItemsJson());
+        if (items.isEmpty() && rawPayload != null) {
+            items = payloadMapper.toOrderItems(rawPayload);
+        } else if (rawPayload != null && items.stream().allMatch(this::itemMissingDetail)) {
+            items = payloadMapper.toOrderItems(rawPayload);
+        }
+
+        String orderNumber = rawPayload != null ? payloadMapper.orderNumber(rawPayload) : null;
+        String deliveryType = rawPayload != null ? payloadMapper.deliveryType(rawPayload) : null;
+        String paymentMethod = rawPayload != null ? payloadMapper.paymentMethod(rawPayload) : null;
+
         return TrendyolGoDtos.OrderResponse.builder()
                 .id(order.getId())
                 .externalOrderId(order.getExternalOrderId())
+                .orderNumber(orderNumber)
+                .deliveryType(deliveryType)
+                .paymentMethod(paymentMethod)
                 .packageStatus(order.getPackageStatus())
                 .totalAmount(order.getTotalAmount())
                 .currency(order.getCurrency())
@@ -211,8 +289,26 @@ public class TrendyolGoOrderService {
                 .note(order.getNote())
                 .packageCreatedAt(order.getPackageCreatedAt())
                 .updatedAt(order.getUpdatedAt())
-                .items(readItems(order.getItemsJson()))
+                .items(items)
                 .build();
+    }
+
+    private boolean itemMissingDetail(TrendyolGoDtos.OrderItemResponse item) {
+        return item.getProductName() == null
+                || item.getProductName().isBlank()
+                || item.getDetail() == null
+                || item.getDetail().isBlank();
+    }
+
+    private JsonNode readRawPayload(String rawPayload) {
+        if (!hasText(rawPayload)) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(rawPayload);
+        } catch (JsonProcessingException exception) {
+            return null;
+        }
     }
 
     private List<TrendyolGoDtos.OrderItemResponse> readItems(String json) {

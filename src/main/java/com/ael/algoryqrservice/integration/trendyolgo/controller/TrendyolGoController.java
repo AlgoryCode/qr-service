@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.integration.trendyolgo.service.TrendyolGoOrderSer
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -72,10 +74,21 @@ public class TrendyolGoController {
     public ResponseEntity<TrendyolGoDtos.OrderPageResponse> orders(
             @RequestParam Long branchId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(orderService.listOrders(branchId, status, page, size));
+        return ResponseEntity.ok(orderService.listOrders(branchId, status, from, to, page, size));
+    }
+
+    @PostMapping("/orders/sync")
+    public ResponseEntity<TrendyolGoDtos.SyncOrdersResponse> syncOrders(
+            @RequestParam Long branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(orderService.syncBranchOrders(branchId, from, to));
     }
 
     @GetMapping("/orders/{orderId}")

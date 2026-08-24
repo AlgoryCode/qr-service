@@ -75,6 +75,46 @@ public class TrendyolGoPayloadMapper {
         return firstText(node, "id", "orderId", "packageId", "externalOrderId");
     }
 
+    public String orderNumber(JsonNode node) {
+        return firstText(node, "orderCode", "orderNumber", "order.code", "shipmentNumber");
+    }
+
+    public String deliveryType(JsonNode node) {
+        String text = firstText(
+                node,
+                "deliveryTypeText",
+                "deliveryProviderName",
+                "courierType",
+                "deliveryType",
+                "deliveryAddressType",
+                "delivery.type"
+        );
+        return text;
+    }
+
+    public String paymentMethod(JsonNode node) {
+        String text = firstText(
+                node,
+                "paymentMethodText",
+                "payment.paymentMethodText",
+                "paymentTypeText",
+                "payment.paymentTypeText",
+                "paymentMethodName",
+                "payment.paymentMethodName",
+                "paymentType",
+                "payment.type",
+                "paymentMethod"
+        );
+        if (text != null) {
+            return text;
+        }
+        Boolean cashOnDelivery = firstBoolean(node, "isCod", "payment.isCod", "cashOnDelivery");
+        if (Boolean.TRUE.equals(cashOnDelivery)) {
+            return "Kapıda ödeme";
+        }
+        return null;
+    }
+
     public String restaurantId(JsonNode node) {
         return firstText(node, "restaurantId", "storeId", "restaurant.id", "store.id");
     }
@@ -110,14 +150,21 @@ public class TrendyolGoPayloadMapper {
     }
 
     public String customerPhone(JsonNode node) {
-        return firstText(node, "customerPhone", "customer.phone", "customer.gsm", "phone");
+        return firstText(
+                node,
+                "customerPhone",
+                "phoneNumber",
+                "customer.phone",
+                "customer.gsm",
+                "phone",
+                "address.phone"
+        );
     }
 
     public String deliveryAddress(JsonNode node) {
         String text = firstText(
                 node,
                 "deliveryAddress",
-                "address",
                 "deliveryAddress.address1",
                 "deliveryAddress.fullAddress",
                 "shippingAddress.address1"
@@ -125,19 +172,21 @@ public class TrendyolGoPayloadMapper {
         if (text != null) {
             return text;
         }
-        JsonNode address = firstNode(node, "deliveryAddress", "shippingAddress", "address");
+        JsonNode address = firstNode(node, "address", "deliveryAddress", "shippingAddress");
         if (address == null || !address.isObject()) {
             return null;
         }
         List<String> parts = new ArrayList<>();
+        addIfPresent(parts, firstText(address, "neighborhood"));
         addIfPresent(parts, firstText(address, "address1", "address", "fullAddress", "street"));
-        addIfPresent(parts, firstText(address, "district", "neighborhood"));
-        addIfPresent(parts, firstText(address, "city", "province"));
+        addIfPresent(parts, apartmentPart(address));
+        addIfPresent(parts, firstText(address, "district", "city", "province"));
+        addIfPresent(parts, firstText(node, "addressDescription"));
         return parts.isEmpty() ? null : String.join(", ", parts);
     }
 
     public String note(JsonNode node) {
-        return firstText(node, "note", "orderNote", "description", "customerNote");
+        return firstText(node, "customerNote", "note", "orderNote", "description");
     }
 
     public LocalDateTime packageCreatedAt(JsonNode node) {
@@ -147,12 +196,14 @@ public class TrendyolGoPayloadMapper {
     public List<TrendyolGoDtos.OrderItemResponse> toOrderItems(JsonNode node) {
         List<TrendyolGoDtos.OrderItemResponse> items = new ArrayList<>();
         for (JsonNode line : listNodes(node, "lines", "items", "products", "orderItems")) {
+            String detail = lineDetail(line);
             items.add(TrendyolGoDtos.OrderItemResponse.builder()
                     .productId(firstText(line, "productId", "id", "itemId"))
-                    .productName(firstText(line, "productName", "name", "title"))
-                    .quantity(firstInt(line, "quantity", "qty", "count"))
-                    .unitPrice(firstDecimal(line, "price", "unitPrice", "salePrice"))
-                    .options(optionsText(line))
+                    .productName(firstText(line, "productName", "name", "title", "nameDisplay"))
+                    .quantity(lineQuantity(line))
+                    .unitPrice(firstDecimal(line, "unitSellingPrice", "unitPrice", "price", "salePrice"))
+                    .options(detail)
+                    .detail(detail)
                     .build());
         }
         return items;
@@ -193,23 +244,75 @@ public class TrendyolGoPayloadMapper {
                 || normalized.contains("closed"));
     }
 
-    private String optionsText(JsonNode line) {
-        JsonNode extras = firstNode(line, "extraIngredients", "ingredients", "options", "modifiers");
-        if (extras == null || extras.isNull()) {
-            return firstText(line, "note", "description");
+    private int lineQuantity(JsonNode line) {
+        JsonNode packageItems = firstNode(line, "items");
+        if (packageItems != null && packageItems.isArray() && !packageItems.isEmpty()) {
+            return packageItems.size();
         }
-        if (extras.isTextual()) {
-            return extras.asText();
+        return firstInt(line, "quantity", "qty", "count");
+    }
+
+    private String lineDetail(JsonNode line) {
+        List<String> parts = new ArrayList<>();
+        collectLineOptions(line, parts, 0);
+        addIfPresent(parts, firstText(line, "note", "description"));
+        return parts.isEmpty() ? null : String.join(" · ", parts);
+    }
+
+    private void collectLineOptions(JsonNode line, List<String> parts, int depth) {
+        if (line == null || depth > 3) {
+            return;
         }
-        if (extras.isArray()) {
-            List<String> names = new ArrayList<>();
-            for (JsonNode extra : extras) {
-                String name = extra.isTextual() ? extra.asText() : firstText(extra, "name", "title");
-                addIfPresent(names, name);
+        appendNamedNodes(parts, firstNode(line, "extraIngredients"), null);
+        appendNamedNodes(parts, firstNode(line, "removedIngredients"), "Çıkarılan");
+        JsonNode modifiers = firstNode(line, "modifierProducts", "modifiers", "options");
+        if (modifiers != null && modifiers.isArray()) {
+            for (JsonNode modifier : modifiers) {
+                String name = modifier.isTextual() ? modifier.asText() : firstText(modifier, "name", "title");
+                addIfPresent(parts, name);
+                collectLineOptions(modifier, parts, depth + 1);
             }
-            return names.isEmpty() ? null : String.join(", ", names);
+            return;
         }
-        return extras.toString();
+        if (modifiers != null && modifiers.isTextual()) {
+            addIfPresent(parts, modifiers.asText());
+        }
+    }
+
+    private void appendNamedNodes(List<String> parts, JsonNode nodes, String suffix) {
+        if (nodes == null || nodes.isNull()) {
+            return;
+        }
+        if (nodes.isTextual()) {
+            addIfPresent(parts, suffix == null ? nodes.asText() : nodes.asText() + " (" + suffix + ")");
+            return;
+        }
+        if (!nodes.isArray()) {
+            return;
+        }
+        for (JsonNode node : nodes) {
+            String name = node.isTextual() ? node.asText() : firstText(node, "name", "title", "optionNameDisplay");
+            if (name == null) {
+                continue;
+            }
+            addIfPresent(parts, suffix == null ? name : name + " (" + suffix + ")");
+        }
+    }
+
+    private String apartmentPart(JsonNode address) {
+        List<String> parts = new ArrayList<>();
+        addIfPresent(parts, labeledPart("Apt", firstText(address, "apartmentNumber")));
+        addIfPresent(parts, labeledPart("Kat", firstText(address, "floor")));
+        addIfPresent(parts, labeledPart("Kapı", firstText(address, "doorNumber")));
+        addIfPresent(parts, labeledPart("Firma", firstText(address, "company")));
+        return parts.isEmpty() ? null : String.join(" ", parts);
+    }
+
+    private String labeledPart(String label, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return label + ": " + value.trim();
     }
 
     private boolean isOrderLike(JsonNode node) {

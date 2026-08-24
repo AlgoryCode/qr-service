@@ -20,7 +20,8 @@ public class TrendyolGoProperties {
     private Duration readTimeout = Duration.ofSeconds(20);
     private int maxAttempts = 3;
     private boolean pollEnabled = true;
-    private int pollLookbackHours = 24;
+    private int pollLookbackHours = 168;
+    private int pollPageSize = 50;
     private String webhookApiKey = "";
     private int defaultPreparationMinutes = 30;
     private int defaultCancelReasonId = 661;
