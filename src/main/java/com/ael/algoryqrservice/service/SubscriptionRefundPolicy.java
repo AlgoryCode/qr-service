@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.config.BillingRefundProperties;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
+import com.ael.algoryqrservice.util.BillingPeriodResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,10 +16,13 @@ public class SubscriptionRefundPolicy {
     private final BillingRefundProperties properties;
 
     public int coolingDays(BillingPeriod billingPeriod) {
-        if (billingPeriod == BillingPeriod.YEARLY) {
-            return properties.getYearlyCoolingDays();
+        if (billingPeriod == null) {
+            return properties.getMonthlyCoolingDays();
         }
-        return properties.getMonthlyCoolingDays();
+        return switch (billingPeriod) {
+            case YEARLY -> properties.getYearlyCoolingDays();
+            case MONTHLY, ONE_TIME -> properties.getMonthlyCoolingDays();
+        };
     }
 
     public LocalDateTime resolvePeriodPaidAt(Purchase purchase) {
@@ -36,7 +40,7 @@ public class SubscriptionRefundPolicy {
         if (paidAt == null) {
             return null;
         }
-        return paidAt.plusDays(coolingDays(resolveBillingPeriod(purchase)));
+        return paidAt.plusDays(coolingDays(BillingPeriodResolver.resolve(purchase)));
     }
 
     public boolean isWithinCoolingWindow(Purchase purchase, LocalDateTime now) {
@@ -52,9 +56,5 @@ public class SubscriptionRefundPolicy {
             return false;
         }
         return isWithinCoolingWindow(purchase, now);
-    }
-
-    private BillingPeriod resolveBillingPeriod(Purchase purchase) {
-        return purchase.getBillingPeriod() != null ? purchase.getBillingPeriod() : BillingPeriod.MONTHLY;
     }
 }

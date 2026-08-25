@@ -15,6 +15,8 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,7 +36,8 @@ public class AdminTrialService {
     private final UserRepository userRepository;
     private final PurchaseRepository purchaseRepository;
     private final PlanPackageRepository packageRepository;
-    private final EntitlementService entitlementService;
+    private final PackageEntitlementWriter entitlementWriter;
+    private final PurchaseExpiryService purchaseExpiryService;
     private final PackageActivationService packageActivationService;
     private final UserTrialService userTrialService;
     private final PurchaseLogService purchaseLogService;
@@ -84,11 +87,11 @@ public class AdminTrialService {
             trial.setStartsAt(now);
         }
         purchaseRepository.save(trial);
-        entitlementService.synchronizePeriod(trial);
+        entitlementWriter.synchronizePeriod(trial);
 
         if (trial.getPackageId() != null) {
             packageRepository.findByIdWithItems(trial.getPackageId())
-                    .ifPresent(planPackage -> entitlementService.ensureEntitlementsForPackage(trial, planPackage));
+                    .ifPresent(planPackage -> entitlementWriter.ensureEntitlementsForPackage(trial, planPackage));
         }
         return trial;
     }
@@ -125,7 +128,7 @@ public class AdminTrialService {
         }
 
         for (PlanPackageItem item : ultimate.getItems()) {
-            entitlementService.grant(
+            entitlementWriter.grant(
                     purchase,
                     item.getProduct().getId(),
                     item.getProduct().getCode(),
@@ -143,7 +146,7 @@ public class AdminTrialService {
     }
 
     private void rejectIfHasUsablePaidPackage(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         boolean hasPaid = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .anyMatch(purchase -> purchase.isUsable()
                         && purchase.getPurchaseType() == PurchaseType.PAID);

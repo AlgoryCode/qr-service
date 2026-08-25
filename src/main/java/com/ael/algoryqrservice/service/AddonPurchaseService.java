@@ -21,6 +21,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.util.BillingPeriodResolver;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,7 @@ public class AddonPurchaseService {
     private final PurchaseFulfillmentService purchaseFulfillmentService;
     private final AppProperties appProperties;
     private final PaymentClientProperties paymentClientProperties;
-    private final EntitlementService entitlementService;
+    private final PurchaseExpiryService purchaseExpiryService;
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, AddonPurchaseRequest request, String clientIp) {
@@ -61,7 +62,7 @@ public class AddonPurchaseService {
             throw new BadRequestException("Bu urun adetli satin alinamaz");
         }
 
-        entitlementService.expireDuePurchasesForUser(user.getId());
+        purchaseExpiryService.expireDueForUser(user.getId());
         Purchase host = findHostPurchase(user.getId());
         BillingPeriod billingPeriod = BillingPeriodResolver.resolve(host);
         PackagePricingService.LinePrice line = packagePricingService.calculateProduct(

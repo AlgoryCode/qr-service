@@ -14,6 +14,8 @@ import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -44,7 +46,9 @@ class TrialServiceTest {
     @Mock
     UserRepository userRepository;
     @Mock
-    EntitlementService entitlementService;
+    PackageEntitlementWriter entitlementWriter;
+    @Mock
+    PurchaseExpiryService purchaseExpiryService;
     @Mock
     PackageActivationService packageActivationService;
     @Mock
@@ -112,7 +116,7 @@ class TrialServiceTest {
                 .isEqualTo(captor.getValue().getStartsAt().plusDays(7));
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
         verify(packageActivationService).activatePurchasedPackage(any());
-        verify(entitlementService).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
+        verify(entitlementWriter).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
         verify(userRepository, never()).save(any());
     }
 
@@ -241,7 +245,7 @@ class TrialServiceTest {
         doAnswer(invocation -> {
             purchase.setStatus(PurchaseStatus.EXPIRED);
             return null;
-        }).when(entitlementService).expirePurchase(purchase);
+        }).when(purchaseExpiryService).expire(purchase);
 
         TrialDtos.Status result = service.status(7L);
 

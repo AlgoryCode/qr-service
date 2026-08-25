@@ -82,10 +82,10 @@ public class NutritionFactsService {
         if (patch.getSalt() != null) {
             target.setSalt(patch.getSalt());
         }
-        if (patch.getVitaminsAndMinerals() != null) {
+        if (isProvided(patch.getVitaminsAndMinerals())) {
             target.setVitaminsAndMinerals(copyEntries(patch.getVitaminsAndMinerals()));
         }
-        if (patch.getOtherNutrients() != null) {
+        if (isProvided(patch.getOtherNutrients())) {
             target.setOtherNutrients(copyEntries(patch.getOtherNutrients()));
         }
         validateMergedState(target);
@@ -176,6 +176,14 @@ public class NutritionFactsService {
                 .vitaminsAndMinerals(copyEntries(source.getVitaminsAndMinerals()))
                 .otherNutrients(copyEntries(source.getOtherNutrients()))
                 .build();
+    }
+
+    /**
+     * A patch never carries {@code null} collections because the DTO defaults them to empty lists,
+     * so an empty list has to be read as "left untouched" instead of "cleared".
+     */
+    private boolean isProvided(List<NutritionNutrientEntry> entries) {
+        return entries != null && !entries.isEmpty();
     }
 
     private List<NutritionNutrientEntry> copyEntries(List<NutritionNutrientEntry> entries) {

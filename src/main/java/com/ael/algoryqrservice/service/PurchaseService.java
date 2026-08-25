@@ -39,6 +39,11 @@ import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.entitlement.EntitlementMaintenanceService;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
+import com.ael.algoryqrservice.service.entitlement.UserEntitlementQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -62,7 +67,11 @@ public class PurchaseService {
     private final PlanPackageService planPackageService;
     private final PurchaseRepository purchaseRepository;
     private final PurchaseLogService purchaseLogService;
-    private final EntitlementService entitlementService;
+    private final PurchaseExpiryService purchaseExpiryService;
+    private final PurchaseSelectionPolicy purchaseSelectionPolicy;
+    private final PackageEntitlementWriter entitlementWriter;
+    private final EntitlementMaintenanceService entitlementMaintenanceService;
+    private final UserEntitlementQueryService entitlementQueryService;
     private final PaymentServiceClient paymentServiceClient;
     private final PaymentRequestMapper paymentRequestMapper;
     private final AppProperties appProperties;
@@ -652,7 +661,7 @@ public class PurchaseService {
 
     @Transactional
     public List<PurchaseResponse> getUserPurchases(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
@@ -660,14 +669,14 @@ public class PurchaseService {
 
     @Transactional
     public SubscriptionOverviewResponse getMySubscriptionOverview(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         packageActivationService.ensureSubscriptionState(userId);
-        entitlementService.repairUsablePackageEntitlements(userId);
+        entitlementMaintenanceService.repairUser(userId);
 
-        List<UserEntitlementResponse> entitlements = entitlementService.getUserEntitlements(userId);
+        List<UserEntitlementResponse> entitlements = entitlementQueryService.forUser(userId);
 
         PurchaseSummaryResponse activePackage = null;
-        Long activePurchaseId = entitlementService.resolveActivePurchaseId(userId);
+        Long activePurchaseId = purchaseSelectionPolicy.activePurchaseId(userId);
         if (activePurchaseId != null) {
             activePackage = purchaseRepository.findById(activePurchaseId)
                     .filter(purchase -> userId.equals(purchase.getUserId()))
@@ -726,7 +735,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseSummaryResponse getPurchaseSummary(Long purchaseId, Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         Purchase purchase = findUserPurchase(purchaseId, userId);
         return toSummary(purchase);
     }
@@ -749,18 +758,7 @@ public class PurchaseService {
         Purchase purchase = purchaseRepository.findById(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (purchase.getStatus() == PurchaseStatus.EXPIRED) {
-            throw new BadRequestException("Paket zaten süresi dolmuş");
-        }
-        if (purchase.getStatus() == PurchaseStatus.CANCELLED) {
-            throw new BadRequestException("Paket zaten iptal edilmiş");
-        }
-        if (purchase.getStatus() == PurchaseStatus.PENDING) {
-            throw new BadRequestException("Ödeme bekleyen paket süresi doldurulamaz");
-        }
-        if (purchase.getStatus() == PurchaseStatus.FAILED) {
-            throw new BadRequestException("Başarısız paket süresi doldurulamaz");
-        }
+        requireExpirable(purchase.getStatus());
 
         if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION
                 && purchase.getSubscriptionId() != null
@@ -779,10 +777,23 @@ public class PurchaseService {
             }
         }
 
-        entitlementService.expirePurchase(purchase);
+        purchaseExpiryService.expire(purchase);
         packageActivationService.ensureSubscriptionState(purchase.getUserId());
         menuPublicAccessService.syncForUser(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
+    }
+
+    private void requireExpirable(PurchaseStatus status) {
+        String rejection = switch (status) {
+            case EXPIRED -> "Paket zaten süresi dolmuş";
+            case CANCELLED -> "Paket zaten iptal edilmiş";
+            case PENDING -> "Ödeme bekleyen paket süresi doldurulamaz";
+            case FAILED -> "Başarısız paket süresi doldurulamaz";
+            case ACTIVE, SUPERSEDED -> null;
+        };
+        if (rejection != null) {
+            throw new BadRequestException(rejection);
+        }
     }
 
     @Transactional
@@ -1083,7 +1094,7 @@ public class PurchaseService {
             purchase.setRefundPendingAt(null);
         }
 
-        entitlementService.revokeForCancelledPurchase(purchase);
+        entitlementWriter.revokeForCancelledPurchase(purchase);
         menuPublicAccessService.deactivateActiveMenusForUser(purchase.getUserId());
         cancelRemoteSubscriptionBestEffort(purchase);
         purchaseRepository.save(purchase);
@@ -1173,7 +1184,7 @@ public class PurchaseService {
                 || previousStatus == PurchaseStatus.EXPIRED
                 || refundedAmount != null;
         if (needsCleanup) {
-            entitlementService.revokeForCancelledPurchase(purchase);
+            entitlementWriter.revokeForCancelledPurchase(purchase);
             menuPublicAccessService.deactivateActiveMenusForUser(userId);
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
@@ -1412,7 +1423,7 @@ public class PurchaseService {
                 .expiryApproaching(lifecycle.expiryApproaching())
                 .expired(lifecycle.expired())
                 .usable(lifecycle.usable())
-                .products(entitlementService.getPurchaseEntitlements(purchase))
+                .products(entitlementQueryService.forPurchase(purchase))
                 .installments(purchaseFulfillmentService.getFulfillments(purchase.getId()))
                 .build();
     }

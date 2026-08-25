@@ -82,11 +82,7 @@ public class MenuPublicAccessService {
             return;
         }
         AccessDecision decision = evaluate(userId);
-        menuRepository.updatePublicAccessByUserId(
-                userId,
-                decision.allowed(),
-                decision.reason() == null ? null : decision.reason().name()
-        );
+        menuRepository.updatePublicAccessByUserId(userId, decision.allowed(), decision.reason());
     }
 
     @Transactional

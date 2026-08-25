@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.catalog.CatalogThemes;
 import com.ael.algoryqrservice.config.AppProperties;
@@ -22,6 +23,7 @@ import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductSpecifications;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
+import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -68,6 +70,7 @@ public class MenuService {
     private final ProductImageStorageService productImageStorageService;
     private final ChefAvatarService chefAvatarService;
     private final EntitlementService entitlementService;
+    private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuProductPairingService menuProductPairingService;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
@@ -162,7 +165,7 @@ public class MenuService {
             sourceToTarget.put(source.getProductId(), saved.getProductId());
         }
         menuProductPairingService.copyPairings(sourceToTarget);
-        entitlementService.syncMenuProductEntitlements(userId);
+        usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
     }
 
     private void createProductsFromDetails(Menu menu, Object productsRaw) {
@@ -228,7 +231,7 @@ public class MenuService {
             menuProductRepository.save(product);
             index++;
         }
-        entitlementService.syncMenuProductEntitlements(menu.getUserId());
+        usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
     }
 
     private java.math.BigDecimal decimalValue(Object value) {
@@ -597,7 +600,7 @@ public class MenuService {
         MenuDtos.MenuProductResponse response = toProductResponse(menuProductRepository.save(product));
         menuProductPairingService.replace(response.getProductId(), menu.getMenuId(), request.getPairings());
         response.setPairings(menuProductPairingService.load(response.getProductId()));
-        entitlementService.syncMenuProductEntitlements(menu.getUserId());
+        usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
         return response;
     }
 
@@ -673,7 +676,7 @@ public class MenuService {
         productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
         product.setDeleted(true);
         menuProductRepository.save(product);
-        entitlementService.syncMenuProductEntitlements(menu.getUserId());
+        usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
     }
 
     @Transactional
@@ -717,7 +720,7 @@ public class MenuService {
             menu.setActive(nextActive);
             qr.setActive(nextActive);
             qrRepository.save(qr);
-            entitlementService.syncMenuEntitlements(menu.getUserId());
+            usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.QR_MENU);
         }
 
         menuRepository.save(menu);

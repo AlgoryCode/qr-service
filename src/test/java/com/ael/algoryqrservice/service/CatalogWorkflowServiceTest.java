@@ -56,6 +56,7 @@ class CatalogWorkflowServiceTest {
                 .subtotal(new BigDecimal("250.00"))
                 .vatAmount(new BigDecimal("50.00"))
                 .price(new BigDecimal("300.00"))
+                .effectiveMonthlyPrice(new BigDecimal("300.00"))
                 .purchasable(true)
                 .active(true)
                 .build());

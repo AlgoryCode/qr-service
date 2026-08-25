@@ -7,11 +7,10 @@ import com.ael.algoryqrservice.model.dto.BranchDtos;
 import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.service.entitlement.ExtraMenuQuotaCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +23,7 @@ public class BranchQuotaService {
     private final MenuRepository menuRepository;
     private final EntitlementService entitlementService;
     private final FulfillmentGateService fulfillmentGateService;
+    private final ExtraMenuQuotaCalculator extraMenuQuotaCalculator;
 
     @Transactional(readOnly = true)
     public BranchDtos.Quota branchQuota(Long userId) {
@@ -115,13 +115,7 @@ public class BranchQuotaService {
     }
 
     public int countExtraMenus(Long userId) {
-        List<Object[]> rows = menuRepository.countActiveLiveMenusGroupedByBranch(userId);
-        int extra = 0;
-        for (Object[] row : rows) {
-            long count = ((Number) row[1]).longValue();
-            extra += (int) Math.max(0, count - 1);
-        }
-        return extra;
+        return extraMenuQuotaCalculator.countExtraMenus(userId);
     }
 
     private int sumAddonQuantity(Long userId, String featureCode) {

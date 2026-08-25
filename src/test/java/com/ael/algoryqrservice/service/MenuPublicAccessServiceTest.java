@@ -135,7 +135,7 @@ class MenuPublicAccessServiceTest {
         verify(menuRepository).updatePublicAccessByUserId(
                 eq(7L),
                 eq(false),
-                eq(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE.name())
+                eq(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE)
         );
     }
 }

@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
+import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +17,7 @@ public class MenuQrSoftDeleteService {
 
     private final QrRepository qrRepository;
     private final MenuRepository menuRepository;
-    private final EntitlementService entitlementService;
+    private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final FulfillmentGateService fulfillmentGateService;
 
     @Transactional
@@ -44,8 +45,8 @@ public class MenuQrSoftDeleteService {
                 }
             }
         });
-        entitlementService.syncMenuEntitlements(qr.getUserId());
-        entitlementService.syncQrCreateEntitlements(qr.getUserId());
+        usageSyncRegistry.synchronize(qr.getUserId(), CatalogProducts.QR_MENU);
+        usageSyncRegistry.synchronize(qr.getUserId(), CatalogProducts.QR_CREATE);
     }
 
     private void softDeleteMenu(Menu menu) {

@@ -31,6 +31,7 @@ import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -65,7 +66,7 @@ class PurchaseServicePaymentEventTest {
     @Mock
     private PurchaseLogService purchaseLogService;
     @Mock
-    private EntitlementService entitlementService;
+    private PackageEntitlementWriter entitlementWriter;
     @Mock
     private PaymentServiceClient paymentServiceClient;
     @Mock
@@ -504,7 +505,7 @@ class PurchaseServicePaymentEventTest {
         assertThat(purchase.getRefundStatus()).isEqualTo(RefundStatus.COMPLETED);
         assertThat(purchase.getRefundedAt()).isNotNull();
         verify(paymentServiceClient).cancelSubscription(20L, "sub-1");
-        verify(entitlementService).revokeForCancelledPurchase(purchase);
+        verify(entitlementWriter).revokeForCancelledPurchase(purchase);
         verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
         verify(paymentEventInboxRepository).save(any());
     }

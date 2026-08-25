@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -127,7 +128,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     int updatePublicAccessByUserId(
             @Param("userId") Long userId,
             @Param("enabled") boolean enabled,
-            @Param("reason") String reason
+            @Param("reason") MenuPublicAccessDisabledReason reason
     );
 
     @Modifying(clearAutomatically = false, flushAutomatically = true)

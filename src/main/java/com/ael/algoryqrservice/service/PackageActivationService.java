@@ -1,41 +1,34 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PackageActivationService {
 
-    private final PlanPackageRepository planPackageRepository;
     private final PurchaseRepository purchaseRepository;
-    private final EntitlementService entitlementService;
+    private final PurchaseExpiryService purchaseExpiryService;
+    private final PurchaseSelectionPolicy purchaseSelectionPolicy;
     private final MenuPublicAccessService menuPublicAccessService;
 
     @Transactional
     public Optional<Purchase> ensureSubscriptionState(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
-        List<Purchase> usablePaidOrTrial = findUsablePaidOrTrial(userId);
+        purchaseExpiryService.expireDueForUser(userId);
+        List<Purchase> subscriptions = purchaseSelectionPolicy.usableSubscriptions(userId);
         menuPublicAccessService.syncForUser(userId);
-        if (usablePaidOrTrial.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(selectHighestPackage(usablePaidOrTrial));
+        return purchaseSelectionPolicy.highestPriority(subscriptions);
     }
 
     @Transactional
@@ -46,25 +39,13 @@ public class PackageActivationService {
         userIds.stream().distinct().forEach(this::ensureSubscriptionState);
     }
 
+    /**
+     * Marks a newly paid subscription as the only active one; add-ons stack instead of superseding.
+     */
     @Transactional
     public void activatePurchasedPackage(Purchase purchasedPackage) {
-        List<Purchase> active = purchaseRepository.findByUserIdAndStatus(
-                purchasedPackage.getUserId(),
-                PurchaseStatus.ACTIVE
-        );
-        if (purchasedPackage.getPurchaseType() == PurchaseType.ADD_ON) {
-            menuPublicAccessService.syncForUser(purchasedPackage.getUserId());
-            return;
-        }
-        for (Purchase purchase : active) {
-            if (purchase.getId().equals(purchasedPackage.getId())) {
-                continue;
-            }
-            if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
-                continue;
-            }
-            purchase.setStatus(PurchaseStatus.SUPERSEDED);
-            purchaseRepository.save(purchase);
+        if (purchasedPackage.getPurchaseType() != PurchaseType.ADD_ON) {
+            supersedePreviousSubscriptions(purchasedPackage);
         }
         menuPublicAccessService.syncForUser(purchasedPackage.getUserId());
     }
@@ -75,38 +56,13 @@ public class PackageActivationService {
         syncSubscriptionStateForUsers(userIds);
     }
 
-    private List<Purchase> findUsablePaidOrTrial(Long userId) {
-        return purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
-                .filter(Purchase::isUsable)
-                .filter(this::isPaidOrTrialPurchase)
+    private void supersedePreviousSubscriptions(Purchase activated) {
+        List<Purchase> superseded = purchaseRepository
+                .findByUserIdAndStatus(activated.getUserId(), PurchaseStatus.ACTIVE).stream()
+                .filter(purchase -> !purchase.getId().equals(activated.getId()))
+                .filter(purchase -> purchase.getPurchaseType() != PurchaseType.ADD_ON)
                 .toList();
-    }
-
-    private boolean isPaidOrTrialPurchase(Purchase purchase) {
-        if (purchase.getPurchaseType() == PurchaseType.FREE) {
-            return false;
-        }
-        if (purchase.isSystemManaged()) {
-            return false;
-        }
-        return purchase.getPurchaseType() == PurchaseType.PAID
-                || purchase.getPurchaseType() == PurchaseType.TRIAL
-                || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT;
-    }
-
-    private Purchase selectHighestPackage(List<Purchase> purchases) {
-        Map<Long, PlanPackage> packagesById = planPackageRepository.findAllById(
-                purchases.stream().map(Purchase::getPackageId).distinct().toList()
-        ).stream().collect(Collectors.toMap(PlanPackage::getId, Function.identity()));
-
-        return purchases.stream()
-                .max(Comparator.comparingInt(purchase -> {
-                    PlanPackage planPackage = packagesById.get(purchase.getPackageId());
-                    if (planPackage != null && planPackage.getPriority() != null) {
-                        return planPackage.getPriority();
-                    }
-                    return 0;
-                }))
-                .orElse(purchases.getFirst());
+        superseded.forEach(purchase -> purchase.setStatus(PurchaseStatus.SUPERSEDED));
+        purchaseRepository.saveAll(superseded);
     }
 }

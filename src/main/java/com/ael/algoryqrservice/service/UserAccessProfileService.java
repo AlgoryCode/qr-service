@@ -1,92 +1,67 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.FulfillmentDetail;
-import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
-import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.entitlement.EntitlementMaintenanceService;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import com.ael.algoryqrservice.util.AppTime;
-import org.springframework.context.annotation.Lazy;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
+/**
+ * Builds the compact access snapshot (package code, feature codes, scope codes) that other
+ * services and the API gateway use for coarse authorization.
+ */
 @Service
+@RequiredArgsConstructor
 public class UserAccessProfileService {
 
-    private final PurchaseRepository purchaseRepository;
-    private final PlanPackageRepository planPackageRepository;
-    private final FulfillmentDetailRepository fulfillmentDetailRepository;
-    private final EntitlementService entitlementService;
-    private final PackageActivationService packageActivationService;
-    private final FulfillmentMigrationService fulfillmentMigrationService;
+    private static final UserAccessProfile EMPTY_PROFILE = new UserAccessProfile(null, List.of(), List.of());
 
-    public UserAccessProfileService(
-            PurchaseRepository purchaseRepository,
-            PlanPackageRepository planPackageRepository,
-            FulfillmentDetailRepository fulfillmentDetailRepository,
-            @Lazy EntitlementService entitlementService,
-            @Lazy PackageActivationService packageActivationService,
-            @Lazy FulfillmentMigrationService fulfillmentMigrationService
-    ) {
-        this.purchaseRepository = purchaseRepository;
-        this.planPackageRepository = planPackageRepository;
-        this.fulfillmentDetailRepository = fulfillmentDetailRepository;
-        this.entitlementService = entitlementService;
-        this.packageActivationService = packageActivationService;
-        this.fulfillmentMigrationService = fulfillmentMigrationService;
-    }
+    private final FulfillmentDetailRepository fulfillmentDetailRepository;
+    private final PurchaseExpiryService purchaseExpiryService;
+    private final PurchaseSelectionPolicy purchaseSelectionPolicy;
+    private final EntitlementMaintenanceService entitlementMaintenanceService;
+    private final PackageActivationService packageActivationService;
 
     @Transactional
     public UserAccessProfile resolve(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         packageActivationService.ensureSubscriptionState(userId);
-        entitlementService.repairUsablePackageEntitlements(userId);
-        fulfillmentMigrationService.backfillUser(userId);
+        entitlementMaintenanceService.repairUser(userId);
 
-        List<Purchase> usablePurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
-                .filter(Purchase::isUsable)
-                .toList();
-
-        Map<Long, Integer> priorityByPackageId = planPackageRepository.findAllById(
-                usablePurchases.stream().map(Purchase::getPackageId).distinct().toList()
-        ).stream().collect(Collectors.toMap(
-                PlanPackage::getId,
-                planPackage -> planPackage.getPriority() == null ? 0 : planPackage.getPriority()
-        ));
-
-        Purchase activePurchase = usablePurchases.stream()
-                .max(Comparator.comparingInt(purchase ->
-                        priorityByPackageId.getOrDefault(purchase.getPackageId(), 0)))
-                .orElse(null);
-
-        if (activePurchase == null) {
-            return new UserAccessProfile(null, List.of(), List.of());
+        Optional<Purchase> activePurchase = purchaseSelectionPolicy
+                .highestPriority(purchaseSelectionPolicy.usablePurchases(userId));
+        if (activePurchase.isEmpty()) {
+            return EMPTY_PROFILE;
         }
 
         List<FulfillmentDetail> details = fulfillmentDetailRepository.findAllActiveByUserId(userId, AppTime.nowLocal());
-        List<String> products = details.stream()
-                .map(FulfillmentDetail::getFeatureCode)
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted()
-                .toList();
-        List<String> scopes = details.stream()
-                .map(FulfillmentDetail::getScopeCode)
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted()
-                .toList();
+        return new UserAccessProfile(
+                activePurchase.get().getPackageCode(),
+                distinctSortedCodes(details, FulfillmentDetail::getFeatureCode),
+                distinctSortedCodes(details, FulfillmentDetail::getScopeCode)
+        );
+    }
 
-        return new UserAccessProfile(activePurchase.getPackageCode(), products, scopes);
+    private List<String> distinctSortedCodes(
+            List<FulfillmentDetail> details,
+            Function<FulfillmentDetail, String> codeExtractor
+    ) {
+        return details.stream()
+                .map(codeExtractor)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
     }
 }

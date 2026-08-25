@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -66,8 +67,9 @@ public class Menu extends QrBaseModel {
     @lombok.Builder.Default
     private boolean publicAccessEnabled = true;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "public_access_disabled_reason", length = 64)
-    private String publicAccessDisabledReason;
+    private MenuPublicAccessDisabledReason publicAccessDisabledReason;
 
     @Column(name = "rating_avg", nullable = false, precision = 3, scale = 2)
     @Builder.Default

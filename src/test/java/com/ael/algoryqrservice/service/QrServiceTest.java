@@ -24,6 +24,8 @@ import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -62,6 +64,10 @@ class QrServiceTest {
     @Mock
     private EntitlementService entitlementService;
     @Mock
+    private PurchaseSelectionPolicy purchaseSelectionPolicy;
+    @Mock
+    private FeatureUsageSyncRegistry usageSyncRegistry;
+    @Mock
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
     @Mock
     private BranchService branchService;
@@ -88,7 +94,7 @@ class QrServiceTest {
         when(qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId))
                 .thenReturn(List.of(activeMenuQr, passiveMenuQr, linkQr));
 
-        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
+        when(purchaseSelectionPolicy.activePurchaseId(userId)).thenReturn(10L);
 
         QrListPageResponse response = qrService.getUserQrs(userId, false, 0, 5, QrListScope.ALL);
 
@@ -108,7 +114,7 @@ class QrServiceTest {
         QrResponse expected = QrResponse.builder().qrId(12L).build();
 
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
+        when(purchaseSelectionPolicy.activePurchaseId(userId)).thenReturn(10L);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
 
@@ -173,7 +179,7 @@ class QrServiceTest {
         QrResponse expected = QrResponse.builder().qrId(11L).build();
 
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
+        when(purchaseSelectionPolicy.activePurchaseId(userId)).thenReturn(10L);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
 
@@ -222,7 +228,6 @@ class QrServiceTest {
         when(qrRepository.findById(5L)).thenReturn(Optional.of(existing));
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(userId).build());
         when(menuRepository.findByQrIdAndDeletedFalse(5L)).thenReturn(Optional.of(menu));
-        doNothing().when(entitlementService).syncMenuEntitlements(userId);
         when(qrRepository.save(any(Qr.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -232,7 +237,7 @@ class QrServiceTest {
         assertThat(existing.isActive()).isTrue();
         assertThat(menu.isActive()).isTrue();
         verify(branchQuotaService).assertMenuActivationAllowed(userId, 3L);
-        verify(entitlementService).syncMenuEntitlements(userId);
+        verify(usageSyncRegistry).synchronize(userId, CatalogProducts.QR_MENU);
     }
 
     @Test
@@ -263,7 +268,7 @@ class QrServiceTest {
 
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_CREATE, 1);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_MENU, 1);
-        verify(entitlementService, never()).syncQrCreateEntitlements(userId);
+        verify(usageSyncRegistry, never()).synchronize(userId, CatalogProducts.QR_CREATE);
         verify(qrRepository, never()).save(any(Qr.class));
     }
 
@@ -280,7 +285,7 @@ class QrServiceTest {
 
         qrService.deleteQrByQrId(6L);
 
-        verify(entitlementService).syncQrCreateEntitlements(userId);
+        verify(usageSyncRegistry).synchronize(userId, CatalogProducts.QR_CREATE);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_CREATE, 1);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_MENU, 1);
     }
@@ -298,7 +303,7 @@ class QrServiceTest {
 
         qrService.deleteQrByQrId(8L);
 
-        verify(entitlementService).syncQrCreateEntitlements(userId);
+        verify(usageSyncRegistry).synchronize(userId, CatalogProducts.QR_CREATE);
         verify(entitlementService, never()).release(userId, CatalogProducts.QR_CREATE, 1);
     }
 
@@ -313,7 +318,7 @@ class QrServiceTest {
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(userId).build());
         when(qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId))
                 .thenReturn(List.of(currentQr, legacyQr));
-        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
+        when(purchaseSelectionPolicy.activePurchaseId(userId)).thenReturn(10L);
         when(purchaseRepository.findAllById(anyCollection())).thenReturn(List.of(
                 com.ael.algoryqrservice.model.Purchase.builder().id(10L).packageName("Ultimate").build(),
                 com.ael.algoryqrservice.model.Purchase.builder().id(99L).packageName("Pro").build()
@@ -337,14 +342,13 @@ class QrServiceTest {
         QrResponse expected = QrResponse.builder().qrId(22L).build();
 
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
+        when(purchaseSelectionPolicy.activePurchaseId(userId)).thenReturn(10L);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
 
         QrResponse response = qrService.createQR(request, userId);
 
         assertThat(response.getQrId()).isEqualTo(22L);
-        verify(entitlementService, never()).hasUsableQrCreatePackage(userId);
     }
 
     private Qr qr(Long qrId, Long userId, String type, Map<String, Object> details) {
