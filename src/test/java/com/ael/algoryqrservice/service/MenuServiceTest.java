@@ -25,6 +25,7 @@ import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -88,6 +89,8 @@ class MenuServiceTest {
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
     @Mock
     private MenuProductPairingService menuProductPairingService;
+    @Mock
+    private MenuProductIndexNotifier menuProductIndexNotifier;
     @Mock
     private BranchService branchService;
     @Mock

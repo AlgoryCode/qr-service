@@ -67,4 +67,9 @@ public class RabbitMqConfig {
     public TopicExchange pushNotificationExchange(PushNotificationProperties properties) {
         return new TopicExchange(properties.getMessaging().getExchange(), true, false);
     }
+
+    @Bean
+    public TopicExchange menuEventsExchange(MenuEventsRabbitProperties properties) {
+        return new TopicExchange(properties.getExchange(), true, false);
+    }
 }

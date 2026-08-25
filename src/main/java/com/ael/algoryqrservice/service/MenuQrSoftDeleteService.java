@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class MenuQrSoftDeleteService {
     private final MenuRepository menuRepository;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final FulfillmentGateService fulfillmentGateService;
+    private final MenuProductIndexNotifier menuProductIndexNotifier;
 
     @Transactional
     public void softDeleteMenuQr(Qr qr) {
@@ -53,6 +55,7 @@ public class MenuQrSoftDeleteService {
         if (!menu.isDeleted()) {
             menu.setDeleted(true);
             menuRepository.save(menu);
+            menuProductIndexNotifier.menuRemoved(menu.getMenuId());
         }
     }
 }
