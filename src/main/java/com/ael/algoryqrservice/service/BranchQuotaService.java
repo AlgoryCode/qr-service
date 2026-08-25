@@ -27,7 +27,6 @@ public class BranchQuotaService {
 
     @Transactional(readOnly = true)
     public BranchDtos.Quota branchQuota(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
         int used = (int) branchRepository.countByUserIdAndDeletedFalse(userId);
         int grandfathered = (int) branchRepository.countByUserIdAndGrandfatheredTrueAndDeletedFalse(userId);
         int extraPurchased = sumAddonQuantity(userId, CatalogProducts.QR_BRANCH);
@@ -48,7 +47,6 @@ public class BranchQuotaService {
 
     @Transactional(readOnly = true)
     public BranchDtos.MenuQuota menuQuota(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
         int extraUsed = countExtraMenus(userId);
         int extraAllowed = sumAddonQuantity(userId, CatalogProducts.QR_MENU);
         int extraRemaining = Math.max(0, extraAllowed - extraUsed);

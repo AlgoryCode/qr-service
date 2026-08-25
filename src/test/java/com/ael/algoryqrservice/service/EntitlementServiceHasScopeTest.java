@@ -19,10 +19,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class EntitlementServiceHasUsableQrCreatePackageTest {
+class EntitlementServiceHasScopeTest {
 
     @Mock
     private UserEntitlementRepository entitlementRepository;
@@ -91,16 +94,12 @@ class EntitlementServiceHasUsableQrCreatePackageTest {
     }
 
     @Test
-    void hasUsableQrCreatePackage_whenFulfillmentHasScope_thenTrue() {
-        when(fulfillmentGateService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
+    void hasScope_whenFulfillmentAllows_thenReturnTrueWithoutRepair() {
+        when(fulfillmentGateService.hasScope(22L, CatalogScopes.QR_MENU_OWNER)).thenReturn(true);
 
-        assertThat(entitlementService.hasUsableQrCreatePackage(7L)).isTrue();
-    }
+        assertThat(entitlementService.hasScope(22L, CatalogScopes.QR_MENU_OWNER)).isTrue();
 
-    @Test
-    void hasUsableQrCreatePackage_whenFulfillmentMissingScope_thenFalse() {
-        when(fulfillmentGateService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(false);
-
-        assertThat(entitlementService.hasUsableQrCreatePackage(7L)).isFalse();
+        verify(fulfillmentMigrationService, never()).backfillUser(22L);
+        verify(purchaseRepository, never()).findByUserIdAndStatus(any(), any());
     }
 }

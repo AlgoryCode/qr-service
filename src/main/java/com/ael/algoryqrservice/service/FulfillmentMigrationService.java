@@ -48,6 +48,9 @@ public class FulfillmentMigrationService {
 
     @Transactional
     public MigrationResult backfillUser(Long userId) {
+        if (userId == null) {
+            return new MigrationResult(null, 0, 0);
+        }
         List<Purchase> activePurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
                 .toList();
@@ -86,6 +89,9 @@ public class FulfillmentMigrationService {
         List<Long> userIds = purchaseRepository.findDistinctUserIdsByActiveStatus();
         int migrated = 0;
         for (Long userId : userIds) {
+            if (userId == null) {
+                continue;
+            }
             try {
                 MigrationResult result = backfillUser(userId);
                 if (result.fulfillmentCount() > 0 || result.detailCount() > 0) {

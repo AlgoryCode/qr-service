@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -134,6 +136,26 @@ class FulfillmentMigrationServiceTest {
         assertThat(result.fulfillmentCount()).isZero();
         verify(fulfillmentDetailRepository, never()).save(any());
         verify(grantFulfillmentRepository, never()).save(any());
+    }
+
+    @Test
+    void backfillUser_whenUserIdNull_thenSkipRepositoryLookup() {
+        FulfillmentMigrationService.MigrationResult result = service.backfillUser(null);
+
+        assertThat(result.userId()).isNull();
+        assertThat(result.fulfillmentCount()).isZero();
+        assertThat(result.detailCount()).isZero();
+        verifyNoInteractions(purchaseRepository);
+    }
+
+    @Test
+    void backfillAllActiveUsers_whenUserIdNull_thenSkip() {
+        when(purchaseRepository.findDistinctUserIdsByActiveStatus()).thenReturn(Collections.singletonList(null));
+
+        int migrated = service.backfillAllActiveUsers();
+
+        assertThat(migrated).isZero();
+        verify(purchaseRepository, never()).findByUserIdAndStatus(any(), any());
     }
 
     private static Purchase usablePurchase() {

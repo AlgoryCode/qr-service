@@ -75,7 +75,9 @@ public class RepairFulfillmentJob {
     }
 
     private void repairSingle(Purchase purchase) {
-        if (purchase.getStatus() != PurchaseStatus.ACTIVE || !purchase.isUsable()) {
+        if (purchase.getUserId() == null
+                || purchase.getStatus() != PurchaseStatus.ACTIVE
+                || !purchase.isUsable()) {
             return;
         }
         fulfillmentMigrationService.backfillUser(purchase.getUserId());
