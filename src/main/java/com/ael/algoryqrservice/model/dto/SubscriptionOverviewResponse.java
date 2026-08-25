@@ -14,4 +14,6 @@ public class SubscriptionOverviewResponse {
     private List<PurchaseSummaryResponse> addonPurchases;
     private BranchDtos.Quota branchQuota;
     private BranchDtos.MenuQuota menuQuota;
+    private List<FulfillmentDetailResponse> fulfillmentDetails;
+    private boolean fulfillmentActive;
 }

@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.config;
 
+import com.ael.algoryqrservice.model.enums.FulfillmentGateMode;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -16,6 +17,7 @@ public class AppProperties {
     private CorsSettings cors = new CorsSettings();
     private MenuSettings menu = new MenuSettings();
     private SeedSettings seed = new SeedSettings();
+    private FulfillmentSettings fulfillment = new FulfillmentSettings();
 
     @Getter
     @Setter
@@ -46,5 +48,13 @@ public class AppProperties {
     public static class MenuProductsSeed {
         private boolean enabled = false;
         private boolean onlyIfEmpty = true;
+    }
+
+    @Getter
+    @Setter
+    public static class FulfillmentSettings {
+        private FulfillmentGateMode gateMode = FulfillmentGateMode.DUAL;
+        private boolean repairJobEnabled = true;
+        private int repairJobBatchSize = 100;
     }
 }

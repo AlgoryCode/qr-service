@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.ProductType;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -23,6 +24,11 @@ public class ProductRequest {
 
     @Pattern(regexp = "^[A-Z][A-Z0-9_]*$", message = "Scope kodu uppercase snake_case olmalidir")
     private String scopeCode;
+
+    private ProductType typeId;
+
+    @Pattern(regexp = "^[A-Z][A-Z0-9_]*$", message = "Feature kodu uppercase snake_case olmalidir")
+    private String featureCode;
 
     @PositiveOrZero(message = "Birim fiyat 0 veya daha buyuk olmalidir")
     private BigDecimal unitPrice;

@@ -3,23 +3,15 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.exception.ForbiddenException;
-import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.BranchDtos;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.repository.UserEntitlementRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,9 +22,8 @@ public class BranchQuotaService {
 
     private final BranchRepository branchRepository;
     private final MenuRepository menuRepository;
-    private final UserEntitlementRepository entitlementRepository;
-    private final PurchaseRepository purchaseRepository;
     private final EntitlementService entitlementService;
+    private final FulfillmentGateService fulfillmentGateService;
 
     @Transactional(readOnly = true)
     public BranchDtos.Quota branchQuota(Long userId) {
@@ -95,6 +86,8 @@ public class BranchQuotaService {
             );
         }
         entitlementService.consumeAddon(userId, CatalogProducts.QR_MENU, 1);
+        fulfillmentGateService.consumeAddon(userId, CatalogProducts.QR_MENU, 1,
+                FulfillmentReferenceType.MENU, branchId);
     }
 
     @Transactional
@@ -120,6 +113,8 @@ public class BranchQuotaService {
         long remainingActive = menuRepository.countActiveLiveMenusForBranch(branchId);
         if (remainingActive >= 1) {
             entitlementService.release(userId, CatalogProducts.QR_MENU, 1);
+            fulfillmentGateService.releaseAddon(userId, CatalogProducts.QR_MENU, 1,
+                    FulfillmentReferenceType.MENU, branchId);
         }
     }
 
@@ -133,28 +128,7 @@ public class BranchQuotaService {
         return extra;
     }
 
-    private int sumAddonQuantity(Long userId, String productCode) {
-        List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        Map<Long, Purchase> purchases = purchaseRepository.findAllById(
-                entitlements.stream().map(UserEntitlement::getPurchaseId).filter(Objects::nonNull).distinct().toList()
-        ).stream().collect(Collectors.toMap(Purchase::getId, Function.identity(), (left, right) -> left));
-        int total = 0;
-        for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), productCode)) {
-                continue;
-            }
-            Purchase purchase = purchases.get(entitlement.getPurchaseId());
-            if (purchase == null || !purchase.isUsable() || purchase.getPurchaseType() != PurchaseType.ADD_ON) {
-                continue;
-            }
-            if (!entitlement.isStartedByDate() || entitlement.isExpiredByDate()) {
-                continue;
-            }
-            if (entitlement.isUnlimited()) {
-                return Integer.MAX_VALUE;
-            }
-            total += entitlement.getTotalQuantity() == null ? 0 : entitlement.getTotalQuantity();
-        }
-        return total;
+    private int sumAddonQuantity(Long userId, String featureCode) {
+        return fulfillmentGateService.sumAddonQuantity(userId, featureCode);
     }
 }
