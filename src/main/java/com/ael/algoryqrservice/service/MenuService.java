@@ -24,6 +24,7 @@ import com.ael.algoryqrservice.repository.MenuProductSpecifications;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -72,6 +73,7 @@ public class MenuService {
     private final EntitlementService entitlementService;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuProductPairingService menuProductPairingService;
+    private final MenuProductIndexNotifier menuProductIndexNotifier;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
     private final BranchQuotaService branchQuotaService;
@@ -597,10 +599,12 @@ public class MenuService {
                 .nutrition(request.getNutrition())
                 .build();
 
-        MenuDtos.MenuProductResponse response = toProductResponse(menuProductRepository.save(product));
+        MenuProduct saved = menuProductRepository.save(product);
+        MenuDtos.MenuProductResponse response = toProductResponse(saved);
         menuProductPairingService.replace(response.getProductId(), menu.getMenuId(), request.getPairings());
         response.setPairings(menuProductPairingService.load(response.getProductId()));
         usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
+        menuProductIndexNotifier.productChanged(saved);
         return response;
     }
 
@@ -648,11 +652,13 @@ public class MenuService {
             product.setNutrition(nutritionFactsService.merge(product.getNutrition(), request.getNutrition()));
         }
 
-        MenuDtos.MenuProductResponse response = toProductResponse(menuProductRepository.save(product));
+        MenuProduct saved = menuProductRepository.save(product);
+        MenuDtos.MenuProductResponse response = toProductResponse(saved);
         if (request.getPairings() != null) {
             menuProductPairingService.replace(product.getProductId(), product.getMenuId(), request.getPairings());
             response.setPairings(menuProductPairingService.load(product.getProductId()));
         }
+        menuProductIndexNotifier.productChanged(saved);
         return response;
     }
 
@@ -665,7 +671,9 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ögesi bilgisi zorunludur");
         }
         product.setNutrition(nutritionFactsService.merge(product.getNutrition(), patch));
-        return toProductResponse(menuProductRepository.save(product));
+        MenuProduct saved = menuProductRepository.save(product);
+        menuProductIndexNotifier.productChanged(saved);
+        return toProductResponse(saved);
     }
 
     @Transactional
@@ -677,6 +685,7 @@ public class MenuService {
         product.setDeleted(true);
         menuProductRepository.save(product);
         usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
+        menuProductIndexNotifier.productRemoved(product.getMenuId(), product.getProductId());
     }
 
     @Transactional

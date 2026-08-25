@@ -23,6 +23,7 @@ import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
+import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -56,6 +57,7 @@ public class QrService {
     private final PurchaseSelectionPolicy purchaseSelectionPolicy;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
+    private final MenuProductIndexNotifier menuProductIndexNotifier;
     private final BranchService branchService;
     private final BranchQuotaService branchQuotaService;
     private final SecurityUtils securityUtils;
@@ -334,6 +336,7 @@ public class QrService {
             if (!menu.isDeleted()) {
                 menu.setDeleted(true);
                 menuRepository.save(menu);
+                menuProductIndexNotifier.menuRemoved(menu.getMenuId());
             }
         });
 
