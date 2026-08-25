@@ -12,5 +12,7 @@ public interface QrRepository extends JpaRepository<Qr,Long> {
 
     long countByUserIdAndDeletedFalse(Long userId);
 
+    long countByUserIdAndDeletedFalseAndQrType_TypeNameNotIgnoreCase(Long userId, String typeName);
+
     long countByUserIdAndPurchaseIdAndDeletedFalse(Long userId, Long purchaseId);
 }

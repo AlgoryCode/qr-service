@@ -57,17 +57,19 @@ public class QrService {
     private final SecurityUtils securityUtils;
 
     public <T extends QrRequest> QrResponse createQR(T req, Long userId) throws IOException, WriterException {
-        entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         Type qrType = Type.from(req.getType());
         if (qrType == Type.MENU) {
             entitlementService.requireScope(userId, CatalogScopes.QR_MENU_OWNER);
             Long branchId = resolveBranchId(req);
             branchService.requireOwnedForUser(branchId, userId);
             branchQuotaService.assertAndConsumeMenuCreation(userId, branchId);
-        }
-        ConsumedEntitlement consumed = entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
-        if (consumed != null && consumed.purchaseId() != null) {
-            req.setPurchaseId(consumed.purchaseId());
+            req.setPurchaseId(entitlementService.resolveActivePurchaseId(userId));
+        } else {
+            entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
+            ConsumedEntitlement consumed = entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
+            if (consumed != null && consumed.purchaseId() != null) {
+                req.setPurchaseId(consumed.purchaseId());
+            }
         }
         req.setUserId(userId);
 
