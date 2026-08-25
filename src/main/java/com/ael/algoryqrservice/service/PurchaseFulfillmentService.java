@@ -85,13 +85,23 @@ public class PurchaseFulfillmentService {
 
         Duration paidPeriod = Duration.between(metadata.periodStart(), metadata.periodEnd());
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime periodStart = purchase.getExpiresAt() != null && purchase.getExpiresAt().isAfter(now)
-                ? purchase.getExpiresAt()
-                : now;
-        LocalDateTime periodEnd = periodStart.plus(paidPeriod);
         boolean firstPaidInstallment = fulfillmentRepository
                 .findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(purchase.getId(), FulfillmentStatus.PAID)
                 .isEmpty();
+
+        LocalDateTime periodStart;
+        LocalDateTime periodEnd;
+        if (firstPaidInstallment && purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+            periodStart = now;
+            periodEnd = purchase.getExpiresAt() != null && purchase.getExpiresAt().isAfter(now)
+                    ? purchase.getExpiresAt()
+                    : now.plus(paidPeriod);
+        } else {
+            periodStart = purchase.getExpiresAt() != null && purchase.getExpiresAt().isAfter(now)
+                    ? purchase.getExpiresAt()
+                    : now;
+            periodEnd = periodStart.plus(paidPeriod);
+        }
 
         fulfillment.setEventId(event.getEventId());
         fulfillment.setStatus(FulfillmentStatus.PAID);

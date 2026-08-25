@@ -198,6 +198,35 @@ public class FulfillmentGrantService {
         }
     }
 
+    @Transactional
+    public void repairAddonFulfillmentsForUser(Long userId) {
+        LocalDateTime now = AppTime.nowLocal();
+        List<GrantFulfillment> active = grantFulfillmentRepository.findByUserIdAndStatus(userId, GrantFulfillmentStatus.ACTIVE);
+        for (GrantFulfillment fulfillment : active) {
+            List<FulfillmentDetail> details = fulfillmentDetailRepository.findByFulfillmentId(fulfillment.getId());
+            boolean isAddon = details.stream()
+                    .anyMatch(d -> d.getSource() == FulfillmentDetailSource.ADDON_PURCHASE);
+            if (!isAddon) {
+                continue;
+            }
+            if (fulfillment.getStartsAt() != null && fulfillment.getStartsAt().isAfter(now)) {
+                fulfillment.setStartsAt(now);
+                grantFulfillmentRepository.save(fulfillment);
+                log.info("Repaired addon GrantFulfillment startsAt: fulfillmentId={}, userId={}",
+                        fulfillment.getId(), userId);
+            }
+            for (FulfillmentDetail detail : details) {
+                if (detail.getSource() == FulfillmentDetailSource.ADDON_PURCHASE
+                        && detail.getStartsAt() != null && detail.getStartsAt().isAfter(now)) {
+                    detail.setStartsAt(now);
+                    fulfillmentDetailRepository.save(detail);
+                    log.info("Repaired addon FulfillmentDetail startsAt: detailId={}, featureCode={}, userId={}",
+                            detail.getId(), detail.getFeatureCode(), userId);
+                }
+            }
+        }
+    }
+
     private String resolveAddonProductCode(Purchase purchase) {
         if (purchase.getProductId() != null) {
             return productRepository.findById(purchase.getProductId())

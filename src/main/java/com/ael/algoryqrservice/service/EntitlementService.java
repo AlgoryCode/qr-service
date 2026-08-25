@@ -49,6 +49,7 @@ public class EntitlementService {
     private final ObjectProvider<PackageActivationService> packageActivationService;
     private final UserTrialService userTrialService;
     private final ObjectProvider<FulfillmentGateService> fulfillmentGateService;
+    private final ObjectProvider<FulfillmentGrantService> fulfillmentGrantService;
     private final Map<String, Consumer<Long>> syncRegistry;
 
     public EntitlementService(
@@ -63,7 +64,8 @@ public class EntitlementService {
             QrRepository qrRepository,
             ObjectProvider<PackageActivationService> packageActivationService,
             UserTrialService userTrialService,
-            ObjectProvider<FulfillmentGateService> fulfillmentGateService
+            ObjectProvider<FulfillmentGateService> fulfillmentGateService,
+            ObjectProvider<FulfillmentGrantService> fulfillmentGrantService
     ) {
         this.entitlementRepository = entitlementRepository;
         this.purchaseRepository = purchaseRepository;
@@ -77,6 +79,7 @@ public class EntitlementService {
         this.packageActivationService = packageActivationService;
         this.userTrialService = userTrialService;
         this.fulfillmentGateService = fulfillmentGateService;
+        this.fulfillmentGrantService = fulfillmentGrantService;
         this.syncRegistry = buildSyncRegistry();
     }
 
@@ -451,11 +454,17 @@ public class EntitlementService {
 
     @Transactional
     public void repairAddonEntitlements(Long userId) {
+        LocalDateTime now = LocalDateTime.now();
         List<Purchase> addonPurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
                 .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
                 .toList();
+        fulfillmentGrantService.getObject().repairAddonFulfillmentsForUser(userId);
         for (Purchase purchase : addonPurchases) {
+            if (purchase.getStartsAt() != null && purchase.getStartsAt().isAfter(now)) {
+                purchase.setStartsAt(now);
+                purchaseRepository.save(purchase);
+            }
             Product product = productRepository.findByCode(purchase.getPackageCode()).orElse(null);
             if (product == null) {
                 continue;
