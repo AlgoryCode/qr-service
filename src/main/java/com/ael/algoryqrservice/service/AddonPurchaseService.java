@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
@@ -52,12 +51,12 @@ public class AddonPurchaseService {
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, AddonPurchaseRequest request, String clientIp) {
         String productCode = request.resolvedProductCode();
-        if (!CatalogProducts.isAddonPurchasable(productCode)) {
-            throw new BadRequestException("Bu urun tekil olarak satin alinamaz");
-        }
         Product product = productRepository.findByCode(productCode)
                 .filter(Product::isActive)
                 .orElseThrow(() -> new BadRequestException("Urun bulunamadi veya aktif degil"));
+        if (!product.isAddonPurchasable()) {
+            throw new BadRequestException("Bu urun tekil olarak satin alinamaz");
+        }
         if (!product.isConsumable()) {
             throw new BadRequestException("Bu urun adetli satin alinamaz");
         }
@@ -87,8 +86,10 @@ public class AddonPurchaseService {
         Purchase purchase = purchaseRepository.save(Purchase.builder()
                 .userId(user.getId())
                 .packageId(host.getPackageId())
+                .productId(product.getId())
                 .packageCode(product.getCode())
                 .packageName(product.getName())
+                .addonQuantity(request.resolvedQuantity())
                 .price(line.lineTotal())
                 .currency("TRY")
                 .paymentMode(PaymentMode.CHECKOUT_FORM)

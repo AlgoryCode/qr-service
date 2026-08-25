@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
@@ -87,7 +86,7 @@ public class PackageActivationService {
         if (purchase.getPurchaseType() == PurchaseType.FREE) {
             return false;
         }
-        if (CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode())) {
+        if (purchase.isSystemManaged()) {
             return false;
         }
         return purchase.getPurchaseType() == PurchaseType.PAID

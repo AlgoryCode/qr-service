@@ -12,9 +12,8 @@ public final class CatalogProducts {
     public static final String CUSTOM_DESIGN = "CUSTOM_DESIGN";
     public static final String WAITER_PANEL = "WAITER_PANEL";
 
-    public static boolean isAddonPurchasable(String code) {
-        return QR_CREATE.equals(code) || QR_MENU.equals(code) || QR_BRANCH.equals(code) || MENU_PRODUCT.equals(code);
-    }
+    public static final String QR_MENU_ADDON = "QR_MENU_ADDON";
+    public static final String QR_BRANCH_ADDON = "QR_BRANCH_ADDON";
 
     private CatalogProducts() {
     }

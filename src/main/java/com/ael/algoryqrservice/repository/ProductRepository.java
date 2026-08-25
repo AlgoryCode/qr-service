@@ -17,4 +17,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByCodeIn(List<String> codes);
 
     List<Product> findByActiveTrueOrderByCodeAsc();
+
+    List<Product> findByFeatureCode(String featureCode);
 }

@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
@@ -121,8 +120,7 @@ public class CatalogSeedService {
         planPackage.setValidityDays(seed.getValidityDays() == null ? 30 : seed.getValidityDays());
         planPackage.setPriority(seed.getPriority() == null ? 0 : seed.getPriority());
         planPackage.setPurchasable(Boolean.TRUE.equals(seed.getPurchasable()));
-        planPackage.setSystemManaged(Boolean.TRUE.equals(seed.getSystemManaged())
-                || CatalogPackages.FREE_PACKAGE.equals(code));
+        planPackage.setSystemManaged(Boolean.TRUE.equals(seed.getSystemManaged()));
         planPackage.setTrialEligible(Boolean.TRUE.equals(seed.getTrialEligible()));
         applySeedTrialDays(planPackage, seed.getTrialDays());
         planPackage.setActive(seed.getActive() == null || Boolean.TRUE.equals(seed.getActive()));
@@ -139,7 +137,7 @@ public class CatalogSeedService {
         syncItems(planPackage, nullSafe(seed.getItems()), productsByCode);
         packagePricingService.applyTo(planPackage);
 
-        if (CatalogPackages.FREE_PACKAGE.equals(code) || planPackage.isSystemManaged()) {
+        if (planPackage.isSystemManaged()) {
             planPackage.setPrice(BigDecimal.ZERO);
             planPackage.setSubtotal(BigDecimal.ZERO);
             planPackage.setVatAmount(BigDecimal.ZERO);
@@ -152,7 +150,7 @@ public class CatalogSeedService {
         } else if (seed.getLockPrice() != null) {
             planPackage.setPrice(seed.getLockPrice());
         }
-        if (!planPackage.isSystemManaged() && !CatalogPackages.FREE_PACKAGE.equals(code)) {
+        if (!planPackage.isSystemManaged()) {
             if (seed.getMonthlyDiscount() != null) {
                 planPackage.setMonthlyDiscount(seed.getMonthlyDiscount());
             } else if (planPackage.getMonthlyDiscount() == null) {

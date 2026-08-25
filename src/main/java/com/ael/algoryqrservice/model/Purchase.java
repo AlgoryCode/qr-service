@@ -37,8 +37,14 @@ public class Purchase {
     @Column(name = "user_id")
     private Long userId;
 
-    @Column(name = "package_id", nullable = false)
+    @Column(name = "package_id")
     private Long packageId;
+
+    @Column(name = "product_id")
+    private Long productId;
+
+    @Column(name = "addon_quantity")
+    private Integer addonQuantity;
 
     @Column(name = "package_code", nullable = false, length = 64)
     private String packageCode;
@@ -130,6 +136,11 @@ public class Purchase {
     @ColumnDefault("false")
     @Builder.Default
     private boolean cancelAtPeriodEnd = false;
+
+    @Column(name = "system_managed", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean systemManaged = false;
 
     @Column(name = "subscription_grace_ends_at")
     private LocalDateTime subscriptionGraceEndsAt;

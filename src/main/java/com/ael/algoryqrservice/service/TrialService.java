@@ -1,7 +1,6 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.util.AppTime;
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
@@ -131,8 +130,7 @@ public class TrialService {
         }
         PlanPackage planPackage = packageRepository.findByIdWithItems(packageId)
                 .orElseThrow(() -> new BadRequestException("Paket bulunamadi: " + packageId));
-        if (!planPackage.isActive() || !planPackage.isTrialEligible() || planPackage.isSystemManaged()
-                || CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
+        if (!planPackage.isActive() || !planPackage.isTrialEligible() || planPackage.isSystemManaged()) {
             throw new BadRequestException("Bu paket deneme icin uygun degil");
         }
         if (planPackage.getItems() == null || planPackage.getItems().isEmpty()) {

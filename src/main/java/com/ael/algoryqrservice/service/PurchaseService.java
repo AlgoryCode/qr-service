@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
@@ -37,6 +36,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +74,7 @@ public class PurchaseService {
     private final MenuPublicAccessService menuPublicAccessService;
     private final PlanChangeService planChangeService;
     private final SubscriptionRefundPolicy subscriptionRefundPolicy;
+    private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final BillingRefundProperties billingRefundProperties;
     private final BillingSubscriptionProperties billingSubscriptionProperties;
     private final PlatformTransactionManager transactionManager;
@@ -82,8 +83,7 @@ public class PurchaseService {
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
         PlanPackage planPackage = planPackageService.findActivePackage(request.getPackageId());
-        if (!planPackage.isPurchasable() || planPackage.isSystemManaged()
-                || CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
+        if (!planPackage.isPurchasable() || planPackage.isSystemManaged()) {
             throw new BadRequestException("Bu paket satın alınamaz");
         }
         if (!request.isPaymentPlanValid()) {
@@ -683,12 +683,44 @@ public class PurchaseService {
                 .map(this::toSummary)
                 .toList();
 
+        List<com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse> fulfillmentDetails = List.of();
+        boolean fulfillmentActive = false;
+        try {
+            fulfillmentDetails = fulfillmentDetailRepository.findAllActiveByUserId(userId, java.time.LocalDateTime.now())
+                    .stream()
+                    .map(this::toFulfillmentDetailResponse)
+                    .toList();
+            fulfillmentActive = !fulfillmentDetails.isEmpty();
+        } catch (Exception e) {
+            log.debug("Fulfillment detail fetch failed for userId={}", userId);
+        }
+
         return SubscriptionOverviewResponse.builder()
                 .activePackage(activePackage)
                 .entitlements(entitlements)
                 .addonPurchases(addonPurchases)
                 .branchQuota(branchQuotaService.branchQuota(userId))
                 .menuQuota(branchQuotaService.menuQuota(userId))
+                .fulfillmentDetails(fulfillmentDetails)
+                .fulfillmentActive(fulfillmentActive)
+                .build();
+    }
+
+    private com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse toFulfillmentDetailResponse(
+            com.ael.algoryqrservice.model.FulfillmentDetail detail) {
+        return com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse.builder()
+                .id(detail.getId())
+                .fulfillmentId(detail.getFulfillmentId())
+                .featureCode(detail.getFeatureCode())
+                .scopeCode(detail.getScopeCode())
+                .productTypeId(detail.getProductTypeId())
+                .source(detail.getSource())
+                .quantity(detail.getQuantity())
+                .unlimited(detail.isUnlimited())
+                .usedQuantity(detail.getUsedQuantity())
+                .remainingQuantity(detail.remainingQuantity())
+                .startsAt(detail.getStartsAt())
+                .expiresAt(detail.getExpiresAt())
                 .build();
     }
 
@@ -1169,7 +1201,7 @@ public class PurchaseService {
     }
 
     private void validateUserCancellable(Purchase purchase) {
-        if (CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode())
+        if (purchase.isSystemManaged()
                 || purchase.getPurchaseType() == PurchaseType.FREE
                 || purchase.getPurchaseType() == PurchaseType.SYSTEM_GRANT) {
             throw new BadRequestException("Bu paket kullanıcı tarafından iptal edilemez");
