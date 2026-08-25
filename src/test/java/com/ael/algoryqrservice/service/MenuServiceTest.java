@@ -83,6 +83,8 @@ class MenuServiceTest {
     @Mock
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
     @Mock
+    private MenuProductPairingService menuProductPairingService;
+    @Mock
     private BranchService branchService;
     @Mock
     private BranchQuotaService branchQuotaService;
@@ -96,6 +98,18 @@ class MenuServiceTest {
     void stubCurrentUser() {
         org.mockito.Mockito.lenient().when(securityUtils.getCurrentUserId()).thenReturn(7L);
         org.mockito.Mockito.lenient().when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
+        org.mockito.Mockito.lenient().when(menuProductPairingService.load(any()))
+                .thenReturn(emptyPairings());
+        org.mockito.Mockito.lenient().when(menuProductPairingService.loadByProductIds(any()))
+                .thenReturn(Map.of());
+    }
+
+    private static MenuDtos.MenuProductPairingsResponse emptyPairings() {
+        return MenuDtos.MenuProductPairingsResponse.builder()
+                .productIds(List.of())
+                .mainCategoryIds(List.of())
+                .subCategoryIds(List.of())
+                .build();
     }
 
     @Test

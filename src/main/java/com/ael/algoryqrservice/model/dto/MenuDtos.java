@@ -41,6 +41,17 @@ public final class MenuDtos {
         private Integer servesPeopleMin;
         private Integer servesPeopleMax;
         private NutritionFacts nutrition;
+        private MenuProductPairingsRequest pairings;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductPairingsRequest {
+        private List<Long> productIds;
+        private List<Long> mainCategoryIds;
+        private List<Long> subCategoryIds;
     }
 
     @Data
@@ -71,6 +82,17 @@ public final class MenuDtos {
         private Integer servesPeopleMin;
         private Integer servesPeopleMax;
         private NutritionFacts nutrition;
+        private MenuProductPairingsResponse pairings;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductPairingsResponse {
+        private List<Long> productIds;
+        private List<Long> mainCategoryIds;
+        private List<Long> subCategoryIds;
     }
 
     @Data

@@ -68,6 +68,7 @@ public class MenuService {
     private final ProductImageStorageService productImageStorageService;
     private final ChefAvatarService chefAvatarService;
     private final EntitlementService entitlementService;
+    private final MenuProductPairingService menuProductPairingService;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
     private final BranchQuotaService branchQuotaService;
@@ -134,6 +135,7 @@ public class MenuService {
         }
         entitlementService.assertMenuProductCreationAllowed(userId, sourceProducts.size());
 
+        Map<Long, Long> sourceToTarget = new HashMap<>();
         for (MenuProduct source : sourceProducts) {
             Set<Long> tagIds = source.getTagIds() == null ? new HashSet<>() : new HashSet<>(source.getTagIds());
             Set<Long> allergenIds = source.getAllergenIds() == null ? new HashSet<>() : new HashSet<>(source.getAllergenIds());
@@ -156,8 +158,10 @@ public class MenuService {
                     .ratingAvg(BigDecimal.ZERO)
                     .ratingCount(0L)
                     .build();
-            menuProductRepository.save(copy);
+            MenuProduct saved = menuProductRepository.save(copy);
+            sourceToTarget.put(source.getProductId(), saved.getProductId());
         }
+        menuProductPairingService.copyPairings(sourceToTarget);
         entitlementService.syncMenuProductEntitlements(userId);
     }
 
@@ -511,6 +515,10 @@ public class MenuService {
                 .filter(MenuProduct::isAvailable)
                 .filter(product -> !product.getProductId().equals(productId))
                 .toList();
+        Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
+                menuProductPairingService.loadByProductIds(
+                        candidates.stream().map(MenuProduct::getProductId).toList()
+                );
 
         return candidates.stream()
                 .sorted(Comparator.comparingDouble((MenuProduct candidate) -> {
@@ -546,7 +554,7 @@ public class MenuService {
                     return -score;
                 }).thenComparing(MenuProduct::getSortOrder).thenComparing(MenuProduct::getProductId))
                 .limit(safeLimit)
-                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap))
+                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct))
                 .toList();
     }
 
@@ -587,6 +595,8 @@ public class MenuService {
                 .build();
 
         MenuDtos.MenuProductResponse response = toProductResponse(menuProductRepository.save(product));
+        menuProductPairingService.replace(response.getProductId(), menu.getMenuId(), request.getPairings());
+        response.setPairings(menuProductPairingService.load(response.getProductId()));
         entitlementService.syncMenuProductEntitlements(menu.getUserId());
         return response;
     }
@@ -635,7 +645,12 @@ public class MenuService {
             product.setNutrition(nutritionFactsService.merge(product.getNutrition(), request.getNutrition()));
         }
 
-        return toProductResponse(menuProductRepository.save(product));
+        MenuDtos.MenuProductResponse response = toProductResponse(menuProductRepository.save(product));
+        if (request.getPairings() != null) {
+            menuProductPairingService.replace(product.getProductId(), product.getMenuId(), request.getPairings());
+            response.setPairings(menuProductPairingService.load(product.getProductId()));
+        }
+        return response;
     }
 
     @Transactional
@@ -1027,8 +1042,12 @@ public class MenuService {
         Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
         Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
         Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
+        Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
+                menuProductPairingService.loadByProductIds(
+                        productPage.getContent().stream().map(MenuProduct::getProductId).toList()
+                );
         List<MenuDtos.MenuProductResponse> content = productPage.getContent().stream()
-                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap))
+                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct))
                 .toList();
         return MenuDtos.MenuProductPageResponse.builder()
                 .content(content)
@@ -1041,12 +1060,17 @@ public class MenuService {
     }
 
     private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
+        Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct = Map.of();
+        if (product.getProductId() != null) {
+            pairingsByProduct = menuProductPairingService.loadByProductIds(List.of(product.getProductId()));
+        }
         return toProductResponse(
                 product,
                 menuTaxonomyService.loadSubCategoryMap(),
                 menuTaxonomyService.loadMainCategoryMap(),
                 menuTaxonomyService.loadTagMap(),
-                menuTaxonomyService.loadAllergenMap()
+                menuTaxonomyService.loadAllergenMap(),
+                pairingsByProduct
         );
     }
 
@@ -1055,7 +1079,8 @@ public class MenuService {
             Map<Long, SubCategory> subMap,
             Map<Long, MainCategory> mainMap,
             Map<Long, MenuTag> tagMap,
-            Map<Long, MenuAllergen> allergenMap
+            Map<Long, MenuAllergen> allergenMap,
+            Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct
     ) {
         SubCategory sub = subMap.get(product.getSubCategoryId());
         MainCategory main = sub == null ? null : mainMap.get(sub.getMainCategoryId());
@@ -1107,6 +1132,17 @@ public class MenuService {
                 .servesPeopleMin(product.getServesPeopleMin())
                 .servesPeopleMax(product.getServesPeopleMax())
                 .nutrition(product.getNutrition())
+                .pairings(pairingsByProduct == null || product.getProductId() == null
+                        ? emptyPairings()
+                        : pairingsByProduct.getOrDefault(product.getProductId(), emptyPairings()))
+                .build();
+    }
+
+    private static MenuDtos.MenuProductPairingsResponse emptyPairings() {
+        return MenuDtos.MenuProductPairingsResponse.builder()
+                .productIds(List.of())
+                .mainCategoryIds(List.of())
+                .subCategoryIds(List.of())
                 .build();
     }
 
