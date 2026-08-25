@@ -75,4 +75,21 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     List<Long> findDistinctUserIdsWithExpiredPaidPurchases(@Param("status") PurchaseStatus status);
 
     List<Purchase> findByRefundStatus(com.ael.algoryqrservice.model.enums.RefundStatus refundStatus);
+
+    @Query("""
+            select distinct p.userId
+            from Purchase p
+            where p.status = com.ael.algoryqrservice.model.enums.PurchaseStatus.ACTIVE
+            """)
+    List<Long> findDistinctUserIdsByActiveStatus();
+
+    @Query("""
+            select p from Purchase p
+            where p.status = com.ael.algoryqrservice.model.enums.PurchaseStatus.ACTIVE
+              and p.purchaseType <> com.ael.algoryqrservice.model.enums.PurchaseType.FREE
+              and not exists (
+                  select 1 from GrantFulfillment g where g.purchaseId = p.id
+              )
+            """)
+    List<Purchase> findActiveWithoutFulfillment(Pageable pageable);
 }

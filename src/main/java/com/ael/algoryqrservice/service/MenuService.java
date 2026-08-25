@@ -286,7 +286,7 @@ public class MenuService {
         return base + "/menu/" + qrId;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MenuDtos.PublicMenuResponse getPublicMenuByQrId(Long qrId) {
         Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
@@ -332,7 +332,7 @@ public class MenuService {
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MenuDtos.MenuProductPageResponse listPublicProducts(
             Long menuId,
             int page,
@@ -372,7 +372,7 @@ public class MenuService {
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MenuDtos.ProductFacetsResponse listPublicProductFacets(
             Long menuId,
             Boolean chefRecommended,
@@ -485,7 +485,7 @@ public class MenuService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<MenuDtos.MenuProductResponse> listPublicRecommendations(Long menuId, Long productId, int limit) {
         Menu menu = ensureMenuExists(menuId);
         ensurePublicAccess(menu);
@@ -878,10 +878,16 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü yayında değil");
         }
         if (!menu.isPublicAccessEnabled()) {
-            throw new ForbiddenException(
-                    ForbiddenException.MENU_OWNER_PACKAGE_INACTIVE,
-                    "Lütfen restoran sahibiyle iletişime geçiniz."
-            );
+            menuPublicAccessService.syncForUser(menu.getUserId());
+            Menu latest = menuRepository.findById(menu.getMenuId()).orElse(menu);
+            if (!latest.isPublicAccessEnabled()) {
+                throw new ForbiddenException(
+                        ForbiddenException.MENU_OWNER_PACKAGE_INACTIVE,
+                        "Lütfen restoran sahibiyle iletişime geçiniz."
+                );
+            }
+            menu.setPublicAccessEnabled(true);
+            menu.setPublicAccessDisabledReason(null);
         }
     }
 

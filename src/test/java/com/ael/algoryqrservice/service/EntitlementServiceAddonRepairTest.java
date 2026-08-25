@@ -6,6 +6,9 @@ import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
+import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
+import com.ael.algoryqrservice.repository.GrantFulfillmentRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
@@ -56,11 +59,32 @@ class EntitlementServiceAddonRepairTest {
     private ObjectProvider<PackageActivationService> packageActivationServiceProvider;
     @Mock
     private UserTrialService userTrialService;
+    @Mock
+    private ObjectProvider<FulfillmentGateService> fulfillmentGateServiceProvider;
+    @Mock
+    private ObjectProvider<FulfillmentGrantService> fulfillmentGrantServiceProvider;
+    @Mock
+    private ObjectProvider<FulfillmentMigrationService> fulfillmentMigrationServiceProvider;
+    @Mock
+    private FulfillmentGateService fulfillmentGateService;
+    @Mock
+    private FulfillmentGrantService fulfillmentGrantService;
+    @Mock
+    private FulfillmentMigrationService fulfillmentMigrationService;
+    @Mock
+    private FulfillmentDetailRepository fulfillmentDetailRepository;
+    @Mock
+    private GrantFulfillmentRepository grantFulfillmentRepository;
+    @Mock
+    private FulfillmentUsageLogRepository fulfillmentUsageLogRepository;
 
     private EntitlementService entitlementService;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(fulfillmentGateServiceProvider.getObject()).thenReturn(fulfillmentGateService);
+        org.mockito.Mockito.lenient().when(fulfillmentGrantServiceProvider.getObject()).thenReturn(fulfillmentGrantService);
+        org.mockito.Mockito.lenient().when(fulfillmentMigrationServiceProvider.getObject()).thenReturn(fulfillmentMigrationService);
         entitlementService = new EntitlementService(
                 entitlementRepository,
                 purchaseRepository,
@@ -72,7 +96,13 @@ class EntitlementServiceAddonRepairTest {
                 menuProductRepository,
                 qrRepository,
                 packageActivationServiceProvider,
-                userTrialService
+                userTrialService,
+                fulfillmentGateServiceProvider,
+                fulfillmentGrantServiceProvider,
+                fulfillmentMigrationServiceProvider,
+                fulfillmentDetailRepository,
+                grantFulfillmentRepository,
+                fulfillmentUsageLogRepository
         );
     }
 
@@ -112,8 +142,6 @@ class EntitlementServiceAddonRepairTest {
         when(purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE)).thenReturn(List.of(addon));
         when(productRepository.findByCode(CatalogProducts.QR_MENU)).thenReturn(Optional.of(product));
         when(entitlementRepository.findByPurchaseIdOrderByProductCodeAsc(20L)).thenReturn(List.of(entitlement));
-        when(entitlementRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(entitlement));
-        when(purchaseRepository.findAllById(List.of(20L))).thenReturn(List.of(addon));
         when(menuRepository.countActiveLiveMenusGroupedByBranch(userId)).thenReturn(List.of());
         when(qrRepository.countByUserIdAndDeletedFalse(userId)).thenReturn(0L);
         when(menuProductRepository.countActiveProductsForUser(userId)).thenReturn(0L);
@@ -121,6 +149,7 @@ class EntitlementServiceAddonRepairTest {
         entitlementService.repairUsablePackageEntitlements(userId);
 
         verify(planPackageRepository, never()).findByIdWithItems(any());
+        verify(fulfillmentMigrationService).backfillUser(userId);
         ArgumentCaptor<UserEntitlement> captor = ArgumentCaptor.forClass(UserEntitlement.class);
         verify(entitlementRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
         assertThat(captor.getAllValues().getFirst().getTotalQuantity()).isEqualTo(2);

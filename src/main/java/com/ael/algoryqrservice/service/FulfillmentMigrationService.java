@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.model.FulfillmentDetail;
 import com.ael.algoryqrservice.model.GrantFulfillment;
 import com.ael.algoryqrservice.model.PlanPackage;
@@ -9,7 +8,6 @@ import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.enums.FulfillmentDetailSource;
-import com.ael.algoryqrservice.model.enums.FulfillmentGateMode;
 import com.ael.algoryqrservice.model.enums.GrantFulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.ProductType;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
@@ -47,7 +45,6 @@ public class FulfillmentMigrationService {
     private final PlanPackageRepository planPackageRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-    private final AppProperties appProperties;
 
     @Transactional
     public MigrationResult backfillUser(Long userId) {
@@ -59,7 +56,15 @@ public class FulfillmentMigrationService {
         int detailCount = 0;
 
         for (Purchase purchase : activePurchases) {
-            if (grantFulfillmentRepository.findByPurchaseId(purchase.getId()).isPresent()) {
+            GrantFulfillment existing = grantFulfillmentRepository.findByPurchaseId(purchase.getId()).orElse(null);
+            if (existing != null) {
+                if (fulfillmentDetailRepository.findByFulfillmentId(existing.getId()).isEmpty()) {
+                    if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+                        detailCount += fillAddonDetails(purchase, existing);
+                    } else if (purchase.getPackageId() != null) {
+                        detailCount += fillPackageDetails(purchase, existing);
+                    }
+                }
                 continue;
             }
             if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
@@ -74,6 +79,23 @@ public class FulfillmentMigrationService {
         }
         log.info("Backfill complete for userId={}: {} fulfillments, {} details", userId, fulfillmentCount, detailCount);
         return new MigrationResult(userId, fulfillmentCount, detailCount);
+    }
+
+    @Transactional
+    public int backfillAllActiveUsers() {
+        List<Long> userIds = purchaseRepository.findDistinctUserIdsByActiveStatus();
+        int migrated = 0;
+        for (Long userId : userIds) {
+            try {
+                MigrationResult result = backfillUser(userId);
+                if (result.fulfillmentCount() > 0 || result.detailCount() > 0) {
+                    migrated++;
+                }
+            } catch (Exception e) {
+                log.error("Backfill failed for userId={}: {}", userId, e.getMessage(), e);
+            }
+        }
+        return migrated;
     }
 
     public List<MigrationResult> backfillBatch(int offset, int batchSize) {
@@ -149,6 +171,14 @@ public class FulfillmentMigrationService {
                 .migrationKey("backfill-v1:" + purchase.getId())
                 .build());
 
+        return fillPackageDetails(purchase, fulfillment);
+    }
+
+    private int fillPackageDetails(Purchase purchase, GrantFulfillment fulfillment) {
+        PlanPackage planPackage = planPackageRepository.findByIdWithItems(purchase.getPackageId()).orElse(null);
+        if (planPackage == null) {
+            return 0;
+        }
         int detailCount = 0;
         List<UserEntitlement> purchaseEntitlements = userEntitlementRepository.findByPurchaseIdOrderByProductCodeAsc(purchase.getId());
         Map<Long, UserEntitlement> byProductId = purchaseEntitlements.stream()
@@ -161,6 +191,9 @@ public class FulfillmentMigrationService {
             int usedQty = ent != null && ent.getUsedQuantity() != null ? ent.getUsedQuantity() : 0;
             boolean unlimited = ent != null ? ent.isUnlimited() : item.isUnlimited();
             String featureCode = resolveFeatureCode(product);
+            if (!unlimited && quantity > 0) {
+                usedQty = Math.min(usedQty, quantity);
+            }
 
             fulfillmentDetailRepository.save(FulfillmentDetail.builder()
                     .fulfillmentId(fulfillment.getId())
@@ -182,11 +215,26 @@ public class FulfillmentMigrationService {
     }
 
     private int backfillAddonPurchase(Purchase purchase) {
-        String productCode = purchase.getPackageCode();
-        if (productCode == null) {
+        if (purchase.getPackageCode() == null || purchase.getPackageId() == null) {
             return 0;
         }
-        if (purchase.getPackageId() == null) {
+        GrantFulfillment fulfillment = grantFulfillmentRepository.save(GrantFulfillment.builder()
+                .userId(purchase.getUserId())
+                .purchaseId(purchase.getId())
+                .paymentId(purchase.getPaymentId())
+                .packageId(purchase.getPackageId())
+                .status(GrantFulfillmentStatus.ACTIVE)
+                .startsAt(purchase.getStartsAt())
+                .expiresAt(purchase.getExpiresAt())
+                .migrationKey("backfill-v1:" + purchase.getId())
+                .build());
+
+        return fillAddonDetails(purchase, fulfillment);
+    }
+
+    private int fillAddonDetails(Purchase purchase, GrantFulfillment fulfillment) {
+        String productCode = purchase.getPackageCode();
+        if (productCode == null) {
             return 0;
         }
         Product product = productRepository.findByCode(productCode).orElse(null);
@@ -198,19 +246,11 @@ public class FulfillmentMigrationService {
         int quantity = ent != null && ent.getTotalQuantity() != null ? ent.getTotalQuantity()
                 : (purchase.getInstallmentCount() != null ? purchase.getInstallmentCount() : 1);
         int usedQty = ent != null && ent.getUsedQuantity() != null ? ent.getUsedQuantity() : 0;
+        if (quantity > 0) {
+            usedQty = Math.min(usedQty, quantity);
+        }
         String featureCode = product != null ? resolveFeatureCode(product) : productCode;
         String scopeCode = product != null ? product.getScopeCode() : null;
-
-        GrantFulfillment fulfillment = grantFulfillmentRepository.save(GrantFulfillment.builder()
-                .userId(purchase.getUserId())
-                .purchaseId(purchase.getId())
-                .paymentId(purchase.getPaymentId())
-                .packageId(purchase.getPackageId())
-                .status(GrantFulfillmentStatus.ACTIVE)
-                .startsAt(purchase.getStartsAt())
-                .expiresAt(purchase.getExpiresAt())
-                .migrationKey("backfill-v1:" + purchase.getId())
-                .build());
 
         fulfillmentDetailRepository.save(FulfillmentDetail.builder()
                 .fulfillmentId(fulfillment.getId())
@@ -226,7 +266,6 @@ public class FulfillmentMigrationService {
                 .startsAt(purchase.getStartsAt())
                 .expiresAt(purchase.getExpiresAt())
                 .build());
-
         return 1;
     }
 

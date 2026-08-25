@@ -2,20 +2,24 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
-import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.config.SmartReportRabbitProperties;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.TooManyRequestsException;
 import com.ael.algoryqrservice.messaging.dto.SmartReportGenerateMessage;
 import com.ael.algoryqrservice.messaging.dto.SmartReportStatusMessage;
+import com.ael.algoryqrservice.model.FulfillmentDetail;
+import com.ael.algoryqrservice.model.FulfillmentUsageLog;
 import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.SmartReportResult;
-import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
+import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
+import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
+import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.SmartReportEventRepository;
 import com.ael.algoryqrservice.repository.SmartReportResultRepository;
-import com.ael.algoryqrservice.repository.UserEntitlementRepository;
+import com.ael.algoryqrservice.util.AppTime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,7 +58,9 @@ public class SmartReportService {
     private final SmartReportQuotaProperties quotaProperties;
     private final SmartReportEventRepository smartReportEventRepository;
     private final SmartReportResultRepository smartReportResultRepository;
-    private final UserEntitlementRepository userEntitlementRepository;
+    private final FulfillmentDetailRepository fulfillmentDetailRepository;
+    private final FulfillmentUsageLogRepository fulfillmentUsageLogRepository;
+    private final FulfillmentGateService fulfillmentGateService;
     private final ProductRepository productRepository;
     private final SmartReportCompletionNotifier smartReportCompletionNotifier;
     private final ObjectMapper objectMapper;
@@ -149,7 +156,7 @@ public class SmartReportService {
                 .status(SmartReportEvent.STATUS_QUEUED)
                 .build());
 
-        touchSmartReportLastUsage(ownerId);
+        touchSmartReportLastUsage(ownerId, resolvedMenuId);
 
         SmartReportGenerateMessage payload = new SmartReportGenerateMessage(
                 processId,
@@ -230,7 +237,7 @@ public class SmartReportService {
             }
             smartReportEventRepository.save(reportEvent);
             upsertResult(reportEvent, resultText);
-            touchSmartReportLastUsage(reportEvent.getUserId());
+            touchSmartReportLastUsage(reportEvent.getUserId(), reportEvent.getMenuId());
             SmartReportDtos.AiSmartReportResult parsed = parseResultText(resultText);
             String title = parsed == null ? null : parsed.title();
             smartReportCompletionNotifier.sendReadyEmail(reportEvent.getProcessId(), title);
@@ -331,27 +338,33 @@ public class SmartReportService {
         smartReportResultRepository.save(existing);
     }
 
-    private void touchSmartReportLastUsage(Long userId) {
+    private void touchSmartReportLastUsage(Long userId, Long menuId) {
         if (userId == null) {
             return;
         }
-        LocalDateTime now = LocalDateTime.now();
-        Set<String> smartReportingCodes = smartReportingProductCodes();
-        List<UserEntitlement> entitlements = userEntitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        for (UserEntitlement entitlement : entitlements) {
-            if (smartReportingCodes.contains(entitlement.getProductCode())) {
-                entitlement.setLastUsage(now);
-                userEntitlementRepository.save(entitlement);
-            }
-        }
+        fulfillmentGateService.logFeatureUsage(
+                userId,
+                CatalogProducts.SMART_REPORTING,
+                FulfillmentReferenceType.FEATURE,
+                menuId
+        );
     }
 
     private Instant resolveLastUsage(Long userId) {
-        Set<String> smartReportingCodes = smartReportingProductCodes();
-        return userEntitlementRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(entitlement -> smartReportingCodes.contains(entitlement.getProductCode()))
-                .map(UserEntitlement::getLastUsage)
-                .filter(value -> value != null)
+        Set<Long> detailIds = fulfillmentDetailRepository.findAllActiveByUserId(userId, AppTime.nowLocal()).stream()
+                .filter(detail -> CatalogProducts.SMART_REPORTING.equals(detail.getFeatureCode())
+                        || (detail.getScopeCode() != null && detail.getScopeCode().contains("SMART_REPORTING")))
+                .map(FulfillmentDetail::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (detailIds.isEmpty()) {
+            return null;
+        }
+        return fulfillmentUsageLogRepository.findByUserIdOrderByCreatedAtDesc(userId, Pageable.ofSize(100))
+                .getContent()
+                .stream()
+                .filter(log -> detailIds.contains(log.getDetailId()))
+                .map(FulfillmentUsageLog::getCreatedAt)
+                .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .map(this::toInstant)
                 .orElse(null);

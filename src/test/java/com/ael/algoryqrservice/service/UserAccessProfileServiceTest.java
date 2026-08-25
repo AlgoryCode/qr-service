@@ -3,17 +3,16 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.model.FulfillmentDetail;
 import com.ael.algoryqrservice.model.PlanPackage;
-import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
+import com.ael.algoryqrservice.model.enums.FulfillmentDetailSource;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
-import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.repository.UserEntitlementRepository;
 import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +28,8 @@ import java.util.List;
 import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,15 +39,15 @@ class UserAccessProfileServiceTest {
     @Mock
     private PurchaseRepository purchaseRepository;
     @Mock
-    private UserEntitlementRepository entitlementRepository;
-    @Mock
     private PlanPackageRepository planPackageRepository;
     @Mock
-    private ProductRepository productRepository;
+    private FulfillmentDetailRepository fulfillmentDetailRepository;
     @Mock
     private EntitlementService entitlementService;
     @Mock
     private PackageActivationService packageActivationService;
+    @Mock
+    private FulfillmentMigrationService fulfillmentMigrationService;
 
     @InjectMocks
     private UserAccessProfileService service;
@@ -79,18 +80,14 @@ class UserAccessProfileServiceTest {
                 .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23))
                 .build();
 
-        UserEntitlement qrMenu = entitlement(177L, CatalogProducts.QR_MENU, 102L);
-        UserEntitlement qrCreate = entitlement(181L, CatalogProducts.QR_CREATE, 102L);
-
         when(purchaseRepository.findByUserIdAndStatus(1L, PurchaseStatus.ACTIVE)).thenReturn(List.of(trial));
         when(planPackageRepository.findAllById(List.of(4L))).thenReturn(List.of(
                 PlanPackage.builder().id(4L).code(CatalogPackages.ULTIMATE_PACKAGE).priority(300).build()
         ));
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(qrMenu, qrCreate));
-        when(productRepository.findByCodeIn(List.of(CatalogProducts.QR_CREATE, CatalogProducts.QR_MENU)))
+        when(fulfillmentDetailRepository.findAllActiveByUserId(eq(1L), any(LocalDateTime.class)))
                 .thenReturn(List.of(
-                        product(CatalogProducts.QR_CREATE, CatalogScopes.QR_CREATE_OWNER),
-                        product(CatalogProducts.QR_MENU, CatalogScopes.QR_MENU_OWNER)
+                        detail(CatalogProducts.QR_MENU, CatalogScopes.QR_MENU_OWNER),
+                        detail(CatalogProducts.QR_CREATE, CatalogScopes.QR_CREATE_OWNER)
                 ));
 
         UserAccessProfile profile = service.resolve(1L);
@@ -101,6 +98,7 @@ class UserAccessProfileServiceTest {
         verify(entitlementService).expireDuePurchasesForUser(1L);
         verify(packageActivationService).ensureSubscriptionState(1L);
         verify(entitlementService).repairUsablePackageEntitlements(1L);
+        verify(fulfillmentMigrationService).backfillUser(1L);
     }
 
     @Test
@@ -142,28 +140,17 @@ class UserAccessProfileServiceTest {
         verify(entitlementService).expireDuePurchasesForUser(1L);
     }
 
-    private static UserEntitlement entitlement(Long id, String productCode, Long purchaseId) {
-        return UserEntitlement.builder()
-                .id(id)
+    private static FulfillmentDetail detail(String featureCode, String scopeCode) {
+        return FulfillmentDetail.builder()
+                .id(1L)
+                .fulfillmentId(10L)
                 .userId(1L)
-                .productId(id)
-                .productCode(productCode)
-                .purchaseId(purchaseId)
-                .totalQuantity(1)
-                .remainingQuantity(1)
+                .featureCode(featureCode)
+                .scopeCode(scopeCode)
+                .source(FulfillmentDetailSource.PACKAGE_INCLUDE)
+                .quantity(1)
                 .usedQuantity(0)
                 .unlimited(false)
-                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23))
-                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23))
-                .build();
-    }
-
-    private static Product product(String code, String scopeCode) {
-        return Product.builder()
-                .code(code)
-                .name(code)
-                .scopeCode(scopeCode)
-                .active(true)
                 .build();
     }
 }

@@ -40,6 +40,7 @@ public class AppProperties {
         private boolean branchBackfill = true;
         private boolean waiterBranchBackfill = true;
         private boolean chefAvatars = false;
+        private boolean fulfillmentEntitlementBackfill = true;
         private MenuProductsSeed menuProducts = new MenuProductsSeed();
     }
 
@@ -53,7 +54,7 @@ public class AppProperties {
     @Getter
     @Setter
     public static class FulfillmentSettings {
-        private FulfillmentGateMode gateMode = FulfillmentGateMode.DUAL;
+        private FulfillmentGateMode gateMode = FulfillmentGateMode.FULFILLMENT_ONLY;
         private boolean repairJobEnabled = true;
         private int repairJobBatchSize = 100;
     }

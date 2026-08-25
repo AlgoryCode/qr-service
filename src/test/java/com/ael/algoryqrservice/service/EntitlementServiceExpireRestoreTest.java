@@ -3,6 +3,9 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
+import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
+import com.ael.algoryqrservice.repository.GrantFulfillmentRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
@@ -51,6 +54,18 @@ class EntitlementServiceExpireRestoreTest {
     private PackageActivationService packageActivationService;
     @Mock
     private UserTrialService userTrialService;
+    @Mock
+    private ObjectProvider<FulfillmentGateService> fulfillmentGateService;
+    @Mock
+    private ObjectProvider<FulfillmentGrantService> fulfillmentGrantService;
+    @Mock
+    private ObjectProvider<FulfillmentMigrationService> fulfillmentMigrationService;
+    @Mock
+    private FulfillmentDetailRepository fulfillmentDetailRepository;
+    @Mock
+    private GrantFulfillmentRepository grantFulfillmentRepository;
+    @Mock
+    private FulfillmentUsageLogRepository fulfillmentUsageLogRepository;
 
     private EntitlementService entitlementService;
 
@@ -67,7 +82,13 @@ class EntitlementServiceExpireRestoreTest {
                 menuProductRepository,
                 qrRepository,
                 packageActivationServiceProvider,
-                userTrialService
+                userTrialService,
+                fulfillmentGateService,
+                fulfillmentGrantService,
+                fulfillmentMigrationService,
+                fulfillmentDetailRepository,
+                grantFulfillmentRepository,
+                fulfillmentUsageLogRepository
         );
         when(packageActivationServiceProvider.getObject()).thenReturn(packageActivationService);
     }

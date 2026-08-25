@@ -87,6 +87,14 @@ class AddonPurchaseServiceTest {
         AddonPurchaseRequest request = new AddonPurchaseRequest();
         request.setProductCode(CatalogProducts.SMART_ASSISTANT);
         request.setBillingAddressId(1L);
+        Product product = Product.builder()
+                .id(9L)
+                .code(CatalogProducts.SMART_ASSISTANT)
+                .name("Smart Assistant")
+                .active(true)
+                .addonPurchasable(false)
+                .build();
+        when(productRepository.findByCode(CatalogProducts.SMART_ASSISTANT)).thenReturn(Optional.of(product));
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
                 .isInstanceOf(BadRequestException.class)
@@ -105,6 +113,7 @@ class AddonPurchaseServiceTest {
                 .unitPrice(new BigDecimal("29.00"))
                 .vatRate(new BigDecimal("20.00"))
                 .consumable(true)
+                .addonPurchasable(true)
                 .active(true)
                 .build();
         when(productRepository.findByCode(CatalogProducts.QR_MENU)).thenReturn(Optional.of(product));
@@ -127,6 +136,7 @@ class AddonPurchaseServiceTest {
                 .unitPrice(new BigDecimal("29.00"))
                 .vatRate(new BigDecimal("20.00"))
                 .consumable(true)
+                .addonPurchasable(true)
                 .active(true)
                 .build();
         Purchase addon = Purchase.builder()
@@ -159,6 +169,7 @@ class AddonPurchaseServiceTest {
                 .unitPrice(new BigDecimal("200.00"))
                 .vatRate(new BigDecimal("20.00"))
                 .consumable(true)
+                .addonPurchasable(true)
                 .active(true)
                 .build();
         Purchase host = Purchase.builder()

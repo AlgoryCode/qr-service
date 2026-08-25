@@ -1,21 +1,24 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogProducts;
-import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.UserEntitlement;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
+import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
+import com.ael.algoryqrservice.repository.GrantFulfillmentRepository;
+import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.repository.UserEntitlementRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,64 +44,72 @@ class EntitlementServiceHasUsableQrCreatePackageTest {
     @Mock
     private MenuRepository menuRepository;
     @Mock
-    private org.springframework.beans.factory.ObjectProvider<PackageActivationService> packageActivationService;
+    private MenuProductRepository menuProductRepository;
+    @Mock
+    private QrRepository qrRepository;
+    @Mock
+    private ObjectProvider<PackageActivationService> packageActivationService;
+    @Mock
+    private UserTrialService userTrialService;
+    @Mock
+    private ObjectProvider<FulfillmentGateService> fulfillmentGateServiceProvider;
+    @Mock
+    private ObjectProvider<FulfillmentGrantService> fulfillmentGrantServiceProvider;
+    @Mock
+    private ObjectProvider<FulfillmentMigrationService> fulfillmentMigrationServiceProvider;
+    @Mock
+    private FulfillmentGateService fulfillmentGateService;
+    @Mock
+    private FulfillmentMigrationService fulfillmentMigrationService;
+    @Mock
+    private FulfillmentDetailRepository fulfillmentDetailRepository;
+    @Mock
+    private GrantFulfillmentRepository grantFulfillmentRepository;
+    @Mock
+    private FulfillmentUsageLogRepository fulfillmentUsageLogRepository;
 
-    @InjectMocks
     private EntitlementService entitlementService;
 
-    @Test
-    void hasUsableQrCreatePackage_whenRemainingZeroButPurchaseActive_thenTrue() {
-        Long userId = 7L;
-        UserEntitlement entitlement = UserEntitlement.builder()
-                .id(1L)
-                .userId(userId)
-                .productCode(CatalogProducts.QR_CREATE)
-                .purchaseId(10L)
-                .totalQuantity(1)
-                .remainingQuantity(0)
-                .usedQuantity(1)
-                .unlimited(false)
-                .build();
-        Purchase purchase = Purchase.builder()
-                .id(10L)
-                .userId(userId)
-                .status(PurchaseStatus.ACTIVE)
-                .expiresAt(LocalDateTime.now().plusDays(10))
-                .build();
-
-        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(eq(userId), eq(PurchaseStatus.ACTIVE), any()))
-                .thenReturn(List.of());
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(entitlement));
-        when(purchaseRepository.findAllById(List.of(10L))).thenReturn(List.of(purchase));
-
-        assertThat(entitlementService.hasUsableQrCreatePackage(userId)).isTrue();
+    @BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient().when(fulfillmentGateServiceProvider.getObject()).thenReturn(fulfillmentGateService);
+        org.mockito.Mockito.lenient().when(fulfillmentMigrationServiceProvider.getObject()).thenReturn(fulfillmentMigrationService);
+        entitlementService = new EntitlementService(
+                entitlementRepository,
+                purchaseRepository,
+                productRepository,
+                planPackageRepository,
+                purchaseLogService,
+                menuPublicAccessService,
+                menuRepository,
+                menuProductRepository,
+                qrRepository,
+                packageActivationService,
+                userTrialService,
+                fulfillmentGateServiceProvider,
+                fulfillmentGrantServiceProvider,
+                fulfillmentMigrationServiceProvider,
+                fulfillmentDetailRepository,
+                grantFulfillmentRepository,
+                fulfillmentUsageLogRepository
+        );
     }
 
     @Test
-    void hasUsableQrCreatePackage_whenPurchaseExpiredByDate_thenFalse() {
-        Long userId = 7L;
-        UserEntitlement entitlement = UserEntitlement.builder()
-                .id(1L)
-                .userId(userId)
-                .productCode(CatalogProducts.QR_CREATE)
-                .purchaseId(10L)
-                .totalQuantity(1)
-                .remainingQuantity(1)
-                .usedQuantity(0)
-                .unlimited(false)
-                .build();
-        Purchase purchase = Purchase.builder()
-                .id(10L)
-                .userId(userId)
-                .status(PurchaseStatus.ACTIVE)
-                .expiresAt(LocalDateTime.now().minusDays(1))
-                .build();
-
-        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(eq(userId), eq(PurchaseStatus.ACTIVE), any()))
+    void hasUsableQrCreatePackage_whenFulfillmentHasScope_thenTrue() {
+        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(eq(7L), eq(PurchaseStatus.ACTIVE), any()))
                 .thenReturn(List.of());
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(entitlement));
-        when(purchaseRepository.findAllById(List.of(10L))).thenReturn(List.of(purchase));
+        when(fulfillmentGateService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
 
-        assertThat(entitlementService.hasUsableQrCreatePackage(userId)).isFalse();
+        assertThat(entitlementService.hasUsableQrCreatePackage(7L)).isTrue();
+    }
+
+    @Test
+    void hasUsableQrCreatePackage_whenFulfillmentMissingScope_thenFalse() {
+        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(eq(7L), eq(PurchaseStatus.ACTIVE), any()))
+                .thenReturn(List.of());
+        when(fulfillmentGateService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(false);
+
+        assertThat(entitlementService.hasUsableQrCreatePackage(7L)).isFalse();
     }
 }

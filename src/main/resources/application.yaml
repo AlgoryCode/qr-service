@@ -97,6 +97,8 @@ app:
     max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:5242880}
   menu:
     category-max-depth: ${MENU_CATEGORY_MAX_DEPTH:10}
+  fulfillment:
+    gate-mode: ${APP_FULFILLMENT_GATE_MODE:FULFILLMENT_ONLY}
   chef-avatars:
     items:
       - key: default
@@ -108,6 +110,7 @@ app:
     package-catalog: ${APP_SEED_PACKAGE_CATALOG_ENABLED:false}
     public-access-backfill: ${APP_SEED_PUBLIC_ACCESS_BACKFILL_ENABLED:false}
     branch-backfill: ${APP_SEED_BRANCH_BACKFILL_ENABLED:true}
+    fulfillment-entitlement-backfill: ${APP_SEED_FULFILLMENT_ENTITLEMENT_BACKFILL_ENABLED:true}
     chef-avatars: ${APP_SEED_CHEF_AVATARS_ENABLED:false}
     menu-products:
       enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:false}

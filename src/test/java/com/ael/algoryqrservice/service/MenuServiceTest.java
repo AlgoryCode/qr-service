@@ -433,6 +433,7 @@ class MenuServiceTest {
                 .publicAccessEnabled(false)
                 .build();
         when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
 
         assertThatThrownBy(() -> menuService.getPublicMenuByQrId(2L))
                 .isInstanceOf(ForbiddenException.class)
@@ -440,6 +441,54 @@ class MenuServiceTest {
                     ForbiddenException forbidden = (ForbiddenException) ex;
                     assertThat(forbidden.getCode()).isEqualTo(ForbiddenException.MENU_OWNER_PACKAGE_INACTIVE);
                 });
+        verify(menuPublicAccessService).syncForUser(7L);
+    }
+
+    @Test
+    void getPublicMenuByQrId_whenPublicAccessStale_thenResyncAndReturn() {
+        Menu disabled = Menu.builder()
+                .menuId(10L)
+                .qrId(2L)
+                .userId(7L)
+                .themeId("soft")
+                .businessName("Kafe")
+                .active(true)
+                .publicAccessEnabled(false)
+                .publicAccessDisabledReason("PACKAGE_INACTIVE")
+                .build();
+        Menu enabled = Menu.builder()
+                .menuId(10L)
+                .qrId(2L)
+                .userId(7L)
+                .themeId("soft")
+                .businessName("Kafe")
+                .active(true)
+                .publicAccessEnabled(true)
+                .build();
+        when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(disabled));
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(enabled));
+        when(appProperties.getUrl()).thenReturn("https://example.com");
+        when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+        when(menuTaxonomyService.listTaxonomyPage(0, 6, null)).thenReturn(
+                TaxonomyDtos.TaxonomyPageResponse.builder()
+                        .content(List.of())
+                        .page(0)
+                        .size(6)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .hasNext(false)
+                        .build()
+        );
+        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
+        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
+        when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
+
+        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByQrId(2L);
+
+        verify(menuPublicAccessService).syncForUser(7L);
+        assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
     }
 
     @Test
