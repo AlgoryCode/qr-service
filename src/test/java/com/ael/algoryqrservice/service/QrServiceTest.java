@@ -100,24 +100,25 @@ class QrServiceTest {
     }
 
     @Test
-    void createQR_whenActiveMenuExistsAndRemainingMenuEntitlement_thenCreateProceeds() throws Exception {
+    void createQR_whenActiveMenuExistsAndRemainingMenuEntitlement_thenCreateProceedsWithoutQrCreateScope() throws Exception {
         Long userId = 7L;
         QrRequest request = new QrRequest();
         request.setType("menu");
         request.setDetails(Map.of("branchId", 3L, "themeId", "classic", "businessName", "Kafe"));
         QrResponse expected = QrResponse.builder().qrId(12L).build();
 
-        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-        when(entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1)).thenReturn(new ConsumedEntitlement(10L, 2L, 1));
+        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
 
         QrResponse response = qrService.createQR(request, userId);
 
         assertThat(response.getQrId()).isEqualTo(12L);
+        assertThat(request.getPurchaseId()).isEqualTo(10L);
+        verify(entitlementService, never()).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         verify(branchQuotaService).assertAndConsumeMenuCreation(userId, 3L);
-        verify(entitlementService).consume(userId, CatalogProducts.QR_CREATE, 1);
+        verify(entitlementService, never()).consume(userId, CatalogProducts.QR_CREATE, 1);
     }
 
     @Test
@@ -127,7 +128,6 @@ class QrServiceTest {
         request.setType("menu");
         request.setDetails(Map.of("branchId", 3L));
 
-        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
         doThrow(new ForbiddenException("EXTRA_MENU_REQUIRED", "Bu şubede ek menü ücretlidir. Lütfen ek menü hakkı satın alın."))
                 .when(branchQuotaService).assertAndConsumeMenuCreation(userId, 3L);
@@ -136,7 +136,32 @@ class QrServiceTest {
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("ek menü ücretlidir");
 
+        verify(entitlementService, never()).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         verify(entitlementService, never()).consume(userId, CatalogProducts.QR_CREATE, 1);
+    }
+
+    @Test
+    void createQR_whenRegularQr_thenRequiresAndConsumesQrCreate() throws Exception {
+        Long userId = 7L;
+        QrRequest request = new QrRequest();
+        request.setType("link");
+        request.setDetails(Map.of("url", "https://example.com"));
+        QrResponse expected = QrResponse.builder().qrId(13L).build();
+
+        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
+        when(entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1))
+                .thenReturn(new ConsumedEntitlement(10L, 2L, 1));
+        when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
+        when(qrProvider.createQr(request)).thenReturn(expected);
+
+        QrResponse response = qrService.createQR(request, userId);
+
+        assertThat(response.getQrId()).isEqualTo(13L);
+        assertThat(request.getPurchaseId()).isEqualTo(10L);
+        verify(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
+        verify(entitlementService).consume(userId, CatalogProducts.QR_CREATE, 1);
+        verify(entitlementService, never()).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
+        verify(branchQuotaService, never()).assertAndConsumeMenuCreation(any(), any());
     }
 
     @Test
@@ -147,9 +172,8 @@ class QrServiceTest {
         request.setDetails(Map.of("branchId", 3L, "themeId", "classic", "businessName", "Kafe"));
         QrResponse expected = QrResponse.builder().qrId(11L).build();
 
-        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-        when(entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1)).thenReturn(new ConsumedEntitlement(10L, 2L, 1));
+        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
 
@@ -158,7 +182,8 @@ class QrServiceTest {
         assertThat(response.getQrId()).isEqualTo(11L);
         verify(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
         verify(branchQuotaService).assertAndConsumeMenuCreation(userId, 3L);
-        verify(entitlementService).consume(userId, CatalogProducts.QR_CREATE, 1);
+        verify(entitlementService, never()).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
+        verify(entitlementService, never()).consume(userId, CatalogProducts.QR_CREATE, 1);
     }
 
     @Test
@@ -311,9 +336,8 @@ class QrServiceTest {
         request.setDetails(Map.of("branchId", 3L));
         QrResponse expected = QrResponse.builder().qrId(22L).build();
 
-        doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
         doNothing().when(entitlementService).requireScope(userId, CatalogScopes.QR_MENU_OWNER);
-        when(entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1)).thenReturn(new ConsumedEntitlement(10L, 2L, 1));
+        when(entitlementService.resolveActivePurchaseId(userId)).thenReturn(10L);
         when(qrProviderFactory.get(any(), eq(QrRequest.class))).thenReturn(qrProvider);
         when(qrProvider.createQr(request)).thenReturn(expected);
 
