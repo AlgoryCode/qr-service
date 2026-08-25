@@ -318,25 +318,23 @@ public class EntitlementService {
         );
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public boolean hasScope(Long userId, String scopeCode) {
-        expireDuePurchasesForUser(userId);
-        repairUsablePackageEntitlements(userId);
-        ensureFulfillmentBackfill(userId);
         return fulfillmentGateService.getObject().hasScope(userId, scopeCode);
     }
 
     @Transactional
     public void requireScope(Long userId, String scopeCode) {
+        expireDuePurchasesForUser(userId);
+        repairUsablePackageEntitlements(userId);
+        ensureFulfillmentBackfill(userId);
         if (!hasScope(userId, scopeCode)) {
             throw new ForbiddenException(scopeCode + " yetkisi için uygun paket gerekli");
         }
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public boolean hasUsableQrCreatePackage(Long userId) {
-        expireDuePurchasesForUser(userId);
-        ensureFulfillmentBackfill(userId);
         return fulfillmentGateService.getObject().hasScope(userId, CatalogScopes.QR_CREATE_OWNER);
     }
 
