@@ -2,17 +2,14 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.model.GrantFulfillment;
-import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.GrantFulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
-import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.GrantFulfillmentRepository;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +23,7 @@ public class RepairFulfillmentJob {
 
     private final PurchaseRepository purchaseRepository;
     private final GrantFulfillmentRepository grantFulfillmentRepository;
-    private final FulfillmentDetailRepository fulfillmentDetailRepository;
-    private final PlanPackageRepository planPackageRepository;
-    private final FulfillmentGrantService fulfillmentGrantService;
+    private final FulfillmentMigrationService fulfillmentMigrationService;
     private final AppProperties appProperties;
 
     @Scheduled(fixedDelay = 600_000)
@@ -72,28 +67,17 @@ public class RepairFulfillmentJob {
     }
 
     private List<Purchase> findOrphanedPurchases() {
-        return purchaseRepository.findByStatusAndExpiresAtBefore(PurchaseStatus.ACTIVE, java.time.LocalDateTime.now())
-                .stream()
-                .filter(p -> p.getPaymentId() != null)
-                .filter(p -> grantFulfillmentRepository.findByPurchaseId(p.getId()).isEmpty())
-                .limit(appProperties.getFulfillment().getRepairJobBatchSize())
+        return purchaseRepository.findActiveWithoutFulfillment(
+                        PageRequest.of(0, appProperties.getFulfillment().getRepairJobBatchSize())
+                ).stream()
+                .filter(Purchase::isUsable)
                 .toList();
     }
 
     private void repairSingle(Purchase purchase) {
-        if (purchase.getStatus() != PurchaseStatus.ACTIVE || purchase.getPaymentId() == null) {
+        if (purchase.getStatus() != PurchaseStatus.ACTIVE || !purchase.isUsable()) {
             return;
         }
-        boolean alreadyHas = grantFulfillmentRepository.findByPurchaseId(purchase.getId()).isPresent();
-        if (alreadyHas) {
-            return;
-        }
-        log.info("Repairing orphaned fulfillment for purchaseId={}", purchase.getId());
-        if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
-            fulfillmentGrantService.grantAddonFulfillment(purchase);
-        } else if (purchase.getPackageId() != null) {
-            planPackageRepository.findByIdWithItems(purchase.getPackageId()).ifPresent(pkg ->
-                    fulfillmentGrantService.grantPackageFulfillment(purchase, pkg));
-        }
+        fulfillmentMigrationService.backfillUser(purchase.getUserId());
     }
 }

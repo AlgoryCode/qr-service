@@ -4,9 +4,11 @@ import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
 import com.ael.algoryqrservice.config.SmartReportRabbitProperties;
 import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
+import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
+import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.SmartReportEventRepository;
 import com.ael.algoryqrservice.repository.SmartReportResultRepository;
-import com.ael.algoryqrservice.repository.UserEntitlementRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +40,13 @@ class SmartReportServiceTest {
     @Mock
     private SmartReportResultRepository smartReportResultRepository;
     @Mock
-    private UserEntitlementRepository userEntitlementRepository;
+    private FulfillmentDetailRepository fulfillmentDetailRepository;
+    @Mock
+    private FulfillmentUsageLogRepository fulfillmentUsageLogRepository;
+    @Mock
+    private FulfillmentGateService fulfillmentGateService;
+    @Mock
+    private ProductRepository productRepository;
     @Mock
     private SmartReportCompletionNotifier smartReportCompletionNotifier;
 
@@ -56,12 +64,14 @@ class SmartReportServiceTest {
                 quotaProperties,
                 smartReportEventRepository,
                 smartReportResultRepository,
-                userEntitlementRepository,
+                fulfillmentDetailRepository,
+                fulfillmentUsageLogRepository,
+                fulfillmentGateService,
+                productRepository,
                 smartReportCompletionNotifier,
                 new ObjectMapper().registerModule(new JavaTimeModule())
         );
         when(smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(any(), any())).thenReturn(0L);
-        when(userEntitlementRepository.findByUserIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
         when(smartReportEventRepository.save(any(SmartReportEvent.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }

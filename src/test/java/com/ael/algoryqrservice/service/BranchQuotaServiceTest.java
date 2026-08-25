@@ -3,27 +3,21 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.exception.ForbiddenException;
-import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.UserEntitlement;
 import com.ael.algoryqrservice.model.dto.BranchDtos;
-import com.ael.algoryqrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.repository.UserEntitlementRepository;
-import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,11 +29,9 @@ class BranchQuotaServiceTest {
     @Mock
     private MenuRepository menuRepository;
     @Mock
-    private UserEntitlementRepository entitlementRepository;
-    @Mock
-    private PurchaseRepository purchaseRepository;
-    @Mock
     private EntitlementService entitlementService;
+    @Mock
+    private FulfillmentGateService fulfillmentGateService;
 
     @InjectMocks
     private BranchQuotaService branchQuotaService;
@@ -49,7 +41,7 @@ class BranchQuotaServiceTest {
         when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(true);
         when(branchRepository.countByUserIdAndDeletedFalse(7L)).thenReturn(0L);
         when(branchRepository.countByUserIdAndGrandfatheredTrueAndDeletedFalse(7L)).thenReturn(0L);
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of());
+        when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_BRANCH)).thenReturn(0);
 
         BranchDtos.Quota quota = branchQuotaService.branchQuota(7L);
 
@@ -62,7 +54,7 @@ class BranchQuotaServiceTest {
         when(entitlementService.hasScope(7L, CatalogScopes.QR_MENU_OWNER)).thenReturn(true);
         when(branchRepository.countByUserIdAndDeletedFalse(7L)).thenReturn(1L);
         when(branchRepository.countByUserIdAndGrandfatheredTrueAndDeletedFalse(7L)).thenReturn(0L);
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of());
+        when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_BRANCH)).thenReturn(0);
 
         assertThatThrownBy(() -> branchQuotaService.assertCanCreateBranch(7L))
                 .isInstanceOf(ForbiddenException.class)
@@ -76,12 +68,20 @@ class BranchQuotaServiceTest {
         branchQuotaService.assertAndConsumeMenuCreation(7L, 3L);
 
         verify(entitlementService).requireScope(7L, CatalogScopes.QR_MENU_OWNER);
+        verify(fulfillmentGateService, never()).consumeAddon(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
     void assertAndConsumeMenuCreation_whenSecondMenuWithoutAddon_thenForbidden() {
         when(menuRepository.countActiveLiveMenusForBranch(3L)).thenReturn(1L);
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of());
+        when(menuRepository.countActiveLiveMenusGroupedByBranch(7L)).thenReturn(List.of());
+        when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_MENU)).thenReturn(0);
 
         assertThatThrownBy(() -> branchQuotaService.assertAndConsumeMenuCreation(7L, 3L))
                 .isInstanceOf(ForbiddenException.class)
@@ -89,26 +89,21 @@ class BranchQuotaServiceTest {
     }
 
     @Test
+    void assertAndConsumeMenuCreation_whenSecondMenuWithAddon_thenConsumeFulfillment() {
+        when(menuRepository.countActiveLiveMenusForBranch(3L)).thenReturn(1L);
+        when(menuRepository.countActiveLiveMenusGroupedByBranch(7L)).thenReturn(List.of());
+        when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_MENU)).thenReturn(2);
+
+        branchQuotaService.assertAndConsumeMenuCreation(7L, 3L);
+
+        verify(fulfillmentGateService).consumeAddon(
+                7L, CatalogProducts.QR_MENU, 1, FulfillmentReferenceType.MENU, 3L
+        );
+    }
+
+    @Test
     void menuQuota_whenAddonPurchased_thenExtraAllowed() {
-        LocalDateTime now = AppTime.nowLocal();
-        Purchase purchase = Purchase.builder()
-                .id(11L)
-                .purchaseType(PurchaseType.ADD_ON)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(now.minusDays(1))
-                .expiresAt(now.plusDays(10))
-                .build();
-        UserEntitlement entitlement = UserEntitlement.builder()
-                .productCode(CatalogProducts.QR_MENU)
-                .purchaseId(11L)
-                .totalQuantity(2)
-                .remainingQuantity(2)
-                .usedQuantity(0)
-                .startsAt(now.minusDays(1))
-                .expiresAt(now.plusDays(10))
-                .build();
-        when(entitlementRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of(entitlement));
-        when(purchaseRepository.findAllById(List.of(11L))).thenReturn(List.of(purchase));
+        when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_MENU)).thenReturn(2);
         List<Object[]> grouped = List.<Object[]>of(new Object[]{3L, 1L});
         when(menuRepository.countActiveLiveMenusGroupedByBranch(7L)).thenReturn(grouped);
 

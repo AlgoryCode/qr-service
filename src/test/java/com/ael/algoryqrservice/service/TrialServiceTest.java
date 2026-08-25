@@ -29,7 +29,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -102,7 +101,6 @@ class TrialServiceTest {
             purchase.setId(10L);
             return purchase;
         });
-        when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         TrialDtos.Status result = service.start(7L, 2L);
 
@@ -260,7 +258,6 @@ class TrialServiceTest {
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
                 .thenReturn(Optional.of(purchase));
-        when(packageRepository.findById(any())).thenReturn(Optional.empty());
 
         TrialDtos.Status result = service.status(7L);
 

@@ -85,7 +85,6 @@ public class BranchQuotaService {
                     "Bu şubede ek menü ücretlidir. Lütfen ek menü hakkı satın alın."
             );
         }
-        entitlementService.consumeAddon(userId, CatalogProducts.QR_MENU, 1);
         fulfillmentGateService.consumeAddon(userId, CatalogProducts.QR_MENU, 1,
                 FulfillmentReferenceType.MENU, branchId);
     }
@@ -112,7 +111,6 @@ public class BranchQuotaService {
         }
         long remainingActive = menuRepository.countActiveLiveMenusForBranch(branchId);
         if (remainingActive >= 1) {
-            entitlementService.release(userId, CatalogProducts.QR_MENU, 1);
             fulfillmentGateService.releaseAddon(userId, CatalogProducts.QR_MENU, 1,
                     FulfillmentReferenceType.MENU, branchId);
         }

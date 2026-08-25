@@ -3,9 +3,11 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.model.FulfillmentDetail;
 import com.ael.algoryqrservice.model.FulfillmentUsageLog;
+import com.ael.algoryqrservice.model.GrantFulfillment;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.UserEntitlement;
+import com.ael.algoryqrservice.model.dto.FulfillmentConsumeResult;
 import com.ael.algoryqrservice.model.enums.FulfillmentDetailSource;
 import com.ael.algoryqrservice.model.enums.FulfillmentGateMode;
 import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
@@ -50,13 +52,7 @@ public class FulfillmentGateService {
         if (mode == FulfillmentGateMode.ENTITLEMENT_ONLY) {
             return hasScopeLegacy(userId, scopeCode);
         }
-        if (mode == FulfillmentGateMode.FULFILLMENT_ONLY) {
-            return hasScopeFromDetail(userId, scopeCode);
-        }
-        if (grantFulfillmentRepository.existsByUserId(userId)) {
-            return hasScopeFromDetail(userId, scopeCode);
-        }
-        return hasScopeLegacy(userId, scopeCode);
+        return hasScopeFromDetail(userId, scopeCode);
     }
 
     @Transactional(readOnly = true)
@@ -87,63 +83,210 @@ public class FulfillmentGateService {
     }
 
     @Transactional
-    public void consumeAddon(Long userId, String featureCode, int amount, FulfillmentReferenceType referenceType, Long referenceId) {
-        if (!shouldUseDetail(userId)) {
-            return;
-        }
-        LocalDateTime now = AppTime.nowLocal();
-        List<FulfillmentDetail> details = fulfillmentDetailRepository.findAndLockActiveByFeatureCodeAndSource(
-                userId, featureCode, FulfillmentDetailSource.ADDON_PURCHASE, now
+    public FulfillmentConsumeResult consumeAddon(
+            Long userId,
+            String featureCode,
+            int amount,
+            FulfillmentReferenceType referenceType,
+            Long referenceId
+    ) {
+        return consumeFromSources(
+                userId,
+                featureCode,
+                amount,
+                referenceType,
+                referenceId,
+                List.of(FulfillmentDetailSource.ADDON_PURCHASE)
         );
-        int remaining = amount;
-        for (FulfillmentDetail detail : details) {
-            if (remaining <= 0) {
-                break;
-            }
-            if (detail.isUnlimited()) {
-                writeUsageLog(detail, userId, FulfillmentUsageAction.CONSUME, amount, referenceType, referenceId);
-                return;
-            }
-            int available = detail.remainingQuantity();
-            if (available <= 0) {
-                continue;
-            }
-            int consumed = Math.min(available, remaining);
-            detail.setUsedQuantity(detail.getUsedQuantity() + consumed);
-            fulfillmentDetailRepository.save(detail);
-            writeUsageLog(detail, userId, FulfillmentUsageAction.CONSUME, consumed, referenceType, referenceId);
-            remaining -= consumed;
-        }
+    }
+
+    @Transactional
+    public FulfillmentConsumeResult consumeFeature(
+            Long userId,
+            String featureCode,
+            int amount,
+            FulfillmentReferenceType referenceType,
+            Long referenceId
+    ) {
+        return consumeFromSources(
+                userId,
+                featureCode,
+                amount,
+                referenceType,
+                referenceId,
+                List.of(FulfillmentDetailSource.PACKAGE_INCLUDE, FulfillmentDetailSource.ADDON_PURCHASE)
+        );
     }
 
     @Transactional
     public void releaseAddon(Long userId, String featureCode, int amount, FulfillmentReferenceType referenceType, Long referenceId) {
-        if (!shouldUseDetail(userId)) {
+        releaseFromSources(
+                userId,
+                featureCode,
+                amount,
+                referenceType,
+                referenceId,
+                List.of(FulfillmentDetailSource.ADDON_PURCHASE)
+        );
+    }
+
+    @Transactional
+    public void releaseFeature(Long userId, String featureCode, int amount, FulfillmentReferenceType referenceType, Long referenceId) {
+        releaseFromSources(
+                userId,
+                featureCode,
+                amount,
+                referenceType,
+                referenceId,
+                List.of(FulfillmentDetailSource.ADDON_PURCHASE, FulfillmentDetailSource.PACKAGE_INCLUDE)
+        );
+    }
+
+    @Transactional
+    public void logFeatureUsage(Long userId, String featureCode, FulfillmentReferenceType referenceType, Long referenceId) {
+        LocalDateTime now = AppTime.nowLocal();
+        List<FulfillmentDetail> details = fulfillmentDetailRepository.findAllActiveByUserId(userId, now).stream()
+                .filter(detail -> Objects.equals(detail.getFeatureCode(), featureCode)
+                        || Objects.equals(detail.getScopeCode(), featureCode))
+                .toList();
+        if (details.isEmpty()) {
+            return;
+        }
+        writeUsageLog(details.getFirst(), userId, FulfillmentUsageAction.CONSUME, 1, referenceType, referenceId);
+    }
+
+    @Transactional(readOnly = true)
+    public int remainingQuantity(Long userId, String featureCode, boolean addonOnly) {
+        LocalDateTime now = AppTime.nowLocal();
+        int remaining = 0;
+        for (FulfillmentDetail detail : fulfillmentDetailRepository.findAllActiveByUserId(userId, now)) {
+            if (!Objects.equals(detail.getFeatureCode(), featureCode)) {
+                continue;
+            }
+            if (addonOnly && detail.getSource() != FulfillmentDetailSource.ADDON_PURCHASE) {
+                continue;
+            }
+            if (detail.isUnlimited()) {
+                return Integer.MAX_VALUE;
+            }
+            remaining += detail.remainingQuantity();
+        }
+        return remaining;
+    }
+
+    @Transactional
+    public void replaceUsedQuantity(Long userId, String featureCode, int usedTotal, boolean addonOnly) {
+        LocalDateTime now = AppTime.nowLocal();
+        int remainingUsed = Math.max(0, usedTotal);
+        for (FulfillmentDetailSource source : addonOnly
+                ? List.of(FulfillmentDetailSource.ADDON_PURCHASE)
+                : List.of(FulfillmentDetailSource.PACKAGE_INCLUDE, FulfillmentDetailSource.ADDON_PURCHASE)) {
+            List<FulfillmentDetail> details = fulfillmentDetailRepository.findAndLockActiveByFeatureCodeAndSource(
+                    userId, featureCode, source, now
+            );
+            for (FulfillmentDetail detail : details) {
+                if (detail.isUnlimited()) {
+                    continue;
+                }
+                int cap = detail.getQuantity() == null ? 0 : detail.getQuantity();
+                int used = Math.min(cap, remainingUsed);
+                detail.setUsedQuantity(used);
+                fulfillmentDetailRepository.save(detail);
+                remainingUsed -= used;
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<FulfillmentDetail> listActiveDetails(Long userId) {
+        return fulfillmentDetailRepository.findAllActiveByUserId(userId, AppTime.nowLocal());
+    }
+
+    private FulfillmentConsumeResult consumeFromSources(
+            Long userId,
+            String featureCode,
+            int amount,
+            FulfillmentReferenceType referenceType,
+            Long referenceId,
+            List<FulfillmentDetailSource> sources
+    ) {
+        if (amount <= 0 || !shouldUseDetail(userId)) {
+            return new FulfillmentConsumeResult(0, null, null);
+        }
+        LocalDateTime now = AppTime.nowLocal();
+        int remaining = amount;
+        Long purchaseId = null;
+        Long detailId = null;
+        for (FulfillmentDetailSource source : sources) {
+            List<FulfillmentDetail> details = fulfillmentDetailRepository.findAndLockActiveByFeatureCodeAndSource(
+                    userId, featureCode, source, now
+            );
+            for (FulfillmentDetail detail : details) {
+                if (remaining <= 0) {
+                    break;
+                }
+                if (detail.isUnlimited()) {
+                    writeUsageLog(detail, userId, FulfillmentUsageAction.CONSUME, remaining, referenceType, referenceId);
+                    return new FulfillmentConsumeResult(amount, purchaseIdOf(detail), detail.getId());
+                }
+                int available = detail.remainingQuantity();
+                if (available <= 0) {
+                    continue;
+                }
+                int consumed = Math.min(available, remaining);
+                detail.setUsedQuantity(detail.getUsedQuantity() + consumed);
+                fulfillmentDetailRepository.save(detail);
+                writeUsageLog(detail, userId, FulfillmentUsageAction.CONSUME, consumed, referenceType, referenceId);
+                remaining -= consumed;
+                purchaseId = purchaseIdOf(detail);
+                detailId = detail.getId();
+            }
+        }
+        return new FulfillmentConsumeResult(amount - remaining, purchaseId, detailId);
+    }
+
+    private void releaseFromSources(
+            Long userId,
+            String featureCode,
+            int amount,
+            FulfillmentReferenceType referenceType,
+            Long referenceId,
+            List<FulfillmentDetailSource> sources
+    ) {
+        if (amount <= 0 || !shouldUseDetail(userId)) {
             return;
         }
         LocalDateTime now = AppTime.nowLocal();
-        List<FulfillmentDetail> details = fulfillmentDetailRepository.findAndLockActiveByFeatureCodeAndSource(
-                userId, featureCode, FulfillmentDetailSource.ADDON_PURCHASE, now
-        );
         int remaining = amount;
-        for (FulfillmentDetail detail : details) {
-            if (remaining <= 0) {
-                break;
+        for (FulfillmentDetailSource source : sources) {
+            List<FulfillmentDetail> details = fulfillmentDetailRepository.findAndLockActiveByFeatureCodeAndSource(
+                    userId, featureCode, source, now
+            );
+            for (FulfillmentDetail detail : details) {
+                if (remaining <= 0) {
+                    break;
+                }
+                if (detail.isUnlimited()) {
+                    writeUsageLog(detail, userId, FulfillmentUsageAction.RELEASE, remaining, referenceType, referenceId);
+                    return;
+                }
+                int used = detail.getUsedQuantity();
+                if (used <= 0) {
+                    continue;
+                }
+                int released = Math.min(used, remaining);
+                detail.setUsedQuantity(used - released);
+                fulfillmentDetailRepository.save(detail);
+                writeUsageLog(detail, userId, FulfillmentUsageAction.RELEASE, released, referenceType, referenceId);
+                remaining -= released;
             }
-            if (detail.isUnlimited()) {
-                writeUsageLog(detail, userId, FulfillmentUsageAction.RELEASE, amount, referenceType, referenceId);
-                return;
-            }
-            int used = detail.getUsedQuantity();
-            if (used <= 0) {
-                continue;
-            }
-            int released = Math.min(used, remaining);
-            detail.setUsedQuantity(used - released);
-            fulfillmentDetailRepository.save(detail);
-            writeUsageLog(detail, userId, FulfillmentUsageAction.RELEASE, released, referenceType, referenceId);
-            remaining -= released;
         }
+    }
+
+    private Long purchaseIdOf(FulfillmentDetail detail) {
+        return grantFulfillmentRepository.findById(detail.getFulfillmentId())
+                .map(GrantFulfillment::getPurchaseId)
+                .orElse(null);
     }
 
     private boolean hasScopeFromDetail(Long userId, String scopeCode) {
