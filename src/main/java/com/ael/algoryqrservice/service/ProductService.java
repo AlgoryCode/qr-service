@@ -41,6 +41,8 @@ public class ProductService {
                 .name(request.getName().trim())
                 .description(trimToNull(request.getDescription()))
                 .scopeCode(scopeCode)
+                .typeId(request.getTypeId())
+                .featureCode(trimToNull(request.getFeatureCode()))
                 .unitPrice(request.resolvedUnitPrice())
                 .vatRate(request.resolvedVatRate())
                 .consumable(request.resolvedCountable())
@@ -88,6 +90,12 @@ public class ProductService {
         product.setActive(request.resolvedActive());
         if (request.getScopeCode() != null && !request.getScopeCode().isBlank()) {
             product.setScopeCode(catalogCodeFactory.normalize(request.getScopeCode()));
+        }
+        if (request.getTypeId() != null) {
+            product.setTypeId(request.getTypeId());
+        }
+        if (request.getFeatureCode() != null && !request.getFeatureCode().isBlank()) {
+            product.setFeatureCode(catalogCodeFactory.normalize(request.getFeatureCode()));
         }
         Product saved = productRepository.save(product);
         recalculatePackagesContaining(id);
@@ -169,6 +177,8 @@ public class ProductService {
                 .name(product.getName())
                 .description(product.getDescription())
                 .scopeCode(product.getScopeCode())
+                .typeId(product.getTypeId())
+                .featureCode(product.getFeatureCode())
                 .unitPrice(product.getUnitPrice())
                 .vatRate(product.getVatRate())
                 .countable(product.isConsumable())

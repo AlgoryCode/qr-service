@@ -18,6 +18,7 @@ import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PurchaseFulfillmentService {
 
     private final PurchaseFulfillmentRepository fulfillmentRepository;
@@ -38,6 +40,7 @@ public class PurchaseFulfillmentService {
     private final EntitlementService entitlementService;
     private final PackageActivationService packageActivationService;
     private final MenuPublicAccessService menuPublicAccessService;
+    private final FulfillmentGrantService fulfillmentGrantService;
 
     @Transactional
     public void initializeSchedule(Purchase purchase, String serviceName) {
@@ -132,6 +135,7 @@ public class PurchaseFulfillmentService {
         purchase.setCancellationReason(null);
         purchaseRepository.save(purchase);
         entitlementService.synchronizePeriod(purchase);
+        tryGrantFulfillment(purchase, planPackage);
         menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 
@@ -250,6 +254,18 @@ public class PurchaseFulfillmentService {
                 .amount(event.getAmount())
                 .currency(event.getCurrency())
                 .build();
+    }
+
+    private void tryGrantFulfillment(Purchase purchase, PlanPackage planPackage) {
+        try {
+            if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+                fulfillmentGrantService.grantAddonFulfillment(purchase);
+            } else if (planPackage != null) {
+                fulfillmentGrantService.grantPackageFulfillment(purchase, planPackage);
+            }
+        } catch (Exception e) {
+            log.error("Fulfillment grant failed for purchaseId={}: {}", purchase.getId(), e.getMessage(), e);
+        }
     }
 
     private void grantAddonEntitlement(Purchase purchase) {
