@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.PlanPackage;
@@ -25,11 +24,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,8 @@ public class EntitlementService {
     private final QrRepository qrRepository;
     private final ObjectProvider<PackageActivationService> packageActivationService;
     private final UserTrialService userTrialService;
+    private final ObjectProvider<FulfillmentGateService> fulfillmentGateService;
+    private final Map<String, Consumer<Long>> syncRegistry;
 
     public EntitlementService(
             UserEntitlementRepository entitlementRepository,
@@ -59,7 +62,8 @@ public class EntitlementService {
             MenuProductRepository menuProductRepository,
             QrRepository qrRepository,
             ObjectProvider<PackageActivationService> packageActivationService,
-            UserTrialService userTrialService
+            UserTrialService userTrialService,
+            ObjectProvider<FulfillmentGateService> fulfillmentGateService
     ) {
         this.entitlementRepository = entitlementRepository;
         this.purchaseRepository = purchaseRepository;
@@ -72,6 +76,16 @@ public class EntitlementService {
         this.qrRepository = qrRepository;
         this.packageActivationService = packageActivationService;
         this.userTrialService = userTrialService;
+        this.fulfillmentGateService = fulfillmentGateService;
+        this.syncRegistry = buildSyncRegistry();
+    }
+
+    private Map<String, Consumer<Long>> buildSyncRegistry() {
+        Map<String, Consumer<Long>> registry = new HashMap<>();
+        registry.put(CatalogProducts.QR_CREATE, this::syncQrCreateEntitlements);
+        registry.put(CatalogProducts.QR_MENU, this::syncQrMenuUsageFromActiveMenus);
+        registry.put(CatalogProducts.MENU_PRODUCT, this::syncMenuProductUsageFromActiveProducts);
+        return registry;
     }
 
     @Transactional
@@ -222,11 +236,15 @@ public class EntitlementService {
     private ConsumedEntitlement consumeInternal(Long userId, String productCode, int amount, boolean addonOnly) {
         expireDuePurchasesForUser(userId);
 
-        if (Objects.equals(productCode, CatalogProducts.QR_CREATE)) {
-            syncQrCreateEntitlements(userId);
+        Product product = productRepository.findByCode(productCode).orElse(null);
+        if (product != null && product.isRequiresCountSync()) {
+            String featureKey = product.getFeatureCode() != null ? product.getFeatureCode() : product.getCode();
+            Consumer<Long> syncFn = syncRegistry.get(featureKey);
+            if (syncFn != null) {
+                syncFn.accept(userId);
+            }
         }
 
-        Product product = productRepository.findByCode(productCode).orElse(null);
         if (product != null && !product.isConsumable()) {
             requireScope(userId, product.getScopeCode());
             return null;
@@ -276,18 +294,19 @@ public class EntitlementService {
         }
 
         if (remainingToConsume > 0) {
-            if (Objects.equals(productCode, CatalogProducts.QR_MENU)) {
+            if (product != null && matchesFeature(product, CatalogProducts.QR_MENU)) {
                 throw new ForbiddenException(
                         addonOnly ? "EXTRA_MENU_REQUIRED" : null,
                         "Yetersiz dijital menü hakkı. Lütfen paket satın alın veya mevcut bir menüyü pasif yaparak slot açın."
                 );
             }
-            if (Objects.equals(productCode, CatalogProducts.MENU_PRODUCT)) {
+            if (product != null && matchesFeature(product, CatalogProducts.MENU_PRODUCT)) {
                 throw new ForbiddenException(
                         "Yetersiz menü ürün hakkı. Lütfen paket satın alın veya paketinizi yükseltin."
                 );
             }
-            throw new ForbiddenException("Yetersiz veya süresi dolmuş " + productCode + " hakkı. Lütfen paket satın alın.");
+            String displayCode = product != null ? product.getCode() : productCode;
+            throw new ForbiddenException("Yetersiz veya süresi dolmuş " + displayCode + " hakkı. Lütfen paket satın alın.");
         }
 
         if (purchaseIdForLog != null) {
@@ -372,21 +391,7 @@ public class EntitlementService {
     public boolean hasScope(Long userId, String scopeCode) {
         expireDuePurchasesForUser(userId);
         repairUsablePackageEntitlements(userId);
-        List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
-        Map<String, Product> productsByCode = productRepository.findByCodeIn(
-                entitlements.stream().map(UserEntitlement::getProductCode).distinct().toList()
-        ).stream().collect(Collectors.toMap(Product::getCode, Function.identity(), (left, right) -> left));
-
-        return entitlements.stream()
-                .anyMatch(entitlement -> {
-                    Product product = productsByCode.get(entitlement.getProductCode());
-                    if (product == null || !Objects.equals(product.getScopeCode(), scopeCode)) {
-                        return false;
-                    }
-                    Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
-                    return purchase != null && entitlement.grantsScope(purchase);
-                });
+        return fulfillmentGateService.getObject().hasScope(userId, scopeCode);
     }
 
     @Transactional
@@ -401,8 +406,9 @@ public class EntitlementService {
         expireDuePurchasesForUser(userId);
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        Set<String> qrCreateCodes = productCodesByFeature(CatalogProducts.QR_CREATE);
         return entitlements.stream()
-                .filter(entitlement -> Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_CREATE))
+                .filter(entitlement -> qrCreateCodes.contains(entitlement.getProductCode()))
                 .anyMatch(entitlement -> {
                     Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
                     return purchase != null && purchase.isUsable();
@@ -428,7 +434,7 @@ public class EntitlementService {
                 .filter(Purchase::isUsable)
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.ADD_ON)
-                .filter(purchase -> !CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()))
+                .filter(purchase -> !purchase.isSystemManaged())
                 .toList();
         for (Purchase purchase : usablePurchases) {
             if (purchase.getPackageId() == null) {
@@ -507,7 +513,7 @@ public class EntitlementService {
         List<Purchase> paidOrTrial = activePurchases.stream()
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.ADD_ON)
-                .filter(purchase -> !CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()))
+                .filter(purchase -> !purchase.isSystemManaged())
                 .toList();
         if (!paidOrTrial.isEmpty()) {
             return selectHighestPriorityPurchase(paidOrTrial).map(Purchase::getId).orElse(null);
@@ -548,8 +554,9 @@ public class EntitlementService {
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtAsc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
 
+        Set<String> qrCreateCodes = productCodesByFeature(CatalogProducts.QR_CREATE);
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_CREATE) || entitlement.isUnlimited()) {
+            if (!qrCreateCodes.contains(entitlement.getProductCode()) || entitlement.isUnlimited()) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
@@ -584,9 +591,10 @@ public class EntitlementService {
     private int sumRemainingMenuSlots(Long userId) {
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        Set<String> menuCodes = productCodesByFeature(CatalogProducts.QR_MENU);
         int remaining = 0;
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU)) {
+            if (!menuCodes.contains(entitlement.getProductCode())) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
@@ -613,9 +621,10 @@ public class EntitlementService {
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtAsc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
 
+        Set<String> menuCodes = productCodesByFeature(CatalogProducts.QR_MENU);
         int remainingActive = extraMenus;
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.QR_MENU) || entitlement.isUnlimited()) {
+            if (!menuCodes.contains(entitlement.getProductCode()) || entitlement.isUnlimited()) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
@@ -694,6 +703,7 @@ public class EntitlementService {
                 PurchaseLogAction.PURCHASE_EXPIRED,
                 purchase.getPackageName() + " paketi süresi doldu (" + purchase.getExpiresAt() + ")"
         );
+
     }
 
     @Transactional
@@ -721,9 +731,10 @@ public class EntitlementService {
     private int sumRemainingMenuProductSlots(Long userId) {
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        Set<String> menuProductCodes = productCodesByFeature(CatalogProducts.MENU_PRODUCT);
         int remaining = 0;
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.MENU_PRODUCT)) {
+            if (!menuProductCodes.contains(entitlement.getProductCode())) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
@@ -746,10 +757,11 @@ public class EntitlementService {
         long activeProducts = menuProductRepository.countActiveProductsForUser(userId);
         List<UserEntitlement> entitlements = entitlementRepository.findByUserIdOrderByCreatedAtAsc(userId);
         Map<Long, Purchase> purchasesById = loadPurchases(entitlements);
+        Set<String> menuProductCodes = productCodesByFeature(CatalogProducts.MENU_PRODUCT);
 
         int remainingActive = (int) Math.min(activeProducts, Integer.MAX_VALUE);
         for (UserEntitlement entitlement : entitlements) {
-            if (!Objects.equals(entitlement.getProductCode(), CatalogProducts.MENU_PRODUCT) || entitlement.isUnlimited()) {
+            if (!menuProductCodes.contains(entitlement.getProductCode()) || entitlement.isUnlimited()) {
                 continue;
             }
             Purchase purchase = purchasesById.get(entitlement.getPurchaseId());
@@ -778,6 +790,19 @@ public class EntitlementService {
             activationService.ensureSubscriptionState(userId);
             menuPublicAccessService.syncForUser(userId);
         }
+    }
+
+    private Set<String> productCodesByFeature(String featureCode) {
+        return productRepository.findByFeatureCode(featureCode).stream()
+                .map(Product::getCode)
+                .collect(Collectors.toSet());
+    }
+
+    private boolean matchesFeature(Product product, String featureCode) {
+        if (product == null || featureCode == null) {
+            return false;
+        }
+        return featureCode.equals(product.getFeatureCode()) || featureCode.equals(product.getCode());
     }
 
     private Map<Long, Purchase> loadPurchases(List<UserEntitlement> entitlements) {

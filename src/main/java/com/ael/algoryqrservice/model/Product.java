@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.ProductType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -36,6 +37,13 @@ public class Product {
     @Column(name = "scope_code", nullable = false, length = 64)
     private String scopeCode;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_id", length = 32)
+    private ProductType typeId;
+
+    @Column(name = "feature_code", length = 64)
+    private String featureCode;
+
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     @ColumnDefault("0")
     @Builder.Default
@@ -50,6 +58,16 @@ public class Product {
     @ColumnDefault("true")
     @Builder.Default
     private boolean consumable = true;
+
+    @Column(name = "addon_purchasable", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean addonPurchasable = false;
+
+    @Column(name = "requires_count_sync", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean requiresCountSync = false;
 
     @Column(nullable = false)
     private boolean active;

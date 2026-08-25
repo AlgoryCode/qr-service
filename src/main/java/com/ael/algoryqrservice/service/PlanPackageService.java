@@ -1,7 +1,6 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogCodeFactory;
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
@@ -221,9 +220,11 @@ public class PlanPackageService {
     }
 
     private void rejectSystemManagedMutation(String code) {
-        if (CatalogPackages.FREE_PACKAGE.equals(code)) {
-            throw new BadRequestException("FREE_PACKAGE kodu yalnizca startup seed ile olusturulabilir");
-        }
+        planPackageRepository.findByCode(code).ifPresent(pkg -> {
+            if (pkg.isSystemManaged()) {
+                throw new BadRequestException("Sistem tarafindan yonetilen paketler degistirilemez");
+            }
+        });
     }
 
     private void validatePackageItems(List<PlanPackageItemRequest> items) {
@@ -324,7 +325,7 @@ public class PlanPackageService {
         if (request.getYearlyPrice() != null) {
             planPackage.setYearlyPrice(request.getYearlyPrice().setScale(2, RoundingMode.HALF_UP));
         } else if (planPackage.isPurchasable()
-                && !CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())
+                && !planPackage.isSystemManaged()
                 && planPackage.getYearlyPrice() == null
                 && planPackage.getPrice() != null
                 && planPackage.getPrice().signum() > 0) {
@@ -335,7 +336,7 @@ public class PlanPackageService {
         } else if (planPackage.getYearlyDiscount() == null) {
             planPackage.setYearlyDiscount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         }
-        if (planPackage.isPurchasable() && !CatalogPackages.FREE_PACKAGE.equals(planPackage.getCode())) {
+        if (planPackage.isPurchasable() && !planPackage.isSystemManaged()) {
             validatePurchasableSubscriptionPricing(planPackage);
         }
     }

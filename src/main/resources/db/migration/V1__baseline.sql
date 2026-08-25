@@ -1,0 +1,4 @@
+-- V1: Baseline schema snapshot.
+-- On existing databases this file is never executed (Flyway uses baseline-on-migrate=true
+-- which marks V1 as BASELINE in flyway_schema_history without running the SQL).
+-- On a fresh install, apply a pg_dump of the production schema here before going live.

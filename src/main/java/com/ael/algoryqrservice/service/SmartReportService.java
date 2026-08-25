@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
+import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.config.SmartReportRabbitProperties;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.TooManyRequestsException;
@@ -38,6 +39,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -52,6 +54,7 @@ public class SmartReportService {
     private final SmartReportEventRepository smartReportEventRepository;
     private final SmartReportResultRepository smartReportResultRepository;
     private final UserEntitlementRepository userEntitlementRepository;
+    private final ProductRepository productRepository;
     private final SmartReportCompletionNotifier smartReportCompletionNotifier;
     private final ObjectMapper objectMapper;
 
@@ -333,9 +336,10 @@ public class SmartReportService {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
+        Set<String> smartReportingCodes = smartReportingProductCodes();
         List<UserEntitlement> entitlements = userEntitlementRepository.findByUserIdOrderByCreatedAtDesc(userId);
         for (UserEntitlement entitlement : entitlements) {
-            if (CatalogProducts.SMART_REPORTING.equals(entitlement.getProductCode())) {
+            if (smartReportingCodes.contains(entitlement.getProductCode())) {
                 entitlement.setLastUsage(now);
                 userEntitlementRepository.save(entitlement);
             }
@@ -343,13 +347,20 @@ public class SmartReportService {
     }
 
     private Instant resolveLastUsage(Long userId) {
+        Set<String> smartReportingCodes = smartReportingProductCodes();
         return userEntitlementRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(entitlement -> CatalogProducts.SMART_REPORTING.equals(entitlement.getProductCode()))
+                .filter(entitlement -> smartReportingCodes.contains(entitlement.getProductCode()))
                 .map(UserEntitlement::getLastUsage)
                 .filter(value -> value != null)
                 .max(Comparator.naturalOrder())
                 .map(this::toInstant)
                 .orElse(null);
+    }
+
+    private Set<String> smartReportingProductCodes() {
+        return productRepository.findByFeatureCode(CatalogProducts.SMART_REPORTING).stream()
+                .map(com.ael.algoryqrservice.model.Product::getCode)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     private String resolveResultText(SmartReportStatusMessage event) {

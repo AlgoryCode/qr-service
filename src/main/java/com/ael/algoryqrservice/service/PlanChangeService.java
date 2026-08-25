@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
@@ -76,6 +75,7 @@ public class PlanChangeService {
     private final PurchaseLogService purchaseLogService;
     private final AppProperties appProperties;
     private final PaymentClientProperties paymentClientProperties;
+    private final FulfillmentGrantService fulfillmentGrantService;
 
     private static final String DOWNGRADE_NEXT_PERIOD_ONLY =
             "Paket dusurme yalnizca donem sonunda yapilabilir.";
@@ -733,6 +733,12 @@ public class PlanChangeService {
             );
         }
         packageActivationService.activatePurchasedPackage(purchase);
+        try {
+            fulfillmentGrantService.grantPackageFulfillment(purchase, planPackage);
+        } catch (Exception e) {
+            log.warn("Fulfillment grant failed during plan change for purchaseId={}: {}",
+                    purchase.getId(), e.getMessage());
+        }
         menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 
@@ -744,6 +750,20 @@ public class PlanChangeService {
                     && !fromPurchase.getId().equals(newPurchase.getId())) {
                 fromPurchase.setStatus(PurchaseStatus.SUPERSEDED);
                 purchaseRepository.save(fromPurchase);
+                if (fromPurchase.getPackageId() != null && newPurchase.getPackageId() != null
+                        && !fromPurchase.getPackageId().equals(newPurchase.getPackageId())) {
+                    try {
+                        fulfillmentGrantService.relinkAddonFulfillmentsToNewPackage(
+                                fromPurchase.getUserId(),
+                                fromPurchase.getPackageId(),
+                                newPurchase.getPackageId()
+                        );
+                        fulfillmentGrantService.supersedeFulfillmentForPurchase(fromPurchase.getId());
+                    } catch (Exception e) {
+                        log.warn("Addon fulfillment re-link failed for userId={}: {}",
+                                fromPurchase.getUserId(), e.getMessage());
+                    }
+                }
             }
         }
 
@@ -880,7 +900,7 @@ public class PlanChangeService {
                 .filter(Purchase::isUsable)
                 .filter(purchase -> purchase.getPurchaseType() == PurchaseType.PAID
                         || purchase.getPurchaseType() == PurchaseType.TRIAL)
-                .filter(purchase -> !CatalogPackages.FREE_PACKAGE.equals(purchase.getPackageCode()))
+                .filter(purchase -> !purchase.isSystemManaged())
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
                 .toList();
         List<Purchase> paidOnly = usable.stream()
@@ -894,8 +914,7 @@ public class PlanChangeService {
 
     private PlanPackage requireTargetPackage(Long toPackageId, Long fromPackageId) {
         PlanPackage toPackage = planPackageService.findActivePackage(toPackageId);
-        if (!toPackage.isPurchasable() || toPackage.isSystemManaged()
-                || CatalogPackages.FREE_PACKAGE.equals(toPackage.getCode())) {
+        if (!toPackage.isPurchasable() || toPackage.isSystemManaged()) {
             throw new BadRequestException("Bu paket gecis hedefi olamaz");
         }
         if (toPackage.getId().equals(fromPackageId)) {
