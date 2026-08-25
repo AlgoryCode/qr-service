@@ -18,6 +18,7 @@ import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -50,7 +51,7 @@ class PurchaseServiceCancelTest {
     @Mock
     private PurchaseLogService purchaseLogService;
     @Mock
-    private EntitlementService entitlementService;
+    private PackageEntitlementWriter entitlementWriter;
     @Mock
     private PaymentServiceClient paymentServiceClient;
     @Mock
@@ -109,7 +110,7 @@ class PurchaseServiceCancelTest {
         assertThat(response.getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
         assertThat(purchase.getCancellationReason()).isEqualTo(PurchaseCancellationReason.MANUAL);
         assertThat(purchase.getExpiresAt()).isBeforeOrEqualTo(LocalDateTime.now().plusSeconds(1));
-        verify(entitlementService).revokeForCancelledPurchase(purchase);
+        verify(entitlementWriter).revokeForCancelledPurchase(purchase);
         verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
         verify(purchaseFulfillmentService).cancelOpenFulfillments(10L);
         verify(packageActivationService).ensureSubscriptionState(20L);
@@ -144,7 +145,7 @@ class PurchaseServiceCancelTest {
         assertThat(response.isCancelAtPeriodEnd()).isTrue();
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         verify(paymentServiceClient).cancelSubscriptionAtPeriodEnd(20L, "sub-1");
-        verify(entitlementService, never()).revokeForCancelledPurchase(any());
+        verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
     }
 
     @Test
@@ -185,7 +186,7 @@ class PurchaseServiceCancelTest {
         assertThat(purchase.getRefundedAt()).isNotNull();
         verify(paymentServiceClient).refundPayment(20L, "conv-1", new BigDecimal("100.00"), "127.0.0.1");
         verify(paymentServiceClient).cancelSubscription(20L, "sub-1");
-        verify(entitlementService).revokeForCancelledPurchase(purchase);
+        verify(entitlementWriter).revokeForCancelledPurchase(purchase);
     }
 
     @Test
@@ -232,7 +233,7 @@ class PurchaseServiceCancelTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         verify(purchaseRepository, never()).save(any());
-        verify(entitlementService, never()).revokeForCancelledPurchase(any());
+        verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
     }
 
     @Test
@@ -286,7 +287,7 @@ class PurchaseServiceCancelTest {
         verify(purchaseRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
         assertThat(captor.getValue().getCancellationReason()).isEqualTo(PurchaseCancellationReason.MANUAL);
-        verify(entitlementService, never()).revokeForCancelledPurchase(any());
+        verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
         verify(menuPublicAccessService, never()).deactivateActiveMenusForUser(any());
         verify(purchaseFulfillmentService).cancelOpenFulfillments(eq(10L));
         verify(packageActivationService).ensureSubscriptionState(20L);

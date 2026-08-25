@@ -29,6 +29,8 @@ import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -74,7 +76,9 @@ class PlanChangeServiceTest {
     @Mock
     private PackageActivationService packageActivationService;
     @Mock
-    private EntitlementService entitlementService;
+    private PackageEntitlementWriter entitlementWriter;
+    @Mock
+    private PurchaseExpiryService purchaseExpiryService;
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
     @Mock
@@ -83,6 +87,8 @@ class PlanChangeServiceTest {
     private AppProperties appProperties;
     @Mock
     private PaymentClientProperties paymentClientProperties;
+    @Mock
+    private FulfillmentGrantService fulfillmentGrantService;
 
     @InjectMocks
     private PlanChangeService planChangeService;
@@ -310,7 +316,7 @@ class PlanChangeServiceTest {
         assertThat(response.getCheckoutFormContent()).contains("iframe");
         verify(paymentServiceClient).initializeCheckoutForm(eq(10L), any());
         verify(paymentServiceClient, never()).refundPayment(anyLong(), anyString(), any(), anyString());
-        verify(entitlementService, never()).grant(any(), anyLong(), anyString(), anyInt(), anyBoolean());
+        verify(entitlementWriter, never()).grant(any(), anyLong(), anyString(), anyInt(), anyBoolean());
         verify(packageActivationService, never()).activatePurchasedPackage(any());
     }
 

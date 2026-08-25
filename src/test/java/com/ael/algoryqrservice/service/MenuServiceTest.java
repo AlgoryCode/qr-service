@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import com.ael.algoryqrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.model.nutrition.NutritionNutrientEntry;
@@ -23,6 +24,7 @@ import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -80,6 +82,8 @@ class MenuServiceTest {
     private ChefAvatarService chefAvatarService;
     @Mock
     private EntitlementService entitlementService;
+    @Mock
+    private FeatureUsageSyncRegistry usageSyncRegistry;
     @Mock
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
     @Mock
@@ -156,7 +160,6 @@ class MenuServiceTest {
         when(nutritionFactsService.parseFromRaw(nutrition)).thenReturn(parsedNutrition);
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
-        doNothing().when(entitlementService).syncMenuProductEntitlements(7L);
 
         Menu saved = menuService.createMenuForQr(qr, request);
 
@@ -237,7 +240,6 @@ class MenuServiceTest {
                 .thenReturn(List.of(sourceProduct));
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
-        doNothing().when(entitlementService).syncMenuProductEntitlements(7L);
 
         Menu saved = menuService.createMenuForQr(qr, request);
 
@@ -468,7 +470,7 @@ class MenuServiceTest {
                 .businessName("Kafe")
                 .active(true)
                 .publicAccessEnabled(false)
-                .publicAccessDisabledReason("PACKAGE_INACTIVE")
+                .publicAccessDisabledReason(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE)
                 .build();
         Menu enabled = Menu.builder()
                 .menuId(10L)

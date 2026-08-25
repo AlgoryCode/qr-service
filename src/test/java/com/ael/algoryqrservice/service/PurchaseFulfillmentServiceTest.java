@@ -15,6 +15,7 @@ import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -45,7 +46,7 @@ class PurchaseFulfillmentServiceTest {
     @Mock
     private ProductRepository productRepository;
     @Mock
-    private EntitlementService entitlementService;
+    private PackageEntitlementWriter entitlementWriter;
     @Mock
     private PackageActivationService packageActivationService;
     @Mock
@@ -182,7 +183,7 @@ class PurchaseFulfillmentServiceTest {
 
         verify(fulfillmentRepository, never()).save(any());
         verify(purchaseRepository, never()).save(any());
-        verify(entitlementService, never()).synchronizePeriod(any());
+        verify(entitlementWriter, never()).synchronizePeriod(any());
     }
 
     @Test
@@ -202,7 +203,7 @@ class PurchaseFulfillmentServiceTest {
         assertThat(purchase.getStartsAt()).isAfterOrEqualTo(before);
         assertThat(purchase.getExpiresAt()).isEqualTo(purchase.getStartsAt().plusDays(31));
         verify(packageActivationService).activatePurchasedPackage(purchase);
-        verify(entitlementService).synchronizePeriod(purchase);
+        verify(entitlementWriter).synchronizePeriod(purchase);
         verify(menuPublicAccessService).syncForUser(2L);
     }
 
@@ -243,7 +244,7 @@ class PurchaseFulfillmentServiceTest {
         fulfillmentService.revokeInstallment(purchase, event, metadata);
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
-        verify(entitlementService).synchronizePeriod(purchase);
+        verify(entitlementWriter).synchronizePeriod(purchase);
         verify(packageActivationService).ensureSubscriptionState(2L);
         verify(menuPublicAccessService).syncForUser(2L);
     }

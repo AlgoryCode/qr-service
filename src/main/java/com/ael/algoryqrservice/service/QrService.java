@@ -21,6 +21,8 @@ import com.ael.algoryqrservice.provider.QrProvider;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
+import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -51,6 +53,8 @@ public class QrService {
     private final PurchaseRepository purchaseRepository;
     private final ObjectMapper objectMapper;
     private final EntitlementService entitlementService;
+    private final PurchaseSelectionPolicy purchaseSelectionPolicy;
+    private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
     private final BranchQuotaService branchQuotaService;
@@ -63,7 +67,7 @@ public class QrService {
             Long branchId = resolveBranchId(req);
             branchService.requireOwnedForUser(branchId, userId);
             branchQuotaService.assertAndConsumeMenuCreation(userId, branchId);
-            req.setPurchaseId(entitlementService.resolveActivePurchaseId(userId));
+            req.setPurchaseId(purchaseSelectionPolicy.activePurchaseId(userId));
         } else {
             entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
             ConsumedEntitlement consumed = entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
@@ -115,7 +119,7 @@ public class QrService {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
         List<Qr> qrs = qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId);
-        Long activePurchaseId = entitlementService.resolveActivePurchaseId(userId);
+        Long activePurchaseId = purchaseSelectionPolicy.activePurchaseId(userId);
         Map<Long, Purchase> purchasesById = loadPurchasesForQrs(qrs);
 
         List<QrListResponse> filtered = qrs
@@ -271,7 +275,7 @@ public class QrService {
         menu.setActive(nextActive);
         qrRepository.save(qr);
         menuRepository.save(menu);
-        entitlementService.syncMenuEntitlements(qr.getUserId());
+        usageSyncRegistry.synchronize(qr.getUserId(), CatalogProducts.QR_MENU);
 
         return QrActiveResponse.builder()
                 .qrId(qr.getQrId())
@@ -333,7 +337,7 @@ public class QrService {
             }
         });
 
-        entitlementService.syncQrCreateEntitlements(qr.getUserId());
+        usageSyncRegistry.synchronize(qr.getUserId(), CatalogProducts.QR_CREATE);
     }
 
     private void requireOwnership(Qr qr) {

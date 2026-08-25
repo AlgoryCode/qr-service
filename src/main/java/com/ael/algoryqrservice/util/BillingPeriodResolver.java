@@ -3,7 +3,13 @@ package com.ael.algoryqrservice.util;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 
+/**
+ * Derives the billing period of a purchase, falling back to its stored interval for legacy rows
+ * that were written before {@code billingPeriod} existed.
+ */
 public final class BillingPeriodResolver {
+
+    private static final int YEARLY_INTERVAL_MONTHS = 12;
 
     private BillingPeriodResolver() {
     }
@@ -12,9 +18,13 @@ public final class BillingPeriodResolver {
         if (purchase.getBillingPeriod() != null) {
             return purchase.getBillingPeriod();
         }
-        if (purchase.getBillingIntervalMonths() != null && purchase.getBillingIntervalMonths() >= 12) {
+        Integer intervalMonths = purchase.getBillingIntervalMonths();
+        if (intervalMonths == null) {
+            return BillingPeriod.MONTHLY;
+        }
+        if (intervalMonths >= YEARLY_INTERVAL_MONTHS) {
             return BillingPeriod.YEARLY;
         }
-        return BillingPeriod.MONTHLY;
+        return intervalMonths <= 0 ? BillingPeriod.ONE_TIME : BillingPeriod.MONTHLY;
     }
 }

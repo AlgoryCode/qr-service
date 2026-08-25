@@ -1,12 +1,12 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogPackages;
-import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,12 +31,14 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PackageActivationServiceTest {
 
-    @Mock
-    private PlanPackageRepository planPackageRepository;
+    private static final Long USER_ID = 20L;
+
     @Mock
     private PurchaseRepository purchaseRepository;
     @Mock
-    private EntitlementService entitlementService;
+    private PurchaseExpiryService purchaseExpiryService;
+    @Mock
+    private PurchaseSelectionPolicy purchaseSelectionPolicy;
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
 
@@ -58,149 +60,101 @@ class PackageActivationServiceTest {
 
     @Test
     void ensureSubscriptionState_whenActiveTrialExists_thenReturnTrial() {
-        Purchase trial = Purchase.builder()
-                .id(102L)
-                .userId(20L)
-                .packageId(4L)
-                .packageCode(CatalogPackages.ULTIMATE_PACKAGE)
-                .purchaseType(PurchaseType.TRIAL)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
-                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
-                .build();
-        PlanPackage ultimate = PlanPackage.builder()
-                .id(4L)
-                .code(CatalogPackages.ULTIMATE_PACKAGE)
-                .priority(300)
-                .build();
+        Purchase trial = subscription(102L, CatalogPackages.ULTIMATE_PACKAGE, PurchaseType.TRIAL);
+        when(purchaseSelectionPolicy.usableSubscriptions(USER_ID)).thenReturn(List.of(trial));
+        when(purchaseSelectionPolicy.highestPriority(List.of(trial))).thenReturn(Optional.of(trial));
 
-        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE)).thenReturn(List.of(trial));
-        when(planPackageRepository.findAllById(List.of(4L))).thenReturn(List.of(ultimate));
-
-        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(20L);
+        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(USER_ID);
 
         assertThat(result).contains(trial);
-        verify(menuPublicAccessService).syncForUser(20L);
+        verify(purchaseExpiryService).expireDueForUser(USER_ID);
+        verify(menuPublicAccessService).syncForUser(USER_ID);
     }
 
     @Test
-    void ensureSubscriptionState_whenNoActivePaidOrTrial_thenReturnEmpty() {
-        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+    void ensureSubscriptionState_whenNoUsableSubscription_thenReturnEmpty() {
+        when(purchaseSelectionPolicy.usableSubscriptions(USER_ID)).thenReturn(List.of());
+        when(purchaseSelectionPolicy.highestPriority(List.of())).thenReturn(Optional.empty());
 
-        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(20L);
+        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(USER_ID);
 
         assertThat(result).isEmpty();
-        verify(menuPublicAccessService).syncForUser(20L);
-    }
-
-    @Test
-    void activatePurchasedPackage_whenAnotherActiveExists_thenSupersedePrevious() {
-        Purchase freePurchase = Purchase.builder()
-                .id(1L)
-                .userId(20L)
-                .packageCode(CatalogPackages.FREE_PACKAGE)
-                .purchaseType(PurchaseType.FREE)
-                .status(PurchaseStatus.ACTIVE)
-                .build();
-        Purchase proPurchase = Purchase.builder()
-                .id(2L)
-                .userId(20L)
-                .packageCode(CatalogPackages.PRO_PACKAGE)
-                .purchaseType(PurchaseType.PAID)
-                .status(PurchaseStatus.ACTIVE)
-                .build();
-        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
-                .thenReturn(List.of(freePurchase, proPurchase));
-
-        packageActivationService.activatePurchasedPackage(proPurchase);
-
-        ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
-        verify(purchaseRepository).save(captor.capture());
-        assertThat(captor.getValue().getId()).isEqualTo(1L);
-        assertThat(captor.getValue().getStatus()).isEqualTo(PurchaseStatus.SUPERSEDED);
-        verify(menuPublicAccessService).syncForUser(20L);
-    }
-
-    @Test
-    void activatePurchasedPackage_whenAddon_thenKeepExistingActive() {
-        Purchase host = Purchase.builder()
-                .id(1L)
-                .userId(20L)
-                .packageCode(CatalogPackages.ULTIMATE_PACKAGE)
-                .purchaseType(PurchaseType.SYSTEM_GRANT)
-                .status(PurchaseStatus.ACTIVE)
-                .build();
-        Purchase addon = Purchase.builder()
-                .id(2L)
-                .userId(20L)
-                .packageCode("QR_MENU")
-                .purchaseType(PurchaseType.ADD_ON)
-                .status(PurchaseStatus.ACTIVE)
-                .build();
-        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
-                .thenReturn(List.of(host, addon));
-
-        packageActivationService.activatePurchasedPackage(addon);
-
-        verify(purchaseRepository, never()).save(any());
-        verify(menuPublicAccessService).syncForUser(20L);
+        verify(menuPublicAccessService).syncForUser(USER_ID);
     }
 
     @Test
     void ensureSubscriptionState_whenAddonAndPaidExist_thenReturnPaid() {
-        Purchase paid = Purchase.builder()
-                .id(1L)
-                .userId(20L)
-                .packageId(4L)
-                .packageCode(CatalogPackages.ULTIMATE_PACKAGE)
-                .purchaseType(PurchaseType.PAID)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
-                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
-                .build();
-        Purchase addon = Purchase.builder()
-                .id(2L)
-                .userId(20L)
-                .packageId(4L)
-                .packageCode("QR_MENU")
-                .purchaseType(PurchaseType.ADD_ON)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
-                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
-                .build();
-        PlanPackage ultimate = PlanPackage.builder()
-                .id(4L)
-                .code(CatalogPackages.ULTIMATE_PACKAGE)
-                .priority(300)
-                .build();
+        Purchase paid = subscription(1L, CatalogPackages.ULTIMATE_PACKAGE, PurchaseType.PAID);
+        when(purchaseSelectionPolicy.usableSubscriptions(USER_ID)).thenReturn(List.of(paid));
+        when(purchaseSelectionPolicy.highestPriority(List.of(paid))).thenReturn(Optional.of(paid));
 
-        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
-                .thenReturn(List.of(paid, addon));
-        when(planPackageRepository.findAllById(List.of(4L))).thenReturn(List.of(ultimate));
-
-        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(20L);
+        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(USER_ID);
 
         assertThat(result).contains(paid);
     }
 
     @Test
-    void ensureSubscriptionState_whenOnlyAddonExists_thenReturnEmpty() {
-        Purchase addon = Purchase.builder()
-                .id(2L)
-                .userId(20L)
-                .packageId(4L)
-                .packageCode("QR_MENU")
-                .purchaseType(PurchaseType.ADD_ON)
+    void syncSubscriptionStateForUsers_whenDuplicateIds_thenSyncEachUserOnce() {
+        when(purchaseSelectionPolicy.usableSubscriptions(USER_ID)).thenReturn(List.of());
+        when(purchaseSelectionPolicy.highestPriority(List.of())).thenReturn(Optional.empty());
+
+        packageActivationService.syncSubscriptionStateForUsers(List.of(USER_ID, USER_ID));
+
+        verify(menuPublicAccessService).syncForUser(USER_ID);
+    }
+
+    @Test
+    void syncSubscriptionStateForUsers_whenEmpty_thenDoNothing() {
+        packageActivationService.syncSubscriptionStateForUsers(List.of());
+
+        verify(purchaseExpiryService, never()).expireDueForUser(any());
+        verify(menuPublicAccessService, never()).syncForUser(any());
+    }
+
+    @Test
+    void activatePurchasedPackage_whenAnotherActiveExists_thenSupersedePrevious() {
+        Purchase freePurchase = activePurchase(1L, CatalogPackages.FREE_PACKAGE, PurchaseType.FREE);
+        Purchase proPurchase = activePurchase(2L, CatalogPackages.PRO_PACKAGE, PurchaseType.PAID);
+        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
+                .thenReturn(List.of(freePurchase, proPurchase));
+
+        packageActivationService.activatePurchasedPackage(proPurchase);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Purchase>> captor = ArgumentCaptor.forClass(List.class);
+        verify(purchaseRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).singleElement().satisfies(superseded -> {
+            assertThat(superseded.getId()).isEqualTo(1L);
+            assertThat(superseded.getStatus()).isEqualTo(PurchaseStatus.SUPERSEDED);
+        });
+        verify(menuPublicAccessService).syncForUser(USER_ID);
+    }
+
+    @Test
+    void activatePurchasedPackage_whenAddon_thenKeepExistingActive() {
+        Purchase addon = activePurchase(2L, "QR_MENU", PurchaseType.ADD_ON);
+
+        packageActivationService.activatePurchasedPackage(addon);
+
+        verify(purchaseRepository, never()).saveAll(any());
+        verify(menuPublicAccessService).syncForUser(USER_ID);
+    }
+
+    private static Purchase activePurchase(Long id, String packageCode, PurchaseType type) {
+        return Purchase.builder()
+                .id(id)
+                .userId(USER_ID)
+                .packageCode(packageCode)
+                .purchaseType(type)
                 .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0))
-                .expiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0))
                 .build();
+    }
 
-        when(purchaseRepository.findByUserIdAndStatus(20L, PurchaseStatus.ACTIVE))
-                .thenReturn(List.of(addon));
-
-        Optional<Purchase> result = packageActivationService.ensureSubscriptionState(20L);
-
-        assertThat(result).isEmpty();
+    private static Purchase subscription(Long id, String packageCode, PurchaseType type) {
+        Purchase purchase = activePurchase(id, packageCode, type);
+        purchase.setPackageId(4L);
+        purchase.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 0, 0));
+        purchase.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 0, 0));
+        return purchase;
     }
 }

@@ -64,7 +64,7 @@ class AddonPurchaseServiceTest {
     @Mock
     private com.ael.algoryqrservice.config.PaymentClientProperties paymentClientProperties;
     @Mock
-    private EntitlementService entitlementService;
+    private com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService purchaseExpiryService;
 
     @InjectMocks
     private AddonPurchaseService addonPurchaseService;

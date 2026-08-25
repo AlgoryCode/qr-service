@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,4 +33,13 @@ public interface PlanPackageRepository extends JpaRepository<PlanPackage, Long> 
             where pkg.id = :id
             """)
     Optional<PlanPackage> findByIdWithItems(@Param("id") Long id);
+
+    @Query("""
+            select distinct pkg
+            from PlanPackage pkg
+            left join fetch pkg.items item
+            left join fetch item.product
+            where pkg.id in :ids
+            """)
+    List<PlanPackage> findAllByIdWithItems(@Param("ids") Collection<Long> ids);
 }

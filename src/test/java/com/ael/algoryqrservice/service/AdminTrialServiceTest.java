@@ -13,6 +13,8 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,7 +45,9 @@ class AdminTrialServiceTest {
     @Mock
     PlanPackageRepository packageRepository;
     @Mock
-    EntitlementService entitlementService;
+    PackageEntitlementWriter entitlementWriter;
+    @Mock
+    PurchaseExpiryService purchaseExpiryService;
     @Mock
     PackageActivationService packageActivationService;
     @Mock
@@ -81,7 +85,7 @@ class AdminTrialServiceTest {
         assertThat(result.getDaysAdded()).isEqualTo(15);
         assertThat(trial.getExpiresAt()).isEqualTo(currentExpiry.plusDays(15));
         verify(userTrialService).resetTrialEligibility(7L);
-        verify(entitlementService).synchronizePeriod(trial);
+        verify(entitlementWriter).synchronizePeriod(trial);
         verify(purchaseLogService).log(
                 eq(10L),
                 eq(7L),
@@ -139,7 +143,7 @@ class AdminTrialServiceTest {
 
         assertThat(result.getPackageName()).isEqualTo("Ultimate");
         assertThat(result.getDaysAdded()).isEqualTo(30);
-        verify(entitlementService).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
+        verify(entitlementWriter).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
     }
 
     @Test

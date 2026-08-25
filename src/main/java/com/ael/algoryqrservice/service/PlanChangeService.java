@@ -33,6 +33,8 @@ import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PlanChangeRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.BillingPeriodResolver;
 import com.ael.algoryqrservice.util.IdentityNumbers;
@@ -70,7 +72,8 @@ public class PlanChangeService {
     private final PaymentRequestMapper paymentRequestMapper;
     private final PurchaseFulfillmentService purchaseFulfillmentService;
     private final PackageActivationService packageActivationService;
-    private final EntitlementService entitlementService;
+    private final PackageEntitlementWriter entitlementWriter;
+    private final PurchaseExpiryService purchaseExpiryService;
     private final MenuPublicAccessService menuPublicAccessService;
     private final PurchaseLogService purchaseLogService;
     private final AppProperties appProperties;
@@ -724,7 +727,7 @@ public class PlanChangeService {
         purchaseRepository.save(purchase);
 
         for (PlanPackageItem item : planPackage.getItems()) {
-            entitlementService.grant(
+            entitlementWriter.grant(
                     purchase,
                     item.getProduct().getId(),
                     item.getProduct().getCode(),
@@ -791,7 +794,7 @@ public class PlanChangeService {
             fromPurchase.setExpiresAt(now);
             purchaseRepository.save(fromPurchase);
         }
-        entitlementService.revokeForCancelledPurchase(fromPurchase);
+        entitlementWriter.revokeForCancelledPurchase(fromPurchase);
         purchaseLogService.log(
                 fromPurchase.getId(),
                 fromPurchase.getUserId(),
@@ -874,7 +877,7 @@ public class PlanChangeService {
         if (newPurchase.getStatus() == PurchaseStatus.ACTIVE
                 || newPurchase.getStatus() == PurchaseStatus.PENDING) {
             if (newPurchase.getStatus() == PurchaseStatus.ACTIVE) {
-                entitlementService.revokeForCancelledPurchase(newPurchase);
+                entitlementWriter.revokeForCancelledPurchase(newPurchase);
             }
             newPurchase.setStatus(PurchaseStatus.FAILED);
             newPurchase.setExpiresAt(LocalDateTime.now());
@@ -895,7 +898,7 @@ public class PlanChangeService {
     }
 
     private Purchase requireUsablePaidPurchase(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         List<Purchase> usable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
                 .filter(purchase -> purchase.getPurchaseType() == PurchaseType.PAID

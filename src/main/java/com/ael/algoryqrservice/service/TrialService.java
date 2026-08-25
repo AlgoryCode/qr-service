@@ -16,6 +16,8 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
+import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -33,7 +35,8 @@ public class TrialService {
     private final PurchaseRepository purchaseRepository;
     private final PlanPackageRepository packageRepository;
     private final UserRepository userRepository;
-    private final EntitlementService entitlementService;
+    private final PackageEntitlementWriter entitlementWriter;
+    private final PurchaseExpiryService purchaseExpiryService;
     private final PackageActivationService packageActivationService;
     private final UserTrialService userTrialService;
 
@@ -70,7 +73,7 @@ public class TrialService {
         }
         packageActivationService.activatePurchasedPackage(purchase);
         for (PlanPackageItem item : planPackage.getItems()) {
-            entitlementService.grant(
+            entitlementWriter.grant(
                     purchase,
                     item.getProduct().getId(),
                     item.getProduct().getCode(),
@@ -104,7 +107,7 @@ public class TrialService {
             return availableStatus();
         }
         if (purchase.getStatus() == PurchaseStatus.ACTIVE && purchase.isExpiredByDate()) {
-            entitlementService.expirePurchase(purchase);
+            purchaseExpiryService.expire(purchase);
             packageActivationService.ensureSubscriptionState(userId);
             user = userRepository.findById(userId).orElse(user);
             return usedUnavailableStatus(user);
@@ -156,7 +159,7 @@ public class TrialService {
     }
 
     private void rejectIfHasUsablePaidPackage(Long userId) {
-        entitlementService.expireDuePurchasesForUser(userId);
+        purchaseExpiryService.expireDueForUser(userId);
         boolean hasPaid = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .anyMatch(purchase -> purchase.isUsable()
                         && purchase.getPurchaseType() == PurchaseType.PAID);

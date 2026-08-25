@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.dto.BranchDtos;
 import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.service.entitlement.ExtraMenuQuotaCalculator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +33,8 @@ class BranchQuotaServiceTest {
     private EntitlementService entitlementService;
     @Mock
     private FulfillmentGateService fulfillmentGateService;
+    @Mock
+    private ExtraMenuQuotaCalculator extraMenuQuotaCalculator;
 
     @InjectMocks
     private BranchQuotaService branchQuotaService;
@@ -80,7 +83,7 @@ class BranchQuotaServiceTest {
     @Test
     void assertAndConsumeMenuCreation_whenSecondMenuWithoutAddon_thenForbidden() {
         when(menuRepository.countActiveLiveMenusForBranch(3L)).thenReturn(1L);
-        when(menuRepository.countActiveLiveMenusGroupedByBranch(7L)).thenReturn(List.of());
+        when(extraMenuQuotaCalculator.countExtraMenus(7L)).thenReturn(0);
         when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_MENU)).thenReturn(0);
 
         assertThatThrownBy(() -> branchQuotaService.assertAndConsumeMenuCreation(7L, 3L))
@@ -91,7 +94,7 @@ class BranchQuotaServiceTest {
     @Test
     void assertAndConsumeMenuCreation_whenSecondMenuWithAddon_thenConsumeFulfillment() {
         when(menuRepository.countActiveLiveMenusForBranch(3L)).thenReturn(1L);
-        when(menuRepository.countActiveLiveMenusGroupedByBranch(7L)).thenReturn(List.of());
+        when(extraMenuQuotaCalculator.countExtraMenus(7L)).thenReturn(0);
         when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_MENU)).thenReturn(2);
 
         branchQuotaService.assertAndConsumeMenuCreation(7L, 3L);
@@ -104,8 +107,7 @@ class BranchQuotaServiceTest {
     @Test
     void menuQuota_whenAddonPurchased_thenExtraAllowed() {
         when(fulfillmentGateService.sumAddonQuantity(7L, CatalogProducts.QR_MENU)).thenReturn(2);
-        List<Object[]> grouped = List.<Object[]>of(new Object[]{3L, 1L});
-        when(menuRepository.countActiveLiveMenusGroupedByBranch(7L)).thenReturn(grouped);
+        when(extraMenuQuotaCalculator.countExtraMenus(7L)).thenReturn(0);
 
         BranchDtos.MenuQuota quota = branchQuotaService.menuQuota(7L);
 
