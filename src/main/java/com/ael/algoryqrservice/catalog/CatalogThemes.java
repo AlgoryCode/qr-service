@@ -18,7 +18,8 @@ public final class CatalogThemes {
             "elixir",
             "tech-gourmet",
             "modern-bistro",
-            "clever-dish-scribe"
+            "clever-dish-scribe",
+            "maison-noir"
     );
 
     /** Yapay zeka ile üretilen özel temalar bu önek ile gelir. */
