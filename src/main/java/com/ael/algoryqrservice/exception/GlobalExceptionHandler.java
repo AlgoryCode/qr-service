@@ -98,6 +98,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> handleDataIntegrity(DataIntegrityViolationException ex) {
         log.error("Data integrity violation", ex);
+        String detail = ex.getMostSpecificCause() != null
+                ? String.valueOf(ex.getMostSpecificCause().getMessage())
+                : "";
+        String lower = detail.toLowerCase();
+        if (lower.contains("uk_menu_waiter_username") || lower.contains("tbl_menu_waiter_username")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Bu kullanıcı adı zaten kullanılıyor"));
+        }
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "Veri kaydı tamamlanamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin."));
     }
