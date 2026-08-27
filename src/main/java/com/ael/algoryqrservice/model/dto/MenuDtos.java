@@ -2,6 +2,8 @@ package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuReservationStatus;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -12,6 +14,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.AccessLevel;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,6 +36,10 @@ public final class MenuDtos {
         private BigDecimal price;
         private String currency;
         private Long subCategoryId;
+        @Setter(AccessLevel.NONE)
+        private Long descriptorCategoryId;
+        @JsonIgnore
+        private boolean descriptorCategoryIdSpecified;
         private List<Long> tagIds;
         private List<Long> allergenIds;
         private Integer sortOrder;
@@ -42,6 +50,12 @@ public final class MenuDtos {
         private Integer servesPeopleMax;
         private NutritionFacts nutrition;
         private MenuProductPairingsRequest pairings;
+
+        @JsonProperty("descriptorCategoryId")
+        public void setDescriptorCategoryId(Long descriptorCategoryId) {
+            this.descriptorCategoryId = descriptorCategoryId;
+            this.descriptorCategoryIdSpecified = true;
+        }
     }
 
     @Data
@@ -68,6 +82,9 @@ public final class MenuDtos {
         private Long subCategoryId;
         private String subCategorySlug;
         private String subCategoryName;
+        private Long descriptorCategoryId;
+        private String descriptorCategorySlug;
+        private String descriptorCategoryName;
         private Long mainCategoryId;
         private String mainCategorySlug;
         private String mainCategoryName;

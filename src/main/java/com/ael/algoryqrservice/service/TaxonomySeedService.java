@@ -2,11 +2,13 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.model.DescriptorCategory;
 import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.repository.DescriptorCategoryRepository;
 import com.ael.algoryqrservice.repository.MainCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuAllergenRepository;
 import com.ael.algoryqrservice.repository.MenuTagRepository;
@@ -35,6 +37,7 @@ public class TaxonomySeedService {
 
     private final MainCategoryRepository mainCategoryRepository;
     private final SubCategoryRepository subCategoryRepository;
+    private final DescriptorCategoryRepository descriptorCategoryRepository;
     private final MenuTagRepository menuTagRepository;
     private final MenuAllergenRepository menuAllergenRepository;
     private final ObjectMapper objectMapper;
@@ -62,6 +65,9 @@ public class TaxonomySeedService {
         }
         for (TaxonomyDtos.AllergenSeed allergenSeed : nullSafe(document.getAllergens())) {
             upsertAllergen(allergenSeed, now);
+        }
+        for (TaxonomyDtos.DescriptorSeed descriptorSeed : nullSafe(document.getDescriptors())) {
+            upsertDescriptor(descriptorSeed, now);
         }
         log.info("Menu taxonomy seed upsert completed");
     }
@@ -169,6 +175,34 @@ public class TaxonomySeedService {
         existing.setDeleted(false);
         existing.setUpdatedAt(now);
         menuAllergenRepository.save(existing);
+    }
+
+    private void upsertDescriptor(TaxonomyDtos.DescriptorSeed seed, LocalDateTime now) {
+        requireIdSlugName(seed.getId(), seed.getSlug(), seed.getName(), "descriptor");
+        if (seed.getSubCategoryId() == null) {
+            throw new BadRequestException("descriptor subCategoryId zorunludur");
+        }
+        DescriptorCategory existing = descriptorCategoryRepository.findById(seed.getId()).orElse(null);
+        if (existing == null) {
+            descriptorCategoryRepository.save(DescriptorCategory.builder()
+                    .id(seed.getId())
+                    .subCategoryId(seed.getSubCategoryId())
+                    .slug(normalizeSlug(seed.getSlug()))
+                    .name(seed.getName().trim())
+                    .sortOrder(seed.getSortOrder() == null ? 0 : seed.getSortOrder())
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .deleted(false)
+                    .build());
+            return;
+        }
+        existing.setSubCategoryId(seed.getSubCategoryId());
+        existing.setSlug(normalizeSlug(seed.getSlug()));
+        existing.setName(seed.getName().trim());
+        existing.setSortOrder(seed.getSortOrder() == null ? existing.getSortOrder() : seed.getSortOrder());
+        existing.setDeleted(false);
+        existing.setUpdatedAt(now);
+        descriptorCategoryRepository.save(existing);
     }
 
     private void requireIdSlugName(Long id, String slug, String name, String kind) {

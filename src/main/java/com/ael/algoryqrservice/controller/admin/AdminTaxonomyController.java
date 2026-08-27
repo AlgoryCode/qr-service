@@ -100,4 +100,26 @@ public class AdminTaxonomyController {
     public void deleteAllergen(@PathVariable Long id) {
         menuTaxonomyService.deleteAllergen(id);
     }
+
+    @PostMapping("/descriptor-categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TaxonomyDtos.DescriptorCategoryResponse createDescriptor(
+            @RequestBody TaxonomyDtos.DescriptorCategoryRequest request
+    ) {
+        return menuTaxonomyService.createDescriptor(request);
+    }
+
+    @PutMapping("/descriptor-categories/{id}")
+    public TaxonomyDtos.DescriptorCategoryResponse updateDescriptor(
+            @PathVariable Long id,
+            @RequestBody TaxonomyDtos.DescriptorCategoryUpdateRequest request
+    ) {
+        return menuTaxonomyService.updateDescriptor(id, request);
+    }
+
+    @DeleteMapping("/descriptor-categories/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteDescriptor(@PathVariable Long id) {
+        menuTaxonomyService.deleteDescriptor(id);
+    }
 }

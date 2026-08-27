@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.repository.DescriptorCategoryRepository;
 import com.ael.algoryqrservice.repository.MainCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuAllergenRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
@@ -34,6 +35,8 @@ class MenuTaxonomyServiceTest {
     @Mock
     private SubCategoryRepository subCategoryRepository;
     @Mock
+    private DescriptorCategoryRepository descriptorCategoryRepository;
+    @Mock
     private MenuTagRepository menuTagRepository;
     @Mock
     private MenuAllergenRepository menuAllergenRepository;
@@ -54,6 +57,7 @@ class MenuTaxonomyServiceTest {
                 SubCategory.builder().id(4L).mainCategoryId(10L).slug("sutlu_tatlilar").name("Sütlü").sortOrder(1).build(),
                 SubCategory.builder().id(2L).mainCategoryId(1L).slug("soguk_icecekler").name("Soğuk").sortOrder(2).build()
         ));
+        when(descriptorCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
 
         List<TaxonomyDtos.MainCategoryResponse> taxonomy = menuTaxonomyService.listTaxonomy();
 
