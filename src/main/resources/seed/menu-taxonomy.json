@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "mains": [
     {
       "id": 1,
@@ -262,6 +262,42 @@
         { "id": 81, "slug": "steak_yanlari", "name": "Steak Yanları", "sortOrder": 2 }
       ]
     }
+  ],
+  "descriptors": [
+    { "id": 1001, "subCategoryId": 5, "slug": "sarap", "name": "Şarap", "sortOrder": 1 },
+    { "id": 1002, "subCategoryId": 5, "slug": "bira", "name": "Bira", "sortOrder": 2 },
+    { "id": 1003, "subCategoryId": 5, "slug": "raki", "name": "Rakı", "sortOrder": 3 },
+    { "id": 1004, "subCategoryId": 5, "slug": "viski", "name": "Viski", "sortOrder": 4 },
+    { "id": 1005, "subCategoryId": 5, "slug": "votka", "name": "Votka", "sortOrder": 5 },
+    { "id": 1006, "subCategoryId": 5, "slug": "cin", "name": "Cin", "sortOrder": 6 },
+    { "id": 1007, "subCategoryId": 5, "slug": "tekila", "name": "Tekila", "sortOrder": 7 },
+    { "id": 1008, "subCategoryId": 5, "slug": "likor", "name": "Likör", "sortOrder": 8 },
+    { "id": 1009, "subCategoryId": 1, "slug": "kahve", "name": "Kahve", "sortOrder": 1 },
+    { "id": 1010, "subCategoryId": 1, "slug": "sicak_cikolata", "name": "Sıcak Çikolata", "sortOrder": 2 },
+    { "id": 1011, "subCategoryId": 1, "slug": "salep", "name": "Salep", "sortOrder": 3 },
+    { "id": 1012, "subCategoryId": 66, "slug": "siyah_cay", "name": "Siyah Çay", "sortOrder": 1 },
+    { "id": 1013, "subCategoryId": 66, "slug": "yesil_cay", "name": "Yeşil Çay", "sortOrder": 2 },
+    { "id": 1014, "subCategoryId": 66, "slug": "bitki_cayi", "name": "Bitki Çayı", "sortOrder": 3 },
+    { "id": 1015, "subCategoryId": 2, "slug": "limonata", "name": "Limonata", "sortOrder": 1 },
+    { "id": 1016, "subCategoryId": 2, "slug": "ayran", "name": "Ayran", "sortOrder": 2 },
+    { "id": 1017, "subCategoryId": 2, "slug": "gazli_icecek", "name": "Gazlı İçecek", "sortOrder": 3 },
+    { "id": 1018, "subCategoryId": 67, "slug": "smoothie", "name": "Smoothie", "sortOrder": 1 },
+    { "id": 1019, "subCategoryId": 67, "slug": "milkshake", "name": "Milkshake", "sortOrder": 2 },
+    { "id": 1020, "subCategoryId": 4, "slug": "kombucha", "name": "Kombucha", "sortOrder": 1 },
+    { "id": 1021, "subCategoryId": 59, "slug": "klasik_kokteyl", "name": "Klasik Kokteyl", "sortOrder": 1 },
+    { "id": 1022, "subCategoryId": 59, "slug": "imza_kokteyl", "name": "İmza Kokteyl", "sortOrder": 2 },
+    { "id": 1023, "subCategoryId": 60, "slug": "mocktail", "name": "Mocktail", "sortOrder": 1 },
+    { "id": 1024, "subCategoryId": 6, "slug": "sutlu_latte", "name": "Latte", "sortOrder": 1 },
+    { "id": 1025, "subCategoryId": 6, "slug": "sutlu_sicak_cikolata", "name": "Sıcak Çikolata", "sortOrder": 2 },
+    { "id": 1026, "subCategoryId": 6, "slug": "sutlu_milkshake", "name": "Milkshake", "sortOrder": 3 },
+    { "id": 1027, "subCategoryId": 3, "slug": "taze_meyve_suyu", "name": "Taze Meyve Suyu", "sortOrder": 1 },
+    {"id": 1028, "subCategoryId": 2, "slug": "ice_tea", "name": "Ice Tea", "sortOrder": 4 },
+    {"id": 1029, "subCategoryId": 4, "slug": "salgam", "name": "Şalgam", "sortOrder": 2 },
+    { "id": 1030, "subCategoryId": 2, "slug": "soguk_kahve", "name": "Soğuk Kahve", "sortOrder": 5 },
+    { "id": 1031, "subCategoryId": 82, "slug": "su_icecek", "name": "Su", "sortOrder": 1 },
+    { "id": 1032, "subCategoryId": 6, "slug": "sutlu_cappuccino", "name": "Cappuccino", "sortOrder": 4 },
+    { "id": 1033, "subCategoryId": 2, "slug": "soguk_meyve_suyu", "name": "Meyve Suyu", "sortOrder": 6 },
+    { "id": 1034, "subCategoryId": 2, "slug": "soguk_milkshake", "name": "Milkshake", "sortOrder": 7 }
   ],
   "tags": [
     { "id": 1, "slug": "glutensiz", "name": "Glutensiz", "sortOrder": 1 },

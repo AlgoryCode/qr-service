@@ -20,6 +20,7 @@ public final class TaxonomyDtos {
     public static class Document {
         private int version;
         private List<MainSeed> mains;
+        private List<DescriptorSeed> descriptors;
         private List<TagSeed> tags;
         private List<AllergenSeed> allergens;
     }
@@ -43,6 +44,18 @@ public final class TaxonomyDtos {
     @AllArgsConstructor
     public static class SubSeed {
         private Long id;
+        private String slug;
+        private String name;
+        private Integer sortOrder;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DescriptorSeed {
+        private Long id;
+        private Long subCategoryId;
         private String slug;
         private String name;
         private Integer sortOrder;
@@ -104,6 +117,20 @@ public final class TaxonomyDtos {
     public static class SubCategoryResponse {
         private Long id;
         private Long mainCategoryId;
+        private String slug;
+        private String name;
+        private int sortOrder;
+        @Builder.Default
+        private List<DescriptorCategoryResponse> descriptors = new ArrayList<>();
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DescriptorCategoryResponse {
+        private Long id;
+        private Long subCategoryId;
         private String slug;
         private String name;
         private int sortOrder;
@@ -191,6 +218,28 @@ public final class TaxonomyDtos {
     @AllArgsConstructor
     public static class SubCategoryUpdateRequest {
         private Long mainCategoryId;
+        private String name;
+        private Integer sortOrder;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DescriptorCategoryRequest {
+        private Long id;
+        private Long subCategoryId;
+        private String slug;
+        private String name;
+        private Integer sortOrder;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DescriptorCategoryUpdateRequest {
+        private Long subCategoryId;
         private String name;
         private Integer sortOrder;
     }

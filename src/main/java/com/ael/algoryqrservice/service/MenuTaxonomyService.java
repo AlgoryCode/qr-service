@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.model.DescriptorCategory;
 import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.repository.DescriptorCategoryRepository;
 import com.ael.algoryqrservice.repository.MainCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuAllergenRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
@@ -37,6 +39,7 @@ public class MenuTaxonomyService {
 
     private final MainCategoryRepository mainCategoryRepository;
     private final SubCategoryRepository subCategoryRepository;
+    private final DescriptorCategoryRepository descriptorCategoryRepository;
     private final MenuTagRepository menuTagRepository;
     private final MenuAllergenRepository menuAllergenRepository;
     private final MenuProductRepository menuProductRepository;
@@ -47,6 +50,10 @@ public class MenuTaxonomyService {
         List<SubCategory> subs = subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc();
         Map<Long, List<SubCategory>> byMain = subs.stream()
                 .collect(Collectors.groupingBy(SubCategory::getMainCategoryId));
+        Map<Long, List<DescriptorCategory>> descriptorsBySub = descriptorCategoryRepository
+                .findByDeletedFalseOrderBySortOrderAscIdAsc()
+                .stream()
+                .collect(Collectors.groupingBy(DescriptorCategory::getSubCategoryId));
         List<TaxonomyDtos.MainCategoryResponse> result = new ArrayList<>();
         for (MainCategory main : mains) {
             result.add(TaxonomyDtos.MainCategoryResponse.builder()
@@ -55,7 +62,7 @@ public class MenuTaxonomyService {
                     .name(main.getName())
                     .sortOrder(main.getSortOrder())
                     .subs(byMain.getOrDefault(main.getId(), List.of()).stream()
-                            .map(this::toSubResponse)
+                            .map(sub -> toSubResponse(sub, descriptorsBySub))
                             .toList())
                     .build());
         }
@@ -91,7 +98,9 @@ public class MenuTaxonomyService {
                     .slug(main.getSlug())
                     .name(main.getName())
                     .sortOrder(main.getSortOrder())
-                    .subs(visibleSubs.stream().map(this::toSubResponse).toList())
+                    .subs(visibleSubs.stream()
+                            .map(sub -> toSubResponse(sub, loadDescriptorsBySub()))
+                            .toList())
                     .build());
         }
         return TaxonomyDtos.TaxonomyPageResponse.builder()
@@ -121,6 +130,21 @@ public class MenuTaxonomyService {
         return menuAllergenRepository.findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
                 .map(this::toAllergenResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public DescriptorCategory requireDescriptorCategory(Long descriptorCategoryId) {
+        if (descriptorCategoryId == null) {
+            return null;
+        }
+        return descriptorCategoryRepository.findByIdAndDeletedFalse(descriptorCategoryId)
+                .orElseThrow(() -> new BadRequestException("Tanimlayici kategori bulunamadi: " + descriptorCategoryId));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, DescriptorCategory> loadDescriptorCategoryMap() {
+        return descriptorCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
+                .collect(Collectors.toMap(DescriptorCategory::getId, descriptor -> descriptor, (a, b) -> a, HashMap::new));
     }
 
     @Transactional(readOnly = true)
@@ -307,7 +331,7 @@ public class MenuTaxonomyService {
                 .updatedAt(LocalDateTime.now())
                 .deleted(false)
                 .build());
-        return toSubResponse(saved);
+        return toSubResponse(saved, loadDescriptorsBySub());
     }
 
     @Transactional
@@ -324,12 +348,15 @@ public class MenuTaxonomyService {
             sub.setSortOrder(request.getSortOrder());
         }
         sub.setUpdatedAt(LocalDateTime.now());
-        return toSubResponse(subCategoryRepository.save(sub));
+        return toSubResponse(subCategoryRepository.save(sub), loadDescriptorsBySub());
     }
 
     @Transactional
     public void deleteSub(Long id) {
         SubCategory sub = requireSubCategory(id);
+        if (descriptorCategoryRepository.countBySubCategoryIdAndDeletedFalse(id) > 0) {
+            throw new BadRequestException("Tanimlayici kategorisi olan alt kategori silinemez");
+        }
         if (menuProductRepository.countBySubCategoryIdAndDeletedFalse(id) > 0) {
             throw new BadRequestException("Urunu olan alt kategori silinemez");
         }
@@ -428,6 +455,61 @@ public class MenuTaxonomyService {
         menuAllergenRepository.save(allergen);
     }
 
+    @Transactional
+    public TaxonomyDtos.DescriptorCategoryResponse createDescriptor(TaxonomyDtos.DescriptorCategoryRequest request) {
+        requireSubCategory(request.getSubCategoryId());
+        Long id = request.getId() != null ? request.getId() : nextDescriptorId();
+        String slug = requireSlug(request.getSlug());
+        if (descriptorCategoryRepository.existsBySlugAndDeletedFalse(slug)) {
+            throw new BadRequestException("Descriptor slug zaten var: " + slug);
+        }
+        if (descriptorCategoryRepository.existsById(id)) {
+            throw new BadRequestException("Descriptor id zaten var: " + id);
+        }
+        DescriptorCategory saved = descriptorCategoryRepository.save(DescriptorCategory.builder()
+                .id(id)
+                .subCategoryId(request.getSubCategoryId())
+                .slug(slug)
+                .name(requireName(request.getName()))
+                .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .deleted(false)
+                .build());
+        return toDescriptorResponse(saved);
+    }
+
+    @Transactional
+    public TaxonomyDtos.DescriptorCategoryResponse updateDescriptor(
+            Long id,
+            TaxonomyDtos.DescriptorCategoryUpdateRequest request
+    ) {
+        DescriptorCategory descriptor = requireDescriptorCategory(id);
+        if (request.getSubCategoryId() != null) {
+            requireSubCategory(request.getSubCategoryId());
+            descriptor.setSubCategoryId(request.getSubCategoryId());
+        }
+        if (request.getName() != null && !request.getName().isBlank()) {
+            descriptor.setName(request.getName().trim());
+        }
+        if (request.getSortOrder() != null) {
+            descriptor.setSortOrder(request.getSortOrder());
+        }
+        descriptor.setUpdatedAt(LocalDateTime.now());
+        return toDescriptorResponse(descriptorCategoryRepository.save(descriptor));
+    }
+
+    @Transactional
+    public void deleteDescriptor(Long id) {
+        DescriptorCategory descriptor = requireDescriptorCategory(id);
+        if (menuProductRepository.countByDescriptorCategoryIdAndDeletedFalse(id) > 0) {
+            throw new BadRequestException("Urunu olan tanimlayici kategori silinemez");
+        }
+        descriptor.setDeleted(true);
+        descriptor.setUpdatedAt(LocalDateTime.now());
+        descriptorCategoryRepository.save(descriptor);
+    }
+
     private long nextMainId() {
         return mainCategoryRepository.findAll().stream().mapToLong(MainCategory::getId).max().orElse(0L) + 1L;
     }
@@ -444,14 +526,43 @@ public class MenuTaxonomyService {
         return menuAllergenRepository.findAll().stream().mapToLong(MenuAllergen::getId).max().orElse(0L) + 1L;
     }
 
-    private TaxonomyDtos.SubCategoryResponse toSubResponse(SubCategory sub) {
+    private long nextDescriptorId() {
+        return descriptorCategoryRepository.findAll().stream().mapToLong(DescriptorCategory::getId).max().orElse(0L) + 1L;
+    }
+
+    private Map<Long, List<DescriptorCategory>> loadDescriptorsBySub() {
+        return descriptorCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
+                .collect(Collectors.groupingBy(DescriptorCategory::getSubCategoryId));
+    }
+
+    private TaxonomyDtos.SubCategoryResponse toSubResponse(
+            SubCategory sub,
+            Map<Long, List<DescriptorCategory>> descriptorsBySub
+    ) {
         return TaxonomyDtos.SubCategoryResponse.builder()
                 .id(sub.getId())
                 .mainCategoryId(sub.getMainCategoryId())
                 .slug(sub.getSlug())
                 .name(sub.getName())
                 .sortOrder(sub.getSortOrder())
+                .descriptors(descriptorsBySub.getOrDefault(sub.getId(), List.of()).stream()
+                        .map(this::toDescriptorResponse)
+                        .toList())
                 .build();
+    }
+
+    private TaxonomyDtos.DescriptorCategoryResponse toDescriptorResponse(DescriptorCategory descriptor) {
+        return TaxonomyDtos.DescriptorCategoryResponse.builder()
+                .id(descriptor.getId())
+                .subCategoryId(descriptor.getSubCategoryId())
+                .slug(descriptor.getSlug())
+                .name(descriptor.getName())
+                .sortOrder(descriptor.getSortOrder())
+                .build();
+    }
+
+    private TaxonomyDtos.SubCategoryResponse toSubResponse(SubCategory sub) {
+        return toSubResponse(sub, loadDescriptorsBySub());
     }
 
     private TaxonomyDtos.TagResponse toTagResponse(MenuTag tag) {

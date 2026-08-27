@@ -64,6 +64,8 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
 
     long countBySubCategoryIdAndDeletedFalse(Long subCategoryId);
 
+    long countByDescriptorCategoryIdAndDeletedFalse(Long descriptorCategoryId);
+
     long countByMenuIdAndDeletedFalse(Long menuId);
 
     @Query("""
