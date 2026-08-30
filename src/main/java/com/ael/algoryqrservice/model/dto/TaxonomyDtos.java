@@ -89,6 +89,8 @@ public final class TaxonomyDtos {
     @AllArgsConstructor
     public static class MainCategoryResponse {
         private Long id;
+        private Long menuId;
+        private Long userId;
         private String slug;
         private String name;
         private int sortOrder;

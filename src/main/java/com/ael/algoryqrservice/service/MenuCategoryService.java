@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,7 @@ public class MenuCategoryService {
     private final MenuCategoryRepository menuCategoryRepository;
     private final MenuSubCategoryRepository menuSubCategoryRepository;
     private final MenuProductRepository menuProductRepository;
+    private final MenuRepository menuRepository;
 
     @Transactional(readOnly = true)
     public List<TaxonomyDtos.MainCategoryResponse> listTaxonomy(Long menuId) {
@@ -69,6 +72,8 @@ public class MenuCategoryService {
             }
             filtered.add(TaxonomyDtos.MainCategoryResponse.builder()
                     .id(main.getId())
+                    .menuId(main.getMenuId())
+                    .userId(main.getUserId())
                     .slug(main.getSlug())
                     .name(main.getName())
                     .sortOrder(main.getSortOrder())
@@ -135,10 +140,12 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse createCategory(Long menuId, TaxonomyDtos.MainCategoryRequest request) {
+        Long userId = requireMenuUserId(menuId);
         String name = requireName(request.getName());
         String slug = resolveSlug(menuId, request.getSlug(), name, true);
         MenuCategory saved = menuCategoryRepository.save(MenuCategory.builder()
                 .menuId(menuId)
+                .userId(userId)
                 .slug(slug)
                 .name(name)
                 .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
@@ -240,6 +247,7 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyCloneResult cloneTaxonomyToMenu(Long sourceMenuId, Long targetMenuId) {
+        Long targetUserId = requireMenuUserId(targetMenuId);
         Map<Long, Long> sourceSubToTargetSub = new HashMap<>();
         Map<Long, Long> sourceCategoryToTarget = new HashMap<>();
         List<MenuCategory> sourceCategories = menuCategoryRepository
@@ -247,6 +255,7 @@ public class MenuCategoryService {
         for (MenuCategory source : sourceCategories) {
             MenuCategory copied = menuCategoryRepository.save(MenuCategory.builder()
                     .menuId(targetMenuId)
+                    .userId(targetUserId)
                     .slug(source.getSlug())
                     .name(source.getName())
                     .sortOrder(source.getSortOrder())
@@ -278,9 +287,21 @@ public class MenuCategoryService {
         return new TaxonomyCloneResult(sourceCategoryToTarget, sourceSubToTargetSub);
     }
 
+    private Long requireMenuUserId(Long menuId) {
+        Menu menu = menuRepository.findById(menuId)
+                .filter(item -> !item.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+        if (menu.getUserId() == null) {
+            throw new BadRequestException("Menü sahibi bulunamadı");
+        }
+        return menu.getUserId();
+    }
+
     private TaxonomyDtos.MainCategoryResponse toMainResponse(MenuCategory category, List<MenuSubCategory> subs) {
         return TaxonomyDtos.MainCategoryResponse.builder()
                 .id(category.getId())
+                .menuId(category.getMenuId())
+                .userId(category.getUserId())
                 .slug(category.getSlug())
                 .name(category.getName())
                 .sortOrder(category.getSortOrder())
