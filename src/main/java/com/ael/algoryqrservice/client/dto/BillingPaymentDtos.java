@@ -104,4 +104,46 @@ public final class BillingPaymentDtos {
             return status != null && "INITIATED".equalsIgnoreCase(status.trim());
         }
     }
+
+    public record PaymentDetail(
+            String conversationId,
+            String paymentId,
+            String paymentTransactionId,
+            String basketId,
+            String accountId,
+            String buyerEmail,
+            String buyerName,
+            String serviceName,
+            String sourceReferenceId,
+            BigDecimal price,
+            BigDecimal paidPrice,
+            BigDecimal refundedAmount,
+            BigDecimal remainingAmount,
+            String currency,
+            String status,
+            String paymentType,
+            String paymentStyle,
+            Integer bankInstallmentCount,
+            String subscriptionId,
+            Integer billingCycleNumber,
+            boolean verificationOnly,
+            String errorCode,
+            String errorMessage,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {
+        public boolean isSuccess() {
+            return status != null && "SUCCESS".equalsIgnoreCase(status.trim());
+        }
+    }
+
+    public record PaymentPage(
+            List<PaymentDetail> content,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages,
+            boolean hasNext
+    ) {
+    }
 }

@@ -77,6 +77,17 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     List<Purchase> findByRefundStatus(com.ael.algoryqrservice.model.enums.RefundStatus refundStatus);
 
     @Query("""
+            select p from Purchase p
+            where p.paymentConversationId = :conversationId
+               or p.currentPeriodConversationId = :conversationId
+            order by p.purchasedAt desc
+            """)
+    List<Purchase> findByPaymentOrPeriodConversationId(
+            @Param("conversationId") String conversationId,
+            Pageable pageable
+    );
+
+    @Query("""
             select distinct p.userId
             from Purchase p
             where p.status = com.ael.algoryqrservice.model.enums.PurchaseStatus.ACTIVE
