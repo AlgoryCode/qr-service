@@ -2,8 +2,8 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCardStorageSessionResponse;
 import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
-import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.User;
@@ -66,12 +66,11 @@ public class BillingPaymentController {
         PaymentCardVerificationRequest request = paymentRequestMapper.toCardVerificationRequest(
                 user, billingSnapshot, clientIp, appProperties, conversationId
         );
-        PaymentCheckoutFormResponse response = paymentServiceClient.initiateCardVerification(user.getId(), request);
+        PaymentCardStorageSessionResponse response = paymentServiceClient.initiateCardVerification(user.getId(), request);
         return new BillingPaymentDtos.CardVerificationInit(
                 response.getConversationId(),
-                response.getToken(),
-                response.getPaymentPageUrl(),
-                response.getCheckoutFormContent()
+                response.getActionUrl(),
+                response.getFields()
         );
     }
 

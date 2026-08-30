@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.client.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public final class BillingPaymentDtos {
     private BillingPaymentDtos() {
@@ -60,9 +61,8 @@ public final class BillingPaymentDtos {
 
     public record CardVerificationInit(
             String conversationId,
-            String token,
-            String paymentPageUrl,
-            String checkoutFormContent
+            String actionUrl,
+            Map<String, String> fields
     ) {
     }
 
