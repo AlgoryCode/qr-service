@@ -870,7 +870,7 @@ public class PurchaseService {
 
     public PurchaseResponse cancelWithRefund(Long purchaseId, Long userId, String clientIp) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        RefundPrep prep = tx.execute(status -> prepareRefund(purchaseId, userId));
+        RefundPrep prep = tx.execute(status -> prepareRefund(purchaseId, userId, false));
         if (prep == null) {
             throw new BadRequestException("Iade hazirligi basarisiz");
         }
@@ -885,11 +885,29 @@ public class PurchaseService {
         return tx.execute(status -> completeRefundCancel(purchaseId, userId, prep.amount()));
     }
 
-    private RefundPrep prepareRefund(Long purchaseId, Long userId) {
+    public PurchaseResponse adminCancelWithRefund(Long purchaseId, BigDecimal amount, String clientIp) {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        RefundPrep prep = tx.execute(status -> prepareAdminRefund(purchaseId, amount));
+        if (prep == null) {
+            throw new BadRequestException("Iade hazirligi basarisiz");
+        }
+
+        Long userId = prep.userId();
+        try {
+            paymentServiceClient.refundPayment(userId, prep.conversationId(), prep.amount(), clientIp);
+        } catch (RuntimeException exception) {
+            tx.executeWithoutResult(status -> clearPendingRefund(purchaseId));
+            throw exception;
+        }
+
+        return tx.execute(status -> completeRefundCancel(purchaseId, userId, prep.amount()));
+    }
+
+    private RefundPrep prepareRefund(Long purchaseId, Long userId, boolean adminOverride) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (!purchase.getUserId().equals(userId)) {
+        if (!adminOverride && !purchase.getUserId().equals(userId)) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
@@ -903,7 +921,7 @@ public class PurchaseService {
             throw new BadRequestException("Iade zaten devam ediyor");
         }
         LocalDateTime now = LocalDateTime.now();
-        if (!subscriptionRefundPolicy.isRefundEligible(purchase, now)) {
+        if (!adminOverride && !subscriptionRefundPolicy.isRefundEligible(purchase, now)) {
             throw new BadRequestException(
                     "Iade penceresi kapandi. Yalnizca donem sonunda bitirme kullanabilirsiniz"
             );
@@ -915,7 +933,7 @@ public class PurchaseService {
         }
 
         BillingPaymentDtos.RefundablePayment refundable =
-                paymentServiceClient.getRefundablePayment(userId, conversationId);
+                paymentServiceClient.getRefundablePayment(purchase.getUserId(), conversationId);
         BigDecimal remaining = refundable.remaining() == null ? BigDecimal.ZERO : refundable.remaining();
         if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Iade edilecek tutar bulunamadi");
@@ -926,11 +944,25 @@ public class PurchaseService {
         purchaseRepository.save(purchase);
         purchaseLogService.log(
                 purchase.getId(),
-                userId,
+                purchase.getUserId(),
                 PurchaseLogAction.PURCHASE_REFUND_STARTED,
                 purchase.getPackageName() + " abonelik iadesi baslatildi: " + remaining
         );
-        return new RefundPrep(conversationId, remaining);
+        return new RefundPrep(conversationId, remaining, purchase.getUserId());
+    }
+
+    private RefundPrep prepareAdminRefund(Long purchaseId, BigDecimal requestedAmount) {
+        RefundPrep prep = prepareRefund(purchaseId, null, true);
+        if (requestedAmount == null) {
+            return prep;
+        }
+        if (requestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Iade tutari sifirdan buyuk olmali");
+        }
+        if (requestedAmount.compareTo(prep.amount()) > 0) {
+            throw new BadRequestException("Iade tutari kalan tutari asamaz");
+        }
+        return new RefundPrep(prep.conversationId(), requestedAmount, prep.userId());
     }
 
     private void clearPendingRefund(Long purchaseId) {
@@ -1208,7 +1240,7 @@ public class PurchaseService {
         return toResponse(purchase);
     }
 
-    private record RefundPrep(String conversationId, BigDecimal amount) {
+    private record RefundPrep(String conversationId, BigDecimal amount, Long userId) {
     }
 
     private void validateUserCancellable(Purchase purchase) {
