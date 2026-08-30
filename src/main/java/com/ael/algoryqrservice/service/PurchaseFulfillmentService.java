@@ -132,6 +132,12 @@ public class PurchaseFulfillmentService {
             }
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
+        if (purchase.getPurchaseType() == PurchaseType.TRIAL) {
+            purchase.setPurchaseType(PurchaseType.PAID);
+            if (event.getAmount() != null) {
+                purchase.setPrice(event.getAmount());
+            }
+        }
         purchase.setPaymentId(event.getPaymentId());
         applyCardSnapshotFromEvent(purchase, event);
         if (event.getSubscriptionId() != null && !event.getSubscriptionId().isBlank()) {

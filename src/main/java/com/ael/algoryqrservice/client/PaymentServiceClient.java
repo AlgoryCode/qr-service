@@ -321,6 +321,38 @@ public class PaymentServiceClient {
             LocalDateTime nextChargeAt,
             Map<String, Object> sourceMetadata
     ) {
+        return bootstrapSubscription(
+                userId,
+                serviceName,
+                sourceReferenceId,
+                conversationId,
+                amount,
+                currency,
+                billingIntervalMonths,
+                paymentMethodId,
+                nextChargeAt,
+                sourceMetadata,
+                null,
+                null,
+                null
+        );
+    }
+
+    public BillingPaymentDtos.Subscription bootstrapSubscription(
+            Long userId,
+            String serviceName,
+            String sourceReferenceId,
+            String conversationId,
+            BigDecimal amount,
+            String currency,
+            Integer billingIntervalMonths,
+            Long paymentMethodId,
+            LocalDateTime nextChargeAt,
+            Map<String, Object> sourceMetadata,
+            Object buyer,
+            Object shippingAddress,
+            Object billingAddress
+    ) {
         try {
             Map<String, Object> body = new HashMap<>();
             body.put("serviceName", serviceName);
@@ -332,6 +364,15 @@ public class PaymentServiceClient {
             body.put("paymentMethodId", paymentMethodId);
             body.put("nextChargeAt", nextChargeAt);
             body.put("sourceMetadata", sourceMetadata);
+            if (buyer != null) {
+                body.put("buyer", buyer);
+            }
+            if (shippingAddress != null) {
+                body.put("shippingAddress", shippingAddress);
+            }
+            if (billingAddress != null) {
+                body.put("billingAddress", billingAddress);
+            }
             return restClient.post()
                     .uri("/api/v1/subscriptions/bootstrap")
                     .headers(authHeaders(userId))

@@ -296,7 +296,10 @@ public class PaymentRequestMapper {
     }
 
     public String buildCardVerificationConversationId(Long userId) {
-        return newPaymentAttemptId(userId);
+        long safeUserId = userId == null ? 0L : userId;
+        String timestamp = AppTime.nowLocal().format(PAYMENT_ATTEMPT_TS);
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4);
+        return "qrcardv" + safeUserId + timestamp + suffix;
     }
 
     private PaymentThreeDsRequest.PaymentCardPayload toPaymentCard(PaymentCardDto card) {

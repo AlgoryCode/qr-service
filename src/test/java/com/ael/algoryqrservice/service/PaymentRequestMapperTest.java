@@ -280,8 +280,8 @@ class PaymentRequestMapperTest {
         String first = mapper.buildCardVerificationConversationId(7L);
         String second = mapper.buildCardVerificationConversationId(7L);
 
-        assertThat(first).matches("^qr7\\d{14}[a-f0-9]{4}$");
-        assertThat(second).matches("^qr7\\d{14}[a-f0-9]{4}$");
+        assertThat(first).matches("^qrcardv7\\d{14}[a-f0-9]{4}$");
+        assertThat(second).matches("^qrcardv7\\d{14}[a-f0-9]{4}$");
         assertThat(first).isNotEqualTo(second);
     }
 
