@@ -1,13 +1,20 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.client.PaymentServiceClient;
+import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
+import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
+import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.TrialDtos;
+import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
@@ -53,6 +60,14 @@ class TrialServiceTest {
     PackageActivationService packageActivationService;
     @Mock
     UserTrialService userTrialService;
+    @Mock
+    PaymentServiceClient paymentServiceClient;
+    @Mock
+    BillingAddressService billingAddressService;
+    @Mock
+    PaymentRequestMapper paymentRequestMapper;
+    @Mock
+    AppProperties appProperties;
     @InjectMocks
     TrialService service;
 
@@ -100,6 +115,8 @@ class TrialServiceTest {
         when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
+        stubSavedCard(7L);
+        stubBootstrap(7L);
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
             purchase.setId(10L);
@@ -111,6 +128,8 @@ class TrialServiceTest {
         ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
         verify(purchaseRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getPurchaseType()).isEqualTo(PurchaseType.TRIAL);
+        assertThat(captor.getValue().getPaymentStyle()).isEqualTo(PaymentStyle.SUBSCRIPTION);
+        assertThat(captor.getValue().getPaymentMethodId()).isEqualTo(9L);
         assertThat(captor.getValue().getPackageId()).isEqualTo(2L);
         assertThat(captor.getValue().getExpiresAt())
                 .isEqualTo(captor.getValue().getStartsAt().plusDays(7));
@@ -124,6 +143,26 @@ class TrialServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userTrialService.hasUsedTrial(user)).thenReturn(false);
         when(userTrialService.hasTrialPurchase(user.getId())).thenReturn(false);
+        stubSavedCard(user.getId());
+    }
+
+    private void stubSavedCard(Long userId) {
+        when(paymentServiceClient.getPaymentMethods(userId)).thenReturn(List.of(
+                new BillingPaymentDtos.PaymentMethod("9", "Kart", "VISA", "0008", 12, 2030)
+        ));
+    }
+
+    private void stubBootstrap(Long userId) {
+        when(billingAddressService.resolveDefaultSnapshot(userId)).thenReturn(BillingSnapshot.builder().build());
+        when(appProperties.getServiceName()).thenReturn("qr-service");
+        when(paymentRequestMapper.toCardVerificationRequest(any(), any(), any(), any(), any()))
+                .thenReturn(PaymentCardVerificationRequest.builder()
+                        .buyer(PaymentThreeDsRequest.BuyerPayload.builder()
+                                .id("7")
+                                .email("ada@example.com")
+                                .ip("127.0.0.1")
+                                .build())
+                        .build());
     }
 
     @Test
@@ -150,6 +189,8 @@ class TrialServiceTest {
         when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
+        stubSavedCard(7L);
+        stubBootstrap(7L);
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
             purchase.setId(10L);
@@ -193,6 +234,19 @@ class TrialServiceTest {
     }
 
     @Test
+    void start_whenNoSavedCard_thenReject() {
+        User user = User.builder().id(7L).trialUsed(false).build();
+        stubEligibleUser(user);
+        when(paymentServiceClient.getPaymentMethods(7L)).thenReturn(List.of());
+        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.start(7L, 2L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("kredi karti");
+        verify(purchaseRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void start_whenUsablePaidExists_thenReject() {
         Purchase paid = Purchase.builder()
                 .id(1L)
@@ -220,6 +274,7 @@ class TrialServiceTest {
                 .thenReturn(Optional.of(plan));
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
         stubEligibleUser(user);
+        stubBootstrap(7L);
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);

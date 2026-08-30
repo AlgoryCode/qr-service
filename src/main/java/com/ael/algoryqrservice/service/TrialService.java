@@ -1,7 +1,13 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.PaymentServiceClient;
+import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
+import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.PaymentServiceException;
+import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Purchase;
@@ -11,6 +17,7 @@ import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
 import com.ael.algoryqrservice.model.dto.TrialDtos;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
@@ -19,6 +26,7 @@ import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,8 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TrialService {
@@ -39,6 +50,10 @@ public class TrialService {
     private final PurchaseExpiryService purchaseExpiryService;
     private final PackageActivationService packageActivationService;
     private final UserTrialService userTrialService;
+    private final PaymentServiceClient paymentServiceClient;
+    private final BillingAddressService billingAddressService;
+    private final PaymentRequestMapper paymentRequestMapper;
+    private final AppProperties appProperties;
 
     @Transactional
     public TrialDtos.Status start(Long userId, Long packageId) {
@@ -48,6 +63,7 @@ public class TrialService {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         rejectIfHasUsablePaidPackage(userId);
+        Long paymentMethodId = requireSavedCard(userId);
 
         PlanPackage planPackage = resolveTrialPackage(packageId);
         LocalDateTime startsAt = AppTime.nowLocal();
@@ -61,7 +77,8 @@ public class TrialService {
                     .price(BigDecimal.ZERO)
                     .currency(planPackage.getCurrency())
                     .purchaseType(PurchaseType.TRIAL)
-                    .paymentStyle(PaymentStyle.ONE_TIME)
+                    .paymentStyle(PaymentStyle.SUBSCRIPTION)
+                    .paymentMethodId(paymentMethodId)
                     .billingPeriod(BillingPeriod.MONTHLY)
                     .billingIntervalMonths(BillingPeriod.MONTHLY.intervalMonths())
                     .status(PurchaseStatus.ACTIVE)
@@ -72,6 +89,7 @@ public class TrialService {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         packageActivationService.activatePurchasedPackage(purchase);
+        bootstrapTrialSubscription(user, purchase, planPackage);
         for (PlanPackageItem item : planPackage.getItems()) {
             entitlementWriter.grant(
                     purchase,
@@ -116,6 +134,14 @@ public class TrialService {
             user = userRepository.findById(userId).orElse(user);
             return usedUnavailableStatus(user);
         }
+        if (user != null && purchase.getPaymentMethodId() != null && purchase.getSubscriptionId() == null) {
+            PlanPackage planPackage = purchase.getPackageId() == null
+                    ? null
+                    : packageRepository.findByIdWithItems(purchase.getPackageId()).orElse(null);
+            if (planPackage != null) {
+                bootstrapTrialSubscription(user, purchase, planPackage);
+            }
+        }
         return statusOf(purchase);
     }
 
@@ -156,6 +182,80 @@ public class TrialService {
             throw new BadRequestException("trialDays 1 ile " + maxTrialDays + " arasinda olmalidir");
         }
         return trialDays;
+    }
+
+    private Long requireSavedCard(Long userId) {
+        List<BillingPaymentDtos.PaymentMethod> methods = paymentServiceClient.getPaymentMethods(userId);
+        if (methods == null || methods.isEmpty()) {
+            throw new BadRequestException("Deneme baslatmak icin kayitli kredi karti zorunludur");
+        }
+        String rawId = methods.getFirst().id();
+        if (rawId == null || rawId.isBlank()) {
+            throw new BadRequestException("Deneme baslatmak icin kayitli kredi karti zorunludur");
+        }
+        try {
+            return Long.valueOf(rawId);
+        } catch (NumberFormatException exception) {
+            throw new BadRequestException("Kayitli kart kimligi gecersiz");
+        }
+    }
+
+    private void bootstrapTrialSubscription(User user, Purchase purchase, PlanPackage planPackage) {
+        if (purchase.getPaymentMethodId() == null) {
+            return;
+        }
+        BigDecimal amount = planPackage.effectiveMonthlyPrice();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = planPackage.getPrice();
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Trial subscription bootstrap skipped; package price missing. purchaseId={}", purchase.getId());
+            return;
+        }
+        BillingSnapshot billingSnapshot = billingAddressService.resolveDefaultSnapshot(user.getId());
+        PaymentCardVerificationRequest identity = paymentRequestMapper.toCardVerificationRequest(
+                user,
+                billingSnapshot,
+                "127.0.0.1",
+                appProperties,
+                "trialboot" + purchase.getId()
+        );
+        Map<String, Object> sourceMetadata = new HashMap<>();
+        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("packageId", planPackage.getId());
+        sourceMetadata.put("packageCode", planPackage.getCode());
+        sourceMetadata.put("purchaseId", purchase.getId());
+        sourceMetadata.put("trialConversion", true);
+        sourceMetadata.put("paymentStyle", PaymentStyle.SUBSCRIPTION.name());
+        try {
+            var subscription = paymentServiceClient.bootstrapSubscription(
+                    user.getId(),
+                    appProperties.getServiceName(),
+                    String.valueOf(purchase.getId()),
+                    "trialboot" + purchase.getId(),
+                    amount,
+                    planPackage.getCurrency() == null ? purchase.getCurrency() : planPackage.getCurrency(),
+                    purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths(),
+                    purchase.getPaymentMethodId(),
+                    purchase.getExpiresAt(),
+                    sourceMetadata,
+                    identity.getBuyer(),
+                    identity.getShippingAddress(),
+                    identity.getBillingAddress()
+            );
+            if (subscription != null && subscription.id() != null) {
+                purchase.setSubscriptionId(subscription.id());
+                purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+                purchaseRepository.save(purchase);
+            }
+        } catch (PaymentServiceException exception) {
+            log.error(
+                    "Trial subscription bootstrap failed. purchaseId={} userId={}",
+                    purchase.getId(),
+                    user.getId(),
+                    exception
+            );
+        }
     }
 
     private void rejectIfHasUsablePaidPackage(Long userId) {
