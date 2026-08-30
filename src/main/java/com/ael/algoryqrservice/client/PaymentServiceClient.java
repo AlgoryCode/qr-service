@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.client;
 
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.client.dto.PaymentCardStorageSessionResponse;
 import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
@@ -137,7 +138,7 @@ public class PaymentServiceClient {
         }
     }
 
-    public PaymentCheckoutFormResponse initiateCardVerification(Long userId, PaymentCardVerificationRequest request) {
+    public PaymentCardStorageSessionResponse initiateCardVerification(Long userId, PaymentCardVerificationRequest request) {
         try {
             if (userId == null) {
                 throw new PaymentServiceException("Kart dogrulama icin kullanici kimligi zorunludur");
@@ -148,7 +149,7 @@ public class PaymentServiceClient {
                     .headers(authHeaders(userId))
                     .body(request)
                     .retrieve()
-                    .body(PaymentCheckoutFormResponse.class);
+                    .body(PaymentCardStorageSessionResponse.class);
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
