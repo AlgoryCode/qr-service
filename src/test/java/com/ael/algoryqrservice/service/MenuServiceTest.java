@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.Qr;
-import com.ael.algoryqrservice.model.SubCategory;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
@@ -63,6 +63,8 @@ class MenuServiceTest {
     private MenuProductRepository menuProductRepository;
     @Mock
     private MenuTaxonomyService menuTaxonomyService;
+    @Mock
+    private MenuCategoryService menuCategoryService;
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
     @Mock
@@ -149,14 +151,14 @@ class MenuServiceTest {
         QrRequest request = new QrRequest();
         request.setDetails(details);
         NutritionFacts parsedNutrition = sampleNutrition();
-        SubCategory sub = SubCategory.builder().id(1L).mainCategoryId(1L).slug("sicak_icecekler").name("Sıcak İçecekler").sortOrder(1).build();
+        MenuSubCategory sub = MenuSubCategory.builder().id(1L).menuCategoryId(1L).slug("sicak_icecekler").name("Sıcak İçecekler").sortOrder(1).build();
 
         when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> {
             Menu menu = invocation.getArgument(0);
             menu.setMenuId(99L);
             return menu;
         });
-        when(menuTaxonomyService.requireSubCategory(1L)).thenReturn(sub);
+        when(menuCategoryService.requireSubCategory(any(), eq(1L))).thenReturn(sub);
         when(menuTaxonomyService.requireTags(any())).thenReturn(List.of());
         when(menuTaxonomyService.requireAllergens(any())).thenReturn(List.of());
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
@@ -242,6 +244,8 @@ class MenuServiceTest {
         when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
                 .thenReturn(List.of(sourceProduct));
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuCategoryService.cloneTaxonomyToMenu(12L, 99L))
+                .thenReturn(new MenuCategoryService.TaxonomyCloneResult(Map.of(1L, 10L), Map.of(3L, 30L)));
         doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
 
         Menu saved = menuService.createMenuForQr(qr, request);
@@ -254,11 +258,12 @@ class MenuServiceTest {
         MenuProduct copied = productCaptor.getValue();
         assertThat(copied.getMenuId()).isEqualTo(99L);
         assertThat(copied.getName()).isEqualTo("Latte");
-        assertThat(copied.getSubCategoryId()).isEqualTo(3L);
+        assertThat(copied.getSubCategoryId()).isEqualTo(30L);
         assertThat(copied.getTagIds()).containsExactly(8L);
         assertThat(copied.getAllergenIds()).containsExactly(2L);
         assertThat(copied.getRatingAvg()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(copied.getRatingCount()).isZero();
+        verify(menuProductPairingService).copyPairings(any(), eq(Map.of(1L, 10L)), eq(Map.of(3L, 30L)));
     }
 
     @Test
@@ -291,8 +296,8 @@ class MenuServiceTest {
         Menu menu = Menu.builder().menuId(10L).userId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
         when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        when(menuTaxonomyService.requireSubCategory(16L))
-                .thenReturn(SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
+        when(menuCategoryService.requireSubCategory(any(), eq(16L)))
+                .thenReturn(MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
         when(menuTaxonomyService.findTagBySlug(MenuTaxonomyService.CHEF_RECOMMENDED_TAG_SLUG))
                 .thenReturn(Optional.of(MenuTag.builder().id(8L).slug("sef_ozel").name("Şef Özel").sortOrder(8).build()));
         when(menuTaxonomyService.requireTags(any())).thenReturn(List.of());
@@ -305,10 +310,10 @@ class MenuServiceTest {
             saved.setProductId(55L);
             return saved;
         });
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(
-                16L, SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build()
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of(
+                16L, MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build()
         ));
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of(
                 8L, MenuTag.builder().id(8L).slug("sef_ozel").name("Şef Özel").sortOrder(8).build()
         ));
@@ -339,8 +344,8 @@ class MenuServiceTest {
                 .publicAccessEnabled(true)
                 .build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
@@ -411,10 +416,10 @@ class MenuServiceTest {
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
         when(nutritionFactsService.merge(existing, patch)).thenReturn(merged);
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(
-                16L, SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build()
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of(
+                16L, MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build()
         ));
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
@@ -489,7 +494,7 @@ class MenuServiceTest {
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuTaxonomyService.listTaxonomyPage(0, 6, null)).thenReturn(
+        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(6), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
                         .content(List.of())
                         .page(0)
@@ -499,8 +504,8 @@ class MenuServiceTest {
                         .hasNext(false)
                         .build()
         );
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
@@ -525,7 +530,7 @@ class MenuServiceTest {
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuTaxonomyService.listTaxonomyPage(0, 6, null)).thenReturn(
+        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(6), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
                         .content(List.of())
                         .page(0)
@@ -535,8 +540,8 @@ class MenuServiceTest {
                         .hasNext(false)
                         .build()
         );
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
@@ -555,8 +560,8 @@ class MenuServiceTest {
     void listProducts_whenMoreThanPageSize_thenReturnHasNext() {
         Menu menu = Menu.builder().menuId(10L).userId(7L).active(true).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
@@ -597,8 +602,8 @@ class MenuServiceTest {
                 .publicAccessEnabled(true)
                 .build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
@@ -638,7 +643,7 @@ class MenuServiceTest {
                 .build();
         when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuTaxonomyService.listTaxonomyPage(0, 6, null)).thenReturn(
+        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(6), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
                         .content(List.of())
                         .page(0)
@@ -648,8 +653,8 @@ class MenuServiceTest {
                         .hasNext(false)
                         .build()
         );
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of());
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
@@ -682,8 +687,8 @@ class MenuServiceTest {
         Menu menu = Menu.builder().menuId(10L).userId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
         when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        when(menuTaxonomyService.requireSubCategory(16L))
-                .thenReturn(SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
+        when(menuCategoryService.requireSubCategory(any(), eq(16L)))
+                .thenReturn(MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
         when(menuTaxonomyService.requireTags(any())).thenReturn(List.of());
         when(menuTaxonomyService.requireAllergens(any())).thenReturn(List.of(
@@ -697,10 +702,10 @@ class MenuServiceTest {
             saved.setProductId(66L);
             return saved;
         });
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(
-                16L, SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build()
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of(
+                16L, MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build()
         ));
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of(
                 7L, MenuAllergen.builder().id(7L).slug("sut").name("Süt").sortOrder(7).build()
@@ -725,8 +730,8 @@ class MenuServiceTest {
         Menu menu = Menu.builder().menuId(10L).userId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
         when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        when(menuTaxonomyService.requireSubCategory(16L))
-                .thenReturn(SubCategory.builder().id(16L).mainCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
+        when(menuCategoryService.requireSubCategory(any(), eq(16L)))
+                .thenReturn(MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
         when(menuTaxonomyService.requireTags(any())).thenReturn(List.of());
         when(menuTaxonomyService.requireAllergens(any()))

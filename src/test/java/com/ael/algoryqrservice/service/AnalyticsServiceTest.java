@@ -9,7 +9,7 @@ import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
-import com.ael.algoryqrservice.model.SubCategory;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
@@ -27,8 +27,8 @@ import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
-import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +68,7 @@ class AnalyticsServiceTest {
     @Mock
     private MenuProductRepository menuProductRepository;
     @Mock
-    private SubCategoryRepository subCategoryRepository;
+    private MenuSubCategoryRepository menuSubCategoryRepository;
     @Mock
     private MenuFeedbackService menuFeedbackService;
     @Mock
@@ -97,7 +97,7 @@ class AnalyticsServiceTest {
                 eventRepository,
                 menuRepository,
                 menuProductRepository,
-                subCategoryRepository,
+                menuSubCategoryRepository,
                 menuFeedbackService,
                 menuOrderRepository,
                 menuWaiterRepository,
@@ -116,8 +116,8 @@ class AnalyticsServiceTest {
         when(menuRepository.findById(5L)).thenReturn(Optional.of(menu));
         when(sessionRepository.findById(sessionId)).thenReturn(Optional.empty());
         when(eventRepository.countBySessionIdAndMenuId(sessionId, 5L)).thenReturn(0L);
-        when(subCategoryRepository.findByIdAndDeletedFalse(3L))
-                .thenReturn(Optional.of(SubCategory.builder().id(3L).mainCategoryId(1L).slug("taze").name("Icecek").sortOrder(1).build()));
+        when(menuSubCategoryRepository.findByIdAndDeletedFalse(3L))
+                .thenReturn(Optional.of(MenuSubCategory.builder().id(3L).menuId(5L).menuCategoryId(1L).slug("taze").name("Icecek").sortOrder(1).build()));
         when(menuProductRepository.findByProductIdAndDeletedFalse(11L))
                 .thenReturn(Optional.of(cayProduct(5L)));
 
@@ -238,8 +238,8 @@ class AnalyticsServiceTest {
                 .thenReturn(List.<Object[]>of(new Object[]{"MOBILE", 3L}, new Object[]{"DESKTOP", 1L}));
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(menuId)))
                 .thenReturn(List.of(cayProduct(menuId)));
-        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc())
-                .thenReturn(List.of(SubCategory.builder().id(3L).mainCategoryId(1L).slug("icecek").name("Icecek").sortOrder(1).build()));
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any()))
+                .thenReturn(List.of(MenuSubCategory.builder().id(3L).menuId(menuId).menuCategoryId(1L).slug("icecek").name("Icecek").sortOrder(1).build()));
         when(eventRepository.topProductsByMenuIds(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{11L, 8L}));
         when(eventRepository.topCategoriesByMenuIds(eq(List.of(menuId)), any(), any()))
@@ -297,10 +297,11 @@ class AnalyticsServiceTest {
                         catalogProduct(menuId, 3L, "Cay", 2),
                         catalogProduct(menuId, 4L, "Salata", 3)
                 ));
-        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc())
-                .thenReturn(List.of(SubCategory.builder()
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any()))
+                .thenReturn(List.of(MenuSubCategory.builder()
                         .id(1L)
-                        .mainCategoryId(1L)
+                        .menuId(menuId)
+                        .menuCategoryId(1L)
                         .slug("icecek")
                         .name("Icecek")
                         .sortOrder(1)
@@ -467,7 +468,7 @@ class AnalyticsServiceTest {
                 .thenReturn(List.of());
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
                 .thenReturn(List.of());
-        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
         when(eventRepository.topProductsByMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
         when(eventRepository.topCategoriesByMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
         when(eventRepository.productViewsByCategoryForMenuIds(eq(List.of(5L, 6L)), any(), any())).thenReturn(List.of());
@@ -512,7 +513,7 @@ class AnalyticsServiceTest {
         when(sessionRepository.countByDeviceTypeAndPeriodForMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L)))
                 .thenReturn(List.of());
-        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
         when(eventRepository.topProductsByMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
         when(eventRepository.topCategoriesByMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
         when(eventRepository.productViewsByCategoryForMenuIds(eq(List.of(5L)), any(), any())).thenReturn(List.of());
@@ -562,7 +563,7 @@ class AnalyticsServiceTest {
         when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
                 .thenReturn(List.of());
-        when(subCategoryRepository.findByDeletedFalseOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
         when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L, 6L))).thenReturn(BigDecimal.ZERO);
         TableBill bill = TableBill.builder().id(20L).menuId(5L).currency("TRY").build();

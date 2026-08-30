@@ -3,16 +3,16 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuTag;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.MenuProductSeedDtos;
 import com.ael.algoryqrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.repository.MenuAllergenRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuTagRepository;
-import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class MenuProductSeedServiceTest {
     @Mock
     private MenuProductRepository menuProductRepository;
     @Mock
-    private SubCategoryRepository subCategoryRepository;
+    private MenuSubCategoryRepository menuSubCategoryRepository;
     @Mock
     private MenuTagRepository menuTagRepository;
     @Mock
@@ -60,7 +60,7 @@ class MenuProductSeedServiceTest {
         service = new MenuProductSeedService(
                 menuRepository,
                 menuProductRepository,
-                subCategoryRepository,
+                menuSubCategoryRepository,
                 menuTagRepository,
                 menuAllergenRepository,
                 nutritionFactsService,
@@ -98,8 +98,8 @@ class MenuProductSeedServiceTest {
         when(menuRepository.findById(4L)).thenReturn(Optional.of(Menu.builder().menuId(4L).deleted(false).build()));
         when(menuProductRepository.countByMenuIdAndDeletedFalse(4L)).thenReturn(0L);
         when(menuProductRepository.existsByMenuIdAndNameIgnoreCaseAndDeletedFalse(4L, "Türk Kahvesi")).thenReturn(false);
-        when(subCategoryRepository.findBySlugAndDeletedFalse("sicak_icecekler"))
-                .thenReturn(Optional.of(SubCategory.builder().id(1L).slug("sicak_icecekler").mainCategoryId(1L).name("Sıcak").sortOrder(1).build()));
+        when(menuSubCategoryRepository.findByMenuIdAndSlugAndDeletedFalse(4L, "sicak_icecekler"))
+                .thenReturn(Optional.of(MenuSubCategory.builder().id(1L).slug("sicak_icecekler").menuCategoryId(1L).name("Sıcak").sortOrder(1).build()));
         when(menuTagRepository.findBySlugAndDeletedFalse("seker_ilavesiz"))
                 .thenReturn(Optional.of(MenuTag.builder().id(5L).slug("seker_ilavesiz").name("Şeker İlavesiz").sortOrder(5).build()));
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));

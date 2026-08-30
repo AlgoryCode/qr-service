@@ -45,9 +45,6 @@ public class MenuProduct extends QrBaseModel {
     @Column(name = "sub_category_id", nullable = false)
     private Long subCategoryId;
 
-    @Column(name = "descriptor_category_id")
-    private Long descriptorCategoryId;
-
     @Column(nullable = false)
     private int sortOrder;
 

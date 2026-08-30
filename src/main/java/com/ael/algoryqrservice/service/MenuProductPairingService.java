@@ -24,7 +24,7 @@ public class MenuProductPairingService {
 
     private final MenuProductPairingRepository menuProductPairingRepository;
     private final MenuProductRepository menuProductRepository;
-    private final MenuTaxonomyService menuTaxonomyService;
+    private final MenuCategoryService menuCategoryService;
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuProductPairingsResponse load(Long productId) {
@@ -61,7 +61,11 @@ public class MenuProductPairingService {
     }
 
     @Transactional
-    public void copyPairings(Map<Long, Long> sourceToTargetProductId) {
+    public void copyPairings(
+            Map<Long, Long> sourceToTargetProductId,
+            Map<Long, Long> sourceToTargetCategoryId,
+            Map<Long, Long> sourceToTargetSubCategoryId
+    ) {
         if (sourceToTargetProductId == null || sourceToTargetProductId.isEmpty()) {
             return;
         }
@@ -89,10 +93,22 @@ public class MenuProductPairingService {
                         .build());
                 continue;
             }
+            Long remappedSub = source.getTargetSubCategoryId() == null
+                    ? null
+                    : sourceToTargetSubCategoryId.get(source.getTargetSubCategoryId());
+            Long remappedMain = source.getTargetMainCategoryId() == null
+                    ? null
+                    : sourceToTargetCategoryId.get(source.getTargetMainCategoryId());
+            if (source.getTargetSubCategoryId() != null && remappedSub == null) {
+                continue;
+            }
+            if (source.getTargetMainCategoryId() != null && remappedMain == null) {
+                continue;
+            }
             copies.add(MenuProductPairing.builder()
                     .productId(newProductId)
-                    .targetSubCategoryId(source.getTargetSubCategoryId())
-                    .targetMainCategoryId(source.getTargetMainCategoryId())
+                    .targetSubCategoryId(remappedSub)
+                    .targetMainCategoryId(remappedMain)
                     .sortOrder(source.getSortOrder())
                     .build());
         }
@@ -130,7 +146,7 @@ public class MenuProductPairingService {
             }
         }
         for (Long mainId : uniqueIds(request.getMainCategoryIds())) {
-            menuTaxonomyService.requireMainCategory(mainId);
+            menuCategoryService.requireCategory(menuId, mainId);
             rows.add(MenuProductPairing.builder()
                     .productId(productId)
                     .targetMainCategoryId(mainId)
@@ -138,7 +154,7 @@ public class MenuProductPairingService {
                     .build());
         }
         for (Long subId : uniqueIds(request.getSubCategoryIds())) {
-            menuTaxonomyService.requireSubCategory(subId);
+            menuCategoryService.requireSubCategory(menuId, subId);
             rows.add(MenuProductPairing.builder()
                     .productId(productId)
                     .targetSubCategoryId(subId)

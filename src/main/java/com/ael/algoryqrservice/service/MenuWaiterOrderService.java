@@ -2,13 +2,13 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
-import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
@@ -43,7 +43,7 @@ public class MenuWaiterOrderService {
     private final RestaurantTableRepository restaurantTableRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuOrderService menuOrderService;
-    private final MenuTaxonomyService menuTaxonomyService;
+    private final MenuCategoryService menuCategoryService;
     private final TableBillService tableBillService;
     private final WaiterCommissionService waiterCommissionService;
     private final CampaignEvaluationService campaignEvaluationService;
@@ -216,8 +216,8 @@ public class MenuWaiterOrderService {
     public MenuWaiterDtos.CatalogResponse listCatalog(Long tableId) {
         MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
         RestaurantTable table = requireTableForWaiter(tableId, waiter);
-        Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
-        Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
+        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(table.getMenuId());
+        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(table.getMenuId());
 
         List<MenuWaiterDtos.CatalogProduct> products = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(table.getMenuId())
@@ -279,11 +279,11 @@ public class MenuWaiterOrderService {
 
     private MenuWaiterDtos.CatalogProduct toCatalogProduct(
             MenuProduct product,
-            Map<Long, SubCategory> subMap,
-            Map<Long, MainCategory> mainMap
+            Map<Long, MenuSubCategory> subMap,
+            Map<Long, MenuCategory> mainMap
     ) {
-        SubCategory sub = product.getSubCategoryId() == null ? null : subMap.get(product.getSubCategoryId());
-        MainCategory main = sub == null ? null : mainMap.get(sub.getMainCategoryId());
+        MenuSubCategory sub = product.getSubCategoryId() == null ? null : subMap.get(product.getSubCategoryId());
+        MenuCategory main = sub == null ? null : mainMap.get(sub.getMenuCategoryId());
         boolean commissionEligible = waiterCommissionService.isCommissionEligible(product, subMap);
         return MenuWaiterDtos.CatalogProduct.builder()
                 .productId(product.getProductId())

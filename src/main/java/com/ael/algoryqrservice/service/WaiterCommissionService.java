@@ -4,8 +4,8 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuWaiter;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.WaiterCommissionRecord;
 import com.ael.algoryqrservice.model.dto.TableBillDtos;
@@ -40,7 +40,7 @@ public class WaiterCommissionService {
     private static final ZoneId MENU_ZONE = ZoneId.of("Europe/Istanbul");
 
     private final WaiterCommissionRecordRepository commissionRecordRepository;
-    private final MenuTaxonomyService menuTaxonomyService;
+    private final MenuCategoryService menuCategoryService;
     private final MenuProductRepository menuProductRepository;
 
     @Transactional
@@ -125,7 +125,7 @@ public class WaiterCommissionService {
             return BigDecimal.ZERO;
         }
 
-        Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
+        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(menuId);
         Map<Long, MenuProduct> productsById = loadProducts(items);
         String resolvedCurrency = currency != null && !currency.isBlank() ? currency : "TRY";
         LocalDateTime now = LocalDateTime.now();
@@ -194,22 +194,22 @@ public class WaiterCommissionService {
         return value;
     }
 
-    public boolean isCommissionEligible(MenuProduct product, Map<Long, SubCategory> subMap) {
+    public boolean isCommissionEligible(MenuProduct product, Map<Long, MenuSubCategory> subMap) {
         if (product == null || product.getSubCategoryId() == null) {
             return true;
         }
-        SubCategory sub = subMap.get(product.getSubCategoryId());
+        MenuSubCategory sub = subMap.get(product.getSubCategoryId());
         if (sub == null || sub.getSlug() == null) {
             return true;
         }
         return !COMMISSION_EXEMPT_SUB_CATEGORY_SLUG.equalsIgnoreCase(sub.getSlug());
     }
 
-    public boolean isCommissionEligible(Long subCategoryId, Map<Long, SubCategory> subMap) {
+    public boolean isCommissionEligible(Long subCategoryId, Map<Long, MenuSubCategory> subMap) {
         if (subCategoryId == null) {
             return true;
         }
-        SubCategory sub = subMap.get(subCategoryId);
+        MenuSubCategory sub = subMap.get(subCategoryId);
         if (sub == null || sub.getSlug() == null) {
             return true;
         }

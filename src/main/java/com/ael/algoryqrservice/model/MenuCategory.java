@@ -2,27 +2,36 @@ package com.ael.algoryqrservice.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-@Table(name = "tbl_main_category")
-@Data
-@EqualsAndHashCode(callSuper = false)
+@Table(name = "tbl_menu_category")
+@Getter
+@Setter
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class MainCategory extends QrBaseModel {
+public class MenuCategory extends QrBaseModel {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 64)
+    @Column(name = "menu_id", nullable = false)
+    private Long menuId;
+
+    @Column(nullable = false, length = 64)
     private String slug;
 
     @Column(nullable = false)

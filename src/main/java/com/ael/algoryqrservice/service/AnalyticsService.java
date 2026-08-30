@@ -11,8 +11,8 @@ import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductVisit;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuVisit;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
@@ -29,8 +29,8 @@ import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
-import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +55,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -79,7 +80,7 @@ public class AnalyticsService {
     private final MenuAnalyticsEventRepository eventRepository;
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
-    private final SubCategoryRepository subCategoryRepository;
+    private final MenuSubCategoryRepository menuSubCategoryRepository;
     private final MenuFeedbackService menuFeedbackService;
     private final MenuOrderRepository menuOrderRepository;
     private final MenuWaiterRepository menuWaiterRepository;
@@ -236,9 +237,12 @@ public class AnalyticsService {
         List<MenuProduct> catalog = menuProductRepository
                 .findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(menuIds);
         Map<Long, String> productNames = labeledProductNames(scope, catalog);
-        Map<Long, String> categoryNames = subCategoryRepository
-                .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
-                .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
+        Map<Long, String> categoryNames = menuSubCategoryRepository
+                .findByIdInAndDeletedFalse(
+                        catalog.stream().map(MenuProduct::getSubCategoryId).filter(Objects::nonNull).distinct().toList()
+                )
+                .stream()
+                .collect(Collectors.toMap(MenuSubCategory::getId, MenuSubCategory::getName, (a, b) -> a));
 
         List<AnalyticsDtos.TopProduct> topProducts = eventRepository.topProductsByMenuIds(menuIds, fromDt, toDt).stream()
                 .limit(TOP_LIMIT)
@@ -348,9 +352,12 @@ public class AnalyticsService {
         Map<Long, MenuProduct> productsById = catalogProducts.stream()
                 .collect(Collectors.toMap(MenuProduct::getProductId, p -> p, (a, b) -> a));
         Map<Long, String> labeledNames = labeledProductNames(scope, catalogProducts);
-        Map<Long, String> categoryNames = subCategoryRepository
-                .findByDeletedFalseOrderBySortOrderAscIdAsc().stream()
-                .collect(Collectors.toMap(SubCategory::getId, SubCategory::getName, (a, b) -> a));
+        Map<Long, String> categoryNames = menuSubCategoryRepository
+                .findByIdInAndDeletedFalse(
+                        catalogProducts.stream().map(MenuProduct::getSubCategoryId).filter(Objects::nonNull).distinct().toList()
+                )
+                .stream()
+                .collect(Collectors.toMap(MenuSubCategory::getId, MenuSubCategory::getName, (a, b) -> a));
         List<MenuWaiter> waiters = loadWaiters(scope);
         Map<Long, MenuWaiter> waitersById = waiters.stream()
                 .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
@@ -1071,7 +1078,7 @@ public class AnalyticsService {
             if (item.categoryId() == null) {
                 throw new BadRequestException("CATEGORY_VIEW icin categoryId zorunludur");
             }
-            subCategoryRepository.findByIdAndDeletedFalse(item.categoryId())
+            menuSubCategoryRepository.findByIdAndDeletedFalse(item.categoryId())
                     .orElseThrow(() -> new BadRequestException("Kategori bulunamadi"));
         }
         if (item.type() == MenuAnalyticsEventType.PRODUCT_VIEW) {

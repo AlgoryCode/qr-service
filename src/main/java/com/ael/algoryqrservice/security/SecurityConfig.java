@@ -66,7 +66,6 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/menu/public/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/campaign/claim").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/menu/taxonomy", "/menu/taxonomy/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/tags").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/allergens").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/chef-avatars").permitAll()

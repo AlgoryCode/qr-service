@@ -1,12 +1,13 @@
 package com.ael.algoryqrservice.service.menuindex;
 
 import com.ael.algoryqrservice.messaging.dto.MenuProductDocumentMessage;
-import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.MenuAllergen;
+import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuTag;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.ael.algoryqrservice.service.MenuCategoryService;
 import com.ael.algoryqrservice.service.MenuTaxonomyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,56 +18,57 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-/**
- * Builds the denormalized product snapshot that travels to the vector indexer.
- * Taxonomy is resolved once per batch so bulk reindex does not re-query per product.
- */
 @Component
 @RequiredArgsConstructor
 public class MenuProductDocumentFactory {
 
+    private final MenuCategoryService menuCategoryService;
     private final MenuTaxonomyService menuTaxonomyService;
 
     public record TaxonomySnapshot(
-            Map<Long, SubCategory> subCategories,
-            Map<Long, MainCategory> mainCategories,
+            Map<Long, MenuSubCategory> subCategories,
+            Map<Long, MenuCategory> mainCategories,
             Map<Long, MenuTag> tags,
             Map<Long, MenuAllergen> allergens
     ) {
     }
 
     @Transactional(readOnly = true)
-    public TaxonomySnapshot loadTaxonomy() {
+    public TaxonomySnapshot loadTaxonomy(Long menuId) {
         return new TaxonomySnapshot(
-                menuTaxonomyService.loadSubCategoryMap(),
-                menuTaxonomyService.loadMainCategoryMap(),
+                menuCategoryService.loadSubCategoryMap(menuId),
+                menuCategoryService.loadCategoryMap(menuId),
                 menuTaxonomyService.loadTagMap(),
                 menuTaxonomyService.loadAllergenMap()
         );
     }
 
     public MenuProductDocumentMessage create(MenuProduct product) {
-        return create(product, loadTaxonomy());
+        return create(product, loadTaxonomy(product.getMenuId()));
     }
 
     public List<MenuProductDocumentMessage> createAll(Collection<MenuProduct> products) {
         if (products == null || products.isEmpty()) {
             return List.of();
         }
-        TaxonomySnapshot snapshot = loadTaxonomy();
+        Map<Long, TaxonomySnapshot> byMenu = new HashMap<>();
         return products.stream()
-                .map(product -> create(product, snapshot))
+                .map(product -> create(
+                        product,
+                        byMenu.computeIfAbsent(product.getMenuId(), this::loadTaxonomy)
+                ))
                 .toList();
     }
 
     public MenuProductDocumentMessage create(MenuProduct product, TaxonomySnapshot snapshot) {
-        SubCategory sub = snapshot.subCategories().get(product.getSubCategoryId());
-        MainCategory main = sub == null ? null : snapshot.mainCategories().get(sub.getMainCategoryId());
+        MenuSubCategory sub = snapshot.subCategories().get(product.getSubCategoryId());
+        MenuCategory main = sub == null ? null : snapshot.mainCategories().get(sub.getMenuCategoryId());
         NutritionFacts nutrition = product.getNutrition();
 
         return new MenuProductDocumentMessage(
