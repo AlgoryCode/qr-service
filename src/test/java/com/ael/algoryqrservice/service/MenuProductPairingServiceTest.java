@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.model.MainCategory;
+import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductPairing;
-import com.ael.algoryqrservice.model.SubCategory;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.repository.MenuProductPairingRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
@@ -33,7 +33,7 @@ class MenuProductPairingServiceTest {
     @Mock
     private MenuProductRepository menuProductRepository;
     @Mock
-    private MenuTaxonomyService menuTaxonomyService;
+    private MenuCategoryService menuCategoryService;
 
     @InjectMocks
     private MenuProductPairingService menuProductPairingService;
@@ -42,10 +42,10 @@ class MenuProductPairingServiceTest {
     void replace_whenSelfProductId_thenSkipSelfAndSaveOthers() {
         when(menuProductRepository.findByProductIdInAndDeletedFalse(List.of(20L)))
                 .thenReturn(List.of(MenuProduct.builder().productId(20L).menuId(8L).build()));
-        when(menuTaxonomyService.requireMainCategory(3L))
-                .thenReturn(MainCategory.builder().id(3L).slug("atistirmaliklar").name("Atıştırmalıklar").sortOrder(1).build());
-        when(menuTaxonomyService.requireSubCategory(9L))
-                .thenReturn(SubCategory.builder().id(9L).mainCategoryId(3L).slug("soslar").name("Soslar").sortOrder(1).build());
+        when(menuCategoryService.requireCategory(8L, 3L))
+                .thenReturn(MenuCategory.builder().id(3L).slug("atistirmaliklar").name("Atıştırmalıklar").sortOrder(1).build());
+        when(menuCategoryService.requireSubCategory(8L, 9L))
+                .thenReturn(MenuSubCategory.builder().id(9L).menuCategoryId(3L).slug("soslar").name("Soslar").sortOrder(1).build());
 
         menuProductPairingService.replace(10L, 8L, MenuDtos.MenuProductPairingsRequest.builder()
                 .productIds(List.of(10L, 20L))
@@ -84,7 +84,11 @@ class MenuProductPairingServiceTest {
                         MenuProductPairing.builder().productId(1L).targetSubCategoryId(9L).sortOrder(1).build()
                 ));
 
-        menuProductPairingService.copyPairings(Map.of(1L, 101L, 2L, 102L));
+        menuProductPairingService.copyPairings(
+                Map.of(1L, 101L, 2L, 102L),
+                Map.of(),
+                Map.of(9L, 90L)
+        );
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<MenuProductPairing>> captor = ArgumentCaptor.forClass(List.class);
@@ -93,6 +97,6 @@ class MenuProductPairingServiceTest {
         assertThat(copies).hasSize(2);
         assertThat(copies.get(0).getProductId()).isEqualTo(101L);
         assertThat(copies.get(0).getTargetProductId()).isEqualTo(102L);
-        assertThat(copies.get(1).getTargetSubCategoryId()).isEqualTo(9L);
+        assertThat(copies.get(1).getTargetSubCategoryId()).isEqualTo(90L);
     }
 }

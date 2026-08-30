@@ -2,14 +2,12 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.ChefAvatarService;
 import com.ael.algoryqrservice.service.MenuFeedbackService;
 import com.ael.algoryqrservice.service.MenuReservationService;
 import com.ael.algoryqrservice.service.MenuService;
-import com.ael.algoryqrservice.service.MenuTaxonomyService;
 import com.ael.algoryqrservice.service.MenuProductRatingService;
 import com.ael.algoryqrservice.service.MenuRatingService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,7 +27,6 @@ import java.util.List;
 public class MenuController {
 
     private final MenuService menuService;
-    private final MenuTaxonomyService menuTaxonomyService;
     private final MenuProductRatingService menuProductRatingService;
     private final MenuRatingService menuRatingService;
     private final MenuFeedbackService menuFeedbackService;
@@ -322,11 +319,5 @@ public class MenuController {
     public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
         menuService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{menuId}/categories")
-    public ResponseEntity<List<TaxonomyDtos.MainCategoryResponse>> listCategories(@PathVariable Long menuId) {
-        menuService.getMenuProfile(menuId);
-        return ResponseEntity.ok(menuTaxonomyService.listTaxonomy());
     }
 }

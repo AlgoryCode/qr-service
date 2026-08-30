@@ -2,8 +2,8 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuWaiter;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.WaiterCommissionRecord;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionRecordType;
@@ -34,7 +34,7 @@ class WaiterCommissionServiceTest {
     @Mock
     private WaiterCommissionRecordRepository commissionRecordRepository;
     @Mock
-    private MenuTaxonomyService menuTaxonomyService;
+    private MenuCategoryService menuCategoryService;
     @Mock
     private MenuProductRepository menuProductRepository;
 
@@ -114,14 +114,14 @@ class WaiterCommissionServiceTest {
                 .commissionValue(new BigDecimal("5.00"))
                 .build();
 
-        SubCategory drinks = SubCategory.builder().id(2L).slug("soguk_icecekler").name("Soğuk").build();
+        MenuSubCategory drinks = MenuSubCategory.builder().id(2L).slug("soguk_icecekler").name("Soğuk").build();
         MenuProduct product = MenuProduct.builder()
                 .productId(100L)
                 .subCategoryId(2L)
                 .name("Kola")
                 .build();
 
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(2L, drinks));
+        when(menuCategoryService.loadSubCategoryMap(1L)).thenReturn(Map.of(2L, drinks));
         when(menuProductRepository.findByProductIdAndDeletedFalse(100L)).thenReturn(Optional.of(product));
         when(commissionRecordRepository.save(any(WaiterCommissionRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -153,14 +153,14 @@ class WaiterCommissionServiceTest {
                 .commissionValue(new BigDecimal("5.00"))
                 .build();
 
-        SubCategory water = SubCategory.builder().id(82L).slug("su").name("Su").build();
+        MenuSubCategory water = MenuSubCategory.builder().id(82L).slug("su").name("Su").build();
         MenuProduct product = MenuProduct.builder()
                 .productId(200L)
                 .subCategoryId(82L)
                 .name("Su")
                 .build();
 
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(82L, water));
+        when(menuCategoryService.loadSubCategoryMap(1L)).thenReturn(Map.of(82L, water));
         when(menuProductRepository.findByProductIdAndDeletedFalse(200L)).thenReturn(Optional.of(product));
 
         BigDecimal amount = waiterCommissionService.recordFixedItemAddCommission(

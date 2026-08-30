@@ -1,12 +1,13 @@
 package com.ael.algoryqrservice.service.menuindex;
 
 import com.ael.algoryqrservice.messaging.dto.MenuProductDocumentMessage;
-import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.MenuAllergen;
+import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuTag;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
+import com.ael.algoryqrservice.service.MenuCategoryService;
 import com.ael.algoryqrservice.service.MenuTaxonomyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.when;
 class MenuProductDocumentFactoryTest {
 
     @Mock
+    private MenuCategoryService menuCategoryService;
+    @Mock
     private MenuTaxonomyService menuTaxonomyService;
 
     @InjectMocks
@@ -38,13 +41,13 @@ class MenuProductDocumentFactoryTest {
 
     @BeforeEach
     void stubTaxonomy() {
-        SubCategory sub = new SubCategory();
+        MenuSubCategory sub = new MenuSubCategory();
         sub.setId(20L);
-        sub.setMainCategoryId(10L);
+        sub.setMenuCategoryId(10L);
         sub.setSlug("corbalar");
         sub.setName("Çorbalar");
 
-        MainCategory main = new MainCategory();
+        MenuCategory main = new MenuCategory();
         main.setId(10L);
         main.setSlug("baslangiclar");
         main.setName("Başlangıçlar");
@@ -59,8 +62,8 @@ class MenuProductDocumentFactoryTest {
         allergen.setSlug("gluten");
         allergen.setName("Gluten");
 
-        when(menuTaxonomyService.loadSubCategoryMap()).thenReturn(Map.of(20L, sub));
-        when(menuTaxonomyService.loadMainCategoryMap()).thenReturn(Map.of(10L, main));
+        when(menuCategoryService.loadSubCategoryMap(5L)).thenReturn(Map.of(20L, sub));
+        when(menuCategoryService.loadCategoryMap(5L)).thenReturn(Map.of(10L, main));
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of(30L, tag));
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of(40L, allergen));
     }
@@ -99,7 +102,7 @@ class MenuProductDocumentFactoryTest {
     void createAll_whenBatchGiven_thenLoadTaxonomyOnlyOnce() {
         factory.createAll(List.of(product(), product(), product()));
 
-        verify(menuTaxonomyService, times(1)).loadSubCategoryMap();
+        verify(menuCategoryService, times(1)).loadSubCategoryMap(5L);
         verify(menuTaxonomyService, times(1)).loadTagMap();
     }
 

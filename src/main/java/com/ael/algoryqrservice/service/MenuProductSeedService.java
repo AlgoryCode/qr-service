@@ -5,14 +5,14 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuTag;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.MenuProductSeedDtos;
 import com.ael.algoryqrservice.repository.MenuAllergenRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuTagRepository;
-import com.ael.algoryqrservice.repository.SubCategoryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +38,7 @@ public class MenuProductSeedService {
 
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
-    private final SubCategoryRepository subCategoryRepository;
+    private final MenuSubCategoryRepository menuSubCategoryRepository;
     private final MenuTagRepository menuTagRepository;
     private final MenuAllergenRepository menuAllergenRepository;
     private final NutritionFactsService nutritionFactsService;
@@ -88,7 +88,8 @@ public class MenuProductSeedService {
             if (menuProductRepository.existsByMenuIdAndNameIgnoreCaseAndDeletedFalse(menuId, seed.getName().trim())) {
                 continue;
             }
-            SubCategory sub = subCategoryRepository.findBySlugAndDeletedFalse(seed.getSubCategorySlug().trim().toLowerCase())
+            MenuSubCategory sub = menuSubCategoryRepository
+                    .findByMenuIdAndSlugAndDeletedFalse(menuId, seed.getSubCategorySlug().trim().toLowerCase())
                     .orElseThrow(() -> new BadRequestException(
                             "Alt kategori slug bulunamadı: " + seed.getSubCategorySlug()));
             Set<Long> tagIds = resolveTagIds(seed.getTagSlugs());

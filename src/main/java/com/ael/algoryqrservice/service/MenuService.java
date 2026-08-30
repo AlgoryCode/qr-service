@@ -6,14 +6,13 @@ import com.ael.algoryqrservice.catalog.CatalogThemes;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
-import com.ael.algoryqrservice.model.DescriptorCategory;
-import com.ael.algoryqrservice.model.MainCategory;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAllergen;
+import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.Qr;
-import com.ael.algoryqrservice.model.SubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
@@ -62,6 +61,7 @@ public class MenuService {
     private final MenuRepository menuRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuTaxonomyService menuTaxonomyService;
+    private final MenuCategoryService menuCategoryService;
     private final MenuPublicAccessService menuPublicAccessService;
     private final NutritionFactsService nutritionFactsService;
     private final ServesPeopleSupport servesPeopleSupport;
@@ -141,8 +141,21 @@ public class MenuService {
         }
         entitlementService.assertMenuProductCreationAllowed(userId, sourceProducts.size());
 
+        MenuCategoryService.TaxonomyCloneResult taxonomyClone = menuCategoryService.cloneTaxonomyToMenu(
+                sourceMenuId,
+                targetMenu.getMenuId()
+        );
+        Map<Long, Long> sourceSubToTargetSub = taxonomyClone.subCategoryIds();
+
         Map<Long, Long> sourceToTarget = new HashMap<>();
         for (MenuProduct source : sourceProducts) {
+            Long targetSubId = sourceSubToTargetSub.get(source.getSubCategoryId());
+            if (targetSubId == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Kaynak ürün kategorisi hedef menüye kopyalanamadı: " + source.getName()
+                );
+            }
             Set<Long> tagIds = source.getTagIds() == null ? new HashSet<>() : new HashSet<>(source.getTagIds());
             Set<Long> allergenIds = source.getAllergenIds() == null ? new HashSet<>() : new HashSet<>(source.getAllergenIds());
             MenuProduct copy = MenuProduct.builder()
@@ -151,8 +164,7 @@ public class MenuService {
                     .description(source.getDescription())
                     .price(source.getPrice())
                     .currency(source.getCurrency())
-                    .subCategoryId(source.getSubCategoryId())
-                    .descriptorCategoryId(source.getDescriptorCategoryId())
+                    .subCategoryId(targetSubId)
                     .tagIds(tagIds)
                     .allergenIds(allergenIds)
                     .chefRecommended(source.isChefRecommended())
@@ -168,7 +180,11 @@ public class MenuService {
             MenuProduct saved = menuProductRepository.save(copy);
             sourceToTarget.put(source.getProductId(), saved.getProductId());
         }
-        menuProductPairingService.copyPairings(sourceToTarget);
+        menuProductPairingService.copyPairings(
+                sourceToTarget,
+                taxonomyClone.categoryIds(),
+                sourceSubToTargetSub
+        );
         usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
     }
 
@@ -201,7 +217,7 @@ public class MenuService {
             if (subCategoryId == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subCategoryId zorunludur");
             }
-            menuTaxonomyService.requireSubCategory(subCategoryId);
+            menuCategoryService.requireSubCategory(menu.getMenuId(), subCategoryId);
             Set<Long> tagIds = parseTagIds(map.get("tagIds"));
             Set<Long> allergenIds = parseTagIds(map.get("allergenIds"));
             Boolean chefFlag = map.get("chefRecommended") == null
@@ -504,13 +520,12 @@ public class MenuService {
                 .filter(product -> product.getMenuId().equals(menuId) && product.isAvailable())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
         int safeLimit = limit <= 0 ? DEFAULT_RECOMMENDATION_LIMIT : Math.min(limit, MAX_RECOMMENDATION_LIMIT);
-        Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
-        Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
+        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(menuId);
+        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(menuId);
         Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
         Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
-        Map<Long, DescriptorCategory> descriptorMap = menuTaxonomyService.loadDescriptorCategoryMap();
-        SubCategory targetSub = subMap.get(target.getSubCategoryId());
-        Long targetMainId = targetSub == null ? null : targetSub.getMainCategoryId();
+        MenuSubCategory targetSub = subMap.get(target.getSubCategoryId());
+        Long targetMainId = targetSub == null ? null : targetSub.getMenuCategoryId();
         double targetMid = servesPeopleSupport.midpoint(target.getServesPeopleMin(), target.getServesPeopleMax());
         Set<Long> targetTags = target.getTagIds() == null ? Set.of() : target.getTagIds();
         Long popularTagId = menuTaxonomyService.findTagBySlug("populer").map(MenuTag::getId).orElse(null);
@@ -534,9 +549,9 @@ public class MenuService {
                     if (candidate.getSubCategoryId().equals(target.getSubCategoryId())) {
                         score += 40;
                     }
-                    SubCategory candidateSub = subMap.get(candidate.getSubCategoryId());
+                    MenuSubCategory candidateSub = subMap.get(candidate.getSubCategoryId());
                     if (targetMainId != null && candidateSub != null
-                            && targetMainId.equals(candidateSub.getMainCategoryId())) {
+                            && targetMainId.equals(candidateSub.getMenuCategoryId())) {
                         score += 20;
                     }
                     double mid = servesPeopleSupport.midpoint(
@@ -562,7 +577,7 @@ public class MenuService {
                     return -score;
                 }).thenComparing(MenuProduct::getSortOrder).thenComparing(MenuProduct::getProductId))
                 .limit(safeLimit)
-                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, descriptorMap, pairingsByProduct))
+                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct))
                 .toList();
     }
 
@@ -572,16 +587,12 @@ public class MenuService {
         validateProductRequest(request);
         entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), 1);
         nutritionFactsService.validateForCreate(request.getNutrition());
-        SubCategory subCategory = menuTaxonomyService.requireSubCategory(request.getSubCategoryId());
+        MenuSubCategory subCategory = menuCategoryService.requireSubCategory(menuId, request.getSubCategoryId());
         Set<Long> tagIds = normalizeTagIds(request.getTagIds());
         tagIds = applyChefRecommended(tagIds, request.getChefRecommended());
         menuTaxonomyService.requireTags(tagIds);
         Set<Long> allergenIds = normalizeTagIds(request.getAllergenIds());
         menuTaxonomyService.requireAllergens(allergenIds);
-        Long descriptorCategoryId = resolveDescriptorCategoryId(
-                subCategory.getId(),
-                request.getDescriptorCategoryId()
-        );
         ServesPeopleSupport.Range serves = servesPeopleSupport.normalize(
                 request.getServesPeopleMin(),
                 request.getServesPeopleMax()
@@ -595,7 +606,6 @@ public class MenuService {
                 .price(request.getPrice())
                 .currency(request.getCurrency() != null && !request.getCurrency().isBlank() ? request.getCurrency().trim() : "TRY")
                 .subCategoryId(subCategory.getId())
-                .descriptorCategoryId(descriptorCategoryId)
                 .tagIds(tagIds)
                 .allergenIds(allergenIds)
                 .chefRecommended(resolveChefRecommended(tagIds, request.getChefRecommended()))
@@ -622,17 +632,15 @@ public class MenuService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
         ensureOwnedMenu(product.getMenuId());
         validateProductRequest(request);
-        SubCategory subCategory = menuTaxonomyService.requireSubCategory(request.getSubCategoryId());
+        MenuSubCategory subCategory = menuCategoryService.requireSubCategory(
+                product.getMenuId(),
+                request.getSubCategoryId()
+        );
         Set<Long> tagIds = normalizeTagIds(request.getTagIds());
         tagIds = applyChefRecommended(tagIds, request.getChefRecommended());
         menuTaxonomyService.requireTags(tagIds);
         Set<Long> allergenIds = normalizeTagIds(request.getAllergenIds());
         menuTaxonomyService.requireAllergens(allergenIds);
-        Long descriptorCategoryId = resolveDescriptorCategoryIdForUpdate(
-                product,
-                subCategory.getId(),
-                request
-        );
         ServesPeopleSupport.Range serves = servesPeopleSupport.normalize(
                 request.getServesPeopleMin(),
                 request.getServesPeopleMax()
@@ -645,7 +653,6 @@ public class MenuService {
             product.setCurrency(request.getCurrency().trim());
         }
         product.setSubCategoryId(subCategory.getId());
-        product.setDescriptorCategoryId(descriptorCategoryId);
         product.setTagIds(tagIds);
         product.setAllergenIds(allergenIds);
         product.setChefRecommended(resolveChefRecommended(tagIds, request.getChefRecommended()));
@@ -878,7 +885,7 @@ public class MenuService {
                 .menuId(menu.getMenuId())
                 .qrId(menu.getQrId())
                 .businessName(menu.getBusinessName())
-                .categories(menuTaxonomyService.listTaxonomy())
+                .categories(menuCategoryService.listTaxonomy(menu.getMenuId()))
                 .build();
     }
 
@@ -1035,7 +1042,8 @@ public class MenuService {
                 0,
                 DEFAULT_PRODUCT_PAGE_SIZE
         );
-        TaxonomyDtos.TaxonomyPageResponse categoryPage = menuTaxonomyService.listTaxonomyPage(
+        TaxonomyDtos.TaxonomyPageResponse categoryPage = menuCategoryService.listTaxonomyPage(
+                menu.getMenuId(),
                 0,
                 DEFAULT_CATEGORY_PAGE_SIZE,
                 null
@@ -1064,17 +1072,16 @@ public class MenuService {
     }
 
     private MenuDtos.MenuProductPageResponse toProductPageResponse(Page<MenuProduct> productPage, Long menuId) {
-        Map<Long, SubCategory> subMap = menuTaxonomyService.loadSubCategoryMap();
-        Map<Long, MainCategory> mainMap = menuTaxonomyService.loadMainCategoryMap();
+        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(menuId);
+        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(menuId);
         Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
         Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
-        Map<Long, DescriptorCategory> descriptorMap = menuTaxonomyService.loadDescriptorCategoryMap();
         Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
                 menuProductPairingService.loadByProductIds(
                         productPage.getContent().stream().map(MenuProduct::getProductId).toList()
                 );
         List<MenuDtos.MenuProductResponse> content = productPage.getContent().stream()
-                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, descriptorMap, pairingsByProduct))
+                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct))
                 .toList();
         return MenuDtos.MenuProductPageResponse.builder()
                 .content(content)
@@ -1093,29 +1100,24 @@ public class MenuService {
         }
         return toProductResponse(
                 product,
-                menuTaxonomyService.loadSubCategoryMap(),
-                menuTaxonomyService.loadMainCategoryMap(),
+                menuCategoryService.loadSubCategoryMap(product.getMenuId()),
+                menuCategoryService.loadCategoryMap(product.getMenuId()),
                 menuTaxonomyService.loadTagMap(),
                 menuTaxonomyService.loadAllergenMap(),
-                menuTaxonomyService.loadDescriptorCategoryMap(),
                 pairingsByProduct
         );
     }
 
     private MenuDtos.MenuProductResponse toProductResponse(
             MenuProduct product,
-            Map<Long, SubCategory> subMap,
-            Map<Long, MainCategory> mainMap,
+            Map<Long, MenuSubCategory> subMap,
+            Map<Long, MenuCategory> mainMap,
             Map<Long, MenuTag> tagMap,
             Map<Long, MenuAllergen> allergenMap,
-            Map<Long, DescriptorCategory> descriptorMap,
             Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct
     ) {
-        SubCategory sub = subMap.get(product.getSubCategoryId());
-        MainCategory main = sub == null ? null : mainMap.get(sub.getMainCategoryId());
-        DescriptorCategory descriptor = product.getDescriptorCategoryId() == null
-                ? null
-                : descriptorMap.get(product.getDescriptorCategoryId());
+        MenuSubCategory sub = subMap.get(product.getSubCategoryId());
+        MenuCategory main = sub == null ? null : mainMap.get(sub.getMenuCategoryId());
         List<TaxonomyDtos.TagResponse> tags = (product.getTagIds() == null ? Set.<Long>of() : product.getTagIds())
                 .stream()
                 .map(tagMap::get)
@@ -1150,9 +1152,6 @@ public class MenuService {
                 .subCategoryId(product.getSubCategoryId())
                 .subCategorySlug(sub == null ? null : sub.getSlug())
                 .subCategoryName(sub == null ? null : sub.getName())
-                .descriptorCategoryId(descriptor == null ? null : descriptor.getId())
-                .descriptorCategorySlug(descriptor == null ? null : descriptor.getSlug())
-                .descriptorCategoryName(descriptor == null ? null : descriptor.getName())
                 .mainCategoryId(main == null ? null : main.getId())
                 .mainCategorySlug(main == null ? null : main.getSlug())
                 .mainCategoryName(main == null ? null : main.getName())
@@ -1318,36 +1317,6 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subCategoryId zorunludur");
         }
         servesPeopleSupport.normalize(request.getServesPeopleMin(), request.getServesPeopleMax());
-    }
-
-    private Long resolveDescriptorCategoryId(Long subCategoryId, Long descriptorCategoryId) {
-        if (descriptorCategoryId == null) {
-            return null;
-        }
-        DescriptorCategory descriptor = menuTaxonomyService.requireDescriptorCategory(descriptorCategoryId);
-        if (!descriptor.getSubCategoryId().equals(subCategoryId)) {
-            throw new BadRequestException("Tanimlayici kategori alt kategori ile uyusmuyor");
-        }
-        return descriptor.getId();
-    }
-
-    private Long resolveDescriptorCategoryIdForUpdate(
-            MenuProduct product,
-            Long subCategoryId,
-            MenuDtos.MenuProductRequest request
-    ) {
-        if (request.isDescriptorCategoryIdSpecified()) {
-            return resolveDescriptorCategoryId(subCategoryId, request.getDescriptorCategoryId());
-        }
-        Long existingId = product.getDescriptorCategoryId();
-        if (existingId == null) {
-            return null;
-        }
-        DescriptorCategory existing = menuTaxonomyService.requireDescriptorCategory(existingId);
-        if (!existing.getSubCategoryId().equals(subCategoryId)) {
-            return null;
-        }
-        return existingId;
     }
 
     private String resolveProductImageUrl(String imageUrl) {

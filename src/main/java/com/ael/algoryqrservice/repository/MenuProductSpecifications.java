@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.MenuProduct;
-import com.ael.algoryqrservice.model.SubCategory;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -72,10 +72,10 @@ public final class MenuProductSpecifications {
             }
             if (mainCategoryId != null) {
                 Subquery<Long> subQuery = query.subquery(Long.class);
-                Root<SubCategory> subRoot = subQuery.from(SubCategory.class);
+                Root<MenuSubCategory> subRoot = subQuery.from(MenuSubCategory.class);
                 subQuery.select(subRoot.get("id"))
                         .where(
-                                cb.equal(subRoot.get("mainCategoryId"), mainCategoryId),
+                                cb.equal(subRoot.get("menuCategoryId"), mainCategoryId),
                                 cb.isFalse(subRoot.get("deleted"))
                         );
                 predicates.add(root.get("subCategoryId").in(subQuery));
