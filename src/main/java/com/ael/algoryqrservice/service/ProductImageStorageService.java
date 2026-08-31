@@ -110,13 +110,14 @@ public class ProductImageStorageService {
             throw new BadRequestException("Görsel boyutu en fazla 5 MB olabilir");
         }
 
-        String contentType = resolveContentType(file);
+        byte[] bytes = readBytes(file);
+        String contentType = detectContentTypeFromBytes(bytes);
+        if (contentType == null) {
+            throw new BadRequestException("Görsel dosyası geçerli bir resim değil");
+        }
         if (!storageProperties.getAllowedContentTypes().contains(contentType)) {
             throw new BadRequestException("Desteklenmeyen görsel formatı");
         }
-
-        byte[] bytes = readBytes(file);
-        validateMagicBytes(bytes, contentType);
 
         String extension = extensionForContentType(contentType);
         String objectKey = keyPrefix + UUID.randomUUID() + "." + extension;
@@ -449,12 +450,21 @@ public class ProductImageStorageService {
         return extractObjectKey(imageUrl);
     }
 
-    private String resolveContentType(MultipartFile file) {
-        String contentType = file.getContentType();
-        if (contentType == null || contentType.isBlank()) {
-            throw new BadRequestException("Görsel içerik tipi belirlenemedi");
+    private String detectContentTypeFromBytes(byte[] bytes) {
+        if (bytes.length < 12) {
+            return null;
         }
-        return contentType.toLowerCase(Locale.ROOT);
+        if (bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8) {
+            return "image/jpeg";
+        }
+        if (bytes[0] == (byte) 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+            return "image/png";
+        }
+        if (bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46
+                && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
+            return "image/webp";
+        }
+        return null;
     }
 
     private byte[] readBytes(MultipartFile file) {
@@ -466,17 +476,8 @@ public class ProductImageStorageService {
     }
 
     private void validateMagicBytes(byte[] bytes, String contentType) {
-        if (bytes.length < 12) {
-            throw new BadRequestException("Geçersiz görsel dosyası");
-        }
-        boolean valid = switch (contentType) {
-            case "image/jpeg" -> bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8;
-            case "image/png" -> bytes[0] == (byte) 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47;
-            case "image/webp" -> bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46
-                    && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
-            default -> false;
-        };
-        if (!valid) {
+        String detected = detectContentTypeFromBytes(bytes);
+        if (detected == null || !detected.equals(contentType)) {
             throw new BadRequestException("Görsel dosyası geçerli bir resim değil");
         }
     }
