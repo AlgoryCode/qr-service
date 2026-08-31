@@ -54,7 +54,7 @@ public class MenuService {
 
     public static final int DEFAULT_PRODUCT_PAGE_SIZE = 20;
     public static final int MAX_PRODUCT_PAGE_SIZE = 50;
-    public static final int DEFAULT_CATEGORY_PAGE_SIZE = 6;
+    public static final int DEFAULT_CATEGORY_PAGE_SIZE = 50;
     public static final int DEFAULT_RECOMMENDATION_LIMIT = 6;
     public static final int MAX_RECOMMENDATION_LIMIT = 20;
 

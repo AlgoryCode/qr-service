@@ -494,7 +494,7 @@ class MenuServiceTest {
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(6), any())).thenReturn(
+        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
                         .content(List.of())
                         .page(0)
@@ -530,7 +530,7 @@ class MenuServiceTest {
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(6), any())).thenReturn(
+        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
                         .content(List.of())
                         .page(0)
@@ -643,7 +643,7 @@ class MenuServiceTest {
                 .build();
         when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(6), any())).thenReturn(
+        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
                         .content(List.of())
                         .page(0)
