@@ -56,6 +56,10 @@ public class ProductImageStorageService {
         return uploadWithPrefix(menuId, file, "menus/" + menuId + "/logo/");
     }
 
+    public ProductImageDtos.UploadResponse uploadCategoryCover(Long menuId, Long categoryId, MultipartFile file) {
+        return uploadWithPrefix(menuId, file, "menus/" + menuId + "/categories/" + categoryId + "/");
+    }
+
     public ProductImageDtos.UploadResponse uploadBranchPhoto(Long branchId, MultipartFile file) {
         return uploadWithPrefix(branchId, file, "branches/" + branchId + "/photo/");
     }
@@ -82,6 +86,18 @@ public class ProductImageStorageService {
         }
         if (!resolvedKey.startsWith("menus/" + menuId + "/logo/")) {
             throw new BadRequestException("Bu logo bu menüye ait değil");
+        }
+        delete(resolvedKey);
+    }
+
+    public void deleteCategoryCoverForMenu(Long menuId, Long categoryId, String objectKey, String imageUrl) {
+        String resolvedKey = resolveObjectKey(objectKey, imageUrl);
+        if (resolvedKey == null || resolvedKey.isBlank()) {
+            throw new BadRequestException("objectKey veya imageUrl zorunludur");
+        }
+        String expectedPrefix = "menus/" + menuId + "/categories/" + categoryId + "/";
+        if (!resolvedKey.startsWith(expectedPrefix)) {
+            throw new BadRequestException("Bu kapak görseli bu kategoriye ait değil");
         }
         delete(resolvedKey);
     }

@@ -42,4 +42,10 @@ public class MenuCategory extends QrBaseModel {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
+    @Column(name = "image_key", length = 512)
+    private String imageKey;
 }
