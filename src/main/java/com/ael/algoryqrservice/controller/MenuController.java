@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.ChefAvatarService;
@@ -73,6 +74,16 @@ public class MenuController {
                 servesPeopleMax,
                 q
         ));
+    }
+
+    @GetMapping("/public/{menuId}/categories")
+    public ResponseEntity<TaxonomyDtos.TaxonomyPageResponse> listPublicCategories(
+            @PathVariable Long menuId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String q
+    ) {
+        return ResponseEntity.ok(menuService.listPublicCategories(menuId, page, size, q));
     }
 
     @GetMapping("/public/{menuId}/product-facets")
