@@ -399,6 +399,18 @@ public class MenuService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public TaxonomyDtos.TaxonomyPageResponse listPublicCategories(
+            Long menuId,
+            int page,
+            int size,
+            String q
+    ) {
+        Menu menu = ensureMenuExists(menuId);
+        ensurePublicAccess(menu);
+        return menuCategoryService.listTaxonomyPage(menu.getMenuId(), page, size, q);
+    }
+
     @Transactional
     public MenuDtos.ProductFacetsResponse listPublicProductFacets(
             Long menuId,
