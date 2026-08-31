@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuSubCategory;
+import com.ael.algoryqrservice.model.dto.ProductImageDtos;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.repository.MenuCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -32,6 +34,7 @@ public class MenuCategoryService {
     private final MenuSubCategoryRepository menuSubCategoryRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuRepository menuRepository;
+    private final ProductImageStorageService productImageStorageService;
 
     @Transactional(readOnly = true)
     public List<TaxonomyDtos.MainCategoryResponse> listTaxonomy(Long menuId) {
@@ -77,6 +80,7 @@ public class MenuCategoryService {
                     .slug(main.getSlug())
                     .name(main.getName())
                     .sortOrder(main.getSortOrder())
+                    .imageUrl(main.getImageUrl())
                     .subs(visibleSubs)
                     .build());
         }
@@ -183,9 +187,38 @@ public class MenuCategoryService {
         if (menuSubCategoryRepository.countByMenuCategoryIdAndDeletedFalse(categoryId) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Alt kategorisi olan kategori silinemez");
         }
+        String previousKey = category.getImageKey();
         category.setDeleted(true);
         category.setUpdatedAt(LocalDateTime.now());
         menuCategoryRepository.save(category);
+        productImageStorageService.deleteQuietly(previousKey);
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse uploadCover(Long menuId, Long categoryId, MultipartFile file) {
+        MenuCategory category = requireCategory(menuId, categoryId);
+        ProductImageDtos.UploadResponse uploaded = productImageStorageService.uploadCategoryCover(menuId, categoryId, file);
+        String previousKey = category.getImageKey();
+        category.setImageUrl(uploaded.imageUrl());
+        category.setImageKey(uploaded.objectKey());
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(uploaded.objectKey())) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+        return toMainResponse(category, List.of());
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse clearCover(Long menuId, Long categoryId) {
+        MenuCategory category = requireCategory(menuId, categoryId);
+        String previousKey = category.getImageKey();
+        category.setImageUrl(null);
+        category.setImageKey(null);
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        productImageStorageService.deleteQuietly(previousKey);
+        return toMainResponse(category, List.of());
     }
 
     @Transactional
@@ -305,6 +338,7 @@ public class MenuCategoryService {
                 .slug(category.getSlug())
                 .name(category.getName())
                 .sortOrder(category.getSortOrder())
+                .imageUrl(category.getImageUrl())
                 .subs(subs.stream().map(this::toSubResponse).toList())
                 .build();
     }

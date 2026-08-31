@@ -94,6 +94,7 @@ public final class TaxonomyDtos {
         private String slug;
         private String name;
         private int sortOrder;
+        private String imageUrl;
         @Builder.Default
         private List<SubCategoryResponse> subs = new ArrayList<>();
     }

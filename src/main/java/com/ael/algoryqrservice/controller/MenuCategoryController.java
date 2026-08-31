@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -53,6 +55,25 @@ public class MenuCategoryController {
     ) {
         requireOwnedMenu(menuId);
         return menuCategoryService.updateCategory(menuId, categoryId, request);
+    }
+
+    @PostMapping("/categories/{categoryId}/cover")
+    public TaxonomyDtos.MainCategoryResponse uploadCover(
+            @PathVariable Long menuId,
+            @PathVariable Long categoryId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        requireOwnedMenu(menuId);
+        return menuCategoryService.uploadCover(menuId, categoryId, file);
+    }
+
+    @DeleteMapping("/categories/{categoryId}/cover")
+    public TaxonomyDtos.MainCategoryResponse deleteCover(
+            @PathVariable Long menuId,
+            @PathVariable Long categoryId
+    ) {
+        requireOwnedMenu(menuId);
+        return menuCategoryService.clearCover(menuId, categoryId);
     }
 
     @DeleteMapping("/categories/{categoryId}")
