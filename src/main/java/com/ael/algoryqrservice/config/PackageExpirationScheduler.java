@@ -3,6 +3,8 @@ package com.ael.algoryqrservice.config;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.service.MenuPublicAccessService;
@@ -41,10 +43,29 @@ public class PackageExpirationScheduler {
         cascadeExpireFulfillments(duePurchases);
         purchaseExpiryService.expireAllDue();
 
+        suspendExpiredGracePeriods();
+
         List<Long> affectedUserIds = duePurchases.stream().map(Purchase::getUserId).distinct().toList();
         packageActivationService.syncSubscriptionStateForUsers(affectedUserIds);
         packageActivationService.syncAfterPaidExpiry();
         menuPublicAccessService.syncForUsers(affectedUserIds);
+    }
+
+    private void suspendExpiredGracePeriods() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Purchase> dueGracePeriods = purchaseRepository
+                .findByPaymentStyleAndSubscriptionStatusAndSubscriptionGraceEndsAtBefore(
+                        PaymentStyle.SUBSCRIPTION, SubscriptionStatus.GRACE_PERIOD, now);
+        for (Purchase purchase : dueGracePeriods) {
+            purchase.setSubscriptionStatus(SubscriptionStatus.SUSPENDED);
+            purchase.setSubscriptionStatusReason("grace_period_expired");
+            purchase.setSubscriptionStatusChangedAt(now);
+            purchase.setSubscriptionStatusChangedBy("system_scheduler");
+            purchaseRepository.save(purchase);
+            log.warn("Subscription suspended after grace period. purchaseId={} graceEndsAt={}",
+                    purchase.getId(), purchase.getSubscriptionGraceEndsAt());
+            menuPublicAccessService.syncForUser(purchase.getUserId());
+        }
     }
 
     private void cascadeExpireFulfillments(List<Purchase> duePurchases) {

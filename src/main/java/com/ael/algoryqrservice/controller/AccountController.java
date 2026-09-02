@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.AccountDtos;
+import com.ael.algoryqrservice.model.dto.EmailVerificationDtos;
 import com.ael.algoryqrservice.service.AccountService;
+import com.ael.algoryqrservice.service.EmailVerificationService;
 import com.ael.algoryqrservice.service.EmailChangeService;
 import com.ael.algoryqrservice.service.PasswordChangeService;
 import jakarta.validation.Valid;
@@ -22,6 +24,24 @@ public class AccountController {
     private final AccountService accountService;
     private final EmailChangeService emailChangeService;
     private final PasswordChangeService passwordChangeService;
+    private final EmailVerificationService emailVerificationService;
+
+    @GetMapping("/email-verification/status")
+    public ResponseEntity<EmailVerificationDtos.Status> emailVerificationStatus() {
+        return ResponseEntity.ok(emailVerificationService.status());
+    }
+
+    @PostMapping("/email-verification/request-code")
+    public ResponseEntity<EmailVerificationDtos.Status> requestEmailVerificationCode() {
+        return ResponseEntity.ok(emailVerificationService.requestCode());
+    }
+
+    @PostMapping("/email-verification/verify")
+    public ResponseEntity<EmailVerificationDtos.Status> verifyEmail(
+            @Valid @RequestBody EmailVerificationDtos.VerifyRequest request
+    ) {
+        return ResponseEntity.ok(emailVerificationService.verify(request));
+    }
 
     @GetMapping("/myprofile")
     public ResponseEntity<AccountDtos.MyProfileResponse> getMyProfile() {

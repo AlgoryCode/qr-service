@@ -20,6 +20,7 @@ import java.util.UUID;
 public class NotificationPublisherService {
 
     private static final String MESSAGE_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
+    private static final String MESSAGE_TYPE_EMAIL_VERIFICATION = "EMAIL_VERIFICATION";
     private static final String MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER = "PRO_TRIAL_EXPIRY_REMINDER";
     private static final String MESSAGE_TYPE_SMART_REPORT_READY = "SMART_REPORT_READY";
 
@@ -51,6 +52,17 @@ public class NotificationPublisherService {
         log.info("Email change code notification queued. email={}", maskEmail(email));
     }
 
+    public void publishEmailVerificationCode(String email, String userName, String code, int validityMinutes) {
+        publishVerificationCode(
+                email,
+                userName,
+                code,
+                validityMinutes,
+                "E-posta Doğrulama Kodu",
+                MESSAGE_TYPE_EMAIL_VERIFICATION
+        );
+    }
+
     public void publishTrialExpiryReminder(
             UUID eventId,
             String email,
@@ -59,20 +71,45 @@ public class NotificationPublisherService {
             String expiresAt,
             String upgradeUrl
     ) {
-        Map<String, Object> templateData = Map.of(
-                "userName", userName,
-                "packageName", packageName,
-                "expiresAt", expiresAt,
-                "daysRemaining", 3,
-                "upgradeUrl", upgradeUrl
-        );
+        publishTrialExpiryNotification(eventId, email, userName, packageName, expiresAt, upgradeUrl, 3, false);
+    }
+
+    public void publishTrialExpired(
+            UUID eventId,
+            String email,
+            String userName,
+            String packageName,
+            String expiresAt,
+            String upgradeUrl
+    ) {
+        publishTrialExpiryNotification(eventId, email, userName, packageName, expiresAt, upgradeUrl, 0, true);
+    }
+
+    private void publishTrialExpiryNotification(
+            UUID eventId,
+            String email,
+            String userName,
+            String packageName,
+            String expiresAt,
+            String upgradeUrl,
+            int daysRemaining,
+            boolean expired
+    ) {
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("userName", userName);
+        templateData.put("packageName", packageName);
+        templateData.put("expiresAt", expiresAt);
+        templateData.put("daysRemaining", daysRemaining);
+        templateData.put("upgradeUrl", upgradeUrl);
+        templateData.put("expired", expired);
+        String subject = expired ? "Deneme süreniz sona erdi" : null;
         NotificationRequestMessage message = new NotificationRequestMessage(
                 eventId,
                 pushNotificationProperties.getChannels(),
                 serviceName,
                 MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER,
                 new NotificationRecipientsMessage(email, List.of(), List.of()),
-                null,
+                subject,
                 templateData,
                 false
         );
@@ -81,7 +118,7 @@ public class NotificationPublisherService {
                 pushNotificationProperties.getMessaging().getRoutingKey(),
                 message
         );
-        log.info("Trial expiry reminder queued. eventId={}, email={}", eventId, maskEmail(email));
+        log.info("Trial expiry notification queued. eventId={}, expired={}, email={}", eventId, expired, maskEmail(email));
     }
 
     public void publishSmartReportReady(
@@ -127,6 +164,17 @@ public class NotificationPublisherService {
             int validityMinutes,
             String subject
     ) {
+        publishVerificationCode(email, userName, code, validityMinutes, subject, MESSAGE_TYPE_PASSWORD_RESET);
+    }
+
+    private void publishVerificationCode(
+            String email,
+            String userName,
+            String code,
+            int validityMinutes,
+            String subject,
+            String messageType
+    ) {
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("userName", userName);
         templateData.put("code", code);
@@ -136,7 +184,7 @@ public class NotificationPublisherService {
                 UUID.randomUUID(),
                 pushNotificationProperties.getChannels(),
                 serviceName,
-                MESSAGE_TYPE_PASSWORD_RESET,
+                messageType,
                 new NotificationRecipientsMessage(email, List.of(), List.of()),
                 subject,
                 templateData,

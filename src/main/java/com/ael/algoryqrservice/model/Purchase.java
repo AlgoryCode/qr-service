@@ -74,6 +74,11 @@ public class Purchase {
     @Column(name = "payment_method_id")
     private Long paymentMethodId;
 
+    @Column(name = "recurring_consent", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean recurringConsent = false;
+
     @Column(name = "card_brand", length = 64)
     private String cardBrand;
 
@@ -145,6 +150,15 @@ public class Purchase {
     @Column(name = "subscription_grace_ends_at")
     private LocalDateTime subscriptionGraceEndsAt;
 
+    @Column(name = "subscription_status_reason", length = 128)
+    private String subscriptionStatusReason;
+
+    @Column(name = "subscription_status_changed_at")
+    private LocalDateTime subscriptionStatusChangedAt;
+
+    @Column(name = "subscription_status_changed_by", length = 64)
+    private String subscriptionStatusChangedBy;
+
     @Column(name = "current_period_paid_at")
     private LocalDateTime currentPeriodPaidAt;
 
@@ -169,7 +183,13 @@ public class Purchase {
     }
 
     public boolean isUsable() {
+        boolean subscriptionUsable = paymentStyle != PaymentStyle.SUBSCRIPTION
+                || subscriptionStatus == null
+                || subscriptionStatus == SubscriptionStatus.ACTIVE
+                || (subscriptionStatus == SubscriptionStatus.GRACE_PERIOD
+                && (subscriptionGraceEndsAt == null || !subscriptionGraceEndsAt.isBefore(AppTime.nowLocal())));
         return status == PurchaseStatus.ACTIVE
+                && subscriptionUsable
                 && expiresAt != null
                 && isStartedByDate()
                 && !isExpiredByDate();

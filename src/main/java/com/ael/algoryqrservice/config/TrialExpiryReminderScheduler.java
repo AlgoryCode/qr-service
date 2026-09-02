@@ -48,5 +48,14 @@ public class TrialExpiryReminderScheduler {
                         reminderDate.plusDays(1).atStartOfDay()
                 );
         purchases.forEach(purchase -> trialExpiryReminderDispatcher.sendIfNeeded(purchase.getId()));
+
+        List<Purchase> expiredPurchases = purchaseRepository
+                .findByPurchaseTypeAndStatusAndExpiresAtGreaterThanEqualAndExpiresAtLessThan(
+                        PurchaseType.TRIAL,
+                        PurchaseStatus.EXPIRED,
+                        currentDate.minusDays(1).atStartOfDay(),
+                        currentDate.plusDays(1).atStartOfDay()
+                );
+        expiredPurchases.forEach(purchase -> trialExpiryReminderDispatcher.sendExpiredIfNeeded(purchase.getId()));
     }
 }

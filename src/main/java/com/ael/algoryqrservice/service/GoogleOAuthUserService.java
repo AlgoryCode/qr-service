@@ -75,6 +75,7 @@ public class GoogleOAuthUserService {
                 .lastName(identity.lastName())
                 .email(identity.email())
                 .password(null)
+                .emailVerified(true)
                 .role(UserRole.USER)
                 .provider(AuthProvider.GOOGLE)
                 .providerSubject(identity.subject())

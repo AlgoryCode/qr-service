@@ -113,6 +113,20 @@ public class User {
     @Column(name = "trial_end_date")
     private LocalDateTime trialEndDate;
 
+    @Column(name = "email_verified", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(name = "email_verification_code_hash", length = 255)
+    private String emailVerificationCodeHash;
+
+    @Column(name = "email_verification_expires_at")
+    private LocalDateTime emailVerificationExpiresAt;
+
+    @Column(name = "email_verification_sent_at")
+    private LocalDateTime emailVerificationSentAt;
+
     public boolean hasCompletedTrial() {
         return trialEndDate != null;
     }

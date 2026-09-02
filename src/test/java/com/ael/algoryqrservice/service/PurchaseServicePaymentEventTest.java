@@ -253,7 +253,7 @@ class PurchaseServicePaymentEventTest {
         verify(paymentEventInboxRepository).save(any());
         org.assertj.core.api.Assertions.assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         org.assertj.core.api.Assertions.assertThat(purchase.getSubscriptionStatus())
-                .isEqualTo(SubscriptionStatus.PAST_DUE);
+                .isEqualTo(SubscriptionStatus.GRACE_PERIOD);
         assertThat(purchase.getSubscriptionGraceEndsAt()).isAfter(LocalDateTime.now().plusDays(6));
     }
 
@@ -267,7 +267,7 @@ class PurchaseServicePaymentEventTest {
 
         purchaseService.handleSubscriptionPastDue(event);
 
-        assertThat(purchase.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.PAST_DUE);
+        assertThat(purchase.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.GRACE_PERIOD);
         assertThat(purchase.getSubscriptionGraceEndsAt()).isAfter(LocalDateTime.now().plusDays(6));
         verify(purchaseLogService).log(
                 eq(10L),

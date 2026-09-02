@@ -15,6 +15,7 @@ import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/billing")
 @RequiredArgsConstructor
@@ -60,23 +62,52 @@ public class BillingPaymentController {
     @ResponseStatus(HttpStatus.CREATED)
     public BillingPaymentDtos.CardVerificationInit initiateCardVerification(HttpServletRequest httpServletRequest) {
         User user = securityUtils.getCurrentUser();
-        BillingSnapshot billingSnapshot = billingAddressService.resolveDefaultSnapshot(user.getId());
-        String conversationId = paymentRequestMapper.buildCardVerificationConversationId(user.getId());
-        String clientIp = resolveClientIp(httpServletRequest);
-        PaymentCardVerificationRequest request = paymentRequestMapper.toCardVerificationRequest(
-                user, billingSnapshot, clientIp, appProperties, conversationId
-        );
-        PaymentCardStorageSessionResponse response = paymentServiceClient.initiateCardVerification(user.getId(), request);
-        return new BillingPaymentDtos.CardVerificationInit(
-                response.getConversationId(),
-                response.getActionUrl(),
-                response.getFields()
-        );
+        log.info("Card verification requested. userId={}", user.getId());
+        try {
+            BillingSnapshot billingSnapshot = billingAddressService.resolveDefaultSnapshot(user.getId());
+            String conversationId = paymentRequestMapper.buildCardVerificationConversationId(user.getId());
+            String clientIp = resolveClientIp(httpServletRequest);
+            PaymentCardVerificationRequest request = paymentRequestMapper.toCardVerificationRequest(
+                    user, billingSnapshot, clientIp, appProperties, conversationId
+            );
+            PaymentCardStorageSessionResponse response = paymentServiceClient.initiateCardVerification(
+                    user.getId(),
+                    request
+            );
+            log.info(
+                    "Card verification session created. userId={} paymentId={}",
+                    user.getId(),
+                    response.getConversationId()
+            );
+            return new BillingPaymentDtos.CardVerificationInit(
+                    response.getConversationId(),
+                    response.getActionUrl(),
+                    response.getFields()
+            );
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "Card verification session failed. userId={} reason={}",
+                    user.getId(),
+                    exception.getMessage()
+            );
+            throw exception;
+        }
     }
 
     @GetMapping("/payment-methods/verification/{conversationId}")
     public BillingPaymentDtos.RefundablePayment cardVerificationStatus(@PathVariable String conversationId) {
-        return paymentServiceClient.getCardVerificationStatus(userId(), conversationId);
+        Long currentUserId = userId();
+        BillingPaymentDtos.RefundablePayment status = paymentServiceClient.getCardVerificationStatus(
+                currentUserId,
+                conversationId
+        );
+        log.info(
+                "Card verification status checked. userId={} paymentId={} status={}",
+                currentUserId,
+                conversationId,
+                status.status()
+        );
+        return status;
     }
 
     @DeleteMapping("/payment-methods/{paymentMethodId}")
