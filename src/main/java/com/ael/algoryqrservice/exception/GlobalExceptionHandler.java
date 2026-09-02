@@ -35,8 +35,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PaymentServiceException.class)
     public ResponseEntity<Map<String, String>> handlePaymentService(PaymentServiceException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(Map.of("message", ex.getMessage()));
+        log.warn(
+                "Payment service call failed. status={} reason={}",
+                ex.getStatus(),
+                ex.getMessage()
+        );
+        return ResponseEntity.status(ex.getStatus()).body(Map.of("message", ex.getMessage()));
     }
 
     @ExceptionHandler(TrendyolGoClientException.class)

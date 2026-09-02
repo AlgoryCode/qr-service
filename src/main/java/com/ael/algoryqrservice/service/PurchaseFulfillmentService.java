@@ -146,6 +146,9 @@ public class PurchaseFulfillmentService {
         if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
             purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
             purchase.setSubscriptionGraceEndsAt(null);
+            purchase.setSubscriptionStatusReason(null);
+            purchase.setSubscriptionStatusChangedAt(LocalDateTime.now());
+            purchase.setSubscriptionStatusChangedBy("system_payment");
             purchase.setCancelAtPeriodEnd(false);
         } else {
             Enums.parse(SubscriptionStatus.class, event.getSubscriptionStatus())

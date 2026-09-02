@@ -46,16 +46,32 @@ public class TrialExpiryReminderDispatcher {
 
     @Transactional
     public void sendIfNeeded(Long purchaseId) {
+        sendIfNeeded(purchaseId, REMINDER_TYPE, false);
+    }
+
+    @Transactional
+    public void sendExpiredIfNeeded(Long purchaseId) {
+        sendIfNeeded(purchaseId, PurchaseReminderType.PRO_TRIAL_EXPIRED, true);
+    }
+
+    private void sendIfNeeded(Long purchaseId, PurchaseReminderType reminderType, boolean expired) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId).orElse(null);
-        if (!isEligible(purchase)) {
+        if (!isEligible(purchase, expired)) {
             return;
         }
-        if (purchaseReminderRepository.existsByPurchaseIdAndReminderType(purchaseId, REMINDER_TYPE)) {
+        if (purchaseReminderRepository.existsByPurchaseIdAndReminderType(purchaseId, reminderType)) {
             return;
         }
         User user = userRepository.findById(purchase.getUserId()).orElseThrow();
-        UUID eventId = deterministicEventId(purchaseId);
-        purchaseReminderRepository.saveAndFlush(new PurchaseReminder(purchaseId, REMINDER_TYPE, eventId));
+        UUID eventId = deterministicEventId(purchaseId, reminderType);
+        purchaseReminderRepository.saveAndFlush(new PurchaseReminder(purchaseId, reminderType, eventId));
+        if (expired) {
+            notificationPublisherService.publishTrialExpired(
+                    eventId, user.getEmail(), user.getDisplayName(), purchase.getPackageName(),
+                    purchase.getExpiresAt().format(EXPIRY_FORMATTER), appUrl + "/dashboard/abonelik"
+            );
+            return;
+        }
         notificationPublisherService.publishTrialExpiryReminder(
                 eventId,
                 user.getEmail(),
@@ -67,14 +83,18 @@ public class TrialExpiryReminderDispatcher {
     }
 
     UUID deterministicEventId(Long purchaseId) {
-        String source = REMINDER_TYPE.name() + ":" + purchaseId;
+        return deterministicEventId(purchaseId, REMINDER_TYPE);
+    }
+
+    private UUID deterministicEventId(Long purchaseId, PurchaseReminderType reminderType) {
+        String source = reminderType.name() + ":" + purchaseId;
         return UUID.nameUUIDFromBytes(source.getBytes(StandardCharsets.UTF_8));
     }
 
-    private boolean isEligible(Purchase purchase) {
+    private boolean isEligible(Purchase purchase, boolean expired) {
         return purchase != null
                 && purchase.getPurchaseType() == PurchaseType.TRIAL
-                && purchase.getStatus() == PurchaseStatus.ACTIVE
+                && purchase.getStatus() == (expired ? PurchaseStatus.EXPIRED : PurchaseStatus.ACTIVE)
                 && purchase.getExpiresAt() != null;
     }
 }

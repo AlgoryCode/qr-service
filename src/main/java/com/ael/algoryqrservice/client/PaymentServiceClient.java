@@ -9,18 +9,20 @@ import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsResponse;
 import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.http.HttpClient;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,8 +46,13 @@ public class PaymentServiceClient {
     ) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
+        );
+        requestFactory.setReadTimeout(Duration.ofSeconds(15));
         this.restClient = restClientBuilder
                 .baseUrl(properties.getUrl())
+                .requestFactory(requestFactory)
                 .build();
     }
 
@@ -119,7 +126,6 @@ public class PaymentServiceClient {
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
-            String detail = extractErrorMessage(exception);
             log.error(
                     "Checkout form init failed. userId={}, conversationId={}, status={} body={}",
                     userId,
@@ -127,11 +133,7 @@ public class PaymentServiceClient {
                     exception.getStatusCode(),
                     exception.getResponseBodyAsString()
             );
-            throw new PaymentServiceException(
-                    detail == null || detail.isBlank()
-                            ? "Ödeme servisi hatası: " + exception.getStatusCode()
-                            : "Ödeme servisi hatası: " + detail
-            );
+            throw paymentError(exception, "Ödeme servisi hatası: ");
         } catch (Exception exception) {
             log.error("Payment service unreachable", exception);
             throw new PaymentServiceException("Ödeme servisine ulaşılamadı");
@@ -143,29 +145,40 @@ public class PaymentServiceClient {
             if (userId == null) {
                 throw new PaymentServiceException("Kart dogrulama icin kullanici kimligi zorunludur");
             }
-            return restClient.post()
+            log.info(
+                    "Card verification request sent. userId={} paymentId={}",
+                    userId,
+                    request == null ? null : request.getConversationId()
+            );
+            PaymentCardStorageSessionResponse response = restClient.post()
                     .uri("/api/v1/payment-methods/verification")
                     .contentType(MediaType.APPLICATION_JSON)
                     .headers(authHeaders(userId))
                     .body(request)
                     .retrieve()
                     .body(PaymentCardStorageSessionResponse.class);
+            log.info(
+                    "Card verification request accepted. userId={} paymentId={}",
+                    userId,
+                    response == null ? null : response.getConversationId()
+            );
+            return response;
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
-            String detail = extractErrorMessage(exception);
             log.error(
-                    "Card verification init failed. status={} body={}",
-                    exception.getStatusCode(),
-                    exception.getResponseBodyAsString()
+                    "Card verification request failed. userId={} paymentId={} status={}",
+                    userId,
+                    request == null ? null : request.getConversationId(),
+                    exception.getStatusCode().value()
             );
-            throw new PaymentServiceException(
-                    detail == null || detail.isBlank()
-                            ? "Kart dogrulama servisi hatasi: " + exception.getStatusCode()
-                            : "Kart dogrulama servisi hatasi: " + detail
-            );
+            throw paymentError(exception, "Kart dogrulama servisi hatasi: ");
         } catch (Exception exception) {
-            log.error("Payment service unreachable", exception);
+            log.error(
+                    "Card verification request failed. userId={} paymentId={} reason=UNREACHABLE",
+                    userId,
+                    request == null ? null : request.getConversationId()
+            );
             throw new PaymentServiceException("Odeme servisine ulasilamadi");
         }
     }
@@ -800,7 +813,6 @@ public class PaymentServiceClient {
         } catch (PaymentServiceException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
-            String detail = extractErrorMessage(exception);
             log.error(
                     "Payment service error. userId={}, conversationId={}, path={}, status={}",
                     extractUserId(request),
@@ -808,33 +820,24 @@ public class PaymentServiceClient {
                     path,
                     exception.getStatusCode()
             );
-            throw new PaymentServiceException(
-                    detail == null || detail.isBlank()
-                            ? "Ödeme servisi hatası: " + exception.getStatusCode()
-                            : "Ödeme servisi hatası: " + detail
-            );
+            throw paymentError(exception, "Ödeme servisi hatası: ");
         } catch (Exception exception) {
             log.error("Payment service unreachable", exception);
             throw new PaymentServiceException("Ödeme servisine ulaşılamadı");
         }
     }
 
+    private PaymentServiceException paymentError(RestClientResponseException exception, String fallbackPrefix) {
+        String detail = extractErrorMessage(exception);
+        int status = PaymentServiceErrorMapper.httpStatus(exception.getStatusCode().value());
+        String message = detail == null || detail.isBlank()
+                ? fallbackPrefix + exception.getStatusCode()
+                : fallbackPrefix + detail;
+        return new PaymentServiceException(message, status);
+    }
+
     private String extractErrorMessage(RestClientResponseException exception) {
-        String body = exception.getResponseBodyAsString();
-        if (body == null || body.isBlank()) {
-            return null;
-        }
-        try {
-            Map<String, Object> parsed = objectMapper.readValue(body, new TypeReference<>() {
-            });
-            Object message = parsed.get("message");
-            if (message != null && !String.valueOf(message).isBlank()) {
-                return String.valueOf(message);
-            }
-        } catch (Exception ignored) {
-            return body.length() > 300 ? body.substring(0, 300) : body;
-        }
-        return null;
+        return PaymentServiceErrorMapper.detail(objectMapper, exception.getResponseBodyAsString());
     }
 
     private Long extractUserId(PaymentThreeDsRequest request) {

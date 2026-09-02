@@ -1,0 +1,2 @@
+ALTER TABLE tbl_purchase
+    ADD COLUMN IF NOT EXISTS recurring_consent BOOLEAN NOT NULL DEFAULT FALSE;

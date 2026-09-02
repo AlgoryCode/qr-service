@@ -59,11 +59,15 @@ public class TrialService {
     public TrialDtos.Status start(Long userId, Long packageId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadRequestException("Kullanici bulunamadi"));
+        if (user.getProvider() == com.ael.algoryqrservice.model.enums.AuthProvider.BASIC
+                && !user.isEmailVerified()) {
+            throw new BadRequestException("Deneme başlatmak için e-posta adresinizi doğrulamanız gerekiyor");
+        }
         if (userTrialService.hasUsedTrial(user) || userTrialService.hasTrialPurchase(userId)) {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         rejectIfHasUsablePaidPackage(userId);
-        Long paymentMethodId = requireSavedCard(userId);
+        Long paymentMethodId = findSavedCard(userId);
 
         PlanPackage planPackage = resolveTrialPackage(packageId);
         LocalDateTime startsAt = AppTime.nowLocal();
@@ -184,19 +188,19 @@ public class TrialService {
         return trialDays;
     }
 
-    private Long requireSavedCard(Long userId) {
+    private Long findSavedCard(Long userId) {
         List<BillingPaymentDtos.PaymentMethod> methods = paymentServiceClient.getPaymentMethods(userId);
         if (methods == null || methods.isEmpty()) {
-            throw new BadRequestException("Deneme baslatmak icin kayitli kredi karti zorunludur");
+            return null;
         }
         String rawId = methods.getFirst().id();
         if (rawId == null || rawId.isBlank()) {
-            throw new BadRequestException("Deneme baslatmak icin kayitli kredi karti zorunludur");
+            return null;
         }
         try {
             return Long.valueOf(rawId);
         } catch (NumberFormatException exception) {
-            throw new BadRequestException("Kayitli kart kimligi gecersiz");
+            return null;
         }
     }
 

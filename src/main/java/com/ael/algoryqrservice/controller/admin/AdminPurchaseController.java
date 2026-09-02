@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.model.FulfillmentUsageLog;
 import com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseSummaryResponse;
+import com.ael.algoryqrservice.model.dto.AdminSubscriptionDtos;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
 import com.ael.algoryqrservice.service.FulfillmentMigrationService;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +37,19 @@ public class AdminPurchaseController {
     @PostMapping("/{purchaseId}/expire")
     public ResponseEntity<PurchaseResponse> expirePurchase(@PathVariable Long purchaseId) {
         return ResponseEntity.ok(purchaseService.expirePurchase(purchaseId));
+    }
+
+    @PostMapping("/{purchaseId}/subscription/deactivate")
+    public ResponseEntity<PurchaseResponse> deactivateSubscription(@PathVariable Long purchaseId) {
+        return ResponseEntity.ok(purchaseService.deactivateSubscriptionForAdmin(purchaseId));
+    }
+
+    @PostMapping("/{purchaseId}/subscription/extend")
+    public ResponseEntity<PurchaseResponse> extendSubscription(
+            @PathVariable Long purchaseId,
+            @Valid @RequestBody AdminSubscriptionDtos.ExtendRequest request
+    ) {
+        return ResponseEntity.ok(purchaseService.extendSubscriptionForAdmin(purchaseId, request.getDays()));
     }
 
     @GetMapping("/{purchaseId}/summary")

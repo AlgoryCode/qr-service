@@ -36,6 +36,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final PackageActivationService packageActivationService;
     private final UserAccessProfileService userAccessProfileService;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request, ClientInfo clientInfo) {
@@ -65,6 +66,7 @@ public class AuthService {
                 .build();
 
         User saved = userRepository.save(user);
+        emailVerificationService.sendForUser(saved);
         packageActivationService.ensureSubscriptionState(saved.getId());
 
         return RegisterResponse.builder()

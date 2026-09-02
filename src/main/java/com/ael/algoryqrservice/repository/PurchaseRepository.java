@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.repository;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -22,6 +23,12 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     List<Purchase> findByUserIdOrderByPurchasedAtDesc(Long userId);
 
     List<Purchase> findByStatusAndExpiresAtBefore(PurchaseStatus status, LocalDateTime expiresAt);
+
+    List<Purchase> findByPaymentStyleAndSubscriptionStatusAndSubscriptionGraceEndsAtBefore(
+            com.ael.algoryqrservice.model.enums.PaymentStyle paymentStyle,
+            SubscriptionStatus subscriptionStatus,
+            LocalDateTime dateTime
+    );
 
     List<Purchase> findByUserIdAndStatusAndExpiresAtBefore(
             Long userId,

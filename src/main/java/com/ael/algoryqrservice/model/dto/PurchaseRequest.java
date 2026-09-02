@@ -28,6 +28,9 @@ public class PurchaseRequest {
 
     private Long paymentMethodId;
 
+    /** Kullanıcının düzenli ödeme için kayıtlı kart kullanma onayı. */
+    private Boolean recurringConsent = false;
+
     @Valid
     private BillingAddressDtos.Request inlineBillingAddress;
 

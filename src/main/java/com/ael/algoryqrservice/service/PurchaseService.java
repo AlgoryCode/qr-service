@@ -134,6 +134,7 @@ public class PurchaseService {
                 .purchaseType(PurchaseType.PAID)
                 .installmentCount(1)
                 .paymentMethodId(request.getPaymentMethodId())
+                .recurringConsent(Boolean.TRUE.equals(request.getRecurringConsent()))
                 .cardBrand(cardSnapshot.brand())
                 .cardLastFour(cardSnapshot.lastFour())
                 .billingSnapshot(billingSnapshot)
@@ -247,13 +248,14 @@ public class PurchaseService {
                 || purchase.getStatus() == PurchaseStatus.EXPIRED) {
             if (purchase.getStatus() == PurchaseStatus.ACTIVE
                     && purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
-                purchase.setSubscriptionStatus(SubscriptionStatus.PAST_DUE);
+                setSubscriptionState(purchase, SubscriptionStatus.GRACE_PERIOD,
+                        "payment_failed_after_retries", "system_renewal");
                 purchase.setSubscriptionGraceEndsAt(
                         LocalDateTime.now().plusDays(billingSubscriptionProperties.getManualPaymentGraceDays())
                 );
                 purchaseRepository.save(purchase);
                 log.warn(
-                        "Marked subscription PAST_DUE after renewal failure. purchaseId={} eventId={}",
+                        "Marked subscription GRACE_PERIOD after renewal failure. purchaseId={} eventId={}",
                         purchase.getId(),
                         event.getEventId()
                 );
@@ -311,7 +313,8 @@ public class PurchaseService {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        purchase.setSubscriptionStatus(SubscriptionStatus.PAST_DUE);
+        setSubscriptionState(purchase, SubscriptionStatus.GRACE_PERIOD,
+                "payment_failed_after_retries", "system_renewal");
         purchase.setSubscriptionGraceEndsAt(now.plusDays(billingSubscriptionProperties.getManualPaymentGraceDays()));
         purchaseRepository.save(purchase);
         purchaseLogService.log(
@@ -323,7 +326,7 @@ public class PurchaseService {
                         + " gun icinde borcu odeyin"
         );
         log.warn(
-                "Subscription marked PAST_DUE with manual payment grace. purchaseId={} graceEndsAt={} eventId={}",
+                "Subscription marked GRACE_PERIOD with manual payment grace. purchaseId={} graceEndsAt={} eventId={}",
                 purchase.getId(),
                 purchase.getSubscriptionGraceEndsAt(),
                 event.getEventId()
@@ -342,6 +345,8 @@ public class PurchaseService {
             throw new BadRequestException("Bu islem yalnizca abonelikler icin gecerlidir");
         }
         boolean manualPaymentAllowed = purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE
+                || purchase.getSubscriptionStatus() == SubscriptionStatus.GRACE_PERIOD
+                || purchase.getSubscriptionStatus() == SubscriptionStatus.SUSPENDED
                 || purchase.getPaymentMethodId() == null
                 || purchase.isCancelAtPeriodEnd();
         if (!manualPaymentAllowed) {
@@ -351,7 +356,8 @@ public class PurchaseService {
         }
         if (purchase.getSubscriptionGraceEndsAt() != null
                 && purchase.getSubscriptionGraceEndsAt().isBefore(LocalDateTime.now())
-                && purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE) {
+                && (purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE
+                || purchase.getSubscriptionStatus() == SubscriptionStatus.GRACE_PERIOD)) {
             throw new BadRequestException("Borc odeme suresi doldu");
         }
         if (purchase.getStatus() != PurchaseStatus.ACTIVE
@@ -781,6 +787,50 @@ public class PurchaseService {
         packageActivationService.ensureSubscriptionState(purchase.getUserId());
         menuPublicAccessService.syncForUser(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
+    }
+
+    @Transactional
+    public PurchaseResponse deactivateSubscriptionForAdmin(Long purchaseId) {
+        Purchase purchase = purchaseRepository.findById(purchaseId)
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            throw new BadRequestException("Bu satın alım abonelik değil");
+        }
+        return expirePurchase(purchaseId);
+    }
+
+    @Transactional
+    public PurchaseResponse extendSubscriptionForAdmin(Long purchaseId, int days) {
+        Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
+                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
+        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
+            throw new BadRequestException("Bu satın alım abonelik değil");
+        }
+        if (days < 1 || days > 3650) {
+            throw new BadRequestException("Uzatma süresi 1-3650 gün arasında olmalı");
+        }
+        LocalDateTime base = purchase.getExpiresAt() != null
+                && purchase.getExpiresAt().isAfter(LocalDateTime.now())
+                ? purchase.getExpiresAt()
+                : LocalDateTime.now();
+        purchase.setExpiresAt(base.plusDays(days));
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        purchase.setSubscriptionGraceEndsAt(null);
+        purchase.setSubscriptionStatusReason("admin_extension");
+        purchase.setSubscriptionStatusChangedAt(LocalDateTime.now());
+        purchase.setSubscriptionStatusChangedBy("admin");
+        purchase.setCancelAtPeriodEnd(false);
+        purchaseRepository.save(purchase);
+        packageActivationService.ensureSubscriptionState(purchase.getUserId());
+        menuPublicAccessService.syncForUser(purchase.getUserId());
+        purchaseLogService.log(
+                purchase.getId(),
+                purchase.getUserId(),
+                PurchaseLogAction.PURCHASE_COMPLETED,
+                purchase.getPackageName() + " aboneliği admin tarafından " + days + " gün uzatıldı"
+        );
+        return toResponse(purchase);
     }
 
     private void requireExpirable(PurchaseStatus status) {
@@ -1581,11 +1631,24 @@ public class PurchaseService {
         if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
             return false;
         }
-        if (purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE) {
+        if (purchase.getSubscriptionStatus() == SubscriptionStatus.PAST_DUE
+                || purchase.getSubscriptionStatus() == SubscriptionStatus.GRACE_PERIOD) {
             return purchase.getSubscriptionGraceEndsAt() == null
                     || !purchase.getSubscriptionGraceEndsAt().isBefore(LocalDateTime.now());
         }
         return purchase.getPaymentMethodId() == null || purchase.isCancelAtPeriodEnd();
+    }
+
+    private void setSubscriptionState(
+            Purchase purchase,
+            SubscriptionStatus status,
+            String reason,
+            String changedBy
+    ) {
+        purchase.setSubscriptionStatus(status);
+        purchase.setSubscriptionStatusReason(reason);
+        purchase.setSubscriptionStatusChangedAt(LocalDateTime.now());
+        purchase.setSubscriptionStatusChangedBy(changedBy);
     }
 
     private static final int APPROACHING_DAYS = 7;
