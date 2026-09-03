@@ -72,4 +72,81 @@ public class RabbitMqConfig {
     public TopicExchange menuEventsExchange(MenuEventsRabbitProperties properties) {
         return new TopicExchange(properties.getExchange(), true, false);
     }
+
+    @Bean
+    public TopicExchange integrationEventsExchange(IntegrationRabbitProperties properties) {
+        return new TopicExchange(properties.getExchange(), true, false);
+    }
+
+    @Bean
+    public Queue integrationAiRequestedQueue(IntegrationRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiRequestedQueue())
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(properties.getAiRequestedQueue() + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue integrationAiRequestedDlq(IntegrationRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiRequestedQueue() + ".dlq").build();
+    }
+
+    @Bean
+    public Queue integrationAiCompletedQueue(IntegrationRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiCompletedQueue())
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(properties.getAiCompletedQueue() + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue integrationAiCompletedDlq(IntegrationRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiCompletedQueue() + ".dlq").build();
+    }
+
+    @Bean
+    public Queue integrationPublishQueue(IntegrationRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getPublishQueue())
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(properties.getPublishQueue() + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue integrationPublishDlq(IntegrationRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getPublishQueue() + ".dlq").build();
+    }
+
+    @Bean
+    public Binding integrationAiRequestedBinding(
+            Queue integrationAiRequestedQueue,
+            TopicExchange integrationEventsExchange,
+            IntegrationRabbitProperties properties
+    ) {
+        return BindingBuilder.bind(integrationAiRequestedQueue)
+                .to(integrationEventsExchange)
+                .with(properties.getAiRequestedRoutingKey());
+    }
+
+    @Bean
+    public Binding integrationAiCompletedBinding(
+            Queue integrationAiCompletedQueue,
+            TopicExchange integrationEventsExchange,
+            IntegrationRabbitProperties properties
+    ) {
+        return BindingBuilder.bind(integrationAiCompletedQueue)
+                .to(integrationEventsExchange)
+                .with(properties.getAiCompletedRoutingKey());
+    }
+
+    @Bean
+    public Binding integrationPublishBinding(
+            Queue integrationPublishQueue,
+            TopicExchange integrationEventsExchange,
+            IntegrationRabbitProperties properties
+    ) {
+        return BindingBuilder.bind(integrationPublishQueue)
+                .to(integrationEventsExchange)
+                .with(properties.getPublishRoutingKey());
+    }
 }
