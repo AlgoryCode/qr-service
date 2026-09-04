@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IntegrationExportService {
@@ -101,10 +103,15 @@ public class IntegrationExportService {
     @Transactional
     public IntegrationJob updateJob(UUID jobId, IntegrationPendingProductDtos.JobUpdateRequest request) {
         IntegrationJob job = requireJob(jobId);
+        String previousStatus = job.getStatus();
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             if (IntegrationJobStatus.AI_PROCESSING.equals(request.getStatus())
                     && !IntegrationJobStatus.QUEUED.equals(job.getStatus())
                     && !IntegrationJobStatus.AI_PROCESSING.equals(job.getStatus())) {
+                log.info(
+                        "integration_job_update_skipped jobId={} currentStatus={} requestedStatus={}",
+                        jobId, job.getStatus(), request.getStatus()
+                );
                 return job;
             }
             job.setStatus(request.getStatus().trim());
@@ -131,7 +138,17 @@ public class IntegrationExportService {
         if (request.getErrorMessage() != null) {
             job.setErrorMessage(request.getErrorMessage());
         }
-        return jobRepository.save(job);
+        IntegrationJob saved = jobRepository.save(job);
+        log.info(
+                "integration_job_updated jobId={} previousStatus={} status={} aiBatchId={} aiInputFileId={} errorMessage={}",
+                saved.getId(),
+                previousStatus,
+                saved.getStatus(),
+                saved.getAiBatchId(),
+                saved.getAiInputFileId(),
+                saved.getErrorMessage()
+        );
+        return saved;
     }
 
     private IntegrationPendingProductDtos.JobAccepted enqueue(
@@ -140,6 +157,7 @@ public class IntegrationExportService {
             ObjectNode snapshot,
             String externalStoreId
     ) {
+        int productCount = snapshot.withArray("products").size();
         LocalDateTime now = LocalDateTime.now();
         IntegrationJob job = IntegrationJob.builder()
                 .id(UUID.randomUUID())
@@ -153,8 +171,20 @@ public class IntegrationExportService {
                 .externalStoreId(externalStoreId)
                 .createdAt(now)
                 .build();
+        log.info(
+                "integration_job_enqueue_start jobId={} menuId={} direction={} productCount={}",
+                job.getId(), menu.getMenuId(), direction, productCount
+        );
         IntegrationJob saved = jobRepository.save(job);
+        log.info(
+                "integration_job_queued jobId={} menuId={} direction={} status={}",
+                saved.getId(), saved.getMenuId(), saved.getDirection(), saved.getStatus()
+        );
         messagePublisher.publishAiRequested(saved);
+        log.info(
+                "integration_job_enqueue_done jobId={} status={}",
+                saved.getId(), saved.getStatus()
+        );
         return IntegrationPendingProductDtos.JobAccepted.builder()
                 .jobId(saved.getId())
                 .status(saved.getStatus())
