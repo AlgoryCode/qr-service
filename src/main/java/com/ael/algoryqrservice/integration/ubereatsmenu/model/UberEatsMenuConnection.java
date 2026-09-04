@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.integration.ubereats.model;
+package com.ael.algoryqrservice.integration.ubereatsmenu.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -7,7 +7,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -21,17 +20,14 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "ubereats_connections", indexes = {
-        @Index(name = "uk_ubereats_connections_user", columnList = "user_id", unique = true),
-        @Index(name = "idx_ubereats_connections_restaurant", columnList = "restaurant_id")
-})
+@Table(name = "ubereats_menu_connections")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class UberEatsConnection {
+public class UberEatsMenuConnection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,24 +37,21 @@ public class UberEatsConnection {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "seller_id", nullable = false, length = 64)
-    private String sellerId;
+    @Column(name = "menu_id", nullable = false)
+    private Long menuId;
 
-    @Column(name = "api_key_encrypted", nullable = false, columnDefinition = "text")
-    private String apiKeyEncrypted;
+    @Column(name = "store_id", nullable = false, length = 128)
+    private String storeId;
 
-    @Column(name = "api_secret_encrypted", nullable = false, columnDefinition = "text")
-    private String apiSecretEncrypted;
+    @Column(name = "client_id_encrypted", nullable = false, columnDefinition = "text")
+    private String clientIdEncrypted;
 
-    @Column(name = "restaurant_id", length = 64)
-    private String restaurantId;
-
-    @Column(name = "restaurant_name", length = 255)
-    private String restaurantName;
+    @Column(name = "client_secret_encrypted", nullable = false, columnDefinition = "text")
+    private String clientSecretEncrypted;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private UberEatsConnectionStatus status;
+    private UberEatsMenuConnectionStatus status;
 
     @Column(name = "last_error", columnDefinition = "text")
     private String lastError;
@@ -82,7 +75,7 @@ public class UberEatsConnection {
             updatedAt = now;
         }
         if (status == null) {
-            status = UberEatsConnectionStatus.DISCONNECTED;
+            status = UberEatsMenuConnectionStatus.DISCONNECTED;
         }
     }
 

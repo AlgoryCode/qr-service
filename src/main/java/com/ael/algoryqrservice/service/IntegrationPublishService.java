@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.integration.ubereats.UberEatsMenuPayloadMapper;
-import com.ael.algoryqrservice.integration.ubereats.UberEatsMenuPublisher;
+import com.ael.algoryqrservice.integration.ubereatsmenu.UberEatsMenuPayloadMapper;
+import com.ael.algoryqrservice.integration.ubereatsmenu.UberEatsMenuPublisher;
 import com.ael.algoryqrservice.model.IntegrationPendingProduct;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;

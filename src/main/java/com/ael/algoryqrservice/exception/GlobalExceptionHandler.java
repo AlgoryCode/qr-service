@@ -1,7 +1,8 @@
 package com.ael.algoryqrservice.exception;
 
 import com.ael.algoryqrservice.integration.odeal.client.OdealClientException;
-import com.ael.algoryqrservice.integration.trendyolgo.client.TrendyolGoClientException;
+import com.ael.algoryqrservice.integration.ubereats.client.UberEatsClientException;
+import com.ael.algoryqrservice.integration.ubereatsmenu.client.UberEatsMenuClientException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -43,8 +44,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(Map.of("message", ex.getMessage()));
     }
 
-    @ExceptionHandler(TrendyolGoClientException.class)
-    public ResponseEntity<Map<String, String>> handleTrendyolGo(TrendyolGoClientException ex) {
+    @ExceptionHandler(UberEatsClientException.class)
+    public ResponseEntity<Map<String, String>> handleUberEats(UberEatsClientException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(UberEatsMenuClientException.class)
+    public ResponseEntity<Map<String, String>> handleUberEatsMenu(UberEatsMenuClientException ex) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("message", ex.getMessage()));
     }

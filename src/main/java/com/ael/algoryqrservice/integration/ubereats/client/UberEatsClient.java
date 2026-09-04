@@ -3,188 +3,251 @@ package com.ael.algoryqrservice.integration.ubereats.client;
 import com.ael.algoryqrservice.integration.ubereats.config.UberEatsProperties;
 import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-@Slf4j
 @Component
+@Slf4j
 public class UberEatsClient {
 
-    private final RestClient apiClient;
-    private final RestClient authClient;
+    private final RestClient restClient;
     private final UberEatsProperties properties;
-    private final ConcurrentHashMap<String, CachedToken> tokenCache = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper;
 
     public UberEatsClient(
-            @Qualifier("uberEatsRestClient") RestClient apiClient,
-            @Qualifier("uberEatsAuthRestClient") RestClient authClient,
-            UberEatsProperties properties
+            @Qualifier("uberEatsRestClient") RestClient restClient,
+            UberEatsProperties properties,
+            ObjectMapper objectMapper
     ) {
-        this.apiClient = apiClient;
-        this.authClient = authClient;
+        this.restClient = restClient;
         this.properties = properties;
+        this.objectMapper = objectMapper;
+    }
+
+    public JsonNode listRestaurants(UberEatsDtos.Credentials credentials) {
+        return exchange(HttpMethod.GET, expand(properties.getPaths().getRestaurants(), credentials, null), credentials, null);
     }
 
     public JsonNode getMenu(UberEatsDtos.Credentials credentials) {
-        return get("/v2/eats/stores/" + credentials.storeId() + "/menus", credentials);
+        requireRestaurant(credentials);
+        return exchange(HttpMethod.GET, expand(properties.getPaths().getRestaurantMenu(), credentials, null), credentials, null);
     }
 
-    public void uploadMenu(UberEatsDtos.Credentials credentials, JsonNode menuPayload) {
-        put("/v2/eats/stores/" + credentials.storeId() + "/menus", credentials, menuPayload);
+    public JsonNode listOrders(UberEatsDtos.Credentials credentials, Instant start, Instant end) {
+        return listOrdersPage(credentials, start, end, 0, properties.getPollPageSize());
     }
 
-    public void updateItem(UberEatsDtos.Credentials credentials, String itemId, JsonNode itemPayload) {
-        post(
-                "/v2/eats/stores/" + credentials.storeId() + "/menus/items/" + itemId,
-                credentials,
-                itemPayload
-        );
-    }
-
-    private JsonNode get(String path, UberEatsDtos.Credentials credentials) {
-        return exchange("GET", path, credentials, null);
-    }
-
-    private void put(String path, UberEatsDtos.Credentials credentials, JsonNode body) {
-        exchange("PUT", path, credentials, body);
-    }
-
-    private void post(String path, UberEatsDtos.Credentials credentials, JsonNode body) {
-        exchange("POST", path, credentials, body);
-    }
-
-    private JsonNode exchange(String method, String path, UberEatsDtos.Credentials credentials, JsonNode body) {
-        int attempts = Math.max(1, properties.getMaxAttempts());
-        RuntimeException lastError = null;
-        for (int attempt = 1; attempt <= attempts; attempt++) {
-            try {
-                String token = accessToken(credentials);
-                if ("GET".equals(method)) {
-                    return apiClient.get()
-                            .uri(path)
-                            .headers(headers -> applyAuth(headers, token))
-                            .retrieve()
-                            .body(JsonNode.class);
-                }
-                if ("PUT".equals(method)) {
-                    apiClient.put()
-                            .uri(path)
-                            .headers(headers -> applyAuth(headers, token))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .body(body)
-                            .retrieve()
-                            .toBodilessEntity();
-                    return null;
-                }
-                if ("POST".equals(method)) {
-                    apiClient.post()
-                            .uri(path)
-                            .headers(headers -> applyAuth(headers, token))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .body(body)
-                            .retrieve()
-                            .toBodilessEntity();
-                    return null;
-                }
-                throw new IllegalArgumentException(method);
-            } catch (RestClientResponseException exception) {
-                int status = exception.getStatusCode().value();
-                boolean retryable = status == 429 || status >= 500;
-                invalidateToken(credentials);
-                lastError = new UberEatsClientException(
-                        "Uber Eats isteği başarısız oldu: HTTP " + status,
-                        status,
-                        retryable,
-                        exception
-                );
-                if (!retryable || attempt == attempts) {
-                    throw lastError;
-                }
-                sleepBackoff(attempt);
-            } catch (RuntimeException exception) {
-                if (exception instanceof UberEatsClientException clientException) {
-                    throw clientException;
-                }
-                lastError = new UberEatsClientException(
-                        "Uber Eats yanıt vermedi",
-                        0,
-                        true,
-                        exception
-                );
-                if (attempt == attempts) {
-                    throw lastError;
-                }
-                sleepBackoff(attempt);
+    public List<JsonNode> listAllOrders(UberEatsDtos.Credentials credentials, Instant start, Instant end) {
+        int pageSize = Math.max(1, Math.min(properties.getPollPageSize(), 200));
+        List<JsonNode> orders = new ArrayList<>();
+        int page = 0;
+        int totalPages = 1;
+        while (page < totalPages) {
+            JsonNode payload = listOrdersPage(credentials, start, end, page, pageSize);
+            List<JsonNode> nodes = new ArrayList<>();
+            for (JsonNode node : extractOrderNodes(payload)) {
+                nodes.add(node);
+            }
+            orders.addAll(nodes);
+            totalPages = Math.max(1, readTotalPages(payload, nodes.isEmpty()));
+            page++;
+            if (nodes.isEmpty()) {
+                break;
             }
         }
-        throw lastError == null
-                ? new UberEatsClientException("Uber Eats isteği başarısız oldu", 0, true)
-                : lastError;
+        return orders;
     }
 
-    private String accessToken(UberEatsDtos.Credentials credentials) {
-        String cacheKey = credentials.clientId() + "|" + credentials.storeId();
-        CachedToken cached = tokenCache.get(cacheKey);
-        if (cached != null && cached.expiresAt().isAfter(Instant.now().plusSeconds(30))) {
-            return cached.token();
+    private JsonNode listOrdersPage(
+            UberEatsDtos.Credentials credentials,
+            Instant start,
+            Instant end,
+            int page,
+            int size
+    ) {
+        String path = expand(properties.getPaths().getOrders(), credentials, null);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath(path)
+                .queryParam("startDate", start.toEpochMilli())
+                .queryParam("endDate", end.toEpochMilli())
+                .queryParam("page", Math.max(0, page))
+                .queryParam("size", Math.max(1, size));
+        if (credentials.getRestaurantId() != null && !credentials.getRestaurantId().isBlank()) {
+            builder.queryParam("restaurantId", credentials.getRestaurantId());
+            builder.queryParam("storeId", credentials.getRestaurantId());
         }
-        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("client_id", credentials.clientId());
-        form.add("client_secret", credentials.clientSecret());
-        form.add("grant_type", "client_credentials");
-        form.add("scope", properties.getDefaultScope());
-        JsonNode response;
-        try {
-            response = authClient.post()
-                    .uri(properties.getAuthUrl())
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(form)
-                    .retrieve()
-                    .body(JsonNode.class);
-        } catch (RestClientResponseException exception) {
-            throw new UberEatsClientException(
-                    "Uber Eats OAuth başarısız: HTTP " + exception.getStatusCode().value(),
-                    exception.getStatusCode().value(),
-                    exception.getStatusCode().value() >= 500,
-                    exception
-            );
+        return exchange(HttpMethod.GET, builder.build(true).toUriString(), credentials, null);
+    }
+
+    private Iterable<JsonNode> extractOrderNodes(JsonNode payload) {
+        List<JsonNode> nodes = new ArrayList<>();
+        if (payload == null || payload.isNull()) {
+            return nodes;
         }
-        if (response == null || !response.hasNonNull("access_token")) {
-            throw new UberEatsClientException("Uber Eats OAuth access_token dönmedi", 0, false);
+        if (payload.isArray()) {
+            payload.forEach(nodes::add);
+            return nodes;
         }
-        String token = response.get("access_token").asText();
-        long expiresIn = response.path("expires_in").asLong(3600);
-        tokenCache.put(cacheKey, new CachedToken(token, Instant.now().plusSeconds(Math.max(60, expiresIn))));
-        return token;
+        JsonNode content = payload.get("content");
+        if (content != null && content.isArray()) {
+            content.forEach(nodes::add);
+            return nodes;
+        }
+        JsonNode packages = payload.get("packages");
+        if (packages != null && packages.isArray()) {
+            packages.forEach(nodes::add);
+            return nodes;
+        }
+        if (payload.has("id")) {
+            nodes.add(payload);
+        }
+        return nodes;
     }
 
-    private void invalidateToken(UberEatsDtos.Credentials credentials) {
-        tokenCache.remove(credentials.clientId() + "|" + credentials.storeId());
+    private int readTotalPages(JsonNode payload, boolean emptyPage) {
+        if (payload == null || payload.isNull()) {
+            return emptyPage ? 0 : 1;
+        }
+        if (payload.has("totalPages")) {
+            return Math.max(0, payload.get("totalPages").asInt(0));
+        }
+        if (payload.has("pageCount")) {
+            return Math.max(0, payload.get("pageCount").asInt(0));
+        }
+        return emptyPage ? 0 : 1;
     }
 
-    private void applyAuth(HttpHeaders headers, String token) {
-        headers.setBearerAuth(token);
-        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+    public void acceptOrder(UberEatsDtos.Credentials credentials, String orderId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        body.put("preparationTime", properties.getDefaultPreparationMinutes());
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderAccept(), credentials, null), credentials, body);
     }
 
-    private void sleepBackoff(int attempt) {
-        try {
-            Thread.sleep(Math.min(2000L * attempt, 8000L));
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
+    public void rejectOrder(UberEatsDtos.Credentials credentials, String orderId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        body.put("reasonId", properties.getDefaultCancelReasonId());
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderReject(), credentials, null), credentials, body);
+    }
+
+    public void cancelOrder(UberEatsDtos.Credentials credentials, String orderId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        body.put("reasonId", properties.getDefaultCancelReasonId());
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderCancel(), credentials, null), credentials, body);
+    }
+
+    public void markReady(UberEatsDtos.Credentials credentials, String orderId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageId", orderId);
+        exchange(HttpMethod.PUT, expand(properties.getPaths().getOrderReady(), credentials, null), credentials, body);
+    }
+
+    private JsonNode exchange(HttpMethod method, String path, UberEatsDtos.Credentials credentials, Object body) {
+        int attempts = Math.max(1, properties.getMaxAttempts());
+        RestClientResponseException lastResponse = null;
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                RestClient.RequestBodySpec spec = restClient.method(method)
+                        .uri(path)
+                        .headers(headers -> applyAuth(headers, credentials))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON);
+                if (body != null) {
+                    spec.body(body);
+                }
+                String raw = spec.retrieve().body(String.class);
+                if (raw == null || raw.isBlank()) {
+                    return objectMapper.nullNode();
+                }
+                return objectMapper.readTree(raw);
+            } catch (RestClientResponseException exception) {
+                lastResponse = exception;
+                if (!retryable(exception.getStatusCode().value()) || attempt == attempts) {
+                    throw wrap(exception);
+                }
+            } catch (UberEatsClientException exception) {
+                throw exception;
+            } catch (Exception exception) {
+                lastError = exception;
+                if (attempt == attempts) {
+                    throw new UberEatsClientException("Uber Eats yanıt vermedi", exception);
+                }
+            }
+        }
+        if (lastResponse != null) {
+            throw wrap(lastResponse);
+        }
+        throw new UberEatsClientException("Uber Eats yanıt vermedi", lastError);
+    }
+
+    private void applyAuth(HttpHeaders headers, UberEatsDtos.Credentials credentials) {
+        headers.set(HttpHeaders.AUTHORIZATION, authorization(credentials));
+        headers.set(HttpHeaders.USER_AGENT, userAgent(credentials));
+    }
+
+    private UberEatsClientException wrap(RestClientResponseException exception) {
+        int status = exception.getStatusCode().value();
+        if (status == 401 || status == 403) {
+            return new UberEatsClientException("Uber Eats kimlik bilgileri reddedildi");
+        }
+        log.warn("Uber Eats HTTP {} {}", status, exception.getResponseBodyAsString());
+        return new UberEatsClientException("Uber Eats isteği başarısız oldu");
+    }
+
+    private boolean retryable(int status) {
+        return status == 408 || status == 429 || status >= 500;
+    }
+
+    private String expand(String template, UberEatsDtos.Credentials credentials, String orderId) {
+        if (template == null || template.isBlank()) {
+            throw new UberEatsClientException("Uber Eats yol şablonu tanımsız");
+        }
+        String path = template
+                .replace("{sellerId}", nullToEmpty(credentials.getSellerId()))
+                .replace("{supplierId}", nullToEmpty(credentials.getSellerId()))
+                .replace("{restaurantId}", nullToEmpty(credentials.getRestaurantId()))
+                .replace("{storeId}", nullToEmpty(credentials.getRestaurantId()))
+                .replace("{orderId}", nullToEmpty(orderId));
+        if (path.contains("{")) {
+            throw new UberEatsClientException("Uber Eats yolunda eksik parametre var");
+        }
+        return path;
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    private void requireRestaurant(UberEatsDtos.Credentials credentials) {
+        if (credentials.getRestaurantId() == null || credentials.getRestaurantId().isBlank()) {
+            throw new UberEatsClientException("Restoran seçilmedi");
         }
     }
 
-    private record CachedToken(String token, Instant expiresAt) {
+    private String authorization(UberEatsDtos.Credentials credentials) {
+        String raw = credentials.getApiKey() + ":" + credentials.getApiSecret();
+        return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String userAgent(UberEatsDtos.Credentials credentials) {
+        return credentials.getSellerId() + " - " + properties.getUserAgentName();
     }
 }

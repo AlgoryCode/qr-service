@@ -18,6 +18,9 @@ import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.Branch;
+import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
+import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
+import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsOrderRepository;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
@@ -85,6 +88,10 @@ class AnalyticsServiceTest {
     private BranchService branchService;
     @Mock
     private BranchRepository branchRepository;
+    @Mock
+    private UberEatsConnectionRepository uberEatsConnectionRepository;
+    @Mock
+    private UberEatsOrderRepository uberEatsOrderRepository;
 
     private AnalyticsService service;
 
@@ -105,7 +112,9 @@ class AnalyticsServiceTest {
                 tableBillRepository,
                 menuFixedExpenseService,
                 branchService,
-                branchRepository
+                branchRepository,
+                uberEatsConnectionRepository,
+                uberEatsOrderRepository
         );
     }
 
@@ -308,6 +317,7 @@ class AnalyticsServiceTest {
                         .build()));
         when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
+        when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
 
         TableBill bill = TableBill.builder().id(20L).menuId(menuId).currency("TRY").build();
         TableBillItem ayran = TableBillItem.builder()
@@ -338,6 +348,41 @@ class AnalyticsServiceTest {
         assertThat(report.hourly().get(14).orderCount()).isEqualTo(3L);
         assertThat(report.hourly().get(14).revenue()).isEqualByComparingTo("260.00");
         assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("260.00");
+        assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void getMenuRevenueReport_whenUberEatsAcceptedAndPrepared_thenAddsToGrossAndExcludesRejected() {
+        Long menuId = 5L;
+        Long ownerId = 9L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        Menu menu = publicMenu(menuId, ownerId);
+        menu.setBranchId(2L);
+        when(menuRepository.findById(menuId)).thenReturn(Optional.of(menu));
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(menuId)))
+                .thenReturn(List.of());
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
+        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
+        when(billPaymentRepository.findByMenuIdInAndPaidAtBetween(eq(List.of(menuId)), any(), any()))
+                .thenReturn(List.of());
+
+        UberEatsConnection connection = new UberEatsConnection();
+        connection.setId(42L);
+        connection.setUserId(ownerId);
+        when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.of(connection));
+        when(uberEatsOrderRepository.sumRevenueByConnectionAndStatuses(
+                eq(42L), any(), any(), eq(List.of("accepted", "prepared"))
+        )).thenReturn(new BigDecimal("175.50"));
+
+        AnalyticsDtos.MenuRevenueReportResponse report = service.getMenuRevenueReport(menuId, ownerId, day, day);
+
+        assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("175.50");
+        assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("175.50");
+        assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("175.50");
+        verify(uberEatsOrderRepository).sumRevenueByConnectionAndStatuses(
+                eq(42L), any(), any(), eq(List.of("accepted", "prepared"))
+        );
     }
 
     private BillPayment payment(
@@ -566,6 +611,7 @@ class AnalyticsServiceTest {
         when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
         when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L, 6L))).thenReturn(BigDecimal.ZERO);
+        when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
         TableBill bill = TableBill.builder().id(20L).menuId(5L).currency("TRY").build();
         TableBillItem item = TableBillItem.builder()
                 .id(1L).productId(1L).productName("Ayran").quantity(1).paidQuantity(1).build();

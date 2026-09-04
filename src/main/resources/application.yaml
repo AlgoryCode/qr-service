@@ -172,16 +172,16 @@ billing:
     manual-payment-grace-days: ${BILLING_SUBSCRIPTION_GRACE_DAYS:7}
 
 ubereats:
-  base-url: ${UBEREATS_BASE_URL:${TGO_BASE_URL:https://api.tgoapis.com}}
-  user-agent-name: ${UBEREATS_USER_AGENT_NAME:${TGO_USER_AGENT_NAME:AlgoryQR}}
-  encrypt-key: ${UBEREATS_CREDENTIALS_ENCRYPT_KEY:${TGO_CREDENTIALS_ENCRYPT_KEY:}}
-  connect-timeout: ${UBEREATS_CONNECT_TIMEOUT:${TGO_CONNECT_TIMEOUT:5s}}
-  read-timeout: ${UBEREATS_READ_TIMEOUT:${TGO_READ_TIMEOUT:20s}}
-  max-attempts: ${UBEREATS_MAX_ATTEMPTS:${TGO_MAX_ATTEMPTS:3}}
-  poll-enabled: ${UBEREATS_POLL_ENABLED:${TGO_POLL_ENABLED:true}}
-  poll-lookback-hours: ${UBEREATS_POLL_LOOKBACK_HOURS:${TGO_POLL_LOOKBACK_HOURS:168}}
-  poll-page-size: ${UBEREATS_POLL_PAGE_SIZE:${TGO_POLL_PAGE_SIZE:50}}
-  webhook-api-key: ${UBEREATS_WEBHOOK_API_KEY:${TGO_WEBHOOK_API_KEY:}}
+  base-url: ${UBEREATS_BASE_URL:https://api.tgoapis.com}
+  user-agent-name: ${UBEREATS_USER_AGENT_NAME:AlgoryQR}
+  encrypt-key: ${UBEREATS_CREDENTIALS_ENCRYPT_KEY:}
+  connect-timeout: ${UBEREATS_CONNECT_TIMEOUT:5s}
+  read-timeout: ${UBEREATS_READ_TIMEOUT:20s}
+  max-attempts: ${UBEREATS_MAX_ATTEMPTS:3}
+  poll-enabled: ${UBEREATS_POLL_ENABLED:true}
+  poll-lookback-hours: ${UBEREATS_POLL_LOOKBACK_HOURS:168}
+  poll-page-size: ${UBEREATS_POLL_PAGE_SIZE:50}
+  webhook-api-key: ${UBEREATS_WEBHOOK_API_KEY:}
 
 ubereats-menu:
   api-base-url: ${UBEREATS_MENU_API_BASE_URL:${UBEREATS_API_BASE_URL:https://api.uber.com}}

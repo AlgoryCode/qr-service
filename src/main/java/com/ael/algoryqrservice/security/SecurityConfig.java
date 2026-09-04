@@ -79,7 +79,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/site/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/integrations/ubereats/webhooks/orders").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/integrations/trendyol-go/webhooks/orders").permitAll()
                         .requestMatchers("/integrations/odeal/test/**").permitAll()
                         .requestMatchers("/internal/integrations/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
