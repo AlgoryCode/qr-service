@@ -10,7 +10,7 @@ import java.time.Duration;
 @Getter
 @Setter
 @Component
-@ConfigurationProperties(prefix = "trendyol-go")
+@ConfigurationProperties(prefix = "ubereats")
 public class TrendyolGoProperties {
 
     private String baseUrl = "https://api.tgoapis.com";

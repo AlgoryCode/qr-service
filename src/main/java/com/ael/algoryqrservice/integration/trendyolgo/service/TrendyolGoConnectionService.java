@@ -71,7 +71,7 @@ public class TrendyolGoConnectionService {
             TrendyolGoDtos.RestaurantResponse selected = restaurants.stream()
                     .filter(restaurant -> request.getRestaurantId().equals(restaurant.getId()))
                     .findFirst()
-                    .orElseThrow(() -> new BadRequestException("Seçilen restoran TGO hesabında bulunamadı"));
+                    .orElseThrow(() -> new BadRequestException("Seçilen restoran Uber Eats hesabında bulunamadı"));
             connection.setRestaurantId(selected.getId());
             connection.setRestaurantName(selected.getName());
             connection.setStatus(TrendyolGoConnectionStatus.CONNECTED);
@@ -104,7 +104,7 @@ public class TrendyolGoConnectionService {
         Long userId = securityUtils.getCurrentUserId();
         requireOwnedBranch(branchId, userId);
         return connectionRepository.findByUserIdAndBranchId(userId, branchId)
-                .orElseThrow(() -> new NotFoundException("TGO bağlantısı bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
     }
 
     @Transactional(readOnly = true)
@@ -112,7 +112,7 @@ public class TrendyolGoConnectionService {
         TrendyolGoConnection connection = requireOwnedConnection(branchId);
         if (connection.getStatus() != TrendyolGoConnectionStatus.CONNECTED
                 || !hasText(connection.getRestaurantId())) {
-            throw new BadRequestException("Önce bir TGO restoranı bağlayın");
+            throw new BadRequestException("Önce bir Uber Eats restoranı bağlayın");
         }
         return connection;
     }

@@ -21,9 +21,9 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_trendyol_go_connection", indexes = {
-        @Index(name = "idx_tgo_connection_user_branch", columnList = "user_id, branch_id", unique = true),
-        @Index(name = "idx_tgo_connection_restaurant", columnList = "restaurant_id")
+@Table(name = "ubereats_connections", indexes = {
+        @Index(name = "uk_ubereats_connections_user_branch", columnList = "user_id, branch_id", unique = true),
+        @Index(name = "idx_ubereats_connections_restaurant", columnList = "restaurant_id")
 })
 @Getter
 @Setter

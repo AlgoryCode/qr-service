@@ -26,10 +26,13 @@ app:
     branch-backfill: false
     package-catalog: false
 
-trendyol-go:
+ubereats:
   poll-enabled: false
   encrypt-key: dGVzdC10Z28tZW5jcnlwdC1rZXktMzItYnl0ZXMh
   webhook-api-key: test-webhook-key
+
+ubereats-menu:
+  encrypt-key: dGVzdC11YmVyZWF0cy1tZW51LWtleS0zMi1ieXRlcyEh
 
 google:
   oauth:

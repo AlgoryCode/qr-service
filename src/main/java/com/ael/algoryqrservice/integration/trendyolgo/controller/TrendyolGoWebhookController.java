@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/integrations/trendyol-go/webhooks")
+@RequestMapping("/integrations/ubereats/webhooks")
 @RequiredArgsConstructor
 public class TrendyolGoWebhookController {
 

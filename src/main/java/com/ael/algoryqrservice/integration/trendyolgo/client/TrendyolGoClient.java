@@ -188,14 +188,14 @@ public class TrendyolGoClient {
             } catch (Exception exception) {
                 lastError = exception;
                 if (attempt == attempts) {
-                    throw new TrendyolGoClientException("Uber Eats Trendyol Go yanıt vermedi", exception);
+                    throw new TrendyolGoClientException("Uber Eats yanıt vermedi", exception);
                 }
             }
         }
         if (lastResponse != null) {
             throw wrap(lastResponse);
         }
-        throw new TrendyolGoClientException("Uber Eats Trendyol Go yanıt vermedi", lastError);
+        throw new TrendyolGoClientException("Uber Eats yanıt vermedi", lastError);
     }
 
     private void applyAuth(HttpHeaders headers, TrendyolGoDtos.Credentials credentials) {
@@ -206,10 +206,10 @@ public class TrendyolGoClient {
     private TrendyolGoClientException wrap(RestClientResponseException exception) {
         int status = exception.getStatusCode().value();
         if (status == 401 || status == 403) {
-            return new TrendyolGoClientException("TGO kimlik bilgileri reddedildi");
+            return new TrendyolGoClientException("Uber Eats kimlik bilgileri reddedildi");
         }
-        log.warn("TGO HTTP {} {}", status, exception.getResponseBodyAsString());
-        return new TrendyolGoClientException("Uber Eats Trendyol Go isteği başarısız oldu");
+        log.warn("Uber Eats HTTP {} {}", status, exception.getResponseBodyAsString());
+        return new TrendyolGoClientException("Uber Eats isteği başarısız oldu");
     }
 
     private boolean retryable(int status) {
@@ -218,7 +218,7 @@ public class TrendyolGoClient {
 
     private String expand(String template, TrendyolGoDtos.Credentials credentials, String orderId) {
         if (template == null || template.isBlank()) {
-            throw new TrendyolGoClientException("TGO yol şablonu tanımsız");
+            throw new TrendyolGoClientException("Uber Eats yol şablonu tanımsız");
         }
         String path = template
                 .replace("{sellerId}", nullToEmpty(credentials.getSellerId()))
@@ -227,7 +227,7 @@ public class TrendyolGoClient {
                 .replace("{storeId}", nullToEmpty(credentials.getRestaurantId()))
                 .replace("{orderId}", nullToEmpty(orderId));
         if (path.contains("{")) {
-            throw new TrendyolGoClientException("TGO yolunda eksik parametre var");
+            throw new TrendyolGoClientException("Uber Eats yolunda eksik parametre var");
         }
         return path;
     }
