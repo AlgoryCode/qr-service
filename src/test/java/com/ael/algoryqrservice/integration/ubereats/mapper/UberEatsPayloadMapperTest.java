@@ -57,6 +57,40 @@ class UberEatsPayloadMapperTest {
     }
 
     @Test
+    void toProducts_whenCategoryStubAndCatalog_thenEnrichNameFromCatalog() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "categories": [
+                    {
+                      "name": "İçecekler",
+                      "products": [
+                        { "id": "8722497" }
+                      ]
+                    }
+                  ],
+                  "products": [
+                    {
+                      "id": "8722497",
+                      "name": "Ayran",
+                      "description": "Ev yapımı",
+                      "price": 40,
+                      "selling": true
+                    }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.ProductResponse> products = mapper.toProducts(root);
+
+        assertThat(products).hasSize(1);
+        assertThat(products.getFirst().getId()).isEqualTo("8722497");
+        assertThat(products.getFirst().getName()).isEqualTo("Ayran");
+        assertThat(products.getFirst().getDescription()).isEqualTo("Ev yapımı");
+        assertThat(products.getFirst().getCategoryName()).isEqualTo("İçecekler");
+        assertThat(products.getFirst().getPrice()).isEqualByComparingTo("40");
+    }
+
+    @Test
     void toOrderNodes_whenWebhookPackage_thenExtractFields() throws Exception {
         JsonNode root = objectMapper.readTree("""
                 {
