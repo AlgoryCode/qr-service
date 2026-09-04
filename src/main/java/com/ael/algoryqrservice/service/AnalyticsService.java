@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
+import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsOrderRepository;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Branch;
@@ -89,6 +91,8 @@ public class AnalyticsService {
     private final MenuFixedExpenseService menuFixedExpenseService;
     private final BranchService branchService;
     private final BranchRepository branchRepository;
+    private final UberEatsConnectionRepository uberEatsConnectionRepository;
+    private final UberEatsOrderRepository uberEatsOrderRepository;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -319,7 +323,7 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to
     ) {
-        return buildRevenueReport(resolveMenuScope(menuId, ownerId), from, to);
+        return buildRevenueReport(resolveMenuScope(menuId, ownerId), ownerId, from, to);
     }
 
     @Transactional(readOnly = true)
@@ -330,20 +334,23 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to
     ) {
-        return buildRevenueReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
+        return buildRevenueReport(resolveBranchScope(branchId, menuId, ownerId), ownerId, from, to);
     }
 
     private AnalyticsDtos.MenuRevenueReportResponse buildRevenueReport(
             ReportScope scope,
+            Long ownerId,
             LocalDate from,
             LocalDate to
     ) {
-        if (scope.menuIds().isEmpty()) {
-            return emptyRevenueReport(scope, from, to);
-        }
-        Collection<Long> menuIds = scope.menuIds();
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
+        BigDecimal uberEatsRevenue = sumUberEatsRevenue(ownerId, fromDt, toDt);
+
+        if (scope.menuIds().isEmpty()) {
+            return emptyRevenueReport(scope, from, to, uberEatsRevenue);
+        }
+        Collection<Long> menuIds = scope.menuIds();
 
         List<BillPayment> payments = billPaymentRepository.findByMenuIdInAndPaidAtBetween(menuIds, fromDt, toDt);
 
@@ -506,7 +513,8 @@ public class AnalyticsService {
         BigDecimal dailyFixedTotal = menuFixedExpenseService.totalDailyActiveAmount(menuIds);
         BigDecimal fixedExpenseTotal = dailyFixedTotal.multiply(BigDecimal.valueOf(dayCount))
                 .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal grossRevenue = totalRevenue;
+        BigDecimal paymentGross = totalRevenue;
+        BigDecimal grossRevenue = paymentGross.add(uberEatsRevenue);
         BigDecimal netRevenue = grossRevenue.subtract(fixedExpenseTotal).max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -533,6 +541,7 @@ public class AnalyticsService {
                 cashRevenue.setScale(2, RoundingMode.HALF_UP),
                 cardRevenue.setScale(2, RoundingMode.HALF_UP),
                 tipRevenue.setScale(2, RoundingMode.HALF_UP),
+                uberEatsRevenue.setScale(2, RoundingMode.HALF_UP),
                 grossRevenue.setScale(2, RoundingMode.HALF_UP),
                 fixedExpenseTotal,
                 netRevenue,
@@ -546,7 +555,7 @@ public class AnalyticsService {
                 scope.branchName(),
                 from,
                 to,
-                new AnalyticsDtos.RevenueKpis(totalRevenue, orderCount, itemCount, avgOrderValue, currency),
+                new AnalyticsDtos.RevenueKpis(grossRevenue, orderCount, itemCount, avgOrderValue, currency),
                 daily,
                 productRows,
                 categoryRows,
@@ -556,6 +565,20 @@ public class AnalyticsService {
                 paymentBreakdown,
                 personnelRows
         );
+    }
+
+    private BigDecimal sumUberEatsRevenue(Long ownerId, LocalDateTime fromDt, LocalDateTime toDt) {
+        if (ownerId == null) {
+            return BigDecimal.ZERO;
+        }
+        return uberEatsConnectionRepository.findByUserId(ownerId)
+                .map(connection -> uberEatsOrderRepository.sumRevenueByConnectionAndStatuses(
+                        connection.getId(),
+                        fromDt,
+                        toDt,
+                        List.of("accepted", "prepared")
+                ))
+                .orElse(BigDecimal.ZERO);
     }
 
     private static final class PersonnelPaymentAgg {
@@ -1188,8 +1211,10 @@ public class AnalyticsService {
     private AnalyticsDtos.MenuRevenueReportResponse emptyRevenueReport(
             ReportScope scope,
             LocalDate from,
-            LocalDate to
+            LocalDate to,
+            BigDecimal uberEatsRevenue
     ) {
+        BigDecimal uber = uberEatsRevenue != null ? uberEatsRevenue : BigDecimal.ZERO;
         List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
         for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
             daily.add(new AnalyticsDtos.DailyRevenuePoint(cursor, BigDecimal.ZERO, 0L));
@@ -1205,7 +1230,7 @@ public class AnalyticsService {
                 scope.branchName(),
                 from,
                 to,
-                new AnalyticsDtos.RevenueKpis(BigDecimal.ZERO, 0L, 0L, BigDecimal.ZERO, "TRY"),
+                new AnalyticsDtos.RevenueKpis(uber, 0L, 0L, BigDecimal.ZERO, "TRY"),
                 daily,
                 List.of(),
                 List.of(),
@@ -1216,9 +1241,10 @@ public class AnalyticsService {
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
+                        uber.setScale(2, RoundingMode.HALF_UP),
+                        uber.setScale(2, RoundingMode.HALF_UP),
                         BigDecimal.ZERO,
-                        BigDecimal.ZERO,
-                        BigDecimal.ZERO,
+                        uber.setScale(2, RoundingMode.HALF_UP),
                         "TRY"
                 ),
                 List.of()

@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.integration.ubereats.client.UberEatsClient;
-import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
-import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
-import com.ael.algoryqrservice.integration.ubereats.service.UberEatsConnectionService;
+import com.ael.algoryqrservice.integration.ubereatsmenu.client.UberEatsMenuAuthClient;
+import com.ael.algoryqrservice.integration.ubereatsmenu.model.UberEatsMenuConnection;
+import com.ael.algoryqrservice.integration.ubereatsmenu.model.dto.UberEatsMenuDtos;
+import com.ael.algoryqrservice.integration.ubereatsmenu.service.UberEatsMenuConnectionService;
 import com.ael.algoryqrservice.messaging.IntegrationMessagePublisher;
 import com.ael.algoryqrservice.model.IntegrationJob;
 import com.ael.algoryqrservice.model.Menu;
@@ -54,8 +54,8 @@ public class IntegrationExportService {
     private final MenuSubCategoryRepository menuSubCategoryRepository;
     private final IntegrationJobRepository jobRepository;
     private final IntegrationMessagePublisher messagePublisher;
-    private final UberEatsConnectionService uberEatsConnectionService;
-    private final UberEatsClient uberEatsClient;
+    private final UberEatsMenuConnectionService uberEatsConnectionService;
+    private final UberEatsMenuAuthClient uberEatsClient;
     private final SecurityUtils securityUtils;
     private final ObjectMapper objectMapper;
 
@@ -73,8 +73,8 @@ public class IntegrationExportService {
     @Transactional
     public IntegrationPendingProductDtos.JobAccepted importFromUberEats(Long menuId) {
         Menu menu = requireOwnedMenu(menuId);
-        UberEatsConnection connection = uberEatsConnectionService.requireConnected(menuId);
-        UberEatsDtos.Credentials credentials = uberEatsConnectionService.decrypt(connection);
+        UberEatsMenuConnection connection = uberEatsConnectionService.requireConnected(menuId);
+        UberEatsMenuDtos.Credentials credentials = uberEatsConnectionService.decrypt(connection);
         JsonNode uberMenu = uberEatsClient.getMenu(credentials);
         ObjectNode snapshot = buildUberSnapshot(menu, uberMenu);
         if (snapshot.withArray("products").isEmpty()) {

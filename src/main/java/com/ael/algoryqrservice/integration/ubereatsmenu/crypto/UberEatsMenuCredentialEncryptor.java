@@ -1,6 +1,6 @@
-package com.ael.algoryqrservice.integration.ubereats.crypto;
+package com.ael.algoryqrservice.integration.ubereatsmenu.crypto;
 
-import com.ael.algoryqrservice.integration.ubereats.config.UberEatsProperties;
+import com.ael.algoryqrservice.integration.ubereatsmenu.config.UberEatsMenuProperties;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -15,7 +15,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 @Component
-public class UberEatsCredentialEncryptor {
+public class UberEatsMenuCredentialEncryptor {
 
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128;
@@ -24,7 +24,7 @@ public class UberEatsCredentialEncryptor {
     private final SecretKey secretKey;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public UberEatsCredentialEncryptor(UberEatsProperties properties) {
+    public UberEatsMenuCredentialEncryptor(UberEatsMenuProperties properties) {
         this.secretKey = new SecretKeySpec(normalizeKey(properties.getEncryptKey()), "AES");
     }
 
@@ -78,7 +78,7 @@ public class UberEatsCredentialEncryptor {
 
     private byte[] normalizeKey(String raw) {
         if (raw == null || raw.isBlank()) {
-            return sha256("algoryqr-tgo-local-dev-key");
+            return sha256("algoryqr-ubereats-local-dev-key");
         }
         try {
             byte[] decoded = Base64.getDecoder().decode(raw.trim());

@@ -279,6 +279,7 @@ public class AnalyticsDtos {
             BigDecimal cashRevenue,
             BigDecimal cardRevenue,
             BigDecimal tipRevenue,
+            BigDecimal uberEatsRevenue,
             BigDecimal grossRevenue,
             BigDecimal fixedExpenseTotal,
             BigDecimal netRevenue,
