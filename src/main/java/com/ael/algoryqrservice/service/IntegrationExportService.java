@@ -9,11 +9,17 @@ import com.ael.algoryqrservice.integration.ubereats.service.UberEatsConnectionSe
 import com.ael.algoryqrservice.messaging.IntegrationMessagePublisher;
 import com.ael.algoryqrservice.model.IntegrationJob;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.MenuCategory;
+import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.IntegrationPendingProductDtos;
 import com.ael.algoryqrservice.model.enums.IntegrationDirection;
 import com.ael.algoryqrservice.model.enums.IntegrationJobStatus;
 import com.ael.algoryqrservice.repository.IntegrationJobRepository;
+import com.ael.algoryqrservice.repository.MenuCategoryRepository;
+import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,8 +33,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +47,9 @@ public class IntegrationExportService {
     private static final String PROVIDER_UBEREATS = "UBEREATS";
 
     private final MenuRepository menuRepository;
+    private final MenuProductRepository menuProductRepository;
+    private final MenuSubCategoryRepository menuSubCategoryRepository;
+    private final MenuCategoryRepository menuCategoryRepository;
     private final IntegrationJobRepository jobRepository;
     private final IntegrationMessagePublisher messagePublisher;
     private final UberEatsConnectionService uberEatsConnectionService;
@@ -47,8 +60,13 @@ public class IntegrationExportService {
 
     @Transactional
     public IntegrationPendingProductDtos.JobAccepted exportToUberEats(Long menuId) {
-        requireOwnedMenu(menuId);
-        throw new BadRequestException("Partner API menü yazmayı desteklemiyor");
+        Menu menu = requireOwnedMenu(menuId);
+        UberEatsConnection connection = uberEatsConnectionService.requireConnected();
+        ObjectNode snapshot = buildInternalSnapshot(menu);
+        if (snapshot.withArray("products").isEmpty()) {
+            throw new BadRequestException("Menüde aktarılacak ürün yok");
+        }
+        return enqueue(menu, IntegrationDirection.EXPORT_TO_UBEREATS, snapshot, connection.getRestaurantId());
     }
 
     @Transactional
@@ -142,6 +160,62 @@ public class IntegrationExportService {
                 .status(saved.getStatus())
                 .direction(saved.getDirection())
                 .build();
+    }
+
+    private ObjectNode buildInternalSnapshot(Menu menu) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("menuId", menu.getMenuId());
+        root.put("tenantId", menu.getUserId());
+        root.put("businessName", menu.getBusinessName());
+        ArrayNode productNodes = root.putArray("products");
+
+        List<MenuProduct> products = menuProductRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(menu.getMenuId());
+        Map<Long, MenuSubCategory> subCategories = menuSubCategoryRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscIdAsc(menu.getMenuId())
+                .stream()
+                .collect(Collectors.toMap(MenuSubCategory::getId, Function.identity(), (a, b) -> a, HashMap::new));
+        Map<Long, MenuCategory> categories = menuCategoryRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscIdAsc(menu.getMenuId())
+                .stream()
+                .collect(Collectors.toMap(MenuCategory::getId, Function.identity(), (a, b) -> a, HashMap::new));
+
+        for (MenuProduct product : products) {
+            if (product.getProductId() == null) {
+                continue;
+            }
+            ObjectNode node = productNodes.addObject();
+            String sourceProductId = String.valueOf(product.getProductId());
+            node.put("sourceProductId", sourceProductId);
+            node.put("internalProductId", product.getProductId());
+            node.put("name", product.getName());
+            if (product.getDescription() != null) {
+                node.put("description", product.getDescription());
+            }
+            if (product.getPrice() != null) {
+                node.put("price", product.getPrice());
+            } else {
+                node.putNull("price");
+            }
+            node.put("currency", product.getCurrency() == null ? "TRY" : product.getCurrency());
+            node.put("available", product.isAvailable());
+            if (product.getImageUrl() != null) {
+                node.put("imageUrl", product.getImageUrl());
+            }
+            MenuSubCategory sub = subCategories.get(product.getSubCategoryId());
+            if (sub != null) {
+                node.put("subCategoryId", sub.getId());
+                node.put("subcategory", sub.getName());
+                MenuCategory category = categories.get(sub.getMenuCategoryId());
+                if (category != null) {
+                    node.put("category", category.getName());
+                } else {
+                    node.put("category", sub.getName());
+                }
+            }
+            node.putArray("modifierGroupIds");
+        }
+        return root;
     }
 
     private ObjectNode buildPartnerSnapshot(Menu menu, JsonNode partnerMenu) {

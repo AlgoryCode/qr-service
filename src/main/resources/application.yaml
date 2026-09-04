@@ -47,10 +47,7 @@ spring:
               - email
 
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 1
-    locations: classpath:db/migration
+    enabled: false
   jpa:
     open-in-view: false
     hibernate:
@@ -141,7 +138,7 @@ menu:
 
 ai-service:
   url: ${AI_SERVICE_URL:http://localhost:8000}
-  api-key: ${AI_SERVICE_API_KEY:}
+  api-key: ${AI_SERVICE_API_KEY:dev-ai-service-key}
   connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:3s}
   read-timeout: ${AI_SERVICE_READ_TIMEOUT:60s}
   reindex-batch-size: ${AI_SERVICE_REINDEX_BATCH_SIZE:100}
@@ -155,6 +152,14 @@ integration:
     ai-completed-routing-key: ${INTEGRATION_AI_COMPLETED_ROUTING_KEY:integration.ai.completed}
     publish-queue: ${INTEGRATION_PUBLISH_QUEUE:qr-service.integration.publish.requested}
     publish-routing-key: ${INTEGRATION_PUBLISH_ROUTING_KEY:integration.publish.requested}
+
+menu-import:
+  rabbitmq:
+    exchange: ${MENU_IMPORT_EVENTS_EXCHANGE:menu.import.events}
+    ai-requested-queue: ${MENU_IMPORT_AI_REQUESTED_QUEUE:menu.import.ai.requested}
+    ai-requested-routing-key: ${MENU_IMPORT_AI_REQUESTED_ROUTING_KEY:menu.import.ai.requested}
+    ai-completed-queue: ${MENU_IMPORT_AI_COMPLETED_QUEUE:qr-service.menu.import.ai.completed}
+    ai-completed-routing-key: ${MENU_IMPORT_AI_COMPLETED_ROUTING_KEY:menu.import.ai.completed}
 
 smart-report:
   rabbitmq:
@@ -182,6 +187,9 @@ ubereats:
   poll-lookback-hours: ${UBEREATS_POLL_LOOKBACK_HOURS:168}
   poll-page-size: ${UBEREATS_POLL_PAGE_SIZE:50}
   webhook-api-key: ${UBEREATS_WEBHOOK_API_KEY:}
+  paths:
+    restaurant-menu-upsert: ${UBEREATS_MENU_UPSERT_PATH:/integrator/product/meal/suppliers/{sellerId}/stores/{restaurantId}/products}
+    restaurant-menu-upsert-method: ${UBEREATS_MENU_UPSERT_METHOD:POST}
 
 ubereats-menu:
   api-base-url: ${UBEREATS_MENU_API_BASE_URL:${UBEREATS_API_BASE_URL:https://api.uber.com}}

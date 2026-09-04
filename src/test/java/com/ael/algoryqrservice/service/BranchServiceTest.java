@@ -2,9 +2,11 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.dto.BranchDtos;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,9 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +32,10 @@ class BranchServiceTest {
     @Mock
     private MenuRepository menuRepository;
     @Mock
+    private QrRepository qrRepository;
+    @Mock
+    private MenuQrSoftDeleteService menuQrSoftDeleteService;
+    @Mock
     private BranchQuotaService branchQuotaService;
     @Mock
     private ProductImageStorageService productImageStorageService;
@@ -36,6 +44,38 @@ class BranchServiceTest {
 
     @InjectMocks
     private BranchService branchService;
+
+    @Test
+    void delete_whenMenusExist_thenSoftDeletesMenusThenBranch() {
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").build();
+        Menu menu = Menu.builder().menuId(4L).userId(7L).qrId(90L).branchId(15L).build();
+        Qr qr = Qr.builder().qrId(90L).userId(7L).build();
+        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(menuRepository.findByBranchIdAndDeletedFalse(15L)).thenReturn(List.of(menu));
+        when(qrRepository.findById(90L)).thenReturn(Optional.of(qr));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        branchService.delete(15L);
+
+        verify(menuQrSoftDeleteService).softDeleteMenuQr(qr);
+        assertThat(branch.isDeleted()).isTrue();
+        verify(branchRepository).save(branch);
+    }
+
+    @Test
+    void delete_whenNoMenus_thenSoftDeletesBranchOnly() {
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").build();
+        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(menuRepository.findByBranchIdAndDeletedFalse(15L)).thenReturn(List.of());
+        when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        branchService.delete(15L);
+
+        verify(menuQrSoftDeleteService, never()).softDeleteMenuQr(any());
+        assertThat(branch.isDeleted()).isTrue();
+    }
 
     @Test
     void create_whenQuotaAllows_thenSavesBranch() {

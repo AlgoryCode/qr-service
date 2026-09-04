@@ -89,6 +89,16 @@
       "vatRate": 20.00,
       "countable": false,
       "active": true
+    },
+    {
+      "code": "AI_MENU_IMPORT",
+      "name": "AI Menu Import",
+      "description": "Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma",
+      "scopeCode": "AI_MENU_IMPORT_OWNER",
+      "unitPrice": 0.00,
+      "vatRate": 20.00,
+      "countable": false,
+      "active": true
     }
   ],
   "packages": [
@@ -159,7 +169,8 @@
         "Haftalik akilli raporlama",
         "Akilli asistan",
         "Akilli ozet",
-        "Ozel tasarim menu"
+        "Ozel tasarim menu",
+        "AI ile menu fotografından urun ekleme"
       ],
       "currency": "TRY",
       "validityDays": 30,
@@ -180,7 +191,8 @@
         { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true },
         { "productCode": "SMART_SUMMARY", "quantity": 1, "unlimited": true },
         { "productCode": "CUSTOM_DESIGN", "quantity": 1, "unlimited": true },
-        { "productCode": "WAITER_PANEL", "quantity": 1, "unlimited": true }
+        { "productCode": "WAITER_PANEL", "quantity": 1, "unlimited": true },
+        { "productCode": "AI_MENU_IMPORT", "quantity": 1, "unlimited": true }
       ]
     },
     {

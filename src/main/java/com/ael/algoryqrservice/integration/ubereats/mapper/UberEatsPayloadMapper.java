@@ -10,8 +10,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Component
 public class UberEatsPayloadMapper {
@@ -32,6 +34,44 @@ public class UberEatsPayloadMapper {
                     .build());
         }
         return restaurants;
+    }
+
+    public Map<String, Object> toUpsertBody(JsonNode productData) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (productData == null || productData.isNull()) {
+            return body;
+        }
+        String externalId = firstText(productData, "externalProductId", "partnerProductId", "id");
+        if (externalId != null) {
+            body.put("id", externalId);
+        }
+        String name = firstText(productData, "name");
+        if (name != null) {
+            body.put("name", name);
+        }
+        String description = firstText(productData, "description");
+        if (description != null) {
+            body.put("description", description);
+        }
+        BigDecimal price = firstDecimal(productData, "price");
+        if (price != null) {
+            body.put("price", price);
+            body.put("salePrice", price);
+        }
+        String currency = firstText(productData, "currency");
+        body.put("currency", currency == null ? "TRY" : currency);
+        String category = firstText(productData, "category", "subcategory");
+        if (category != null) {
+            body.put("categoryName", category);
+        }
+        String imageUrl = firstText(productData, "imageUrl");
+        if (imageUrl != null) {
+            body.put("imageUrl", imageUrl);
+        }
+        Boolean available = firstBoolean(productData, "available");
+        body.put("selling", available == null || available);
+        body.put("status", available != null && !available ? "PASSIVE" : "ACTIVE");
+        return body;
     }
 
     public List<UberEatsDtos.ProductResponse> toProducts(JsonNode root) {
@@ -210,20 +250,77 @@ public class UberEatsPayloadMapper {
     }
 
     private void addProduct(List<UberEatsDtos.ProductResponse> products, JsonNode product, String categoryName) {
-        String id = firstText(product, "id", "productId", "itemId");
+        String id = firstText(
+                product,
+                "id",
+                "productId",
+                "itemId",
+                "stockId",
+                "stock.id",
+                "product.id",
+                "productContentId"
+        );
         if (id == null) {
             return;
         }
+        for (UberEatsDtos.ProductResponse existing : products) {
+            if (id.equals(existing.getId())) {
+                return;
+            }
+        }
+        String name = firstText(
+                product,
+                "name",
+                "productName",
+                "title",
+                "nameDisplay",
+                "stockName",
+                "stockNameDisplay",
+                "productContentName",
+                "contentName",
+                "product.name",
+                "product.title",
+                "product.productName",
+                "stock.name"
+        );
+        String description = firstText(
+                product,
+                "description",
+                "detail",
+                "productDescription",
+                "stockDescription",
+                "product.description"
+        );
+        BigDecimal price = firstDecimal(
+                product,
+                "price",
+                "salePrice",
+                "sellingPrice",
+                "listPrice",
+                "unitPrice",
+                "amount",
+                "product.price",
+                "product.salePrice",
+                "stock.salePrice"
+        );
+        String currency = firstText(product, "currency", "currencyCode", "product.currency");
         products.add(UberEatsDtos.ProductResponse.builder()
                 .id(id)
-                .name(firstText(product, "name", "productName", "title"))
-                .description(firstText(product, "description", "detail"))
+                .name(name)
+                .description(description)
                 .categoryName(categoryName)
-                .price(firstDecimal(product, "price", "salePrice", "sellingPrice"))
-                .currency(firstText(product, "currency", "currencyCode") == null
-                        ? "TRY"
-                        : firstText(product, "currency", "currencyCode"))
-                .imageUrl(firstText(product, "imageUrl", "image", "photoUrl", "images.0"))
+                .price(price)
+                .currency(currency == null ? "TRY" : currency)
+                .imageUrl(firstText(
+                        product,
+                        "imageUrl",
+                        "image",
+                        "photoUrl",
+                        "images.0",
+                        "images.0.url",
+                        "product.images.0",
+                        "product.imageUrl"
+                ))
                 .available(isAvailable(product))
                 .build());
     }
