@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiMenuImportService {
@@ -67,8 +69,20 @@ public class AiMenuImportService {
                 .imageUrls(urlsNode)
                 .createdAt(now)
                 .build();
+        log.info(
+                "menu_import_job_enqueue_start jobId={} menuId={} imageCount={}",
+                job.getId(), menuId, imageUrls.size()
+        );
         AiMenuImportJob saved = jobRepository.save(job);
+        log.info(
+                "menu_import_job_queued jobId={} menuId={} status={}",
+                saved.getId(), saved.getMenuId(), saved.getStatus()
+        );
         messagePublisher.publishAiRequested(saved);
+        log.info(
+                "menu_import_job_enqueue_done jobId={} status={}",
+                saved.getId(), saved.getStatus()
+        );
         return AiMenuImportDtos.JobAccepted.builder()
                 .jobId(saved.getId())
                 .status(saved.getStatus())
@@ -190,11 +204,16 @@ public class AiMenuImportService {
     @Transactional
     public AiMenuImportJob updateJob(UUID jobId, AiMenuImportDtos.JobUpdateRequest request) {
         AiMenuImportJob job = requireJob(jobId);
+        String previousStatus = job.getStatus();
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             String status = request.getStatus().trim();
             if (AiMenuImportJobStatus.EXTRACTING.equals(status)
                     && !AiMenuImportJobStatus.QUEUED.equals(job.getStatus())
                     && !AiMenuImportJobStatus.EXTRACTING.equals(job.getStatus())) {
+                log.info(
+                        "menu_import_job_update_skipped jobId={} currentStatus={} requestedStatus={}",
+                        jobId, job.getStatus(), status
+                );
                 return job;
             }
             if (AiMenuImportJobStatus.BATCH_SUBMITTED.equals(status)
@@ -228,7 +247,17 @@ public class AiMenuImportService {
         if (request.getExtractedProducts() != null) {
             job.setExtractedProducts(request.getExtractedProducts());
         }
-        return jobRepository.save(job);
+        AiMenuImportJob saved = jobRepository.save(job);
+        log.info(
+                "menu_import_job_updated jobId={} previousStatus={} status={} aiBatchId={} aiInputFileId={} errorMessage={}",
+                saved.getId(),
+                previousStatus,
+                saved.getStatus(),
+                saved.getAiBatchId(),
+                saved.getAiInputFileId(),
+                saved.getErrorMessage()
+        );
+        return saved;
     }
 
     private MenuDtos.MenuProductResponse createProductFromDraft(Long menuId, AiMenuImportDraft draft) {
