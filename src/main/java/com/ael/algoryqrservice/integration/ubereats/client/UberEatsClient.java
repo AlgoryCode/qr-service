@@ -49,6 +49,20 @@ public class UberEatsClient {
         return exchange(HttpMethod.GET, expand(properties.getPaths().getRestaurantMenu(), credentials, null), credentials, null);
     }
 
+    public JsonNode upsertMenuProduct(UberEatsDtos.Credentials credentials, Object body) {
+        requireRestaurant(credentials);
+        String path = expand(properties.getPaths().getRestaurantMenuUpsert(), credentials, null);
+        return exchange(upsertMethod(), path, credentials, body);
+    }
+
+    private HttpMethod upsertMethod() {
+        String configured = properties.getPaths().getRestaurantMenuUpsertMethod();
+        if (configured == null || configured.isBlank()) {
+            return HttpMethod.POST;
+        }
+        return HttpMethod.valueOf(configured.trim().toUpperCase());
+    }
+
     public JsonNode listOrders(UberEatsDtos.Credentials credentials, Instant start, Instant end) {
         return listOrdersPage(credentials, start, end, 0, properties.getPollPageSize());
     }
@@ -206,10 +220,10 @@ public class UberEatsClient {
     private UberEatsClientException wrap(RestClientResponseException exception) {
         int status = exception.getStatusCode().value();
         if (status == 401 || status == 403) {
-            return new UberEatsClientException("Uber Eats kimlik bilgileri reddedildi");
+            return new UberEatsClientException("Uber Eats kimlik bilgileri reddedildi", exception, status);
         }
         log.warn("Uber Eats HTTP {} {}", status, exception.getResponseBodyAsString());
-        return new UberEatsClientException("Uber Eats isteği başarısız oldu");
+        return new UberEatsClientException("Uber Eats isteği başarısız oldu (HTTP " + status + ")", exception, status);
     }
 
     private boolean retryable(int status) {

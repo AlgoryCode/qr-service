@@ -1,6 +1,12 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.integration.ubereats.client.UberEatsClient;
+import com.ael.algoryqrservice.integration.ubereats.client.UberEatsClientException;
+import com.ael.algoryqrservice.integration.ubereats.mapper.UberEatsPayloadMapper;
+import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
+import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
+import com.ael.algoryqrservice.integration.ubereats.service.UberEatsConnectionService;
 import com.ael.algoryqrservice.model.IntegrationPendingProduct;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
@@ -23,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -38,6 +45,9 @@ public class IntegrationPublishService {
     private final EntitlementService entitlementService;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
+    private final UberEatsConnectionService uberEatsConnectionService;
+    private final UberEatsClient uberEatsClient;
+    private final UberEatsPayloadMapper payloadMapper;
 
     @Transactional
     public void publish(UUID pendingProductId) {
@@ -50,24 +60,66 @@ public class IntegrationPublishService {
         }
 
         Set<String> targets = product.getPublishTargets() == null ? Set.of() : product.getPublishTargets();
-        if (targets.contains(IntegrationPublishTarget.UBEREATS)) {
-            product.setErrorMessage("Partner API menü yazmayı desteklemiyor");
-        }
-        boolean internalOk = !targets.contains(IntegrationPublishTarget.INTERNAL_MENU)
+        boolean needsInternal = targets.contains(IntegrationPublishTarget.INTERNAL_MENU);
+        boolean needsUber = targets.contains(IntegrationPublishTarget.UBEREATS);
+        boolean internalOk = !needsInternal
                 || product.getPublishedProductId() != null
                 || publishInternal(product);
-        boolean uberOk = !targets.contains(IntegrationPublishTarget.UBEREATS);
+        boolean uberOk = !needsUber || publishUber(product);
 
-        if (internalOk && uberOk) {
+        boolean anySuccess = (needsInternal && internalOk) || (needsUber && uberOk);
+        boolean anyFailure = (needsInternal && !internalOk) || (needsUber && !uberOk);
+
+        if (!anyFailure) {
             product.setApprovalStatus(IntegrationJobStatus.PUBLISHED);
             product.setErrorMessage(null);
-        } else if (internalOk || uberOk) {
+        } else if (anySuccess) {
             product.setApprovalStatus(IntegrationJobStatus.PARTIALLY_PUBLISHED);
         } else {
             product.setApprovalStatus(IntegrationJobStatus.FAILED);
         }
         product.setUpdatedAt(LocalDateTime.now());
         pendingProductRepository.save(product);
+    }
+
+    private boolean publishUber(IntegrationPendingProduct pending) {
+        try {
+            UberEatsConnection connection = uberEatsConnectionService.requireConnectedForUser(pending.getTenantId());
+            UberEatsDtos.Credentials credentials = uberEatsConnectionService.decrypt(connection);
+            Map<String, Object> body = payloadMapper.toUpsertBody(pending.getProductData());
+            if (body.get("name") == null) {
+                throw new BadRequestException("name zorunludur");
+            }
+            uberEatsClient.upsertMenuProduct(credentials, body);
+            log.info(
+                    "Uber Eats menu upsert ok jobId={} pendingProductId={} sourceProductId={}",
+                    pending.getJobId(),
+                    pending.getId(),
+                    pending.getSourceProductId()
+            );
+            return true;
+        } catch (UberEatsClientException exception) {
+            log.warn(
+                    "Uber Eats menu upsert failed jobId={} pendingProductId={} sourceProductId={} httpStatus={}",
+                    pending.getJobId(),
+                    pending.getId(),
+                    pending.getSourceProductId(),
+                    exception.getHttpStatus(),
+                    exception
+            );
+            pending.setErrorMessage(exception.getMessage());
+            return false;
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "Uber Eats menu upsert failed jobId={} pendingProductId={} sourceProductId={}",
+                    pending.getJobId(),
+                    pending.getId(),
+                    pending.getSourceProductId(),
+                    exception
+            );
+            pending.setErrorMessage(exception.getMessage());
+            return false;
+        }
     }
 
     private boolean publishInternal(IntegrationPendingProduct pending) {

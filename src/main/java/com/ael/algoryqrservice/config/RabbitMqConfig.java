@@ -149,4 +149,91 @@ public class RabbitMqConfig {
                 .to(integrationEventsExchange)
                 .with(properties.getPublishRoutingKey());
     }
+
+    @Bean
+    public TopicExchange menuImportEventsExchange(MenuImportRabbitProperties properties) {
+        return new TopicExchange(properties.getExchange(), true, false);
+    }
+
+    @Bean
+    public Queue menuImportAiRequestedQueue(MenuImportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiRequestedQueue())
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(properties.getAiRequestedQueue() + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue menuImportAiRequestedDlq(MenuImportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiRequestedQueue() + ".dlq").build();
+    }
+
+    @Bean
+    public Queue menuImportAiCompletedQueue(MenuImportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiCompletedQueue())
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(properties.getAiCompletedQueue() + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue menuImportAiCompletedDlq(MenuImportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getAiCompletedQueue() + ".dlq").build();
+    }
+
+    @Bean
+    public Binding menuImportAiRequestedBinding(
+            Queue menuImportAiRequestedQueue,
+            TopicExchange menuImportEventsExchange,
+            MenuImportRabbitProperties properties
+    ) {
+        return BindingBuilder.bind(menuImportAiRequestedQueue)
+                .to(menuImportEventsExchange)
+                .with(properties.getAiRequestedRoutingKey());
+    }
+
+    @Bean
+    public Binding menuImportAiCompletedBinding(
+            Queue menuImportAiCompletedQueue,
+            TopicExchange menuImportEventsExchange,
+            MenuImportRabbitProperties properties
+    ) {
+        return BindingBuilder.bind(menuImportAiCompletedQueue)
+                .to(menuImportEventsExchange)
+                .with(properties.getAiCompletedRoutingKey());
+    }
+
+    @Bean
+    public TopicExchange smartReportEventsExchange(SmartReportRabbitProperties properties) {
+        return new TopicExchange(properties.getEventsExchange(), true, false);
+    }
+
+    @Bean
+    public Queue smartReportGenerateQueue(SmartReportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getQueue()).build();
+    }
+
+    @Bean
+    public Queue smartReportEventsQueue(SmartReportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getEventsQueue())
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(properties.getEventsQueue() + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue smartReportEventsDlq(SmartReportRabbitProperties properties) {
+        return QueueBuilder.durable(properties.getEventsQueue() + ".dlq").build();
+    }
+
+    @Bean
+    public Binding smartReportEventsBinding(
+            Queue smartReportEventsQueue,
+            TopicExchange smartReportEventsExchange,
+            SmartReportRabbitProperties properties
+    ) {
+        return BindingBuilder.bind(smartReportEventsQueue)
+                .to(smartReportEventsExchange)
+                .with(properties.getEventsRoutingKey());
+    }
 }

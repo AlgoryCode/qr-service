@@ -32,6 +32,8 @@ public class UberEatsProperties {
     public static class Paths {
         private String restaurants = "/integrator/store/meal/suppliers/{sellerId}/stores";
         private String restaurantMenu = "/integrator/product/meal/suppliers/{sellerId}/stores/{restaurantId}/products";
+        private String restaurantMenuUpsert = "/integrator/product/meal/suppliers/{sellerId}/stores/{restaurantId}/products";
+        private String restaurantMenuUpsertMethod = "POST";
         private String orders = "/integrator/order/meal/suppliers/{sellerId}/packages";
         private String orderAccept = "/integrator/order/meal/suppliers/{sellerId}/packages/picked";
         private String orderReject = "/integrator/order/meal/suppliers/{sellerId}/packages/unsupplied";

@@ -3,10 +3,12 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.dto.BranchDtos;
 import com.ael.algoryqrservice.model.dto.ProductImageDtos;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,8 @@ public class BranchService {
 
     private final BranchRepository branchRepository;
     private final MenuRepository menuRepository;
+    private final QrRepository qrRepository;
+    private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchQuotaService branchQuotaService;
     private final ProductImageStorageService productImageStorageService;
     private final SecurityUtils securityUtils;
@@ -152,9 +156,10 @@ public class BranchService {
     @Transactional
     public void delete(Long branchId) {
         Branch branch = requireOwned(branchId);
-        List<Menu> menus = menuRepository.findByBranchIdAndDeletedFalse(branch.getId());
-        if (!menus.isEmpty()) {
-            throw new BadRequestException("Önce şubedeki menüleri silin");
+        for (Menu menu : menuRepository.findByBranchIdAndDeletedFalse(branch.getId())) {
+            Qr qr = qrRepository.findById(menu.getQrId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
+            menuQrSoftDeleteService.softDeleteMenuQr(qr);
         }
         branch.setDeleted(true);
         branchRepository.save(branch);

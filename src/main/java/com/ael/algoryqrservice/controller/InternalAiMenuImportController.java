@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.config.AiServiceProperties;
-import com.ael.algoryqrservice.model.IntegrationJob;
-import com.ael.algoryqrservice.model.dto.IntegrationPendingProductDtos;
-import com.ael.algoryqrservice.service.IntegrationExportService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ael.algoryqrservice.model.AiMenuImportJob;
+import com.ael.algoryqrservice.model.dto.AiMenuImportDtos;
+import com.ael.algoryqrservice.service.AiMenuImportService;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,15 +26,14 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/internal/integrations")
+@RequestMapping("/internal/menu-import")
 @RequiredArgsConstructor
-public class InternalIntegrationController {
+public class InternalAiMenuImportController {
 
     public static final String API_KEY_HEADER = "X-API-Key";
 
-    private final IntegrationExportService exportService;
+    private final AiMenuImportService aiMenuImportService;
     private final AiServiceProperties aiServiceProperties;
-    private final ObjectMapper objectMapper;
 
     @GetMapping("/jobs")
     public ResponseEntity<List<Map<String, Object>>> listJobs(
@@ -45,20 +45,10 @@ public class InternalIntegrationController {
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .toList();
-        List<Map<String, Object>> body = exportService.listByStatuses(statuses).stream()
+        List<Map<String, Object>> body = aiMenuImportService.listByStatuses(statuses).stream()
                 .map(this::toJobBody)
                 .toList();
         return ResponseEntity.ok(body);
-    }
-
-    @GetMapping("/jobs/{jobId}/snapshot")
-    @SuppressWarnings("unchecked")
-    public ResponseEntity<Map<String, Object>> getSnapshot(
-            @PathVariable UUID jobId,
-            @RequestHeader(value = API_KEY_HEADER, required = false) String apiKey
-    ) {
-        requireServiceKey(apiKey);
-        return ResponseEntity.ok(objectMapper.convertValue(exportService.getSnapshot(jobId), Map.class));
     }
 
     @GetMapping("/jobs/{jobId}")
@@ -67,32 +57,45 @@ public class InternalIntegrationController {
             @RequestHeader(value = API_KEY_HEADER, required = false) String apiKey
     ) {
         requireServiceKey(apiKey);
-        return ResponseEntity.ok(toJobBody(exportService.requireJob(jobId)));
+        return ResponseEntity.ok(toJobBody(aiMenuImportService.requireJob(jobId)));
     }
 
     @PatchMapping("/jobs/{jobId}")
     public ResponseEntity<Map<String, Object>> updateJob(
             @PathVariable UUID jobId,
             @RequestHeader(value = API_KEY_HEADER, required = false) String apiKey,
-            @RequestBody IntegrationPendingProductDtos.JobUpdateRequest request
+            @RequestBody AiMenuImportDtos.JobUpdateRequest request
     ) {
         requireServiceKey(apiKey);
-        return ResponseEntity.ok(toJobBody(exportService.updateJob(jobId, request)));
+        return ResponseEntity.ok(toJobBody(aiMenuImportService.updateJob(jobId, request)));
     }
 
-    private Map<String, Object> toJobBody(IntegrationJob job) {
+    private Map<String, Object> toJobBody(AiMenuImportJob job) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("jobId", job.getId());
         body.put("tenantId", job.getTenantId());
         body.put("menuId", job.getMenuId());
-        body.put("direction", job.getDirection());
         body.put("status", job.getStatus());
-        body.put("snapshotVersion", job.getSnapshotVersion());
+        body.put("imageUrls", toUrlList(job.getImageUrls()));
+        body.put("extractedProducts", job.getExtractedProducts());
         body.put("aiBatchId", job.getAiBatchId());
         body.put("aiInputFileId", job.getAiInputFileId());
         body.put("aiOutputFileId", job.getAiOutputFileId());
         body.put("errorMessage", job.getErrorMessage());
         return body;
+    }
+
+    private List<String> toUrlList(JsonNode imageUrls) {
+        List<String> urls = new ArrayList<>();
+        if (imageUrls == null || !imageUrls.isArray()) {
+            return urls;
+        }
+        for (JsonNode node : imageUrls) {
+            if (node != null && !node.isNull()) {
+                urls.add(node.asText());
+            }
+        }
+        return urls;
     }
 
     private void requireServiceKey(String apiKey) {

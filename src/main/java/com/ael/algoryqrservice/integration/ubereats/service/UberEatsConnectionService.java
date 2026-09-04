@@ -112,6 +112,17 @@ public class UberEatsConnectionService {
     }
 
     @Transactional(readOnly = true)
+    public UberEatsConnection requireConnectedForUser(Long userId) {
+        UberEatsConnection connection = connectionRepository.findByUserId(userId)
+                .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
+        if (connection.getStatus() != UberEatsConnectionStatus.CONNECTED
+                || !hasText(connection.getRestaurantId())) {
+            throw new BadRequestException("Önce bir Uber Eats restoranı bağlayın");
+        }
+        return connection;
+    }
+
+    @Transactional(readOnly = true)
     public UberEatsConnection findByUserId(Long userId) {
         return connectionRepository.findByUserId(userId).orElse(null);
     }

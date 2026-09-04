@@ -81,6 +81,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/integrations/ubereats/webhooks/orders").permitAll()
                         .requestMatchers("/integrations/odeal/test/**").permitAll()
                         .requestMatchers("/internal/integrations/**").permitAll()
+                        .requestMatchers("/internal/menu-import/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

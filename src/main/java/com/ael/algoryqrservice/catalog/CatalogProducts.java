@@ -11,6 +11,7 @@ public final class CatalogProducts {
     public static final String SMART_REPORTING = "SMART_REPORTING";
     public static final String CUSTOM_DESIGN = "CUSTOM_DESIGN";
     public static final String WAITER_PANEL = "WAITER_PANEL";
+    public static final String AI_MENU_IMPORT = "AI_MENU_IMPORT";
 
     public static final String QR_MENU_ADDON = "QR_MENU_ADDON";
     public static final String QR_BRANCH_ADDON = "QR_BRANCH_ADDON";
