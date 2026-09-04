@@ -81,7 +81,7 @@ public class TrendyolGoOrderService {
     public TrendyolGoDtos.OrderResponse getOrder(Long branchId, Long orderId) {
         TrendyolGoConnection connection = connectionService.requireConnected(branchId);
         TrendyolGoOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
-                .orElseThrow(() -> new NotFoundException("TGO siparişi bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
         return toResponse(order);
     }
 
@@ -227,7 +227,7 @@ public class TrendyolGoOrderService {
     ) {
         TrendyolGoConnection connection = connectionService.requireConnected(branchId);
         TrendyolGoOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
-                .orElseThrow(() -> new NotFoundException("TGO siparişi bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
         action.apply(connectionService.decrypt(connection), order.getExternalOrderId());
         order.setPackageStatus(localStatus);
         return toResponse(orderRepository.save(order));

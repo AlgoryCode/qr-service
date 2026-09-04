@@ -10,7 +10,7 @@ import java.time.Duration;
 @Getter
 @Setter
 @Configuration
-@ConfigurationProperties(prefix = "ubereats")
+@ConfigurationProperties(prefix = "ubereats-menu")
 public class UberEatsProperties {
 
     private String apiBaseUrl = "https://api.uber.com";

@@ -24,7 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/integrations/trendyol-go")
+@RequestMapping("/integrations/ubereats")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
 public class TrendyolGoController {

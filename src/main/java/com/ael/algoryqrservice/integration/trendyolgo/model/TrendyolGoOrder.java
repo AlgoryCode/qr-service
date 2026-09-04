@@ -22,10 +22,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_trendyol_go_order", indexes = {
-        @Index(name = "idx_tgo_order_connection_external", columnList = "connection_id, external_order_id", unique = true),
-        @Index(name = "idx_tgo_order_connection_status", columnList = "connection_id, package_status"),
-        @Index(name = "idx_tgo_order_created", columnList = "package_created_at")
+@Table(name = "ubereats_orders", indexes = {
+        @Index(name = "uk_ubereats_orders_connection_external", columnList = "connection_id, external_order_id", unique = true),
+        @Index(name = "idx_ubereats_orders_connection_status", columnList = "connection_id, package_status"),
+        @Index(name = "idx_ubereats_orders_created", columnList = "package_created_at")
 })
 @Getter
 @Setter

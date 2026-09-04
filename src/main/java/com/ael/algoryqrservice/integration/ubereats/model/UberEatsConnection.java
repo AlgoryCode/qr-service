@@ -20,7 +20,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "ubereats_connections")
+@Table(name = "ubereats_menu_connections")
 @Getter
 @Setter
 @NoArgsConstructor

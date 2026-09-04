@@ -171,26 +171,26 @@ billing:
   subscription:
     manual-payment-grace-days: ${BILLING_SUBSCRIPTION_GRACE_DAYS:7}
 
-trendyol-go:
-  base-url: ${TGO_BASE_URL:https://api.tgoapis.com}
-  user-agent-name: ${TGO_USER_AGENT_NAME:AlgoryQR}
-  encrypt-key: ${TGO_CREDENTIALS_ENCRYPT_KEY:}
-  connect-timeout: ${TGO_CONNECT_TIMEOUT:5s}
-  read-timeout: ${TGO_READ_TIMEOUT:20s}
-  max-attempts: ${TGO_MAX_ATTEMPTS:3}
-  poll-enabled: ${TGO_POLL_ENABLED:true}
-  poll-lookback-hours: ${TGO_POLL_LOOKBACK_HOURS:168}
-  poll-page-size: ${TGO_POLL_PAGE_SIZE:50}
-  webhook-api-key: ${TGO_WEBHOOK_API_KEY:}
-
 ubereats:
-  api-base-url: ${UBEREATS_API_BASE_URL:https://api.uber.com}
-  auth-url: ${UBEREATS_AUTH_URL:https://login.uber.com/oauth/v2/token}
-  encrypt-key: ${UBEREATS_CREDENTIALS_ENCRYPT_KEY:}
-  connect-timeout: ${UBEREATS_CONNECT_TIMEOUT:5s}
-  read-timeout: ${UBEREATS_READ_TIMEOUT:30s}
-  max-attempts: ${UBEREATS_MAX_ATTEMPTS:3}
-  default-scope: ${UBEREATS_DEFAULT_SCOPE:eats.store}
+  base-url: ${UBEREATS_BASE_URL:${TGO_BASE_URL:https://api.tgoapis.com}}
+  user-agent-name: ${UBEREATS_USER_AGENT_NAME:${TGO_USER_AGENT_NAME:AlgoryQR}}
+  encrypt-key: ${UBEREATS_CREDENTIALS_ENCRYPT_KEY:${TGO_CREDENTIALS_ENCRYPT_KEY:}}
+  connect-timeout: ${UBEREATS_CONNECT_TIMEOUT:${TGO_CONNECT_TIMEOUT:5s}}
+  read-timeout: ${UBEREATS_READ_TIMEOUT:${TGO_READ_TIMEOUT:20s}}
+  max-attempts: ${UBEREATS_MAX_ATTEMPTS:${TGO_MAX_ATTEMPTS:3}}
+  poll-enabled: ${UBEREATS_POLL_ENABLED:${TGO_POLL_ENABLED:true}}
+  poll-lookback-hours: ${UBEREATS_POLL_LOOKBACK_HOURS:${TGO_POLL_LOOKBACK_HOURS:168}}
+  poll-page-size: ${UBEREATS_POLL_PAGE_SIZE:${TGO_POLL_PAGE_SIZE:50}}
+  webhook-api-key: ${UBEREATS_WEBHOOK_API_KEY:${TGO_WEBHOOK_API_KEY:}}
+
+ubereats-menu:
+  api-base-url: ${UBEREATS_MENU_API_BASE_URL:${UBEREATS_API_BASE_URL:https://api.uber.com}}
+  auth-url: ${UBEREATS_MENU_AUTH_URL:${UBEREATS_AUTH_URL:https://login.uber.com/oauth/v2/token}}
+  encrypt-key: ${UBEREATS_MENU_CREDENTIALS_ENCRYPT_KEY:}
+  connect-timeout: ${UBEREATS_MENU_CONNECT_TIMEOUT:${UBEREATS_CONNECT_TIMEOUT:5s}}
+  read-timeout: ${UBEREATS_MENU_READ_TIMEOUT:${UBEREATS_READ_TIMEOUT:30s}}
+  max-attempts: ${UBEREATS_MENU_MAX_ATTEMPTS:${UBEREATS_MAX_ATTEMPTS:3}}
+  default-scope: ${UBEREATS_MENU_DEFAULT_SCOPE:${UBEREATS_DEFAULT_SCOPE:eats.store}}
 
 odeal:
   enabled: ${ODEAL_ENABLED:true}
