@@ -1,8 +1,6 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.integration.ubereatsmenu.UberEatsMenuPayloadMapper;
-import com.ael.algoryqrservice.integration.ubereatsmenu.UberEatsMenuPublisher;
 import com.ael.algoryqrservice.model.IntegrationPendingProduct;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
@@ -37,8 +35,6 @@ public class IntegrationPublishService {
     private final IntegrationPendingProductRepository pendingProductRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuSubCategoryRepository menuSubCategoryRepository;
-    private final UberEatsMenuPublisher uberEatsMenuPublisher;
-    private final UberEatsMenuPayloadMapper uberEatsMenuPayloadMapper;
     private final EntitlementService entitlementService;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
@@ -54,12 +50,13 @@ public class IntegrationPublishService {
         }
 
         Set<String> targets = product.getPublishTargets() == null ? Set.of() : product.getPublishTargets();
+        if (targets.contains(IntegrationPublishTarget.UBEREATS)) {
+            product.setErrorMessage("Partner API menü yazmayı desteklemiyor");
+        }
         boolean internalOk = !targets.contains(IntegrationPublishTarget.INTERNAL_MENU)
                 || product.getPublishedProductId() != null
                 || publishInternal(product);
-        boolean uberOk = !targets.contains(IntegrationPublishTarget.UBEREATS)
-                || (product.getUberItemId() != null && !product.getUberItemId().isBlank())
-                || publishUber(product);
+        boolean uberOk = !targets.contains(IntegrationPublishTarget.UBEREATS);
 
         if (internalOk && uberOk) {
             product.setApprovalStatus(IntegrationJobStatus.PUBLISHED);
@@ -132,28 +129,6 @@ public class IntegrationPublishService {
             return true;
         } catch (RuntimeException exception) {
             log.warn("Internal menu publish failed pendingProductId={}", pending.getId(), exception);
-            pending.setErrorMessage(exception.getMessage());
-            return false;
-        }
-    }
-
-    private boolean publishUber(IntegrationPendingProduct pending) {
-        try {
-            JsonNode payload = uberEatsMenuPayloadMapper.toUberItem(pending);
-            UberEatsMenuPublisher.PublishResult result = uberEatsMenuPublisher.publishItem(pending, payload);
-            if (result.success()) {
-                pending.setUberItemId(result.uberItemId());
-                return true;
-            }
-            pending.setErrorMessage(result.errorMessage());
-            if (result.retryable()) {
-                throw new IllegalStateException(result.errorMessage());
-            }
-            return false;
-        } catch (IllegalStateException exception) {
-            throw exception;
-        } catch (RuntimeException exception) {
-            log.warn("Uber publish failed pendingProductId={}", pending.getId(), exception);
             pending.setErrorMessage(exception.getMessage());
             return false;
         }
