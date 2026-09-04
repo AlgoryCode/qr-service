@@ -6,7 +6,7 @@ public final class IntegrationPublishTarget {
 
     public static final String INTERNAL_MENU = "INTERNAL_MENU";
     public static final String UBEREATS = "UBEREATS";
-    public static final Set<String> ALL = Set.of(INTERNAL_MENU, UBEREATS);
+    public static final Set<String> ALL = Set.of(INTERNAL_MENU);
 
     private IntegrationPublishTarget() {
     }
