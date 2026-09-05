@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -37,6 +38,18 @@ public interface WaiterCommissionRecordRepository extends JpaRepository<WaiterCo
             """)
     BigDecimal sumAmountByWaiterAndCreatedAtBetween(
             @Param("waiterId") Long waiterId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+            SELECT r FROM WaiterCommissionRecord r
+            WHERE r.waiterId IN :waiterIds
+              AND r.createdAt >= :start
+              AND r.createdAt <= :end
+            """)
+    List<WaiterCommissionRecord> findByWaiterIdInAndCreatedAtBetween(
+            @Param("waiterIds") Collection<Long> waiterIds,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
