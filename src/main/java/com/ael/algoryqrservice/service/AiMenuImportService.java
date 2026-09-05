@@ -9,6 +9,8 @@ import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.AiMenuImportDtos;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.model.enums.NutritionBasis;
+import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -129,7 +131,7 @@ public class AiMenuImportService {
                     .available(product.getAvailable() == null || product.getAvailable())
                     .servesPeopleMin(1)
                     .servesPeopleMax(1)
-                    .nutrition(product.getNutrition())
+                    .nutrition(normalizeNutrition(product.getNutrition()))
                     .build();
             MenuDtos.MenuProductResponse created = menuService.createProductForOwner(menuId, userId, createRequest);
             productIds.add(created.getProductId());
@@ -270,5 +272,15 @@ public class AiMenuImportService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private NutritionFacts normalizeNutrition(NutritionFacts nutrition) {
+        if (nutrition == null) {
+            return null;
+        }
+        if (nutrition.getBasis() == null) {
+            nutrition.setBasis(NutritionBasis.PER_100G);
+        }
+        return nutrition;
     }
 }
