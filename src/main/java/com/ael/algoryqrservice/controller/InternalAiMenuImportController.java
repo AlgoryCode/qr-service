@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.AiMenuImportJob;
 import com.ael.algoryqrservice.model.dto.AiMenuImportDtos;
 import com.ael.algoryqrservice.service.AiMenuImportService;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,7 @@ public class InternalAiMenuImportController {
 
     private final AiMenuImportService aiMenuImportService;
     private final AiServiceProperties aiServiceProperties;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/jobs")
     public ResponseEntity<List<Map<String, Object>>> listJobs(
@@ -77,7 +79,12 @@ public class InternalAiMenuImportController {
         body.put("menuId", job.getMenuId());
         body.put("status", job.getStatus());
         body.put("imageUrls", toUrlList(job.getImageUrls()));
-        body.put("extractedProducts", job.getExtractedProducts());
+        body.put(
+                "extractedProducts",
+                job.getExtractedProducts() == null
+                        ? null
+                        : objectMapper.convertValue(job.getExtractedProducts(), Object.class)
+        );
         body.put("aiBatchId", job.getAiBatchId());
         body.put("aiInputFileId", job.getAiInputFileId());
         body.put("aiOutputFileId", job.getAiOutputFileId());

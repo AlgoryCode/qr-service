@@ -117,6 +117,6 @@ public final class AiMenuImportDtos {
         private String aiInputFileId;
         private String aiOutputFileId;
         private String errorMessage;
-        private JsonNode extractedProducts;
+        private Object extractedProducts;
     }
 }
