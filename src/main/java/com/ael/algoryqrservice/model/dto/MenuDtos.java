@@ -42,6 +42,7 @@ public final class MenuDtos {
         private Integer servesPeopleMax;
         private NutritionFacts nutrition;
         private MenuProductPairingsRequest pairings;
+        private List<MenuProductOptionGroupRequest> optionGroups;
     }
 
     @Data
@@ -52,6 +53,31 @@ public final class MenuDtos {
         private List<Long> productIds;
         private List<Long> mainCategoryIds;
         private List<Long> subCategoryIds;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductOptionGroupRequest {
+        private String name;
+        private String kind;
+        private String unit;
+        private Integer minSelect;
+        private Integer maxSelect;
+        private Integer sortOrder;
+        private List<MenuProductOptionRequest> options;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductOptionRequest {
+        private String name;
+        private BigDecimal priceDelta;
+        private Boolean available;
+        private Integer sortOrder;
     }
 
     @Data
@@ -83,6 +109,34 @@ public final class MenuDtos {
         private Integer servesPeopleMax;
         private NutritionFacts nutrition;
         private MenuProductPairingsResponse pairings;
+        private List<MenuProductOptionGroupResponse> optionGroups;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductOptionGroupResponse {
+        private Long groupId;
+        private String name;
+        private String kind;
+        private String unit;
+        private int minSelect;
+        private int maxSelect;
+        private int sortOrder;
+        private List<MenuProductOptionResponse> options;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MenuProductOptionResponse {
+        private Long optionId;
+        private String name;
+        private BigDecimal priceDelta;
+        private boolean available;
+        private int sortOrder;
     }
 
     @Data
@@ -340,6 +394,7 @@ public final class MenuDtos {
         private boolean active;
         private BigDecimal ratingAvg;
         private long ratingCount;
+        private LocalDateTime updatedAt;
         private QrBrief qr;
     }
 

@@ -74,6 +74,7 @@ public class MenuService {
     private final EntitlementService entitlementService;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuProductPairingService menuProductPairingService;
+    private final MenuProductOptionService menuProductOptionService;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
@@ -185,6 +186,7 @@ public class MenuService {
                 taxonomyClone.categoryIds(),
                 sourceSubToTargetSub
         );
+        menuProductOptionService.copyOptions(sourceToTarget);
         usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
     }
 
@@ -550,10 +552,11 @@ public class MenuService {
                 .filter(MenuProduct::isAvailable)
                 .filter(product -> !product.getProductId().equals(productId))
                 .toList();
+        List<Long> candidateIds = candidates.stream().map(MenuProduct::getProductId).toList();
         Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
-                menuProductPairingService.loadByProductIds(
-                        candidates.stream().map(MenuProduct::getProductId).toList()
-                );
+                menuProductPairingService.loadByProductIds(candidateIds);
+        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
+                menuProductOptionService.loadByProductIds(candidateIds);
 
         return candidates.stream()
                 .sorted(Comparator.comparingDouble((MenuProduct candidate) -> {
@@ -589,13 +592,32 @@ public class MenuService {
                     return -score;
                 }).thenComparing(MenuProduct::getSortOrder).thenComparing(MenuProduct::getProductId))
                 .limit(safeLimit)
-                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct))
+                .map(product -> toProductResponse(
+                        product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct, optionsByProduct))
                 .toList();
     }
 
     @Transactional
     public MenuDtos.MenuProductResponse createProduct(Long menuId, MenuDtos.MenuProductRequest request) {
         Menu menu = ensureOwnedMenu(menuId);
+        return createProductOnMenu(menu, request);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductResponse createProductForOwner(
+            Long menuId,
+            Long userId,
+            MenuDtos.MenuProductRequest request
+    ) {
+        Menu menu = ensureMenuExists(menuId);
+        if (userId == null || !userId.equals(menu.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
+        }
+        return createProductOnMenu(menu, request);
+    }
+
+    private MenuDtos.MenuProductResponse createProductOnMenu(Menu menu, MenuDtos.MenuProductRequest request) {
+        Long menuId = menu.getMenuId();
         validateProductRequest(request);
         entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), 1);
         nutritionFactsService.validateForCreate(request.getNutrition());
@@ -633,6 +655,8 @@ public class MenuService {
         MenuDtos.MenuProductResponse response = toProductResponse(saved);
         menuProductPairingService.replace(response.getProductId(), menu.getMenuId(), request.getPairings());
         response.setPairings(menuProductPairingService.load(response.getProductId()));
+        menuProductOptionService.replace(response.getProductId(), request.getOptionGroups());
+        response.setOptionGroups(menuProductOptionService.load(response.getProductId()));
         usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
         menuProductIndexNotifier.productChanged(saved);
         return response;
@@ -690,6 +714,10 @@ public class MenuService {
         if (request.getPairings() != null) {
             menuProductPairingService.replace(product.getProductId(), product.getMenuId(), request.getPairings());
             response.setPairings(menuProductPairingService.load(product.getProductId()));
+        }
+        if (request.getOptionGroups() != null) {
+            menuProductOptionService.replace(product.getProductId(), request.getOptionGroups());
+            response.setOptionGroups(menuProductOptionService.load(product.getProductId()));
         }
         menuProductIndexNotifier.productChanged(saved);
         return response;
@@ -1088,12 +1116,14 @@ public class MenuService {
         Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(menuId);
         Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
         Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
+        List<Long> productIds = productPage.getContent().stream().map(MenuProduct::getProductId).toList();
         Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
-                menuProductPairingService.loadByProductIds(
-                        productPage.getContent().stream().map(MenuProduct::getProductId).toList()
-                );
+                menuProductPairingService.loadByProductIds(productIds);
+        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
+                menuProductOptionService.loadByProductIds(productIds);
         List<MenuDtos.MenuProductResponse> content = productPage.getContent().stream()
-                .map(product -> toProductResponse(product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct))
+                .map(product -> toProductResponse(
+                        product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct, optionsByProduct))
                 .toList();
         return MenuDtos.MenuProductPageResponse.builder()
                 .content(content)
@@ -1107,8 +1137,10 @@ public class MenuService {
 
     private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
         Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct = Map.of();
+        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct = Map.of();
         if (product.getProductId() != null) {
             pairingsByProduct = menuProductPairingService.loadByProductIds(List.of(product.getProductId()));
+            optionsByProduct = menuProductOptionService.loadByProductIds(List.of(product.getProductId()));
         }
         return toProductResponse(
                 product,
@@ -1116,7 +1148,8 @@ public class MenuService {
                 menuCategoryService.loadCategoryMap(product.getMenuId()),
                 menuTaxonomyService.loadTagMap(),
                 menuTaxonomyService.loadAllergenMap(),
-                pairingsByProduct
+                pairingsByProduct,
+                optionsByProduct
         );
     }
 
@@ -1126,7 +1159,8 @@ public class MenuService {
             Map<Long, MenuCategory> mainMap,
             Map<Long, MenuTag> tagMap,
             Map<Long, MenuAllergen> allergenMap,
-            Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct
+            Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct,
+            Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct
     ) {
         MenuSubCategory sub = subMap.get(product.getSubCategoryId());
         MenuCategory main = sub == null ? null : mainMap.get(sub.getMenuCategoryId());
@@ -1181,6 +1215,9 @@ public class MenuService {
                 .pairings(pairingsByProduct == null || product.getProductId() == null
                         ? emptyPairings()
                         : pairingsByProduct.getOrDefault(product.getProductId(), emptyPairings()))
+                .optionGroups(optionsByProduct == null || product.getProductId() == null
+                        ? List.of()
+                        : optionsByProduct.getOrDefault(product.getProductId(), List.of()))
                 .build();
     }
 
@@ -1293,6 +1330,7 @@ public class MenuService {
                 .active(menu.isActive())
                 .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
                 .ratingCount(menu.getRatingCount())
+                .updatedAt(menu.getUpdatedAt())
                 .qr(qrBrief)
                 .build();
     }
