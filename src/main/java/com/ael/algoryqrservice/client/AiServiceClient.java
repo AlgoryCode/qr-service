@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.client;
 
+import com.ael.algoryqrservice.client.dto.AiMenuImportClientDtos;
 import com.ael.algoryqrservice.client.dto.MenuProductReindexDtos;
 import com.ael.algoryqrservice.config.AiServiceProperties;
 import com.ael.algoryqrservice.messaging.dto.MenuProductDocumentMessage;
@@ -10,16 +11,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.UUID;
 
-/**
- * Bulk backfill channel to the vector indexer. Incremental changes travel over RabbitMQ;
- * this client exists for full menu reindex, which also needs stale-point purging.
- */
 @Slf4j
 @Component
 public class AiServiceClient {
 
     private static final String REINDEX_PATH = "/api/v1/menu-products/reindex";
+    private static final String MENU_IMPORT_PATH = "/api/v1/menu-import";
     private static final String API_KEY_HEADER = "X-API-Key";
 
     private final RestClient restClient;
@@ -56,5 +55,29 @@ public class AiServiceClient {
                 ))
                 .retrieve()
                 .body(MenuProductReindexDtos.Response.class);
+    }
+
+    public AiMenuImportClientDtos.JobAccepted createMenuImportJob(AiMenuImportClientDtos.CreateRequest request) {
+        log.info(
+                "ai_menu_import_proxy_create menuId={} userId={} imageCount={}",
+                request.getMenuId(),
+                request.getUserId(),
+                request.getImageUrls() == null ? 0 : request.getImageUrls().size()
+        );
+        return restClient.post()
+                .uri(MENU_IMPORT_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(API_KEY_HEADER, properties.getApiKey())
+                .body(request)
+                .retrieve()
+                .body(AiMenuImportClientDtos.JobAccepted.class);
+    }
+
+    public AiMenuImportClientDtos.JobResponse getMenuImportJob(UUID jobId) {
+        return restClient.get()
+                .uri(MENU_IMPORT_PATH + "/{jobId}", jobId)
+                .header(API_KEY_HEADER, properties.getApiKey())
+                .retrieve()
+                .body(AiMenuImportClientDtos.JobResponse.class);
     }
 }
