@@ -596,6 +596,24 @@ public class MenuService {
     @Transactional
     public MenuDtos.MenuProductResponse createProduct(Long menuId, MenuDtos.MenuProductRequest request) {
         Menu menu = ensureOwnedMenu(menuId);
+        return createProductOnMenu(menu, request);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductResponse createProductForOwner(
+            Long menuId,
+            Long userId,
+            MenuDtos.MenuProductRequest request
+    ) {
+        Menu menu = ensureMenuExists(menuId);
+        if (userId == null || !userId.equals(menu.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
+        }
+        return createProductOnMenu(menu, request);
+    }
+
+    private MenuDtos.MenuProductResponse createProductOnMenu(Menu menu, MenuDtos.MenuProductRequest request) {
+        Long menuId = menu.getMenuId();
         validateProductRequest(request);
         entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), 1);
         nutritionFactsService.validateForCreate(request.getNutrition());

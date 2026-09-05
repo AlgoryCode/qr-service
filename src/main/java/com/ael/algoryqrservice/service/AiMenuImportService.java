@@ -1,37 +1,28 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.AiServiceClient;
+import com.ael.algoryqrservice.client.dto.AiMenuImportClientDtos;
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.messaging.AiMenuImportMessagePublisher;
-import com.ael.algoryqrservice.model.AiMenuImportDraft;
-import com.ael.algoryqrservice.model.AiMenuImportJob;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.AiMenuImportDtos;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.model.enums.AiMenuImportJobStatus;
-import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
-import com.ael.algoryqrservice.repository.AiMenuImportDraftRepository;
-import com.ael.algoryqrservice.repository.AiMenuImportJobRepository;
+import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,265 +33,128 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AiMenuImportService {
 
-    private final AiMenuImportJobRepository jobRepository;
-    private final AiMenuImportDraftRepository draftRepository;
     private final MenuRepository menuRepository;
     private final MenuService menuService;
     private final MenuCategoryService menuCategoryService;
-    private final AiMenuImportMessagePublisher messagePublisher;
+    private final AiServiceClient aiServiceClient;
     private final SecurityUtils securityUtils;
-    private final ObjectMapper objectMapper;
 
-    @Transactional
     public AiMenuImportDtos.JobAccepted createJob(Long menuId, AiMenuImportDtos.CreateJobRequest request) {
         Menu menu = requireOwnedMenuEntity(menuId);
         List<String> imageUrls = normalizeImageUrls(request.getImageUrls());
         if (imageUrls.isEmpty()) {
             throw new BadRequestException("En az bir görsel URL zorunludur");
         }
-        LocalDateTime now = LocalDateTime.now();
-        ArrayNode urlsNode = objectMapper.createArrayNode();
-        imageUrls.forEach(urlsNode::add);
-        AiMenuImportJob job = AiMenuImportJob.builder()
-                .id(UUID.randomUUID())
-                .tenantId(menu.getUserId())
-                .menuId(menuId)
-                .status(AiMenuImportJobStatus.QUEUED)
-                .imageUrls(urlsNode)
-                .createdAt(now)
-                .build();
-        log.info(
-                "menu_import_job_enqueue_start jobId={} menuId={} imageCount={}",
-                job.getId(), menuId, imageUrls.size()
-        );
-        AiMenuImportJob saved = jobRepository.save(job);
-        log.info(
-                "menu_import_job_queued jobId={} menuId={} status={}",
-                saved.getId(), saved.getMenuId(), saved.getStatus()
-        );
-        messagePublisher.publishAiRequested(saved);
-        log.info(
-                "menu_import_job_enqueue_done jobId={} status={}",
-                saved.getId(), saved.getStatus()
-        );
-        return AiMenuImportDtos.JobAccepted.builder()
-                .jobId(saved.getId())
-                .status(saved.getStatus())
-                .build();
+        try {
+            AiMenuImportClientDtos.JobAccepted remote = aiServiceClient.createMenuImportJob(
+                    AiMenuImportClientDtos.CreateRequest.builder()
+                            .menuId(menuId)
+                            .userId(menu.getUserId())
+                            .imageUrls(imageUrls)
+                            .build()
+            );
+            if (remote == null || remote.getJobId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI menü import başlatılamadı");
+            }
+            log.info(
+                    "menu_import_proxy_accepted jobId={} menuId={} status={}",
+                    remote.getJobId(), menuId, remote.getStatus()
+            );
+            return AiMenuImportDtos.JobAccepted.builder()
+                    .jobId(remote.getJobId())
+                    .status(remote.getStatus())
+                    .build();
+        } catch (RestClientResponseException ex) {
+            throw mapAiServiceError(ex, "AI menü import başlatılamadı");
+        }
     }
 
-    @Transactional(readOnly = true)
     public AiMenuImportDtos.JobResponse getJob(Long menuId, UUID jobId) {
-        menuService.requireOwnedMenu(menuId);
-        return toJobResponse(requireOwnedJob(menuId, jobId));
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AiMenuImportDtos.DraftResponse> listDrafts(
-            Long menuId,
-            String status,
-            UUID jobId,
-            Pageable pageable
-    ) {
-        menuService.requireOwnedMenu(menuId);
-        String approvalStatus = status == null || status.isBlank()
-                ? AiMenuImportJobStatus.WAITING_APPROVAL
-                : status.trim();
-        Page<AiMenuImportDraft> page = jobId == null
-                ? draftRepository.findByMenuIdAndApprovalStatusOrderByCreatedAtAsc(menuId, approvalStatus, pageable)
-                : draftRepository.findByMenuIdAndJobIdAndApprovalStatusOrderByCreatedAtAsc(
-                        menuId, jobId, approvalStatus, pageable
-                );
-        return page.map(this::toDraftResponse);
+        requireOwnedMenuEntity(menuId);
+        try {
+            AiMenuImportClientDtos.JobResponse remote = aiServiceClient.getMenuImportJob(jobId);
+            if (remote == null || remote.getJobId() == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "AI menu import job bulunamadı");
+            }
+            if (remote.getMenuId() != null && !menuId.equals(remote.getMenuId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu job bu menüye ait değil");
+            }
+            return AiMenuImportDtos.JobResponse.builder()
+                    .jobId(remote.getJobId())
+                    .menuId(remote.getMenuId())
+                    .userId(remote.getUserId())
+                    .status(remote.getStatus())
+                    .imageUrls(remote.getImageUrls())
+                    .publishedCount(remote.getPublishedCount())
+                    .productCount(remote.getProductCount())
+                    .errorMessage(remote.getErrorMessage())
+                    .createdAt(toLocalDateTime(remote.getCreatedAt()))
+                    .completedAt(toLocalDateTime(remote.getCompletedAt()))
+                    .build();
+        } catch (RestClientResponseException ex) {
+            throw mapAiServiceError(ex, "AI menu import job okunamadı");
+        }
     }
 
     @Transactional
-    public AiMenuImportDtos.DraftResponse updateDraft(
-            Long menuId,
-            UUID draftId,
-            AiMenuImportDtos.DraftUpdateRequest request
-    ) {
-        AiMenuImportDraft draft = requireWaitingDraft(menuId, draftId);
-        ObjectNode data = asObjectNode(draft.getProductData());
-        putIfPresent(data, "name", request.getName());
-        putIfPresent(data, "description", request.getDescription());
-        putIfPresent(data, "currency", request.getCurrency());
-        putIfPresent(data, "category", request.getCategory());
-        putIfPresent(data, "subcategory", request.getSubcategory());
-        putIfPresent(data, "imageUrl", request.getImageUrl());
-        if (request.getPrice() != null) {
-            data.put("price", request.getPrice());
+    public AiMenuImportDtos.PublishResponse publishProducts(AiMenuImportDtos.PublishRequest request) {
+        Long menuId = request.getMenuId();
+        Long userId = request.getUserId();
+        Menu menu = menuRepository.findById(menuId)
+                .filter(item -> !item.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+        if (!userId.equals(menu.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
-        if (request.getSubCategoryId() != null) {
-            data.put("subCategoryId", request.getSubCategoryId());
-        }
-        if (request.getAvailable() != null) {
-            data.put("available", request.getAvailable());
-        }
-        if (request.getNutrition() != null) {
-            data.set("nutrition", objectMapper.valueToTree(request.getNutrition()));
-        }
-        draft.setProductData(data);
-        draft.setUpdatedAt(LocalDateTime.now());
-        return toDraftResponse(draftRepository.save(draft));
-    }
 
-    @Transactional
-    public AiMenuImportDtos.DraftResponse approve(Long menuId, UUID draftId, Long userId) {
-        AiMenuImportDraft draft = requireWaitingDraft(menuId, draftId);
-        MenuDtos.MenuProductResponse created = createProductFromDraft(menuId, draft);
-        draft.setApprovalStatus(AiMenuImportJobStatus.APPROVED);
-        draft.setApprovedBy(userId);
-        draft.setApprovedAt(LocalDateTime.now());
-        draft.setPublishedProductId(created.getProductId());
-        draft.setUpdatedAt(LocalDateTime.now());
-        return toDraftResponse(draftRepository.save(draft));
-    }
-
-    @Transactional
-    public List<AiMenuImportDtos.DraftResponse> bulkApprove(Long menuId, List<UUID> draftIds, Long userId) {
-        menuService.requireOwnedMenu(menuId);
-        List<AiMenuImportDraft> drafts = draftRepository.findByMenuIdAndIdIn(menuId, draftIds);
-        if (drafts.size() != draftIds.size()) {
-            throw new BadRequestException("Bazı taslaklar bulunamadı");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        List<AiMenuImportDtos.DraftResponse> responses = new ArrayList<>();
-        for (AiMenuImportDraft draft : drafts) {
-            if (!AiMenuImportJobStatus.WAITING_APPROVAL.equals(draft.getApprovalStatus())) {
-                throw new BadRequestException("Yalnızca onay bekleyen taslaklar onaylanabilir");
+        List<Long> productIds = new ArrayList<>();
+        for (AiMenuImportDtos.PublishProduct product : request.getProducts()) {
+            if (product == null) {
+                continue;
             }
-            MenuDtos.MenuProductResponse created = createProductFromDraft(menuId, draft);
-            draft.setApprovalStatus(AiMenuImportJobStatus.APPROVED);
-            draft.setApprovedBy(userId);
-            draft.setApprovedAt(now);
-            draft.setPublishedProductId(created.getProductId());
-            draft.setUpdatedAt(now);
-            responses.add(toDraftResponse(draftRepository.save(draft)));
-        }
-        return responses;
-    }
-
-    @Transactional
-    public void reject(Long menuId, UUID draftId, AiMenuImportDtos.RejectRequest request) {
-        AiMenuImportDraft draft = requireWaitingDraft(menuId, draftId);
-        draft.setApprovalStatus(AiMenuImportJobStatus.REJECTED);
-        draft.setRejectReason(request == null ? null : blankToNull(request.getReason()));
-        draft.setUpdatedAt(LocalDateTime.now());
-        draftRepository.save(draft);
-    }
-
-    @Transactional(readOnly = true)
-    public AiMenuImportJob requireJob(UUID jobId) {
-        return jobRepository.findById(jobId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "AI menu import job bulunamadı"));
-    }
-
-    @Transactional(readOnly = true)
-    public List<AiMenuImportJob> listByStatuses(Collection<String> statuses) {
-        return jobRepository.findByStatusInOrderByCreatedAtAsc(statuses);
-    }
-
-    @Transactional
-    public AiMenuImportJob updateJob(UUID jobId, AiMenuImportDtos.JobUpdateRequest request) {
-        AiMenuImportJob job = requireJob(jobId);
-        String previousStatus = job.getStatus();
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            String status = request.getStatus().trim();
-            if (AiMenuImportJobStatus.EXTRACTING.equals(status)
-                    && !AiMenuImportJobStatus.QUEUED.equals(job.getStatus())
-                    && !AiMenuImportJobStatus.EXTRACTING.equals(job.getStatus())) {
-                log.info(
-                        "menu_import_job_update_skipped jobId={} currentStatus={} requestedStatus={}",
-                        jobId, job.getStatus(), status
-                );
-                return job;
+            String name = product.getName() == null ? "" : product.getName().trim();
+            if (name.isBlank() || product.getPrice() == null) {
+                continue;
             }
-            if (AiMenuImportJobStatus.BATCH_SUBMITTED.equals(status)
-                    && (AiMenuImportJobStatus.EXTRACTING.equals(job.getStatus())
-                    || AiMenuImportJobStatus.BATCH_SUBMITTED.equals(job.getStatus()))) {
-                job.setStatus(status);
-            } else if (!AiMenuImportJobStatus.WAITING_APPROVAL.equals(job.getStatus())
-                    && !AiMenuImportJobStatus.FAILED.equals(job.getStatus())) {
-                job.setStatus(status);
-            }
-            if (AiMenuImportJobStatus.EXTRACTING.equals(status) && job.getStartedAt() == null) {
-                job.setStartedAt(LocalDateTime.now());
-            }
-            if (AiMenuImportJobStatus.WAITING_APPROVAL.equals(status)
-                    || AiMenuImportJobStatus.FAILED.equals(status)) {
-                job.setFinishedAt(LocalDateTime.now());
-            }
+            Long subCategoryId = resolveOrCreateSubCategoryId(menuId, product);
+            MenuDtos.MenuProductRequest createRequest = MenuDtos.MenuProductRequest.builder()
+                    .name(name)
+                    .description(product.getDescription())
+                    .price(product.getPrice())
+                    .currency(product.getCurrency() == null || product.getCurrency().isBlank()
+                            ? "TRY"
+                            : product.getCurrency())
+                    .subCategoryId(subCategoryId)
+                    .imageUrl(product.getImageUrl())
+                    .available(product.getAvailable() == null || product.getAvailable())
+                    .servesPeopleMin(1)
+                    .servesPeopleMax(1)
+                    .nutrition(product.getNutrition())
+                    .build();
+            MenuDtos.MenuProductResponse created = menuService.createProductForOwner(menuId, userId, createRequest);
+            productIds.add(created.getProductId());
         }
-        if (request.getAiBatchId() != null) {
-            job.setAiBatchId(blankToNull(request.getAiBatchId()));
-        }
-        if (request.getAiInputFileId() != null) {
-            job.setAiInputFileId(blankToNull(request.getAiInputFileId()));
-        }
-        if (request.getAiOutputFileId() != null) {
-            job.setAiOutputFileId(blankToNull(request.getAiOutputFileId()));
-        }
-        if (request.getErrorMessage() != null) {
-            job.setErrorMessage(blankToNull(request.getErrorMessage()));
-        }
-        if (request.getExtractedProducts() != null) {
-            job.setExtractedProducts(objectMapper.valueToTree(request.getExtractedProducts()));
-        }
-        AiMenuImportJob saved = jobRepository.save(job);
         log.info(
-                "menu_import_job_updated jobId={} previousStatus={} status={} aiBatchId={} aiInputFileId={} errorMessage={}",
-                saved.getId(),
-                previousStatus,
-                saved.getStatus(),
-                saved.getAiBatchId(),
-                saved.getAiInputFileId(),
-                saved.getErrorMessage()
+                "menu_import_products_published menuId={} userId={} createdCount={}",
+                menuId, userId, productIds.size()
         );
-        return saved;
-    }
-
-    private MenuDtos.MenuProductResponse createProductFromDraft(Long menuId, AiMenuImportDraft draft) {
-        JsonNode data = draft.getProductData();
-        String name = text(data, "name");
-        if (name == null || name.isBlank()) {
-            throw new BadRequestException("Ürün adı zorunludur");
-        }
-        BigDecimal price = decimal(data, "price");
-        if (price == null) {
-            throw new BadRequestException("Fiyat zorunludur");
-        }
-        Long subCategoryId = resolveSubCategoryId(menuId, data);
-        NutritionFacts nutrition = null;
-        if (data != null && data.has("nutrition") && !data.get("nutrition").isNull()) {
-            nutrition = objectMapper.convertValue(data.get("nutrition"), NutritionFacts.class);
-        }
-        MenuDtos.MenuProductRequest request = MenuDtos.MenuProductRequest.builder()
-                .name(name.trim())
-                .description(text(data, "description"))
-                .price(price)
-                .currency(text(data, "currency") == null ? "TRY" : text(data, "currency"))
-                .subCategoryId(subCategoryId)
-                .imageUrl(text(data, "imageUrl"))
-                .available(data == null || !data.has("available") || data.get("available").asBoolean(true))
-                .servesPeopleMin(1)
-                .servesPeopleMax(1)
-                .nutrition(nutrition)
+        return AiMenuImportDtos.PublishResponse.builder()
+                .menuId(menuId)
+                .createdCount(productIds.size())
+                .productIds(productIds)
                 .build();
-        return menuService.createProduct(menuId, request);
     }
 
-    private Long resolveSubCategoryId(Long menuId, JsonNode data) {
-        if (data != null && data.hasNonNull("subCategoryId")) {
-            long id = data.get("subCategoryId").asLong();
-            menuCategoryService.requireSubCategory(menuId, id);
-            return id;
+    private Long resolveOrCreateSubCategoryId(Long menuId, AiMenuImportDtos.PublishProduct product) {
+        if (product.getSubCategoryId() != null) {
+            menuCategoryService.requireSubCategory(menuId, product.getSubCategoryId());
+            return product.getSubCategoryId();
         }
-        String subcategory = text(data, "subcategory");
-        String category = text(data, "category");
+        String subcategory = blankToNull(product.getSubcategory());
+        String category = blankToNull(product.getCategory());
         Map<Long, MenuSubCategory> subs = menuCategoryService.loadSubCategoryMap(menuId);
         Map<Long, MenuCategory> mains = menuCategoryService.loadCategoryMap(menuId);
-        if (subcategory != null && !subcategory.isBlank()) {
+        if (subcategory != null) {
             String needle = normalizeName(subcategory);
             for (MenuSubCategory sub : subs.values()) {
                 if (normalizeName(sub.getName()).equals(needle)) {
@@ -308,7 +162,7 @@ public class AiMenuImportService {
                 }
             }
         }
-        if (category != null && !category.isBlank()) {
+        if (category != null) {
             String needle = normalizeName(category);
             for (MenuSubCategory sub : subs.values()) {
                 MenuCategory main = mains.get(sub.getMenuCategoryId());
@@ -316,8 +170,41 @@ public class AiMenuImportService {
                     return sub.getId();
                 }
             }
+            for (MenuCategory main : mains.values()) {
+                if (normalizeName(main.getName()).equals(needle)) {
+                    TaxonomyDtos.SubCategoryResponse created = menuCategoryService.createSub(
+                            menuId,
+                            main.getId(),
+                            TaxonomyDtos.SubCategoryRequest.builder()
+                                    .name(subcategory != null ? subcategory : category)
+                                    .build()
+                    );
+                    return created.getId();
+                }
+            }
         }
-        throw new BadRequestException("Alt kategori seçilmelidir (subCategoryId)");
+        String mainName = category != null ? category : "AI Import";
+        String subName = subcategory != null ? subcategory : "Genel";
+        Long mainId = null;
+        for (MenuCategory main : mains.values()) {
+            if (normalizeName(main.getName()).equals(normalizeName(mainName))) {
+                mainId = main.getId();
+                break;
+            }
+        }
+        if (mainId == null) {
+            TaxonomyDtos.MainCategoryResponse createdMain = menuCategoryService.createCategory(
+                    menuId,
+                    TaxonomyDtos.MainCategoryRequest.builder().name(mainName).build()
+            );
+            mainId = createdMain.getId();
+        }
+        TaxonomyDtos.SubCategoryResponse createdSub = menuCategoryService.createSub(
+                menuId,
+                mainId,
+                TaxonomyDtos.SubCategoryRequest.builder().name(subName).build()
+        );
+        return createdSub.getId();
     }
 
     private Menu requireOwnedMenuEntity(Long menuId) {
@@ -329,21 +216,6 @@ public class AiMenuImportService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;
-    }
-
-    private AiMenuImportJob requireOwnedJob(Long menuId, UUID jobId) {
-        return jobRepository.findByIdAndMenuId(jobId, menuId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "AI menu import job bulunamadı"));
-    }
-
-    private AiMenuImportDraft requireWaitingDraft(Long menuId, UUID draftId) {
-        menuService.requireOwnedMenu(menuId);
-        AiMenuImportDraft draft = draftRepository.findByIdAndMenuId(draftId, menuId)
-                .orElseThrow(() -> new BadRequestException("Taslak bulunamadı"));
-        if (!AiMenuImportJobStatus.WAITING_APPROVAL.equals(draft.getApprovalStatus())) {
-            throw new BadRequestException("Taslak onay bekleyen durumda değil");
-        }
-        return draft;
     }
 
     private List<String> normalizeImageUrls(List<String> raw) {
@@ -358,82 +230,38 @@ public class AiMenuImportService {
                 .toList();
     }
 
-    private AiMenuImportDtos.JobResponse toJobResponse(AiMenuImportJob job) {
-        List<String> urls = new ArrayList<>();
-        if (job.getImageUrls() != null && job.getImageUrls().isArray()) {
-            for (JsonNode node : job.getImageUrls()) {
-                if (node != null && !node.isNull()) {
-                    urls.add(node.asText());
-                }
-            }
-        }
-        return AiMenuImportDtos.JobResponse.builder()
-                .jobId(job.getId())
-                .menuId(job.getMenuId())
-                .status(job.getStatus())
-                .imageUrls(urls)
-                .errorMessage(job.getErrorMessage())
-                .createdAt(job.getCreatedAt())
-                .startedAt(job.getStartedAt())
-                .finishedAt(job.getFinishedAt())
-                .build();
-    }
-
-    private AiMenuImportDtos.DraftResponse toDraftResponse(AiMenuImportDraft draft) {
-        return AiMenuImportDtos.DraftResponse.builder()
-                .id(draft.getId())
-                .jobId(draft.getJobId())
-                .menuId(draft.getMenuId())
-                .sourceProductId(draft.getSourceProductId())
-                .productData(draft.getProductData())
-                .confidence(draft.getConfidence())
-                .approvalStatus(draft.getApprovalStatus())
-                .publishedProductId(draft.getPublishedProductId())
-                .rejectReason(draft.getRejectReason())
-                .errorMessage(draft.getErrorMessage())
-                .createdAt(draft.getCreatedAt())
-                .updatedAt(draft.getUpdatedAt())
-                .build();
-    }
-
-    private ObjectNode asObjectNode(JsonNode node) {
-        if (node == null || !node.isObject()) {
-            return objectMapper.createObjectNode();
-        }
-        return (ObjectNode) node.deepCopy();
-    }
-
-    private void putIfPresent(ObjectNode data, String field, String value) {
-        if (value != null) {
-            data.put(field, value);
-        }
-    }
-
-    private String text(JsonNode node, String field) {
-        if (node == null || !node.has(field) || node.get(field).isNull()) {
-            return null;
-        }
-        String value = node.get(field).asText();
-        return value == null || value.isBlank() ? null : value;
-    }
-
-    private BigDecimal decimal(JsonNode node, String field) {
-        if (node == null || !node.has(field) || node.get(field).isNull()) {
-            return null;
-        }
-        JsonNode value = node.get(field);
-        if (value.isNumber()) {
-            return value.decimalValue();
-        }
-        String raw = value.asText();
-        if (raw == null || raw.isBlank()) {
+    private LocalDateTime toLocalDateTime(String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
         try {
-            return new BigDecimal(raw.replace(",", ".").trim());
-        } catch (NumberFormatException ex) {
-            return null;
+            return OffsetDateTime.parse(value).toLocalDateTime();
+        } catch (DateTimeParseException ignored) {
+            try {
+                return LocalDateTime.parse(value);
+            } catch (DateTimeParseException ex) {
+                return null;
+            }
         }
+    }
+
+    private ResponseStatusException mapAiServiceError(RestClientResponseException ex, String fallback) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.BAD_GATEWAY;
+        } else if (status.is5xxServerError()) {
+            status = HttpStatus.BAD_GATEWAY;
+        }
+        String detail = ex.getResponseBodyAsString();
+        if (detail == null || detail.isBlank()) {
+            detail = fallback;
+        }
+        log.warn(
+                "menu_import_proxy_failed status={} body={}",
+                ex.getStatusCode().value(),
+                detail.length() > 500 ? detail.substring(0, 500) : detail
+        );
+        return new ResponseStatusException(status, fallback);
     }
 
     private String normalizeName(String value) {
