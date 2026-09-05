@@ -245,7 +245,7 @@ public class AiMenuImportService {
             job.setErrorMessage(blankToNull(request.getErrorMessage()));
         }
         if (request.getExtractedProducts() != null) {
-            job.setExtractedProducts(request.getExtractedProducts());
+            job.setExtractedProducts(objectMapper.valueToTree(request.getExtractedProducts()));
         }
         AiMenuImportJob saved = jobRepository.save(job);
         log.info(
