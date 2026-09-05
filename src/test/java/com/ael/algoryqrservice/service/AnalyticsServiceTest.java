@@ -5,18 +5,13 @@ import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
-import com.ael.algoryqrservice.model.MenuOrder;
-import com.ael.algoryqrservice.model.MenuOrderItem;
-import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
-import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
-import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
@@ -25,14 +20,12 @@ import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
-import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.repository.MenuVisitRepository;
-import com.ael.algoryqrservice.repository.TableBillRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,15 +68,13 @@ class AnalyticsServiceTest {
     @Mock
     private MenuFeedbackService menuFeedbackService;
     @Mock
-    private MenuOrderRepository menuOrderRepository;
-    @Mock
     private MenuWaiterRepository menuWaiterRepository;
     @Mock
     private BillPaymentRepository billPaymentRepository;
     @Mock
-    private TableBillRepository tableBillRepository;
-    @Mock
     private MenuFixedExpenseService menuFixedExpenseService;
+    @Mock
+    private WaiterPerformanceReportService waiterPerformanceReportService;
     @Mock
     private BranchService branchService;
     @Mock
@@ -106,15 +97,14 @@ class AnalyticsServiceTest {
                 menuProductRepository,
                 menuSubCategoryRepository,
                 menuFeedbackService,
-                menuOrderRepository,
                 menuWaiterRepository,
                 billPaymentRepository,
-                tableBillRepository,
                 menuFixedExpenseService,
                 branchService,
                 branchRepository,
                 uberEatsConnectionRepository,
-                uberEatsOrderRepository
+                uberEatsOrderRepository,
+                waiterPerformanceReportService
         );
     }
 
@@ -405,79 +395,37 @@ class AnalyticsServiceTest {
     }
 
     @Test
-    void getMenuWaiterPerformanceReport_whenConfirmedOrders_thenGroupsByWaiterAndUnassigned() {
+    void getMenuWaiterPerformanceReport_whenScopeResolved_thenDelegatesToReportService() {
         Long menuId = 5L;
         Long ownerId = 9L;
         LocalDate day = LocalDate.of(2026, 8, 13);
         Menu menu = publicMenu(menuId, ownerId);
         menu.setBranchId(2L);
         when(menuRepository.findById(menuId)).thenReturn(Optional.of(menu));
-
-        MenuWaiter ali = MenuWaiter.builder()
-                .id(101L)
-                .ownerUserId(ownerId)
-                .branchId(2L)
-                .username("ali")
-                .passwordHash("hash")
-                .displayName("Ali")
-                .active(true)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-        MenuWaiter ayse = MenuWaiter.builder()
-                .id(102L)
-                .ownerUserId(ownerId)
-                .branchId(2L)
-                .username("ayse")
-                .passwordHash("hash")
-                .displayName("Ayse")
-                .active(true)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of(ali, ayse));
-        when(tableBillRepository.findByMenuIdInAndStatusAndClosedAtBetween(
-                eq(List.of(menuId)), eq(TableBillStatus.CLOSED), any(), any()
-        )).thenReturn(List.of(
-                TableBill.builder()
-                        .id(10L)
-                        .menuId(menuId)
-                        .tableId(1L)
-                        .status(TableBillStatus.CLOSED)
-                        .closedByWaiterId(101L)
-                        .closedAt(LocalDateTime.of(2026, 8, 13, 18, 0))
-                        .build()
-        ));
-
-        MenuOrder aliOrder = confirmedOrder(menuId, 1L, new BigDecimal("150.00"), 101L, 2, new BigDecimal("15.00"));
-        MenuOrder ayseOrder = confirmedOrder(menuId, 2L, new BigDecimal("90.00"), 102L, 1, new BigDecimal("9.00"));
-        MenuOrder unassignedOrder = confirmedOrder(menuId, 3L, new BigDecimal("20.00"), null, 1, BigDecimal.ZERO);
-
-        when(menuOrderRepository.findByMenuIdInAndStatusAndConfirmedAtBetweenOrderByConfirmedAtAsc(
-                eq(List.of(menuId)), eq(MenuOrderStatus.CONFIRMED), any(), any()
-        )).thenReturn(List.of(aliOrder, ayseOrder, unassignedOrder));
+        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        AnalyticsDtos.MenuWaiterPerformanceReportResponse expected =
+                new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+                        menuId,
+                        "Test",
+                        2L,
+                        null,
+                        day,
+                        day,
+                        new AnalyticsDtos.WaiterPerformanceKpis(
+                                0L, 0L, 0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO, BigDecimal.ZERO, 0L, "TRY"),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of()
+                );
+        when(waiterPerformanceReportService.build(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(expected);
 
         AnalyticsDtos.MenuWaiterPerformanceReportResponse report =
                 service.getMenuWaiterPerformanceReport(menuId, ownerId, day, day);
 
-        assertThat(report.kpis().activeWaiterCount()).isEqualTo(2L);
-        assertThat(report.kpis().assignedOrderCount()).isEqualTo(2L);
-        assertThat(report.kpis().unassignedOrderCount()).isEqualTo(1L);
-        assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("260.00");
-        assertThat(report.kpis().itemCount()).isEqualTo(4L);
-        assertThat(report.kpis().totalCommission()).isEqualByComparingTo("24.00");
-        assertThat(report.kpis().billsClosedCount()).isEqualTo(1L);
-        assertThat(report.waiters()).extracting(AnalyticsDtos.WaiterPerformanceRow::displayName)
-                .containsExactly("Ali", "Ayse", "Atanmamış");
-        assertThat(report.waiters().getFirst().orderCount()).isEqualTo(1L);
-        assertThat(report.waiters().getFirst().itemCount()).isEqualTo(2L);
-        assertThat(report.waiters().getFirst().revenue()).isEqualByComparingTo("150.00");
-        assertThat(report.waiters().getFirst().commissionAmount()).isEqualByComparingTo("15.00");
-        assertThat(report.waiters().getFirst().billsClosedCount()).isEqualTo(1L);
-        assertThat(report.waiters().get(2).waiterId()).isNull();
-        assertThat(report.products()).isNotEmpty();
-        assertThat(report.daily()).hasSize(1);
-        assertThat(report.hourly()).hasSize(24);
+        assertThat(report).isSameAs(expected);
+        verify(waiterPerformanceReportService).build(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -626,39 +574,6 @@ class AnalyticsServiceTest {
         assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("40.00");
     }
 
-    private MenuOrder confirmedOrder(
-            Long menuId,
-            Long id,
-            BigDecimal total,
-            Long waiterId,
-            int itemQuantity,
-            BigDecimal commission
-    ) {
-        MenuOrderItem item = MenuOrderItem.builder()
-                .productId(11L)
-                .productName("Cay")
-                .quantity(itemQuantity)
-                .lineTotal(total)
-                .build();
-        return MenuOrder.builder()
-                .id(id)
-                .menuId(menuId)
-                .tableId(1L)
-                .tableSessionId(UUID.randomUUID())
-                .status(MenuOrderStatus.CONFIRMED)
-                .totalAmount(total)
-                .currency("TRY")
-                .waiterId(waiterId)
-                .commissionAmount(commission)
-                .confirmedAt(LocalDateTime.of(2026, 8, 13, 14, 30))
-                .items(new java.util.ArrayList<>(List.of(item)))
-                .build();
-    }
-
-    private MenuOrder confirmedOrder(Long menuId, Long id, BigDecimal total, Long waiterId) {
-        return confirmedOrder(menuId, id, total, waiterId, 1, BigDecimal.ZERO);
-    }
-
     private Menu publicMenu(Long menuId, Long ownerId) {
         return Menu.builder()
                 .menuId(menuId)
@@ -687,16 +602,6 @@ class AnalyticsServiceTest {
                 .name(name)
                 .subCategoryId(1L)
                 .sortOrder(sortOrder)
-                .build();
-    }
-
-    private MenuOrderItem line(Long productId, String name, int quantity, String lineTotal) {
-        return MenuOrderItem.builder()
-                .productId(productId)
-                .productName(name)
-                .quantity(quantity)
-                .unitPrice(new BigDecimal(lineTotal))
-                .lineTotal(new BigDecimal(lineTotal))
                 .build();
     }
 }

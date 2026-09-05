@@ -75,23 +75,101 @@ public class UberEatsPayloadMapper {
     }
 
     public List<UberEatsDtos.ProductResponse> toProducts(JsonNode root) {
+        Map<String, JsonNode> catalog = indexCatalogProducts(root);
         List<UberEatsDtos.ProductResponse> products = new ArrayList<>();
         JsonNode categories = firstNode(root, "categories", "sections", "menuCategories");
         if (categories != null && categories.isArray()) {
             for (JsonNode category : categories) {
                 String categoryName = firstText(category, "name", "categoryName", "title");
                 for (JsonNode product : listNodes(category, "products", "items", "meals")) {
-                    addProduct(products, product, categoryName);
+                    addProduct(products, enrichFromCatalog(product, catalog), categoryName);
                 }
             }
-            if (!products.isEmpty()) {
-                return products;
+        }
+        if (products.isEmpty()) {
+            for (JsonNode product : catalog.values()) {
+                addProduct(
+                        products,
+                        product,
+                        firstText(product, "categoryName", "category", "sectionName")
+                );
+            }
+            return products;
+        }
+        for (Map.Entry<String, JsonNode> entry : catalog.entrySet()) {
+            boolean alreadyListed = false;
+            for (UberEatsDtos.ProductResponse existing : products) {
+                if (entry.getKey().equals(existing.getId())) {
+                    alreadyListed = true;
+                    break;
+                }
+            }
+            if (!alreadyListed) {
+                addProduct(
+                        products,
+                        entry.getValue(),
+                        firstText(entry.getValue(), "categoryName", "category", "sectionName")
+                );
             }
         }
-        for (JsonNode product : listNodes(root, "products", "items", "content", "data")) {
-            addProduct(products, product, firstText(product, "categoryName", "category", "sectionName"));
-        }
         return products;
+    }
+
+    private Map<String, JsonNode> indexCatalogProducts(JsonNode root) {
+        Map<String, JsonNode> catalog = new LinkedHashMap<>();
+        for (JsonNode product : listNodes(root, "products", "items", "content", "data")) {
+            String id = productId(product);
+            if (id != null) {
+                catalog.put(id, product);
+            }
+        }
+        return catalog;
+    }
+
+    private JsonNode enrichFromCatalog(JsonNode product, Map<String, JsonNode> catalog) {
+        String id = productId(product);
+        if (id == null) {
+            return product;
+        }
+        JsonNode full = catalog.get(id);
+        if (full == null) {
+            return product;
+        }
+        if (productName(product) != null) {
+            return product;
+        }
+        return full;
+    }
+
+    private String productId(JsonNode product) {
+        return firstText(
+                product,
+                "id",
+                "productId",
+                "itemId",
+                "stockId",
+                "stock.id",
+                "product.id",
+                "productContentId"
+        );
+    }
+
+    private String productName(JsonNode product) {
+        return firstText(
+                product,
+                "name",
+                "productName",
+                "title",
+                "nameDisplay",
+                "stockName",
+                "stockNameDisplay",
+                "productContentName",
+                "contentName",
+                "product.name",
+                "product.title",
+                "product.productName",
+                "stock.name"
+        );
     }
 
     public List<JsonNode> toOrderNodes(JsonNode root) {
@@ -250,16 +328,7 @@ public class UberEatsPayloadMapper {
     }
 
     private void addProduct(List<UberEatsDtos.ProductResponse> products, JsonNode product, String categoryName) {
-        String id = firstText(
-                product,
-                "id",
-                "productId",
-                "itemId",
-                "stockId",
-                "stock.id",
-                "product.id",
-                "productContentId"
-        );
+        String id = productId(product);
         if (id == null) {
             return;
         }
@@ -268,21 +337,7 @@ public class UberEatsPayloadMapper {
                 return;
             }
         }
-        String name = firstText(
-                product,
-                "name",
-                "productName",
-                "title",
-                "nameDisplay",
-                "stockName",
-                "stockNameDisplay",
-                "productContentName",
-                "contentName",
-                "product.name",
-                "product.title",
-                "product.productName",
-                "stock.name"
-        );
+        String name = productName(product);
         String description = firstText(
                 product,
                 "description",

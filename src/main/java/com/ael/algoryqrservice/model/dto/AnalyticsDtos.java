@@ -313,6 +313,7 @@ public class AnalyticsDtos {
             BigDecimal totalRevenue,
             long itemCount,
             BigDecimal totalCommission,
+            BigDecimal totalTip,
             long billsClosedCount,
             String currency
     ) {
@@ -324,6 +325,7 @@ public class AnalyticsDtos {
             long orderCount,
             long itemCount,
             BigDecimal revenue,
+            BigDecimal tipAmount,
             BigDecimal commissionAmount,
             long billsClosedCount,
             BigDecimal avgOrderValue,

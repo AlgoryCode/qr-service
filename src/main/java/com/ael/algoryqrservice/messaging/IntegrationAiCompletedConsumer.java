@@ -117,12 +117,8 @@ public class IntegrationAiCompletedConsumer {
         if (mapping != null && mapping.isObject()) {
             copyText(mapping, data, "category");
             copyText(mapping, data, "subcategory");
-            if (mapping.hasNonNull("translatedName")) {
-                data.put("name", mapping.get("translatedName").asText());
-            }
-            if (mapping.hasNonNull("translatedDescription")) {
-                data.put("description", mapping.get("translatedDescription").asText());
-            }
+            copyNonBlankAs(mapping, data, "translatedName", "name");
+            copyNonBlankAs(mapping, data, "translatedDescription", "description");
             if (mapping.has("modifierGroupIds")) {
                 data.set("modifierGroupIds", mapping.get("modifierGroupIds"));
             }
@@ -170,8 +166,22 @@ public class IntegrationAiCompletedConsumer {
 
     private void copyText(JsonNode source, ObjectNode target, String field) {
         if (source.hasNonNull(field)) {
-            target.put(field, source.get(field).asText());
+            String value = source.get(field).asText();
+            if (value != null && !value.isBlank()) {
+                target.put(field, value);
+            }
         }
+    }
+
+    private void copyNonBlankAs(JsonNode source, ObjectNode target, String sourceField, String targetField) {
+        if (!source.hasNonNull(sourceField)) {
+            return;
+        }
+        String value = source.get(sourceField).asText();
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        target.put(targetField, value);
     }
 
     private String text(JsonNode node, String field) {
