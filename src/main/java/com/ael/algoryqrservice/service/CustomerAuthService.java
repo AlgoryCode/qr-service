@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CustomerAuthService {
 
+    private static final String GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE =
+            "Bu e-posta adresi Google ile kayıtlı. Lütfen Google ile giriş yapın.";
+
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomerSessionService customerSessionService;
@@ -75,8 +78,11 @@ public class CustomerAuthService {
         String email = request.getEmail().trim().toLowerCase();
         Customer customer = customerRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
+        if (customer.getProvider() == AuthProvider.GOOGLE) {
+            throw new BadRequestException(GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE);
+        }
         if (customer.getProvider() != AuthProvider.BASIC) {
-            throw new BadCredentialsException("Geçersiz kimlik bilgileri");
+            throw new BadRequestException("Bu hesap farklı bir giriş yöntemiyle oluşturulmuş");
         }
         if (customer.getPassword() == null
                 || !passwordEncoder.matches(request.getPassword(), customer.getPassword())) {
