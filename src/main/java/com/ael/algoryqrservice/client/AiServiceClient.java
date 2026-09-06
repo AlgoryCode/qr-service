@@ -10,6 +10,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,15 +28,16 @@ public class AiServiceClient {
     public AiServiceClient(RestClient.Builder restClientBuilder, AiServiceProperties properties) {
         this.properties = properties;
         this.restClient = restClientBuilder
+                .clone()
                 .baseUrl(properties.getUrl())
-                .requestFactory(requestFactory(properties))
+                .requestFactory(requestFactory(properties.getConnectTimeout(), properties.getReadTimeout()))
                 .build();
     }
 
-    private static SimpleClientHttpRequestFactory requestFactory(AiServiceProperties properties) {
+    private static SimpleClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(properties.getConnectTimeout());
-        factory.setReadTimeout(properties.getReadTimeout());
+        factory.setConnectTimeout(connectTimeout);
+        factory.setReadTimeout(readTimeout);
         return factory;
     }
 

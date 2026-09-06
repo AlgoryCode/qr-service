@@ -1,0 +1,2 @@
+ALTER TABLE tbl_campaign
+    ADD COLUMN IF NOT EXISTS image_url VARCHAR(512);
