@@ -27,6 +27,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final String GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE =
+            "Bu e-posta adresi Google ile kayıtlı. Lütfen Google ile giriş yapın.";
+
     private final UserRepository userRepository;
     private final DashboardUserRepository dashboardUserRepository;
     private final MenuWaiterRepository menuWaiterRepository;
@@ -102,8 +105,11 @@ public class AuthService {
         if (user.getRole() == UserRole.WAITER) {
             throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");
         }
+        if (user.getProvider() == AuthProvider.GOOGLE) {
+            throw new BadRequestException(GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE);
+        }
         if (user.getProvider() != AuthProvider.BASIC) {
-            throw new BadCredentialsException("Geçersiz kimlik bilgileri");
+            throw new BadRequestException("Bu hesap farklı bir giriş yöntemiyle oluşturulmuş");
         }
 
         authenticationManager.authenticate(

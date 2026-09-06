@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,11 @@ public interface CampaignRewardRepository extends JpaRepository<CampaignReward, 
             Long customerId,
             Long campaignId,
             CampaignRewardStatus status
+    );
+
+    List<CampaignReward> findByCustomerIdAndStatusInOrderByIssuedAtDesc(
+            Long customerId,
+            Collection<CampaignRewardStatus> statuses
     );
 
     Optional<CampaignReward> findByIdAndCustomerId(Long id, Long customerId);

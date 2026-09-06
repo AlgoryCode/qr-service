@@ -34,6 +34,7 @@ public class CampaignEvaluationService {
     private final CampaignProgressRepository campaignProgressRepository;
     private final CampaignEventLogRepository campaignEventLogRepository;
     private final CampaignRewardService campaignRewardService;
+    private final CartStampCardProgressService cartStampCardProgressService;
     private final CampaignService campaignService;
     private final CampaignConfigSupport configSupport;
     private final MenuOrderRepository menuOrderRepository;
@@ -204,6 +205,7 @@ public class CampaignEvaluationService {
                     .guestOrder(order != null && order.getCustomerId() == null)
                     .rewardEligible(false)
                     .hint("")
+                    .stampCardProgress(List.of())
                     .build();
         }
         Set<Long> campaignProductIds = campaignService.activeCampaignProductIds(order.getMenuId());
@@ -224,6 +226,7 @@ public class CampaignEvaluationService {
                 .guestOrder(guest)
                 .rewardEligible(count > 0)
                 .hint(hint)
+                .stampCardProgress(cartStampCardProgressService.forOrder(order))
                 .build();
     }
 

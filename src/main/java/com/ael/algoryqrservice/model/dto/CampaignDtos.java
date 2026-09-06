@@ -237,11 +237,39 @@ public final class CampaignDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class StampCardProgress {
+        private Long campaignId;
+        private String campaignName;
+        private int currentQuantity;
+        private int requiredQuantity;
+        private boolean earned;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class OrderCampaignSummary {
         private int campaignProductCount;
         private boolean guestOrder;
         private boolean rewardEligible;
         private String hint;
+        private List<StampCardProgress> stampCardProgress;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CustomerRewardResponse {
+        private Long rewardId;
+        private Long campaignId;
+        private String campaignName;
+        private String rewardType;
+        private Map<String, Object> rewardPayload;
+        private CampaignRewardStatus status;
+        private LocalDateTime issuedAt;
+        private LocalDateTime redeemedAt;
     }
 
     @Data
