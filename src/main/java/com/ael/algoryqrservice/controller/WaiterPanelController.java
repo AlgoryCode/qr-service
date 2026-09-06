@@ -113,25 +113,17 @@ public class WaiterPanelController {
     @GetMapping("/menu/{menuId}/orders")
     public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listOrders(
             @PathVariable Long menuId,
-            @RequestParam(required = false, defaultValue = "SUBMITTED") String status
+            @RequestParam(required = false, defaultValue = "ALL") String status
     ) {
         return ResponseEntity.ok(menuOrderService.merchantList(menuId, status));
     }
 
-    @PostMapping("/menu/{menuId}/orders/{orderId}/confirm")
-    public ResponseEntity<MenuOrderDtos.OrderResponse> confirmOrder(
+    @PostMapping("/menu/{menuId}/orders/{orderId}/cancel")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> cancelOrder(
             @PathVariable Long menuId,
             @PathVariable Long orderId
     ) {
-        return ResponseEntity.ok(menuOrderService.merchantConfirm(menuId, orderId));
-    }
-
-    @PostMapping("/menu/{menuId}/orders/{orderId}/reject")
-    public ResponseEntity<MenuOrderDtos.OrderResponse> rejectOrder(
-            @PathVariable Long menuId,
-            @PathVariable Long orderId
-    ) {
-        return ResponseEntity.ok(menuOrderService.merchantReject(menuId, orderId));
+        return ResponseEntity.ok(menuOrderService.merchantCancel(menuId, orderId));
     }
 
     @GetMapping("/menu/{menuId}/customers")
