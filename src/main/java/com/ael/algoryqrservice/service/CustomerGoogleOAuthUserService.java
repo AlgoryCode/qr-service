@@ -18,8 +18,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class CustomerGoogleOAuthUserService {
 
-    private static final String PROVIDER_CONFLICT_MESSAGE =
-            "Bu hesap farklı bir giriş yöntemiyle oluşturulmuş";
+    static final String BASIC_ACCOUNT_GOOGLE_LOGIN_MESSAGE =
+            "Bu e-posta adresi e-posta/şifre ile kayıtlı. Lütfen e-posta ve şifre ile giriş yapın.";
 
     private final CustomerRepository customerRepository;
 
@@ -44,7 +44,7 @@ public class CustomerGoogleOAuthUserService {
 
         Optional<Customer> existingByEmail = customerRepository.findByEmail(identity.email());
         if (existingByEmail.isPresent() && existingByEmail.get().getProvider() != AuthProvider.GOOGLE) {
-            throw new BadRequestException(PROVIDER_CONFLICT_MESSAGE);
+            throw new BadRequestException(providerConflictMessage(existingByEmail.get().getProvider()));
         }
 
         throw new UnauthorizedException("Bu e-posta adresi ile Google hesabı kayıtlı değil");
@@ -62,7 +62,7 @@ public class CustomerGoogleOAuthUserService {
         Optional<Customer> existingByEmail = customerRepository.findByEmail(identity.email());
         if (existingByEmail.isPresent()) {
             if (existingByEmail.get().getProvider() != AuthProvider.GOOGLE) {
-                throw new BadRequestException(PROVIDER_CONFLICT_MESSAGE);
+                throw new BadRequestException(providerConflictMessage(existingByEmail.get().getProvider()));
             }
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
@@ -88,5 +88,12 @@ public class CustomerGoogleOAuthUserService {
             return fallback;
         }
         return value.trim();
+    }
+
+    static String providerConflictMessage(AuthProvider provider) {
+        if (provider == AuthProvider.BASIC) {
+            return BASIC_ACCOUNT_GOOGLE_LOGIN_MESSAGE;
+        }
+        return "Bu hesap farklı bir giriş yöntemiyle oluşturulmuş";
     }
 }
