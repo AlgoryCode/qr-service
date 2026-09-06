@@ -36,7 +36,15 @@ public enum GoogleAuthErrorCode {
         if (normalized.contains("zaten kayıtlı") || normalized.contains("zaten kayitli")) {
             return ACCOUNT_EXISTS;
         }
-        if (normalized.contains("farklı bir giriş") || normalized.contains("provider conflict")) {
+        if (normalized.contains("e-posta/şifre")
+                || normalized.contains("e-posta/sifre")
+                || normalized.contains("e-posta ve şifre")
+                || normalized.contains("e-posta ve sifre")
+                || normalized.contains("google ile kayıtlı")
+                || normalized.contains("google ile kayitli")
+                || normalized.contains("farklı bir giriş")
+                || normalized.contains("farkli bir giris")
+                || normalized.contains("provider conflict")) {
             return PROVIDER_CONFLICT;
         }
         if (normalized.contains("kimlik doğrulama oturumu")
