@@ -127,10 +127,6 @@ public class User {
     @Column(name = "email_verification_sent_at")
     private LocalDateTime emailVerificationSentAt;
 
-    public boolean hasCompletedTrial() {
-        return trialEndDate != null;
-    }
-
     public String getDisplayName() {
         StringBuilder name = new StringBuilder();
         if (firstName != null && !firstName.isBlank()) {

@@ -6,7 +6,6 @@ import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.service.PurchaseLogService;
-import com.ael.algoryqrservice.service.UserTrialService;
 import com.ael.algoryqrservice.util.WritableTransactionGuard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,8 +36,6 @@ class PurchaseExpiryServiceTest {
     @Mock
     private PurchaseLogService purchaseLogService;
     @Mock
-    private UserTrialService userTrialService;
-    @Mock
     private ApplicationEventPublisher eventPublisher;
     @Mock
     private WritableTransactionGuard writableTransactionGuard;
@@ -56,7 +53,6 @@ class PurchaseExpiryServiceTest {
         purchaseExpiryService.expire(purchase);
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
-        verify(userTrialService).markTrialCompleted(USER_ID, purchase.getExpiresAt());
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().userIds()).containsExactly(USER_ID);
     }

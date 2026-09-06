@@ -19,7 +19,8 @@ public final class CatalogThemes {
             "tech-gourmet",
             "modern-bistro",
             "clever-dish-scribe",
-            "maison-noir"
+            "maison-noir",
+            "kahve-sokagi"
     );
 
     /** Yapay zeka ile üretilen özel temalar bu önek ile gelir. */

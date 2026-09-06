@@ -51,7 +51,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: ${DDL_AUTO:validate}
     show-sql: true
 
 management:
@@ -152,14 +152,6 @@ integration:
     ai-completed-routing-key: ${INTEGRATION_AI_COMPLETED_ROUTING_KEY:integration.ai.completed}
     publish-queue: ${INTEGRATION_PUBLISH_QUEUE:qr-service.integration.publish.requested}
     publish-routing-key: ${INTEGRATION_PUBLISH_ROUTING_KEY:integration.publish.requested}
-
-menu-import:
-  rabbitmq:
-    exchange: ${MENU_IMPORT_EVENTS_EXCHANGE:menu.import.events}
-    ai-requested-queue: ${MENU_IMPORT_AI_REQUESTED_QUEUE:menu.import.ai.requested}
-    ai-requested-routing-key: ${MENU_IMPORT_AI_REQUESTED_ROUTING_KEY:menu.import.ai.requested}
-    ai-completed-queue: ${MENU_IMPORT_AI_COMPLETED_QUEUE:qr-service.menu.import.ai.completed}
-    ai-completed-routing-key: ${MENU_IMPORT_AI_COMPLETED_ROUTING_KEY:menu.import.ai.completed}
 
 smart-report:
   rabbitmq:

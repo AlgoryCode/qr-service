@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -148,7 +149,7 @@ public class CatalogSeedService {
             planPackage.setTrialEligible(false);
             planPackage.setTrialDays(null);
         } else if (seed.getLockPrice() != null) {
-            planPackage.setPrice(seed.getLockPrice());
+            applyLockedGrossPrice(planPackage, seed.getLockPrice());
         }
         if (!planPackage.isSystemManaged()) {
             if (seed.getMonthlyDiscount() != null) {
@@ -212,6 +213,17 @@ public class CatalogSeedService {
             }
         }
         planPackage.getItems().removeIf(item -> !requestedCodes.contains(item.getProduct().getCode()));
+    }
+
+    private void applyLockedGrossPrice(PlanPackage planPackage, BigDecimal lockPrice) {
+        BigDecimal gross = lockPrice.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal divisor = BigDecimal.ONE.add(
+                PackagePricingService.DEFAULT_VAT_RATE.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
+        );
+        BigDecimal subtotal = gross.divide(divisor, 2, RoundingMode.HALF_UP);
+        planPackage.setPrice(gross);
+        planPackage.setSubtotal(subtotal);
+        planPackage.setVatAmount(gross.subtract(subtotal));
     }
 
     private void applySeedTrialDays(PlanPackage planPackage, Integer trialDays) {

@@ -22,7 +22,8 @@ class CatalogThemesTest {
             "bigarade",
             "modern-bistro",
             "clever-dish-scribe",
-            "maison-noir"
+            "maison-noir",
+            "kahve-sokagi"
     })
     void isCustomTheme_whenPresetTheme_thenFalse(String themeId) {
         assertThat(CatalogThemes.isCustomTheme(themeId)).isFalse();

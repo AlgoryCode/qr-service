@@ -12,7 +12,11 @@ public enum NutritionBasis {
         if (value == null || value.isBlank()) {
             return null;
         }
-        return NutritionBasis.valueOf(value.trim().toUpperCase());
+        String normalized = value.trim().toUpperCase();
+        if ("PER_100ML".equals(normalized)) {
+            return PER_100ML;
+        }
+        return PER_100G;
     }
 
     @JsonValue

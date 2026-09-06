@@ -36,6 +36,10 @@ INSERT INTO tbl_product (code, name, description, active, scope_code, consumable
 SELECT 'WAITER_PANEL', 'Garson Paneli', 'Garson siparis ve adisyon modulu erisimi', TRUE, 'WAITER_PANEL_OWNER', FALSE, 149.00, 20.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'WAITER_PANEL');
 
+INSERT INTO tbl_product (code, name, description, active, scope_code, consumable, unit_price, vat_rate, created_at, updated_at)
+SELECT 'AI_MENU_IMPORT', 'AI Menu Import', 'Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma', TRUE, 'AI_MENU_IMPORT_OWNER', FALSE, 0.00, 20.00, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'AI_MENU_IMPORT');
+
 UPDATE tbl_product SET unit_price = 4.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_CREATE';
 UPDATE tbl_product SET name = 'QR Menu', description = 'QR menu olusturma hakki', scope_code = 'QR_MENU_OWNER',
     unit_price = 200.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_MENU';
@@ -53,6 +57,9 @@ UPDATE tbl_product SET name = 'Ozel Tasarim Menu', description = 'Butik marka ta
     unit_price = 199.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW() WHERE code = 'CUSTOM_DESIGN';
 UPDATE tbl_product SET name = 'Garson Paneli', description = 'Garson siparis ve adisyon modulu erisimi', scope_code = 'WAITER_PANEL_OWNER',
     unit_price = 149.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW() WHERE code = 'WAITER_PANEL';
+UPDATE tbl_product SET name = 'AI Menu Import', description = 'Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma',
+    scope_code = 'AI_MENU_IMPORT_OWNER', unit_price = 0.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW()
+WHERE code = 'AI_MENU_IMPORT';
 
 UPDATE tbl_plan_package SET active = FALSE, purchasable = FALSE, trial_eligible = FALSE, updated_at = NOW()
 WHERE code IN ('FREE_PACKAGE', 'CORPORATE_PACKAGE');
@@ -79,9 +86,9 @@ WHERE code = 'PRO_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Ultimate', description = 'Pro ozellikleri, ozel tasarim ve yapay zeka araclari',
-    features = '["1 ucretsiz sube","Sube basi 1 ucretsiz menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu"]'::jsonb,
-    price = 999.00, subtotal = 832.50, vat_amount = 166.50, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 30, priority = 200,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = 9215.00, updated_at = NOW()
+    features = '["1 ucretsiz sube","Sube basi 1 ucretsiz menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu","AI ile menu fotografından urun ekleme"]'::jsonb,
+    price = 3450.00, subtotal = 2875.00, vat_amount = 575.00, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 30, priority = 200,
+    purchasable = TRUE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = 31823.57, updated_at = NOW()
 WHERE code = 'ULTIMATE_PACKAGE';
 
 DELETE FROM tbl_plan_package_item
@@ -125,3 +132,5 @@ INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'CUSTOM_DESIGN' WHERE p.code = 'ULTIMATE_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'WAITER_PANEL' WHERE p.code = 'ULTIMATE_PACKAGE';
+INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
+SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'AI_MENU_IMPORT' WHERE p.code = 'ULTIMATE_PACKAGE';

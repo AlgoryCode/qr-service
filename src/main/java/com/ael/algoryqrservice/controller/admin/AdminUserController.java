@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller.admin;
 
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
 import com.ael.algoryqrservice.service.AdminTrialService;
+import com.ael.algoryqrservice.service.AdminUserPackageService;
 import com.ael.algoryqrservice.service.AdminUserService;
 import com.ael.algoryqrservice.util.ClientInfo;
 import com.ael.algoryqrservice.util.DashboardSecurityUtils;
@@ -26,6 +27,7 @@ public class AdminUserController {
 
     private final AdminUserService adminUserService;
     private final AdminTrialService adminTrialService;
+    private final AdminUserPackageService adminUserPackageService;
     private final DashboardSecurityUtils dashboardSecurityUtils;
 
     @GetMapping
@@ -60,5 +62,23 @@ public class AdminUserController {
             @Valid @RequestBody AdminUserDtos.ExtendTrialRequest request
     ) {
         return ResponseEntity.ok(adminTrialService.extendTrial(id, request.getDays()));
+    }
+
+    @PostMapping("/{id}/trial/end")
+    public ResponseEntity<AdminUserDtos.EndTrialResponse> endTrial(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTrialService.endTrial(id));
+    }
+
+    @PostMapping("/{id}/package/deactivate")
+    public ResponseEntity<AdminUserDtos.PackageLifecycleResponse> deactivatePackage(@PathVariable Long id) {
+        return ResponseEntity.ok(adminUserPackageService.deactivate(id));
+    }
+
+    @PostMapping("/{id}/package/reactivate")
+    public ResponseEntity<AdminUserDtos.PackageLifecycleResponse> reactivatePackage(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminUserDtos.ReactivatePackageRequest request
+    ) {
+        return ResponseEntity.ok(adminUserPackageService.reactivate(id, request.getDays()));
     }
 }
