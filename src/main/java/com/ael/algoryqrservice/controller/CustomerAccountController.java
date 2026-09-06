@@ -1,8 +1,10 @@
 package com.ael.algoryqrservice.controller;
 
+import com.ael.algoryqrservice.model.dto.CampaignDtos;
 import com.ael.algoryqrservice.model.dto.CustomerAuthDtos;
 import com.ael.algoryqrservice.service.CustomerAccountService;
 import com.ael.algoryqrservice.service.MenuService;
+import com.ael.algoryqrservice.service.campaign.CampaignRewardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/customer/account")
 @RequiredArgsConstructor
@@ -21,6 +25,7 @@ public class CustomerAccountController {
 
     private final CustomerAccountService customerAccountService;
     private final MenuService menuService;
+    private final CampaignRewardService campaignRewardService;
 
     @GetMapping("/profile")
     public ResponseEntity<CustomerAuthDtos.CustomerProfileResponse> getMyProfile() {
@@ -54,5 +59,10 @@ public class CustomerAccountController {
     public ResponseEntity<CustomerAuthDtos.MembershipResponse> getMembership(@PathVariable String publicId) {
         Long menuId = menuService.requirePublicMenuId(publicId);
         return ResponseEntity.ok(customerAccountService.getMembership(menuId));
+    }
+
+    @GetMapping("/rewards")
+    public ResponseEntity<List<CampaignDtos.CustomerRewardResponse>> listMyRewards() {
+        return ResponseEntity.ok(campaignRewardService.listMyRewards());
     }
 }
