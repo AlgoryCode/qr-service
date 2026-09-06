@@ -148,12 +148,19 @@ public class MenuOrderService {
             throw new BadRequestException("Sepet boş olamaz");
         }
 
-        order.setStatus(MenuOrderStatus.SUBMITTED);
-        order.setSubmittedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        order.setStatus(MenuOrderStatus.CONFIRMED);
+        order.setSubmittedAt(now);
+        order.setConfirmedAt(now);
+        order.setUpdatedAt(now);
         securityUtils.findCurrentCustomerId().ifPresent(order::setCustomerId);
 
-        return toOrderResponse(menuOrderRepository.save(order));
+        TableBill bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), null);
+        order.setBillId(bill.getId());
+        MenuOrder saved = menuOrderRepository.save(order);
+        tableBillService.addItemsFromOrder(bill, saved, null);
+        campaignEvaluationService.onOrderConfirmed(saved);
+        return toOrderResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -167,39 +174,34 @@ public class MenuOrderService {
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> merchantList(Long menuId, String status) {
         requireOwnedMenu(menuId);
-        MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.SUBMITTED);
+        if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status.trim())) {
+            return menuOrderRepository
+                    .findByMenuIdAndStatusInOrderBySubmittedAtDesc(
+                            menuId,
+                            List.of(
+                                    MenuOrderStatus.CONFIRMED,
+                                    MenuOrderStatus.SUBMITTED,
+                                    MenuOrderStatus.CANCELLED
+                            )
+                    )
+                    .stream()
+                    .map(this::toOrderResponse)
+                    .toList();
+        }
+        MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
         return menuOrderRepository.findByMenuIdAndStatusOrderBySubmittedAtDesc(menuId, orderStatus).stream()
                 .map(this::toOrderResponse)
                 .toList();
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse merchantConfirm(Long menuId, Long orderId) {
+    public MenuOrderDtos.OrderResponse merchantCancel(Long menuId, Long orderId) {
         requireOwnedMenu(menuId);
         MenuOrder order = requireOrderForMenu(menuId, orderId);
-        if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
-            throw new BadRequestException("Sadece gönderilmiş siparişler onaylanabilir");
+        if (order.getStatus() != MenuOrderStatus.CONFIRMED && order.getStatus() != MenuOrderStatus.SUBMITTED) {
+            throw new BadRequestException("Bu sipariş iptal edilemez");
         }
-        order.setStatus(MenuOrderStatus.CONFIRMED);
-        order.setConfirmedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
-
-        TableBill bill = tableBillService.getOrOpenBill(menuId, order.getTableId(), null);
-        order.setBillId(bill.getId());
-        MenuOrder saved = menuOrderRepository.save(order);
-        tableBillService.addItemsFromOrder(bill, saved, null);
-        campaignEvaluationService.onOrderConfirmed(saved);
-        return toOrderResponse(saved);
-    }
-
-    @Transactional
-    public MenuOrderDtos.OrderResponse merchantReject(Long menuId, Long orderId) {
-        requireOwnedMenu(menuId);
-        MenuOrder order = requireOrderForMenu(menuId, orderId);
-        if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
-            throw new BadRequestException("Sadece gönderilmiş siparişler reddedilebilir");
-        }
-        order.setStatus(MenuOrderStatus.REJECTED);
+        order.setStatus(MenuOrderStatus.CANCELLED);
         order.setRejectedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
         return toOrderResponse(menuOrderRepository.save(order));
