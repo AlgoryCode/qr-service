@@ -42,6 +42,9 @@ public class Campaign {
     @Column(length = 255)
     private String slogan;
 
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
     @Column(name = "starts_at", nullable = false)
     private LocalDateTime startsAt;
 

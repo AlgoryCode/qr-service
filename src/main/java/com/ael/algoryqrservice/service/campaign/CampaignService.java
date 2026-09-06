@@ -160,6 +160,7 @@ public class CampaignService {
                 .templateCode(template.getCode())
                 .name(request.getName().trim())
                 .slogan(trim(request.getSlogan()))
+                .imageUrl(trim(request.getImageUrl()))
                 .startsAt(request.getStartsAt())
                 .endsAt(request.getEndsAt())
                 .status(CampaignStatus.DRAFT)
@@ -182,6 +183,9 @@ public class CampaignService {
         }
         if (request.getSlogan() != null) {
             campaign.setSlogan(trim(request.getSlogan()));
+        }
+        if (request.getImageUrl() != null) {
+            campaign.setImageUrl(trim(request.getImageUrl()));
         }
         if (request.getStartsAt() != null) {
             campaign.setStartsAt(request.getStartsAt());
@@ -262,6 +266,7 @@ public class CampaignService {
                 .templateCode(campaign.getTemplateCode())
                 .name(campaign.getName())
                 .slogan(campaign.getSlogan())
+                .imageUrl(campaign.getImageUrl())
                 .startsAt(campaign.getStartsAt())
                 .endsAt(campaign.getEndsAt())
                 .status(campaign.getStatus())
@@ -283,6 +288,7 @@ public class CampaignService {
                 .templateCode(campaign.getTemplateCode())
                 .name(campaign.getName())
                 .slogan(campaign.getSlogan())
+                .imageUrl(campaign.getImageUrl())
                 .config(configSupport.parseJsonMap(campaign.getConfig()))
                 .targetProductIds(targetProductIds)
                 .build();

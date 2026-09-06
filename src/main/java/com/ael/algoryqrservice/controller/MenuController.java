@@ -34,14 +34,19 @@ public class MenuController {
     private final MenuReservationService menuReservationService;
     private final ChefAvatarService chefAvatarService;
 
-    @GetMapping("/public/id/{qrId}")
-    public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuByQrId(@PathVariable Long qrId) {
-        return ResponseEntity.ok(menuService.getPublicMenuByQrId(qrId));
+    @GetMapping("/public/legacy-qr/{qrId}/public-id")
+    public ResponseEntity<MenuDtos.PublicIdResponse> resolveLegacyQrPublicId(@PathVariable Long qrId) {
+        return ResponseEntity.ok(menuService.resolvePublicIdFromLegacyQrId(qrId));
     }
 
-    @GetMapping("/public/{menuId}/products")
+    @GetMapping("/public/{publicId}")
+    public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuByPublicId(@PathVariable String publicId) {
+        return ResponseEntity.ok(menuService.getPublicMenuByPublicId(publicId));
+    }
+
+    @GetMapping("/public/{publicId}/products")
     public ResponseEntity<MenuDtos.MenuProductPageResponse> listPublicProducts(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Boolean chefRecommended,
@@ -58,7 +63,7 @@ public class MenuController {
             @RequestParam(required = false) String q
     ) {
         return ResponseEntity.ok(menuService.listPublicProducts(
-                menuId,
+                publicId,
                 page,
                 size,
                 chefRecommended,
@@ -76,19 +81,19 @@ public class MenuController {
         ));
     }
 
-    @GetMapping("/public/{menuId}/categories")
+    @GetMapping("/public/{publicId}/categories")
     public ResponseEntity<TaxonomyDtos.TaxonomyPageResponse> listPublicCategories(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String q
     ) {
-        return ResponseEntity.ok(menuService.listPublicCategories(menuId, page, size, q));
+        return ResponseEntity.ok(menuService.listPublicCategories(publicId, page, size, q));
     }
 
-    @GetMapping("/public/{menuId}/product-facets")
+    @GetMapping("/public/{publicId}/product-facets")
     public ResponseEntity<MenuDtos.ProductFacetsResponse> listPublicProductFacets(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @RequestParam(required = false) Boolean chefRecommended,
             @RequestParam(required = false) String tagSlug,
             @RequestParam(required = false) BigDecimal minRating,
@@ -103,7 +108,7 @@ public class MenuController {
             @RequestParam(required = false) String q
     ) {
         return ResponseEntity.ok(menuService.listPublicProductFacets(
-                menuId,
+                publicId,
                 chefRecommended,
                 tagSlug,
                 minRating,
@@ -119,41 +124,44 @@ public class MenuController {
         ));
     }
 
-    @GetMapping("/public/{menuId}/products/{productId}/recommendations")
+    @GetMapping("/public/{publicId}/products/{productId}/recommendations")
     public ResponseEntity<List<MenuDtos.MenuProductResponse>> listPublicRecommendations(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @PathVariable Long productId,
             @RequestParam(defaultValue = "6") int limit
     ) {
-        return ResponseEntity.ok(menuService.listPublicRecommendations(menuId, productId, limit));
+        return ResponseEntity.ok(menuService.listPublicRecommendations(publicId, productId, limit));
     }
 
-    @PostMapping("/public/{menuId}/products/{productId}/ratings")
+    @PostMapping("/public/{publicId}/products/{productId}/ratings")
     public ResponseEntity<MenuDtos.ProductRatingResponse> ratePublicProduct(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @PathVariable Long productId,
             @Valid @RequestBody MenuDtos.ProductRatingRequest request,
             HttpServletRequest httpRequest
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         return ResponseEntity.status(201).body(
                 menuProductRatingService.rateProduct(menuId, productId, request, httpRequest)
         );
     }
 
-    @GetMapping("/public/{menuId}/rating")
+    @GetMapping("/public/{publicId}/rating")
     public ResponseEntity<MenuDtos.MenuRatingResponse> getPublicMenuRating(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             HttpServletRequest httpRequest
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         return ResponseEntity.ok(menuRatingService.getRating(menuId, httpRequest));
     }
 
-    @PostMapping("/public/{menuId}/rating")
+    @PostMapping("/public/{publicId}/rating")
     public ResponseEntity<MenuDtos.MenuRatingResponse> ratePublicMenu(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @Valid @RequestBody MenuDtos.MenuRatingRequest request,
             HttpServletRequest httpRequest
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         return ResponseEntity.status(201).body(menuRatingService.rateMenu(menuId, request, httpRequest));
     }
 
@@ -179,12 +187,13 @@ public class MenuController {
         return ResponseEntity.ok(menuFeedbackService.getSummary(menuId));
     }
 
-    @PostMapping("/public/{menuId}/reservations")
+    @PostMapping("/public/{publicId}/reservations")
     public ResponseEntity<MenuDtos.ReservationResponse> createPublicReservation(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @Valid @RequestBody MenuDtos.ReservationCreateRequest request,
             HttpServletRequest httpRequest
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         return ResponseEntity.status(201).body(
                 menuReservationService.createPublic(menuId, request, httpRequest)
         );
@@ -253,7 +262,7 @@ public class MenuController {
     @PatchMapping("/{menuId}")
     public ResponseEntity<MenuDtos.MenuProfileResponse> updateMenu(
             @PathVariable Long menuId,
-            @RequestBody MenuDtos.MenuUpdateRequest request
+            @Valid @RequestBody MenuDtos.MenuUpdateRequest request
     ) throws Exception {
         return ResponseEntity.ok(menuService.updateMenu(menuId, request));
     }
@@ -305,7 +314,7 @@ public class MenuController {
     @PostMapping("/{menuId}/products")
     public ResponseEntity<MenuDtos.MenuProductResponse> createProduct(
             @PathVariable Long menuId,
-            @RequestBody MenuDtos.MenuProductRequest request
+            @Valid @RequestBody MenuDtos.MenuProductRequest request
     ) {
         return ResponseEntity.status(201).body(menuService.createProduct(menuId, request));
     }
@@ -313,7 +322,7 @@ public class MenuController {
     @PutMapping("/products/{productId}")
     public ResponseEntity<MenuDtos.MenuProductResponse> updateProduct(
             @PathVariable Long productId,
-            @RequestBody MenuDtos.MenuProductRequest request
+            @Valid @RequestBody MenuDtos.MenuProductRequest request
     ) {
         return ResponseEntity.ok(menuService.updateProduct(productId, request));
     }

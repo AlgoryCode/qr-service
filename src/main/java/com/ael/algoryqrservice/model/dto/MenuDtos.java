@@ -377,6 +377,7 @@ public final class MenuDtos {
     public static class MenuProfileResponse {
         private Long menuId;
         private Long qrId;
+        private String publicId;
         private Long branchId;
         private Long userId;
         private String themeId;
@@ -396,6 +397,30 @@ public final class MenuDtos {
         private long ratingCount;
         private LocalDateTime updatedAt;
         private QrBrief qr;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PublicMenuProfileResponse {
+        private String publicId;
+        private String themeId;
+        private String businessName;
+        private String slogan;
+        private String chefName;
+        private String chefDisplayName;
+        private String chefAvatarKey;
+        private String chefAvatarUrl;
+        private String logoUrl;
+        private String phone;
+        private String email;
+        private String address;
+        private String publicUrl;
+        private boolean active;
+        private BigDecimal ratingAvg;
+        private long ratingCount;
+        private LocalDateTime updatedAt;
     }
 
     @Data
@@ -425,6 +450,7 @@ public final class MenuDtos {
     public static class ActiveMenuSummary {
         private Long menuId;
         private Long qrId;
+        private String publicId;
         private Long branchId;
         private String businessName;
         private String themeId;
@@ -446,8 +472,17 @@ public final class MenuDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class PublicIdResponse {
+        private String publicId;
+        private String publicUrl;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PublicMenuResponse {
-        private MenuProfileResponse menu;
+        private PublicMenuProfileResponse menu;
         private List<MenuProductResponse> products;
         private List<TaxonomyDtos.MainCategoryResponse> categories;
         private String themeId;

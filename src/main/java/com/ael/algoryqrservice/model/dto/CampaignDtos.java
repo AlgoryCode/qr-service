@@ -44,6 +44,7 @@ public final class CampaignDtos {
         private String templateCode;
         private String name;
         private String slogan;
+        private String imageUrl;
         private LocalDateTime startsAt;
         private LocalDateTime endsAt;
         private CampaignStatus status;
@@ -61,6 +62,7 @@ public final class CampaignDtos {
         @NotBlank
         private String name;
         private String slogan;
+        private String imageUrl;
         @NotNull
         private LocalDateTime startsAt;
         @NotNull
@@ -75,6 +77,7 @@ public final class CampaignDtos {
     public static class UpdateCampaignRequest {
         private String name;
         private String slogan;
+        private String imageUrl;
         private LocalDateTime startsAt;
         private LocalDateTime endsAt;
         private Map<String, Object> config;
@@ -90,6 +93,7 @@ public final class CampaignDtos {
         private String templateCode;
         private String name;
         private String slogan;
+        private String imageUrl;
         private Map<String, Object> config;
         private List<Long> targetProductIds;
     }

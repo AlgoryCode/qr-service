@@ -39,7 +39,7 @@ public class MenuProvider implements QrProvider<QrRequest> {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "details zorunludur");
             }
 
-            String initialContent = menuService.buildPublicUrlForQrId(0L);
+            String initialContent = menuService.buildPublicUrlForPublicId("pending");
 
             Qr qr = qrGenerationService.createAndSave(request, initialContent);
             Menu menu = menuService.createMenuForQr(qr, request);

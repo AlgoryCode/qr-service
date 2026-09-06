@@ -80,6 +80,7 @@ public class MenuService {
     private final BranchService branchService;
     private final BranchQuotaService branchQuotaService;
     private final BranchRepository branchRepository;
+    private final MenuPublicIdGenerator menuPublicIdGenerator;
 
     @Transactional(readOnly = true)
     public void requireOwnedMenu(Long menuId) {
@@ -100,6 +101,7 @@ public class MenuService {
 
         Menu menu = Menu.builder()
                 .qrId(qr.getQrId())
+                .publicId(menuPublicIdGenerator.generateUnique())
                 .userId(qr.getUserId())
                 .branchId(branchId)
                 .themeId(themeId)
@@ -307,19 +309,47 @@ public class MenuService {
     }
 
     public String buildPublicUrl(Menu menu) {
-        return buildPublicUrlForQrId(menu.getQrId());
+        String base = trimTrailingSlash(appProperties.getUrl());
+        return base + "/menu/" + menu.getPublicId();
     }
 
-    public String buildPublicUrlForQrId(Long qrId) {
+    public String buildPublicUrlForPublicId(String publicId) {
         String base = trimTrailingSlash(appProperties.getUrl());
-        return base + "/menu/" + qrId;
+        return base + "/menu/" + publicId;
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.PublicIdResponse resolvePublicIdFromLegacyQrId(Long qrId) {
+        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+        return MenuDtos.PublicIdResponse.builder()
+                .publicId(menu.getPublicId())
+                .publicUrl(buildPublicUrl(menu))
+                .build();
     }
 
     @Transactional
-    public MenuDtos.PublicMenuResponse getPublicMenuByQrId(Long qrId) {
-        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+    public MenuDtos.PublicMenuResponse getPublicMenuByPublicId(String publicId) {
+        Menu menu = requireActivePublicMenu(publicId);
         return buildPublicResponse(menu);
+    }
+
+    @Transactional(readOnly = true)
+    public Menu requireActivePublicMenu(String publicId) {
+        Menu menu = menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse(publicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
+        ensurePublicAccess(menu);
+        return menu;
+    }
+
+    @Transactional(readOnly = true)
+    public Long requirePublicMenuId(String publicId) {
+        return requireActivePublicMenu(publicId).getMenuId();
+    }
+
+    @Transactional(readOnly = true)
+    public Long requirePublicQrId(String publicId) {
+        return requireActivePublicMenu(publicId).getQrId();
     }
 
     @Transactional(readOnly = true)
@@ -363,7 +393,7 @@ public class MenuService {
 
     @Transactional
     public MenuDtos.MenuProductPageResponse listPublicProducts(
-            Long menuId,
+            String publicId,
             int page,
             int size,
             Boolean chefRecommended,
@@ -379,8 +409,7 @@ public class MenuService {
             Integer servesPeopleMax,
             String q
     ) {
-        Menu menu = ensureMenuExists(menuId);
-        ensurePublicAccess(menu);
+        Menu menu = requireActivePublicMenu(publicId);
         return searchProductsPage(
                 menu.getMenuId(),
                 true,
@@ -403,19 +432,18 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public TaxonomyDtos.TaxonomyPageResponse listPublicCategories(
-            Long menuId,
+            String publicId,
             int page,
             int size,
             String q
     ) {
-        Menu menu = ensureMenuExists(menuId);
-        ensurePublicAccess(menu);
+        Menu menu = requireActivePublicMenu(publicId);
         return menuCategoryService.listTaxonomyPage(menu.getMenuId(), page, size, q);
     }
 
     @Transactional
     public MenuDtos.ProductFacetsResponse listPublicProductFacets(
-            Long menuId,
+            String publicId,
             Boolean chefRecommended,
             String tagSlug,
             BigDecimal minRating,
@@ -429,8 +457,7 @@ public class MenuService {
             Integer servesPeopleMax,
             String q
     ) {
-        Menu menu = ensureMenuExists(menuId);
-        ensurePublicAccess(menu);
+        Menu menu = requireActivePublicMenu(publicId);
         Specification<MenuProduct> spec = buildSearchSpec(
                 menu.getMenuId(),
                 true,
@@ -527,9 +554,9 @@ public class MenuService {
     }
 
     @Transactional
-    public List<MenuDtos.MenuProductResponse> listPublicRecommendations(Long menuId, Long productId, int limit) {
-        Menu menu = ensureMenuExists(menuId);
-        ensurePublicAccess(menu);
+    public List<MenuDtos.MenuProductResponse> listPublicRecommendations(String publicId, Long productId, int limit) {
+        Menu menu = requireActivePublicMenu(publicId);
+        Long menuId = menu.getMenuId();
         MenuProduct target = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .filter(product -> product.getMenuId().equals(menuId) && product.isAvailable())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
@@ -876,6 +903,7 @@ public class MenuService {
                     return MenuDtos.ActiveMenuSummary.builder()
                             .menuId(menu.getMenuId())
                             .qrId(menu.getQrId())
+                            .publicId(menu.getPublicId())
                             .branchId(menu.getBranchId())
                             .businessName(menu.getBusinessName())
                             .themeId(menu.getThemeId())
@@ -1090,7 +1118,7 @@ public class MenuService {
         );
 
         return MenuDtos.PublicMenuResponse.builder()
-                .menu(toMenuProfile(menu, buildPublicUrl(menu), null))
+                .menu(toPublicMenuProfile(menu, buildPublicUrl(menu)))
                 .products(productPage.getContent())
                 .categories(categoryPage.getContent())
                 .themeId(menu.getThemeId())
@@ -1102,6 +1130,31 @@ public class MenuService {
                 .categorySize(categoryPage.getSize())
                 .categoryTotalElements(categoryPage.getTotalElements())
                 .categoryHasNext(categoryPage.isHasNext())
+                .build();
+    }
+
+    private MenuDtos.PublicMenuProfileResponse toPublicMenuProfile(Menu menu, String publicUrl) {
+        Branch branch = menu.getBranchId() == null
+                ? null
+                : branchRepository.findById(menu.getBranchId()).orElse(null);
+        return MenuDtos.PublicMenuProfileResponse.builder()
+                .publicId(menu.getPublicId())
+                .themeId(menu.getThemeId())
+                .businessName(menu.getBusinessName())
+                .slogan(menu.getSlogan())
+                .chefName(menu.getChefName())
+                .chefDisplayName(chefAvatarService.resolveDisplayName(menu.getChefName()))
+                .chefAvatarKey(menu.getChefAvatarKey())
+                .chefAvatarUrl(chefAvatarService.resolveImageUrl(menu.getChefAvatarKey()))
+                .logoUrl(menu.getLogoUrl())
+                .phone(branch != null && branch.getPhone() != null ? branch.getPhone() : menu.getPhone())
+                .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
+                .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
+                .publicUrl(publicUrl)
+                .active(menu.isActive())
+                .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
+                .ratingCount(menu.getRatingCount())
+                .updatedAt(menu.getUpdatedAt())
                 .build();
     }
 
@@ -1313,6 +1366,7 @@ public class MenuService {
         return MenuDtos.MenuProfileResponse.builder()
                 .menuId(menu.getMenuId())
                 .qrId(menu.getQrId())
+                .publicId(menu.getPublicId())
                 .branchId(menu.getBranchId())
                 .userId(menu.getUserId())
                 .themeId(menu.getThemeId())
