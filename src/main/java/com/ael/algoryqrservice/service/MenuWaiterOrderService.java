@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableBill;
+import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
@@ -47,6 +48,7 @@ public class MenuWaiterOrderService {
     private final TableBillService tableBillService;
     private final WaiterCommissionService waiterCommissionService;
     private final CampaignEvaluationService campaignEvaluationService;
+    private final MenuProductOptionService menuProductOptionService;
     private final WaiterAccessService waiterAccessService;
 
     @Transactional(readOnly = true)
@@ -219,10 +221,15 @@ public class MenuWaiterOrderService {
         Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(table.getMenuId());
         Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(table.getMenuId());
 
-        List<MenuWaiterDtos.CatalogProduct> products = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(table.getMenuId())
-                .stream()
-                .map(product -> toCatalogProduct(product, subMap, mainMap))
+        List<MenuProduct> menuProducts = menuProductRepository
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(table.getMenuId());
+        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
+                menuProductOptionService.loadByProductIds(
+                        menuProducts.stream().map(MenuProduct::getProductId).toList()
+                );
+
+        List<MenuWaiterDtos.CatalogProduct> products = menuProducts.stream()
+                .map(product -> toCatalogProduct(product, subMap, mainMap, optionsByProduct))
                 .toList();
 
         return MenuWaiterDtos.CatalogResponse.builder()
@@ -280,7 +287,8 @@ public class MenuWaiterOrderService {
     private MenuWaiterDtos.CatalogProduct toCatalogProduct(
             MenuProduct product,
             Map<Long, MenuSubCategory> subMap,
-            Map<Long, MenuCategory> mainMap
+            Map<Long, MenuCategory> mainMap,
+            Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct
     ) {
         MenuSubCategory sub = product.getSubCategoryId() == null ? null : subMap.get(product.getSubCategoryId());
         MenuCategory main = sub == null ? null : mainMap.get(sub.getMenuCategoryId());
@@ -299,6 +307,7 @@ public class MenuWaiterOrderService {
                 .mainCategoryId(main == null ? null : main.getId())
                 .mainCategoryName(main == null ? null : main.getName())
                 .commissionEligible(commissionEligible)
+                .optionGroups(optionsByProduct.getOrDefault(product.getProductId(), List.of()))
                 .build();
     }
 

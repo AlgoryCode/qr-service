@@ -2,8 +2,12 @@ package com.ael.algoryqrservice.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "tbl_menu_order_item", indexes = {
@@ -40,6 +44,11 @@ public class MenuOrderItem {
 
     @Column(columnDefinition = "text")
     private String note;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "selected_options", nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<SelectedMenuOption> selectedOptions = new ArrayList<>();
 
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;

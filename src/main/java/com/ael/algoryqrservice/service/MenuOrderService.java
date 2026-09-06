@@ -7,8 +7,10 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuProductOptionGroup;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.RestaurantTable;
+import com.ael.algoryqrservice.model.SelectedMenuOption;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableSession;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
@@ -31,6 +33,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -51,6 +54,7 @@ public class MenuOrderService {
     private final TableBillService tableBillService;
     private final WaiterCommissionService waiterCommissionService;
     private final CampaignEvaluationService campaignEvaluationService;
+    private final MenuProductOptionService menuProductOptionService;
     private final SecurityUtils securityUtils;
 
     @Transactional
@@ -227,6 +231,9 @@ public class MenuOrderService {
 
         if (items != null && !items.isEmpty()) {
             Map<Long, MenuProduct> productsById = loadProductsForMenu(menuId, items);
+            Map<Long, List<MenuProductOptionGroup>> groupsByProduct =
+                    menuProductOptionService.loadEntitiesByProductIds(productsById.keySet());
+            Map<String, MenuOrderItem> mergedByLineKey = new LinkedHashMap<>();
 
             for (MenuOrderDtos.CartItemRequest itemRequest : items) {
                 MenuProduct product = productsById.get(itemRequest.getProductId());
@@ -237,23 +244,48 @@ public class MenuOrderService {
                     throw new BadRequestException("Ürün şu an siparişe kapalı: " + product.getName());
                 }
 
-                BigDecimal unitPrice = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
-                int quantity = itemRequest.getQuantity();
-                BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
-                total = total.add(lineTotal);
+                MenuProductOptionService.ResolvedSelections resolved = menuProductOptionService.resolveSelections(
+                        product.getProductId(),
+                        groupsByProduct.getOrDefault(product.getProductId(), List.of()),
+                        itemRequest.getSelectedOptionIds()
+                );
 
-                if (product.getCurrency() != null && !product.getCurrency().isBlank()) {
-                    currency = product.getCurrency();
+                BigDecimal basePrice = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
+                BigDecimal unitPrice = basePrice.add(resolved.priceDeltaTotal());
+                int quantity = itemRequest.getQuantity();
+                String note = trimToNull(itemRequest.getNote());
+                String key = MenuProductOptionService.lineKey(product.getProductId(), resolved.selectedOptions());
+
+                MenuOrderItem existing = mergedByLineKey.get(key);
+                if (existing != null) {
+                    int nextQty = existing.getQuantity() + quantity;
+                    existing.setQuantity(nextQty);
+                    existing.setLineTotal(existing.getUnitPrice().multiply(BigDecimal.valueOf(nextQty)));
+                    if (existing.getNote() == null && note != null) {
+                        existing.setNote(note);
+                    }
+                    continue;
                 }
 
+                BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
                 MenuOrderItem item = MenuOrderItem.builder()
                         .productId(product.getProductId())
                         .productName(product.getName())
                         .unitPrice(unitPrice)
                         .quantity(quantity)
-                        .note(trimToNull(itemRequest.getNote()))
+                        .note(note)
+                        .selectedOptions(new ArrayList<>(resolved.selectedOptions()))
                         .lineTotal(lineTotal)
                         .build();
+                mergedByLineKey.put(key, item);
+
+                if (product.getCurrency() != null && !product.getCurrency().isBlank()) {
+                    currency = product.getCurrency();
+                }
+            }
+
+            for (MenuOrderItem item : mergedByLineKey.values()) {
+                total = total.add(item.getLineTotal());
                 order.addItem(item);
             }
         }
@@ -371,6 +403,7 @@ public class MenuOrderService {
                         .quantity(item.getQuantity())
                         .note(item.getNote())
                         .lineTotal(item.getLineTotal())
+                        .selectedOptions(toSelectedOptionResponses(item.getSelectedOptions()))
                         .build())
                 .toList();
 
@@ -400,6 +433,23 @@ public class MenuOrderService {
                 .updatedAt(order.getUpdatedAt())
                 .campaignSummary(campaignEvaluationService.summarizeOrder(order))
                 .build();
+    }
+
+    private static List<MenuOrderDtos.SelectedOptionResponse> toSelectedOptionResponses(
+            List<SelectedMenuOption> selectedOptions
+    ) {
+        if (selectedOptions == null || selectedOptions.isEmpty()) {
+            return List.of();
+        }
+        return selectedOptions.stream()
+                .map(option -> MenuOrderDtos.SelectedOptionResponse.builder()
+                        .groupId(option.getGroupId())
+                        .groupName(option.getGroupName())
+                        .optionId(option.getOptionId())
+                        .optionName(option.getOptionName())
+                        .priceDelta(option.getPriceDelta())
+                        .build())
+                .toList();
     }
 
     private String trimToNull(String value) {

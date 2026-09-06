@@ -34,6 +34,8 @@ public final class MenuOrderDtos {
 
         @Size(max = 500)
         private String note;
+
+        private List<Long> selectedOptionIds;
     }
 
     @Data
@@ -81,6 +83,19 @@ public final class MenuOrderDtos {
         private int quantity;
         private String note;
         private BigDecimal lineTotal;
+        private List<SelectedOptionResponse> selectedOptions;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SelectedOptionResponse {
+        private Long groupId;
+        private String groupName;
+        private Long optionId;
+        private String optionName;
+        private BigDecimal priceDelta;
     }
 
     @Data

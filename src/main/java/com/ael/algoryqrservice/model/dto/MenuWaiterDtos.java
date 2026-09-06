@@ -161,6 +161,7 @@ public final class MenuWaiterDtos {
         private Long mainCategoryId;
         private String mainCategoryName;
         private boolean commissionEligible;
+        private List<MenuDtos.MenuProductOptionGroupResponse> optionGroups;
     }
 
     @Data
