@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.dto.SmartReportDtos;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.AnalyticsService;
 import com.ael.algoryqrservice.service.EntitlementService;
+import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.SmartReportService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,13 +37,15 @@ public class AnalyticsController {
     private final SmartReportService smartReportService;
     private final EntitlementService entitlementService;
     private final SecurityUtils securityUtils;
+    private final MenuService menuService;
 
-    @PostMapping("/menu/{menuId}/events")
+    @PostMapping("/menu/{publicId}/events")
     public ResponseEntity<Void> recordEvents(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @Valid @RequestBody AnalyticsDtos.AnalyticsEventsRequest body,
             HttpServletRequest request
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         String ip = analyticsService.extractIpAddress(request);
         String userAgent = analyticsService.extractUserAgent(request);
         analyticsService.recordEvents(menuId, body, ip, userAgent);
@@ -197,23 +200,25 @@ public class AnalyticsController {
         return ResponseEntity.ok(smartReportService.getJobDetail(ownerId, jobId));
     }
 
-    @PostMapping("/menu/{menuId}/visit")
+    @PostMapping("/menu/{publicId}/visit")
     public ResponseEntity<Void> recordMenuVisit(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             HttpServletRequest request
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         String ip = analyticsService.extractIpAddress(request);
         String userAgent = request.getHeader("User-Agent");
         analyticsService.recordMenuVisit(menuId, ip, userAgent);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/menu/{menuId}/product/{productId}/visit")
+    @PostMapping("/menu/{publicId}/product/{productId}/visit")
     public ResponseEntity<Void> recordProductVisit(
-            @PathVariable Long menuId,
+            @PathVariable String publicId,
             @PathVariable Long productId,
             HttpServletRequest request
     ) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         String ip = analyticsService.extractIpAddress(request);
         String userAgent = request.getHeader("User-Agent");
         analyticsService.recordProductVisit(menuId, productId, ip, userAgent);

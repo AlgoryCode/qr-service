@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.CustomerAuthDtos;
 import com.ael.algoryqrservice.service.CustomerAccountService;
+import com.ael.algoryqrservice.service.MenuService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CustomerAccountController {
 
     private final CustomerAccountService customerAccountService;
+    private final MenuService menuService;
 
     @GetMapping("/profile")
     public ResponseEntity<CustomerAuthDtos.CustomerProfileResponse> getMyProfile() {
@@ -44,11 +46,13 @@ public class CustomerAccountController {
     public ResponseEntity<CustomerAuthDtos.MembershipResponse> joinMembership(
             @Valid @RequestBody CustomerAuthDtos.JoinMembershipRequest request
     ) {
-        return ResponseEntity.ok(customerAccountService.joinMembership(request.getMenuId()));
+        Long menuId = menuService.requirePublicMenuId(request.getPublicId());
+        return ResponseEntity.ok(customerAccountService.joinMembership(menuId));
     }
 
-    @GetMapping("/memberships/{menuId}")
-    public ResponseEntity<CustomerAuthDtos.MembershipResponse> getMembership(@PathVariable Long menuId) {
+    @GetMapping("/memberships/{publicId}")
+    public ResponseEntity<CustomerAuthDtos.MembershipResponse> getMembership(@PathVariable String publicId) {
+        Long menuId = menuService.requirePublicMenuId(publicId);
         return ResponseEntity.ok(customerAccountService.getMembership(menuId));
     }
 }

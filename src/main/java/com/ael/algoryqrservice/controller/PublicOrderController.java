@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.service.MenuOrderService;
+import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.TableSessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,38 +15,43 @@ import org.springframework.web.bind.annotation.*;
 public class PublicOrderController {
 
     private final MenuOrderService menuOrderService;
+    private final MenuService menuService;
 
-    @GetMapping("/id/{qrId}/cart")
+    @GetMapping("/{publicId}/cart")
     public ResponseEntity<MenuOrderDtos.OrderResponse> getCart(
-            @PathVariable Long qrId,
+            @PathVariable String publicId,
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken
     ) {
+        Long qrId = menuService.requirePublicQrId(publicId);
         return ResponseEntity.ok(menuOrderService.getCart(qrId, tableSessionToken));
     }
 
-    @PutMapping("/id/{qrId}/cart")
+    @PutMapping("/{publicId}/cart")
     public ResponseEntity<MenuOrderDtos.OrderResponse> updateCart(
-            @PathVariable Long qrId,
+            @PathVariable String publicId,
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken,
             @Valid @RequestBody MenuOrderDtos.UpdateCartRequest request
     ) {
+        Long qrId = menuService.requirePublicQrId(publicId);
         return ResponseEntity.ok(menuOrderService.upsertCart(qrId, tableSessionToken, request));
     }
 
-    @PostMapping("/id/{qrId}/orders/submit")
+    @PostMapping("/{publicId}/orders/submit")
     public ResponseEntity<MenuOrderDtos.OrderResponse> submitOrder(
-            @PathVariable Long qrId,
+            @PathVariable String publicId,
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken
     ) {
+        Long qrId = menuService.requirePublicQrId(publicId);
         return ResponseEntity.ok(menuOrderService.submit(qrId, tableSessionToken));
     }
 
-    @GetMapping("/id/{qrId}/orders/{orderId}")
+    @GetMapping("/{publicId}/orders/{orderId}")
     public ResponseEntity<MenuOrderDtos.OrderResponse> getOrder(
-            @PathVariable Long qrId,
+            @PathVariable String publicId,
             @PathVariable Long orderId,
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken
     ) {
+        Long qrId = menuService.requirePublicQrId(publicId);
         return ResponseEntity.ok(menuOrderService.getOrder(qrId, tableSessionToken, orderId));
     }
 }

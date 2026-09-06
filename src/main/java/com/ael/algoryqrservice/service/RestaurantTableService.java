@@ -39,7 +39,7 @@ public class RestaurantTableService {
     public List<RestaurantTableDtos.TableResponse> listTables(Long menuId) {
         Menu menu = requireOwnedMenu(menuId);
         return restaurantTableRepository.findByMenuIdOrderByTableNumberAscNameAsc(menu.getMenuId()).stream()
-                .map(table -> toTableResponse(table, menu.getQrId()))
+                .map(table -> toTableResponse(table, menu))
                 .toList();
     }
 
@@ -51,7 +51,7 @@ public class RestaurantTableService {
         }
 
         String publicToken = generateToken();
-        String publicUrl = buildPublicUrl(menu.getQrId(), publicToken);
+        String publicUrl = buildPublicUrl(menu, publicToken);
         String qrImageBase64 = generateQrImage(publicUrl);
 
         LocalDateTime now = LocalDateTime.now();
@@ -66,7 +66,7 @@ public class RestaurantTableService {
                 .updatedAt(now)
                 .build();
 
-        return toTableResponse(restaurantTableRepository.save(table), menu.getQrId());
+        return toTableResponse(restaurantTableRepository.save(table), menu);
     }
 
     @Transactional
@@ -95,7 +95,7 @@ public class RestaurantTableService {
         }
 
         table.setUpdatedAt(LocalDateTime.now());
-        return toTableResponse(restaurantTableRepository.save(table), menu.getQrId());
+        return toTableResponse(restaurantTableRepository.save(table), menu);
     }
 
     @Transactional
@@ -104,12 +104,12 @@ public class RestaurantTableService {
         RestaurantTable table = requireTable(menu.getMenuId(), tableId);
 
         String publicToken = generateToken();
-        String publicUrl = buildPublicUrl(menu.getQrId(), publicToken);
+        String publicUrl = buildPublicUrl(menu, publicToken);
         table.setPublicToken(publicToken);
         table.setQrImageBase64(generateQrImage(publicUrl));
         table.setUpdatedAt(LocalDateTime.now());
 
-        return toTableResponse(restaurantTableRepository.save(table), menu.getQrId());
+        return toTableResponse(restaurantTableRepository.save(table), menu);
     }
 
     @Transactional
@@ -121,14 +121,14 @@ public class RestaurantTableService {
         restaurantTableRepository.save(table);
     }
 
-    public RestaurantTableDtos.TableResponse toTableResponse(RestaurantTable table, Long menuQrId) {
+    public RestaurantTableDtos.TableResponse toTableResponse(RestaurantTable table, Menu menu) {
         return RestaurantTableDtos.TableResponse.builder()
                 .id(table.getId())
                 .menuId(table.getMenuId())
                 .name(table.getName())
                 .tableNumber(table.getTableNumber())
                 .publicToken(table.getPublicToken())
-                .publicUrl(buildPublicUrl(menuQrId, table.getPublicToken()))
+                .publicUrl(buildPublicUrl(menu, table.getPublicToken()))
                 .qrImageBase64(table.getQrImageBase64())
                 .active(table.isActive())
                 .createdAt(table.getCreatedAt())
@@ -152,8 +152,8 @@ public class RestaurantTableService {
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
     }
 
-    private String buildPublicUrl(Long menuQrId, String publicToken) {
-        return menuService.buildPublicUrlForQrId(menuQrId) + "?t=" + publicToken;
+    private String buildPublicUrl(Menu menu, String publicToken) {
+        return menuService.buildPublicUrl(menu) + "?t=" + publicToken;
     }
 
     private String generateQrImage(String publicUrl) {

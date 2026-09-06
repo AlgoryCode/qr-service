@@ -125,8 +125,8 @@ public final class CustomerAuthDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class JoinMembershipRequest {
-        @NotNull
-        private Long menuId;
+        @NotBlank
+        private String publicId;
     }
 
     @Data

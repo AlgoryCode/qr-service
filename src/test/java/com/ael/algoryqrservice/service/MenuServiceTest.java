@@ -99,6 +99,10 @@ class MenuServiceTest {
     private BranchQuotaService branchQuotaService;
     @Mock
     private BranchRepository branchRepository;
+    @Mock
+    private MenuPublicIdGenerator menuPublicIdGenerator;
+    @Mock
+    private MenuProductOptionService menuProductOptionService;
 
     @InjectMocks
     private MenuService menuService;
@@ -111,6 +115,7 @@ class MenuServiceTest {
                 .thenReturn(emptyPairings());
         org.mockito.Mockito.lenient().when(menuProductPairingService.loadByProductIds(any()))
                 .thenReturn(Map.of());
+        org.mockito.Mockito.lenient().when(menuPublicIdGenerator.generateUnique()).thenReturn("new-public-id");
     }
 
     private static MenuDtos.MenuProductPairingsResponse emptyPairings() {
@@ -153,6 +158,7 @@ class MenuServiceTest {
         NutritionFacts parsedNutrition = sampleNutrition();
         MenuSubCategory sub = MenuSubCategory.builder().id(1L).menuCategoryId(1L).slug("sicak_icecekler").name("Sıcak İçecekler").sortOrder(1).build();
 
+        when(menuPublicIdGenerator.generateUnique()).thenReturn("new-public-id");
         when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> {
             Menu menu = invocation.getArgument(0);
             menu.setMenuId(99L);
@@ -339,11 +345,12 @@ class MenuServiceTest {
     void listPublicProducts_whenChefRecommendedFilter_thenPassFilterToRepository() {
         Menu menu = Menu.builder()
                 .menuId(10L)
+                .publicId("pub-test")
                 .userId(7L)
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
-        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
         when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
@@ -351,7 +358,7 @@ class MenuServiceTest {
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-        menuService.listPublicProducts(10L, 0, 20, true, null, null, null, null, null, null, null, null, null, null, null);
+        menuService.listPublicProducts("pub-test", 0, 20, true, null, null, null, null, null, null, null, null, null, null, null);
 
         verify(menuProductRepository).findAll(any(Specification.class), any(Pageable.class));
     }
@@ -446,20 +453,21 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByQrId_whenPublicAccessDisabled_thenThrowForbidden() {
+    void getPublicMenuByPublicId_whenPublicAccessDisabled_thenThrowForbidden() {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
+                .publicId("pub-test")
                 .userId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
                 .publicAccessEnabled(false)
                 .build();
-        when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
 
-        assertThatThrownBy(() -> menuService.getPublicMenuByQrId(2L))
+        assertThatThrownBy(() -> menuService.getPublicMenuByPublicId("pub-test"))
                 .isInstanceOf(ForbiddenException.class)
                 .satisfies(ex -> {
                     ForbiddenException forbidden = (ForbiddenException) ex;
@@ -469,10 +477,11 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByQrId_whenPublicAccessStale_thenResyncAndReturn() {
+    void getPublicMenuByPublicId_whenPublicAccessStale_thenResyncAndReturn() {
         Menu disabled = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
+                .publicId("pub-test")
                 .userId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
@@ -483,13 +492,14 @@ class MenuServiceTest {
         Menu enabled = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
+                .publicId("pub-test")
                 .userId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
-        when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(disabled));
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(disabled));
         when(menuRepository.findById(10L)).thenReturn(Optional.of(enabled));
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
@@ -509,24 +519,27 @@ class MenuServiceTest {
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
-        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByQrId(2L);
+        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByPublicId("pub-test");
 
         verify(menuPublicAccessService).syncForUser(7L);
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
+        assertThat(response.getMenu().getPublicId()).isEqualTo("pub-test");
+        assertThat(response.getMenu().getPublicUrl()).isEqualTo("https://example.com/menu/pub-test");
     }
 
     @Test
-    void getPublicMenuByQrId_whenPublicAccessEnabled_thenReturnPublicMenu() {
+    void getPublicMenuByPublicId_whenPublicAccessEnabled_thenReturnPublicMenu() {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
+                .publicId("pub-test")
                 .userId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
-        when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
@@ -545,7 +558,7 @@ class MenuServiceTest {
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
-        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByQrId(2L);
+        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByPublicId("pub-test");
 
         assertThat(response.getThemeId()).isEqualTo("soft");
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
@@ -597,11 +610,12 @@ class MenuServiceTest {
     void listPublicProducts_whenUnavailablePresent_thenOnlyAvailableReturned() {
         Menu menu = Menu.builder()
                 .menuId(10L)
+                .publicId("pub-test")
                 .userId(7L)
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
-        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
         when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
@@ -621,7 +635,7 @@ class MenuServiceTest {
                 .thenReturn(new PageImpl<>(List.of(available), pageable, 1));
 
         MenuDtos.MenuProductPageResponse response = menuService.listPublicProducts(
-                10L, 0, 20, null, null, null, null, null, null, null, null, null, null, null, null
+                "pub-test", 0, 20, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(response.getContent()).hasSize(1);
@@ -631,17 +645,18 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByQrId_whenManyProducts_thenReturnFirstPageOnly() {
+    void getPublicMenuByPublicId_whenManyProducts_thenReturnFirstPageOnly() {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
+                .publicId("pub-test")
                 .userId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
-        when(menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(2L)).thenReturn(Optional.of(menu));
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
         when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
                 TaxonomyDtos.TaxonomyPageResponse.builder()
@@ -673,7 +688,7 @@ class MenuServiceTest {
         when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(firstPage, PageRequest.of(0, 20), 45));
 
-        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByQrId(2L);
+        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByPublicId("pub-test");
 
         assertThat(response.getProducts()).hasSize(20);
         assertThat(response.getProductTotalElements()).isEqualTo(45);

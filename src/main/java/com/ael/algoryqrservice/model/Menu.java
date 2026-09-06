@@ -27,6 +27,9 @@ public class Menu extends QrBaseModel {
     @Column(nullable = false, unique = true)
     private Long qrId;
 
+    @Column(name = "public_id", nullable = false, unique = true, length = 32)
+    private String publicId;
+
     @Column(nullable = false)
     private Long userId;
 

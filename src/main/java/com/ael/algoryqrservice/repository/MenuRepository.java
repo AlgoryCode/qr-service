@@ -17,6 +17,12 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
 
     Optional<Menu> findByQrIdAndActiveTrueAndDeletedFalse(Long qrId);
 
+    Optional<Menu> findByPublicIdAndDeletedFalse(String publicId);
+
+    Optional<Menu> findByPublicIdAndActiveTrueAndDeletedFalse(String publicId);
+
+    boolean existsByPublicId(String publicId);
+
     @Query("""
             select menu, qr
             from Menu menu, Qr qr
