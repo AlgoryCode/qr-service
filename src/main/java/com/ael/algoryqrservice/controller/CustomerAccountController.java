@@ -4,7 +4,7 @@ import com.ael.algoryqrservice.model.dto.CampaignDtos;
 import com.ael.algoryqrservice.model.dto.CustomerAuthDtos;
 import com.ael.algoryqrservice.service.CustomerAccountService;
 import com.ael.algoryqrservice.service.MenuService;
-import com.ael.algoryqrservice.service.campaign.CampaignRewardService;
+import com.ael.algoryqrservice.service.campaign.CustomerCampaignRewardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +25,7 @@ public class CustomerAccountController {
 
     private final CustomerAccountService customerAccountService;
     private final MenuService menuService;
-    private final CampaignRewardService campaignRewardService;
+    private final CustomerCampaignRewardService customerCampaignRewardService;
 
     @GetMapping("/profile")
     public ResponseEntity<CustomerAuthDtos.CustomerProfileResponse> getMyProfile() {
@@ -63,6 +63,6 @@ public class CustomerAccountController {
 
     @GetMapping("/rewards")
     public ResponseEntity<List<CampaignDtos.CustomerRewardResponse>> listMyRewards() {
-        return ResponseEntity.ok(campaignRewardService.listMyRewards());
+        return ResponseEntity.ok(customerCampaignRewardService.listMyRewards());
     }
 }
