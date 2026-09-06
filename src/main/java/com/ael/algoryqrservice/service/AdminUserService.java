@@ -11,6 +11,7 @@ import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.repository.UserSpecifications;
+import com.ael.algoryqrservice.trial.TrialUseCases;
 import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +35,7 @@ public class AdminUserService {
     private final QrRepository qrRepository;
     private final MenuRepository menuRepository;
     private final SessionService sessionService;
+    private final TrialUseCases trialUseCases;
 
     @Transactional(readOnly = true)
     public AdminUserDtos.UserPageResponse listUsers(String query, int page, int size) {
@@ -56,6 +58,7 @@ public class AdminUserService {
 
         UserAccessProfile accessProfile = userAccessProfileService.resolve(user.getId());
         List<PurchaseResponse> purchases = purchaseService.getUserPurchases(user.getId());
+        var trial = trialUseCases.snapshot(user.getId());
 
         return AdminUserDtos.UserDetailResponse.builder()
                 .id(user.getId())
@@ -68,8 +71,9 @@ public class AdminUserService {
                 .role(user.getRole())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
-                .trialUsed(user.isTrialUsed() || user.getTrialEndDate() != null)
-                .trialEndDate(user.getTrialEndDate())
+                .trialLifecycle(trial.lifecycle())
+                .trialConsumed(trial.consumed())
+                .trialExpiresAt(trial.expiresAt())
                 .registrationIpAddress(user.getRegistrationIpAddress())
                 .registrationDevice(user.getRegistrationDevice())
                 .registrationDeviceType(user.getRegistrationDeviceType())

@@ -44,12 +44,13 @@ Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expires
 | `SMART_ASSISTANT` | Akıllı asistan (Ultimate) |
 | `SMART_SUMMARY` | Akıllı özet (Ultimate) |
 | `CUSTOM_DESIGN` | Özel tasarım menü (Ultimate) |
+| `AI_MENU_IMPORT` | Menü fotoğrafından AI ile ürün çıkarma (Ultimate) |
 
 ### Satılabilir paketler
 
 - **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `trialEligible=false`
 - **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `trialEligible=false`
-- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL` — 999 TRY/ay, yıllık 9215 TRY, `trialEligible=true`, `trialDays=30`
+- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL`, `AI_MENU_IMPORT` — 3450 TRY/ay (KDV dahil), yıllık 31823.57 TRY, `trialEligible=true`, `trialDays=30`
 
 Garson sipariş/adisyon modülü yalnızca Ultimate pakette (`WAITER_PANEL` / `WAITER_PANEL_OWNER`). Başlangıç ve Pro paketlerinde bu özellik yoktur.
 

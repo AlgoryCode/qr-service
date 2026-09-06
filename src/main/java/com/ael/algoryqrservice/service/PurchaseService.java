@@ -44,6 +44,7 @@ import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import com.ael.algoryqrservice.service.entitlement.UserEntitlementQueryService;
+import com.ael.algoryqrservice.purchase.lifecycle.RemoteSubscriptionCanceller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -88,6 +89,7 @@ public class PurchaseService {
     private final BillingSubscriptionProperties billingSubscriptionProperties;
     private final PlatformTransactionManager transactionManager;
     private final BranchQuotaService branchQuotaService;
+    private final RemoteSubscriptionCanceller remoteSubscriptionCanceller;
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -765,24 +767,7 @@ public class PurchaseService {
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
         requireExpirable(purchase.getStatus());
-
-        if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION
-                && purchase.getSubscriptionId() != null
-                && !purchase.getSubscriptionId().isBlank()
-                && purchase.getSubscriptionStatus() != SubscriptionStatus.CANCELLED) {
-            try {
-                paymentServiceClient.cancelSubscription(purchase.getUserId(), purchase.getSubscriptionId());
-                purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
-                purchaseRepository.save(purchase);
-            } catch (PaymentServiceException exception) {
-                log.warn(
-                        "Admin expire remote subscription cancel failed. purchaseId={} reason={}",
-                        purchaseId,
-                        exception.getMessage()
-                );
-            }
-        }
-
+        remoteSubscriptionCanceller.cancelIfNeeded(purchase);
         purchaseExpiryService.expire(purchase);
         packageActivationService.ensureSubscriptionState(purchase.getUserId());
         menuPublicAccessService.syncForUser(purchase.getUserId());
@@ -791,11 +776,6 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse deactivateSubscriptionForAdmin(Long purchaseId) {
-        Purchase purchase = purchaseRepository.findById(purchaseId)
-                .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
-        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
-            throw new BadRequestException("Bu satın alım abonelik değil");
-        }
         return expirePurchase(purchaseId);
     }
 

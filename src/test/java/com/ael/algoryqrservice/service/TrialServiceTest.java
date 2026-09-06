@@ -14,6 +14,7 @@ import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.TrialDtos;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
@@ -23,6 +24,7 @@ import com.ael.algoryqrservice.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.trial.TrialUseCases;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -38,7 +40,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,7 +64,7 @@ class TrialServiceTest {
     @Mock
     PackageActivationService packageActivationService;
     @Mock
-    UserTrialService userTrialService;
+    TrialUseCases trialUseCases;
     @Mock
     PaymentServiceClient paymentServiceClient;
     @Mock
@@ -72,22 +77,11 @@ class TrialServiceTest {
     TrialService service;
 
     @Test
-    void start_whenTrialHistoryExists_thenReject() {
-        User user = User.builder().id(7L).trialUsed(false).build();
+    void start_whenTrialAlreadyConsumed_thenReject() {
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
-        when(userTrialService.hasTrialPurchase(7L)).thenReturn(true);
-
-        assertThatThrownBy(() -> service.start(7L, 2L))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("kullanilmis");
-    }
-
-    @Test
-    void start_whenTrialUsedFlag_thenReject() {
-        User user = User.builder().id(7L).trialUsed(true).build();
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userTrialService.hasUsedTrial(user)).thenReturn(true);
+        doThrow(new BadRequestException("Deneme hakki daha once kullanilmis"))
+                .when(trialUseCases).assertCanStart(7L);
 
         assertThatThrownBy(() -> service.start(7L, 2L))
                 .isInstanceOf(BadRequestException.class)
@@ -96,24 +90,11 @@ class TrialServiceTest {
     }
 
     @Test
-    void start_whenTrialEndDateSet_thenReject() {
-        User user = User.builder().id(7L).trialEndDate(LocalDateTime.now().minusDays(1)).build();
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userTrialService.hasUsedTrial(user)).thenReturn(true);
-
-        assertThatThrownBy(() -> service.start(7L, 2L))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("kullanilmis");
-    }
-
-    @Test
     void start_whenPackageIdProvided_thenGrantForTrialDays() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
-        when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        doNothing().when(trialUseCases).assertCanStart(7L);
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
         stubSavedCard(7L);
         stubBootstrap(7L);
@@ -141,8 +122,7 @@ class TrialServiceTest {
 
     private void stubEligibleUser(User user) {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
-        when(userTrialService.hasTrialPurchase(user.getId())).thenReturn(false);
+        doNothing().when(trialUseCases).assertCanStart(user.getId());
         stubSavedCard(user.getId());
     }
 
@@ -169,9 +149,8 @@ class TrialServiceTest {
     void start_whenIneligiblePackage_thenReject() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
         plan.setTrialEligible(false);
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         stubEligibleUser(user);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
 
         assertThatThrownBy(() -> service.start(7L, 2L))
@@ -183,11 +162,9 @@ class TrialServiceTest {
     @Test
     void start_whenUltimateTrialEligible_thenGrantForTrialDays() {
         PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, 30);
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userTrialService.hasUsedTrial(user)).thenReturn(false);
-        when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        doNothing().when(trialUseCases).assertCanStart(7L);
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
         stubSavedCard(7L);
         stubBootstrap(7L);
@@ -210,9 +187,8 @@ class TrialServiceTest {
     void start_whenStarterNotTrialEligible_thenReject() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.STARTER_PACKAGE, 30, null);
         plan.setTrialEligible(false);
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         stubEligibleUser(user);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
 
         assertThatThrownBy(() -> service.start(7L, 2L))
@@ -223,9 +199,8 @@ class TrialServiceTest {
     @Test
     void start_whenMissingTrialDays_thenReject() {
         PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, null);
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         stubEligibleUser(user);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
 
         assertThatThrownBy(() -> service.start(7L, 2L))
@@ -234,32 +209,10 @@ class TrialServiceTest {
     }
 
     @Test
-    void start_whenNoSavedCard_thenReject() {
-        User user = User.builder().id(7L).trialUsed(false).build();
-        stubEligibleUser(user);
-        when(paymentServiceClient.getPaymentMethods(7L)).thenReturn(List.of());
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
-
-        assertThatThrownBy(() -> service.start(7L, 2L))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("kredi karti");
-        verify(purchaseRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
     void start_whenUsablePaidExists_thenReject() {
-        Purchase paid = Purchase.builder()
-                .id(1L)
-                .userId(7L)
-                .purchaseType(PurchaseType.PAID)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(1))
-                .expiresAt(LocalDateTime.now().plusDays(10))
-                .build();
-        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).trialUsed(false).build()));
-        when(userTrialService.hasUsedTrial(any())).thenReturn(false);
-        when(userTrialService.hasTrialPurchase(7L)).thenReturn(false);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build()));
+        doThrow(new BadRequestException("Aktif ucretli paket varken deneme baslatilamaz"))
+                .when(trialUseCases).assertCanStart(7L);
 
         assertThatThrownBy(() -> service.start(7L, 2L))
                 .isInstanceOf(BadRequestException.class)
@@ -269,13 +222,12 @@ class TrialServiceTest {
     @Test
     void startDigitalMenuPro_whenAvailable_thenPinTrialEligiblePackage() {
         PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, 30);
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(packageRepository.findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc())
                 .thenReturn(Optional.of(plan));
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
         stubEligibleUser(user);
         stubBootstrap(7L);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
             purchase.setId(10L);
@@ -290,7 +242,7 @@ class TrialServiceTest {
 
     @Test
     void status_whenTrialDateExpired_thenExposeTrialExpiredAndSyncSubscription() {
-        User user = User.builder().id(7L).trialUsed(false).build();
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         Purchase purchase = Purchase.builder().id(10L).userId(7L).purchaseType(PurchaseType.TRIAL)
                 .status(PurchaseStatus.ACTIVE).startsAt(LocalDateTime.now().minusDays(31))
                 .expiresAt(LocalDateTime.now().minusDays(1)).build();
@@ -309,8 +261,8 @@ class TrialServiceTest {
     }
 
     @Test
-    void status_whenActiveTrial_thenDoesNotMarkTrialUsedEarly() {
-        User user = User.builder().id(7L).trialUsed(false).build();
+    void status_whenActiveTrial_thenDoesNotPersistUserFlags() {
+        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         Purchase purchase = Purchase.builder().id(10L).userId(7L).purchaseType(PurchaseType.TRIAL)
                 .status(PurchaseStatus.ACTIVE).startsAt(LocalDateTime.now().minusDays(1))
                 .expiresAt(LocalDateTime.now().plusDays(5)).build();
@@ -321,7 +273,6 @@ class TrialServiceTest {
         TrialDtos.Status result = service.status(7L);
 
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
-        assertThat(user.isTrialUsed()).isFalse();
         verify(userRepository, never()).save(any());
     }
 
@@ -348,3 +299,4 @@ class TrialServiceTest {
                 .build();
     }
 }
+

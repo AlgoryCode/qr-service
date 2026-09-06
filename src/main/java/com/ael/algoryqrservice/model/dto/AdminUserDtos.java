@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.AuthProvider;
+import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.UserRole;
+import com.ael.algoryqrservice.trial.domain.TrialLifecycle;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -61,8 +63,9 @@ public final class AdminUserDtos {
         private UserRole role;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
-        private boolean trialUsed;
-        private LocalDateTime trialEndDate;
+        private TrialLifecycle trialLifecycle;
+        private boolean trialConsumed;
+        private LocalDateTime trialExpiresAt;
         private String registrationIpAddress;
         private String registrationDevice;
         private String registrationDeviceType;
@@ -93,6 +96,38 @@ public final class AdminUserDtos {
         private String packageName;
         private LocalDateTime expiresAt;
         private int daysAdded;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EndTrialResponse {
+        private Long purchaseId;
+        private String packageName;
+        private LocalDateTime expiresAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReactivatePackageRequest {
+        @Min(1)
+        @Max(3650)
+        private int days;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PackageLifecycleResponse {
+        private Long purchaseId;
+        private String packageName;
+        private PurchaseStatus status;
+        private LocalDateTime expiresAt;
+        private Integer daysAdded;
     }
 
     @Data

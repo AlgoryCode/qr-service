@@ -25,6 +25,7 @@ import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.trial.TrialUseCases;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -49,7 +50,7 @@ public class TrialService {
     private final PackageEntitlementWriter entitlementWriter;
     private final PurchaseExpiryService purchaseExpiryService;
     private final PackageActivationService packageActivationService;
-    private final UserTrialService userTrialService;
+    private final TrialUseCases trialUseCases;
     private final PaymentServiceClient paymentServiceClient;
     private final BillingAddressService billingAddressService;
     private final PaymentRequestMapper paymentRequestMapper;
@@ -63,10 +64,7 @@ public class TrialService {
                 && !user.isEmailVerified()) {
             throw new BadRequestException("Deneme başlatmak için e-posta adresinizi doğrulamanız gerekiyor");
         }
-        if (userTrialService.hasUsedTrial(user) || userTrialService.hasTrialPurchase(userId)) {
-            throw new BadRequestException("Deneme hakki daha once kullanilmis");
-        }
-        rejectIfHasUsablePaidPackage(userId);
+        trialUseCases.assertCanStart(userId);
         Long paymentMethodId = findSavedCard(userId);
 
         PlanPackage planPackage = resolveTrialPackage(packageId);
@@ -123,20 +121,15 @@ public class TrialService {
                 .findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(userId, PurchaseType.TRIAL)
                 .orElse(null);
         if (purchase == null) {
-            if (user != null && userTrialService.hasUsedTrial(user)) {
-                return usedUnavailableStatus(user);
-            }
             return availableStatus();
         }
         if (purchase.getStatus() == PurchaseStatus.ACTIVE && purchase.isExpiredByDate()) {
             purchaseExpiryService.expire(purchase);
             packageActivationService.ensureSubscriptionState(userId);
-            user = userRepository.findById(userId).orElse(user);
-            return usedUnavailableStatus(user);
+            return usedUnavailableStatus(purchase.getExpiresAt());
         }
         if (purchase.getStatus() != PurchaseStatus.ACTIVE) {
-            user = userRepository.findById(userId).orElse(user);
-            return usedUnavailableStatus(user);
+            return usedUnavailableStatus(purchase.getExpiresAt());
         }
         if (user != null && purchase.getPaymentMethodId() != null && purchase.getSubscriptionId() == null) {
             PlanPackage planPackage = purchase.getPackageId() == null
@@ -262,16 +255,6 @@ public class TrialService {
         }
     }
 
-    private void rejectIfHasUsablePaidPackage(Long userId) {
-        purchaseExpiryService.expireDueForUser(userId);
-        boolean hasPaid = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
-                .anyMatch(purchase -> purchase.isUsable()
-                        && purchase.getPurchaseType() == PurchaseType.PAID);
-        if (hasPaid) {
-            throw new BadRequestException("Aktif ucretli paket varken deneme baslatilamaz");
-        }
-    }
-
     private TrialDtos.Status availableStatus() {
         return new TrialDtos.Status(
                 TrialDtos.Lifecycle.AVAILABLE,
@@ -287,12 +270,12 @@ public class TrialService {
         );
     }
 
-    private TrialDtos.Status usedUnavailableStatus(User user) {
+    private TrialDtos.Status usedUnavailableStatus(LocalDateTime expiresAt) {
         return new TrialDtos.Status(
                 TrialDtos.Lifecycle.TRIAL_EXPIRED,
                 null,
                 null,
-                user != null ? user.getTrialEndDate() : null,
+                expiresAt,
                 null,
                 null,
                 null,

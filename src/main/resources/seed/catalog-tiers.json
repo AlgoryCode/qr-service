@@ -180,8 +180,8 @@
       "systemManaged": false,
       "trialEligible": true,
       "active": true,
-      "lockPrice": 999.00,
-      "yearlyPrice": 9215.00,
+      "lockPrice": 3450.00,
+      "yearlyPrice": 31823.57,
       "items": [
         { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
         { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },

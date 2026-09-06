@@ -4,10 +4,8 @@ import com.ael.algoryqrservice.event.PurchasesExpiredEvent;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.service.PurchaseLogService;
-import com.ael.algoryqrservice.service.UserTrialService;
 import com.ael.algoryqrservice.util.WritableTransactionGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,7 +29,6 @@ public class PurchaseExpiryService {
 
     private final PurchaseRepository purchaseRepository;
     private final PurchaseLogService purchaseLogService;
-    private final UserTrialService userTrialService;
     private final ApplicationEventPublisher eventPublisher;
     private final WritableTransactionGuard writableTransactionGuard;
 
@@ -78,10 +75,6 @@ public class PurchaseExpiryService {
         }
         purchase.setStatus(PurchaseStatus.EXPIRED);
         purchaseRepository.save(purchase);
-
-        if (purchase.getPurchaseType() == PurchaseType.TRIAL) {
-            userTrialService.markTrialCompleted(purchase.getUserId(), purchase.getExpiresAt());
-        }
 
         purchaseLogService.log(
                 purchase.getId(),
