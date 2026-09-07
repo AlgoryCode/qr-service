@@ -275,10 +275,9 @@ class AdminTrialServiceTest {
                 .name("Ultimate Deneme")
                 .price(BigDecimal.ZERO)
                 .currency("TRY")
-                .validityDays(30)
-                .trialDays(15)
+                .validityDays(15)
                 .active(true)
-                .trialEligible(true)
+                .purchasable(false)
                 .systemManaged(false)
                 .items(new ArrayList<>(List.of(item)))
                 .build();

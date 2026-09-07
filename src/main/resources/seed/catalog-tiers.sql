@@ -61,47 +61,47 @@ UPDATE tbl_product SET name = 'AI Menu Import', description = 'Menu fotografınd
     scope_code = 'AI_MENU_IMPORT_OWNER', unit_price = 0.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW()
 WHERE code = 'AI_MENU_IMPORT';
 
-UPDATE tbl_plan_package SET active = FALSE, purchasable = FALSE, trial_eligible = FALSE, updated_at = NOW()
+UPDATE tbl_plan_package SET active = FALSE, purchasable = FALSE, updated_at = NOW()
 WHERE code IN ('FREE_PACKAGE', 'CORPORATE_PACKAGE');
 
-INSERT INTO tbl_plan_package (code, name, description, features, price, subtotal, vat_amount, currency, active, validity_days, trial_days, priority, purchasable, system_managed, trial_eligible, yearly_price, created_at, updated_at)
+INSERT INTO tbl_plan_package (code, name, description, features, price, subtotal, vat_amount, currency, active, validity_days, priority, purchasable, system_managed, yearly_price, created_at, updated_at)
 SELECT 'STARTER_PACKAGE', 'Baslangic', 'Kucuk kafeler icin operasyonel giris paketi',
        '["50 urun hakki","1 ucretsiz sube","Sube basi 1 ucretsiz menu","Standart sablonlar"]'::jsonb,
-       299.00, 249.17, 49.83, 'TRY', TRUE, 30, 7, 50, TRUE, FALSE, TRUE, 2988.00, NOW(), NOW()
+       299.00, 249.17, 49.83, 'TRY', TRUE, 30, 50, TRUE, FALSE, 2988.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_plan_package WHERE code = 'STARTER_PACKAGE');
 
 UPDATE tbl_plan_package SET
     name = 'Baslangic', description = 'Kucuk kafeler icin operasyonel giris paketi',
     features = '["50 urun hakki","1 ucretsiz sube","Sube basi 1 ucretsiz menu","Standart sablonlar"]'::jsonb,
-    price = 299.00, subtotal = 249.17, vat_amount = 49.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 50,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 2988.00, updated_at = NOW()
+    price = 299.00, subtotal = 249.17, vat_amount = 49.83, currency = 'TRY', active = TRUE, validity_days = 30, priority = 50,
+    purchasable = TRUE, system_managed = FALSE, yearly_price = 2988.00, updated_at = NOW()
 WHERE code = 'STARTER_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Pro', description = 'Sinirsiz urun, QR ve menu ile ciro takibi',
     features = '["Sinirsiz urun hakki","1 ucretsiz sube","Sube basi 1 ucretsiz menu","Ciro takibi ve gelir raporlamasi"]'::jsonb,
-    price = 599.00, subtotal = 499.17, vat_amount = 99.83, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 100,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 5643.00, updated_at = NOW()
+    price = 599.00, subtotal = 499.17, vat_amount = 99.83, currency = 'TRY', active = TRUE, validity_days = 30, priority = 100,
+    purchasable = TRUE, system_managed = FALSE, yearly_price = 5643.00, updated_at = NOW()
 WHERE code = 'PRO_PACKAGE';
 
 UPDATE tbl_plan_package SET
     name = 'Ultimate', description = 'Pro ozellikleri, ozel tasarim ve yapay zeka araclari',
     features = '["1 ucretsiz sube","Sube basi 1 ucretsiz menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu","AI ile menu fotografından urun ekleme"]'::jsonb,
-    price = 3450.00, subtotal = 2875.00, vat_amount = 575.00, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = NULL, priority = 200,
-    purchasable = TRUE, system_managed = FALSE, trial_eligible = FALSE, yearly_price = 31823.57, updated_at = NOW()
+    price = 3450.00, subtotal = 2875.00, vat_amount = 575.00, currency = 'TRY', active = TRUE, validity_days = 30, priority = 200,
+    purchasable = TRUE, system_managed = FALSE, yearly_price = 31823.57, updated_at = NOW()
 WHERE code = 'ULTIMATE_PACKAGE';
 
-INSERT INTO tbl_plan_package (code, name, description, features, price, subtotal, vat_amount, currency, active, validity_days, trial_days, priority, purchasable, system_managed, trial_eligible, yearly_price, created_at, updated_at)
+INSERT INTO tbl_plan_package (code, name, description, features, price, subtotal, vat_amount, currency, active, validity_days, priority, purchasable, system_managed, yearly_price, created_at, updated_at)
 SELECT 'ULTIMATE_TRIAL_PACKAGE', 'Ultimate Deneme', '15 gunluk Ultimate deneme paketi',
        '["1 ucretsiz sube","Sube basi 1 ucretsiz menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu","AI ile menu fotografından urun ekleme"]'::jsonb,
-       0.00, 0.00, 0.00, 'TRY', TRUE, 30, 15, 190, FALSE, FALSE, TRUE, NULL, NOW(), NOW()
+       0.00, 0.00, 0.00, 'TRY', TRUE, 15, 190, FALSE, FALSE, NULL, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_plan_package WHERE code = 'ULTIMATE_TRIAL_PACKAGE');
 
 UPDATE tbl_plan_package SET
     name = 'Ultimate Deneme', description = '15 gunluk Ultimate deneme paketi',
     features = '["1 ucretsiz sube","Sube basi 1 ucretsiz menu","Garson siparis ve adisyon modulu","Ciro takibi ve gelismis raporlar","Haftalik akilli raporlama","Akilli asistan","Akilli ozet","Ozel tasarim menu","AI ile menu fotografından urun ekleme"]'::jsonb,
-    price = 0.00, subtotal = 0.00, vat_amount = 0.00, currency = 'TRY', active = TRUE, validity_days = 30, trial_days = 15, priority = 190,
-    purchasable = FALSE, system_managed = FALSE, trial_eligible = TRUE, yearly_price = NULL, updated_at = NOW()
+    price = 0.00, subtotal = 0.00, vat_amount = 0.00, currency = 'TRY', active = TRUE, validity_days = 15, priority = 190,
+    purchasable = FALSE, system_managed = FALSE, yearly_price = NULL, updated_at = NOW()
 WHERE code = 'ULTIMATE_TRIAL_PACKAGE';
 
 DELETE FROM tbl_plan_package_item

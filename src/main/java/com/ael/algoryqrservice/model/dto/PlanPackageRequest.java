@@ -42,14 +42,9 @@ public class PlanPackageRequest {
     @Min(value = 1, message = "Gecerlilik suresi en az 1 gun olmalidir")
     private Integer validityDays;
 
-    @Min(value = 1, message = "Deneme suresi en az 1 gun olmalidir")
-    private Integer trialDays;
-
     private Integer priority;
 
     private Boolean purchasable;
-
-    private Boolean trialEligible;
 
     @Valid
     private List<PlanPackageItemRequest> items;
@@ -60,10 +55,6 @@ public class PlanPackageRequest {
 
     public boolean resolvedPurchasable() {
         return Boolean.TRUE.equals(purchasable);
-    }
-
-    public boolean resolvedTrialEligible() {
-        return Boolean.TRUE.equals(trialEligible);
     }
 
     public int resolvedPriority() {

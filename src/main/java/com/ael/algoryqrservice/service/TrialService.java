@@ -107,9 +107,8 @@ public class TrialService {
     @Transactional
     public TrialDtos.Status startDigitalMenuPro(Long userId) {
         PlanPackage planPackage = packageRepository
-                .findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc()
+                .findFirstByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc()
                 .flatMap(existing -> packageRepository.findByIdWithItems(existing.getId()))
-                .filter(pkg -> !pkg.isSystemManaged())
                 .orElseThrow(() -> new BadRequestException("Deneme icin uygun paket bulunamadi"));
         return start(userId, planPackage.getId());
     }
@@ -144,7 +143,7 @@ public class TrialService {
 
     @Transactional(readOnly = true)
     public List<PlanPackageResponse> listEligiblePackages() {
-        return packageRepository.findByTrialEligibleTrueAndActiveTrueAndSystemManagedFalseOrderByPriorityDesc()
+        return packageRepository.findByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc()
                 .stream()
                 .map(this::toEligiblePackageResponse)
                 .toList();
@@ -156,7 +155,7 @@ public class TrialService {
         }
         PlanPackage planPackage = packageRepository.findByIdWithItems(packageId)
                 .orElseThrow(() -> new BadRequestException("Paket bulunamadi: " + packageId));
-        if (!planPackage.isActive() || !planPackage.isTrialEligible() || planPackage.isSystemManaged()) {
+        if (!planPackage.isActive() || planPackage.isPurchasable() || planPackage.isSystemManaged()) {
             throw new BadRequestException("Bu paket deneme icin uygun degil");
         }
         if (planPackage.getItems() == null || planPackage.getItems().isEmpty()) {
@@ -167,18 +166,11 @@ public class TrialService {
     }
 
     private int resolvedTrialDays(PlanPackage planPackage) {
-        Integer trialDays = planPackage.getTrialDays();
-        if (trialDays == null || trialDays < 1) {
-            throw new BadRequestException("Deneme paketi icin trialDays zorunludur");
+        Integer validityDays = planPackage.getValidityDays();
+        if (validityDays == null || validityDays < 1) {
+            throw new BadRequestException("Deneme paketi icin validityDays en az 1 olmalidir");
         }
-        int maxTrialDays = Math.min(
-                planPackage.getValidityDays() == null ? 30 : planPackage.getValidityDays(),
-                30
-        );
-        if (trialDays > maxTrialDays) {
-            throw new BadRequestException("trialDays 1 ile " + maxTrialDays + " arasinda olmalidir");
-        }
-        return trialDays;
+        return validityDays;
     }
 
     private Long findSavedCard(Long userId) {
@@ -339,11 +331,9 @@ public class TrialService {
                 .currency(planPackage.getCurrency())
                 .active(planPackage.isActive())
                 .validityDays(planPackage.getValidityDays())
-                .trialDays(planPackage.getTrialDays())
                 .priority(planPackage.getPriority())
                 .purchasable(planPackage.isPurchasable())
                 .systemManaged(planPackage.isSystemManaged())
-                .trialEligible(planPackage.isTrialEligible())
                 .items(planPackage.getItems() == null ? List.of() : planPackage.getItems().stream()
                         .map(item -> PlanPackageItemResponse.builder()
                                 .id(item.getId())

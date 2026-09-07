@@ -6,31 +6,31 @@ Ayrı trial entity yok. Deneme, admin’de tanımlanan **normal paket**tir:
 
 | Alan | Anlam |
 |------|--------|
-| `trialEligible=true` | Kullanıcı deneme seçicisinde görür ve seçebilir |
-| `trialDays` | Deneme süresi (gün); ücretli `validityDays`’ten bağımsız |
-| `purchasable=true` | Aynı paket ücretli satın alınabilir |
-| `validityDays` | Ücretli abonelik / satın alma süresi |
+| `active && !purchasable && !systemManaged` | Kullanıcı deneme seçicisinde görür ve seçebilir |
+| `validityDays` | Deneme süresi (gün); ücretli abonelik süresi ile aynı alan |
+| `purchasable=true` | Ücretli satın alınabilir paket |
 | `items` / `features` | Deneme hakları ve UI maddeleri |
 
-Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expiresAt = now + trialDays`; haklar paketin `items` içeriğidir.
+Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expiresAt = now + validityDays`; haklar paketin `items` içeriğidir.
 
-`trialEligible=true` ise `trialDays` zorunludur ve `1..min(validityDays, 30)` aralığında olmalıdır.
+Deneme paketi için `validityDays >= 1` zorunludur. `trialEligible` / `trialDays` kolonları yoktur.
 
 ## Yönetim
 
 | Kontrol | Nasıl |
 |---------|--------|
-| Hangi paketler denemede | Paket formunda **Deneme olarak sun** (`trialEligible`) |
-| Süre | `trialDays` |
+| Hangi paketler denemede | `active && !purchasable && !systemManaged` (öncelik desc) |
+| Süre | `validityDays` |
 | Haklar | Paket `items` |
 | UI maddeleri | Paket `features` |
-| Denemeyi kapat | `trialEligible=false` veya `active=false` (yeni start reddedilir; süren denemeler `expiresAt`’e kadar devam) |
+| Denemeyi kapat | `purchasable=true`, `active=false` veya `systemManaged=true` (yeni start reddedilir; süren denemeler `expiresAt`’e kadar devam) |
 | Seed / reset | JSON import |
 
 ## Seed dosyaları
 
-- `src/main/resources/seed/catalog-tiers.json` — ürün + Başlangıç / Pro / Ultimate
+- `src/main/resources/seed/catalog-tiers.json` — ürün + Başlangıç / Pro / Ultimate / Ultimate Deneme
 - `src/main/resources/seed/catalog-tiers.sql` — opsiyonel manuel SQL
+- `src/main/resources/seed/apply-ultimate-trial-package.sql` — stage/prod manuel upsert + trial kolon drop
 
 ### Ürünler
 
@@ -48,10 +48,10 @@ Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expires
 
 ### Satılabilir paketler
 
-- **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `trialEligible=false`
-- **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `trialEligible=false`
-- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL`, `AI_MENU_IMPORT` — 3450 TRY/ay (KDV dahil), yıllık 31823.57 TRY, `trialEligible=false`
-- **Ultimate Deneme** (`ULTIMATE_TRIAL_PACKAGE`): Ultimate ile aynı haklar — `purchasable=false`, `trialEligible=true`, `trialDays=15`
+- **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `purchasable=true`
+- **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `purchasable=true`
+- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL`, `AI_MENU_IMPORT` — 3450 TRY/ay (KDV dahil), yıllık 31823.57 TRY, `purchasable=true`
+- **Ultimate Deneme** (`ULTIMATE_TRIAL_PACKAGE`): Ultimate ile aynı haklar — `purchasable=false`, `validityDays=15`
 
 Garson sipariş/adisyon modülü yalnızca Ultimate pakette (`WAITER_PANEL` / `WAITER_PANEL_OWNER`). Başlangıç ve Pro paketlerinde bu özellik yoktur.
 
@@ -79,13 +79,13 @@ Yanıt: `{ productsUpserted, packagesUpserted, packageCodes }`.
 
 Admin dashboard: Paketler → **Seed katalogu içe aktar**.
 
-`ULTIMATE_TRIAL_PACKAGE` ayrıca Flyway `V89__ultimate_trial_package.sql` ile deploy’da otomatik eklenir; seed import şart değildir.
+`ULTIMATE_TRIAL_PACKAGE` ayrıca Flyway `V91` / `V92` ile deploy’da otomatik eklenir; seed import şart değildir.
 
 ## Trial API
 
 | Method | Path | Davranış |
 |--------|------|----------|
-| GET | `/trials/eligible-packages` | `trialEligible && active && !systemManaged` paketler (`trialDays` dahil) |
+| GET | `/trials/eligible-packages` | `active && !purchasable && !systemManaged` paketler (`validityDays` dahil) |
 | POST | `/trials` | `{ "packageId" }` ile TRIAL başlat |
 | GET | `/trials/status` | `AVAILABLE` / `ACTIVE` / `TRIAL_EXPIRED` + bitiş bilgisi |
 
@@ -102,9 +102,9 @@ Admin uzatması aktif ücretli paket varken reddedilir; deneme hakkı bayraklar�
 ### Backend kurallar
 
 1. Kullanıcı başına tek deneme (`uk_purchase_trial_user` + `tbl_user.trial_end_date` / `trial_used`).
-2. Paket `active && trialEligible` ve geçerli `trialDays`; Free / `systemManaged` hedef olamaz.
+2. Paket `active && !purchasable && !systemManaged` ve `validityDays >= 1`; Free / `systemManaged` hedef olamaz.
 3. Aktif ücretli usable paket varken start → 400.
-4. Start: TRIAL ACTIVE, `expiresAt = now + trialDays`, entitlement grant, diğer ACTIVE → SUPERSEDED; `trial_used` ve `trial_end_date` **başlangıçta set edilmez**.
+4. Start: TRIAL ACTIVE, `expiresAt = now + validityDays`, entitlement grant, diğer ACTIVE → SUPERSEDED; `trial_used` ve `trial_end_date` **başlangıçta set edilmez**.
 5. Bitiş: `expiresAt` sonrası `trial_end_date = expiresAt`, `trial_used = true`; entitlement usable değildir; `expirePurchase` menü erişimini senkronize eder.
 6. Kontrol: `trial_end_date IS NOT NULL` veya `trial_used = true` → deneme kullanılmış sayılır.
 
@@ -119,17 +119,17 @@ POST /trials
 {
   "lifecycle": "ACTIVE",
   "packageId": 12,
-  "packageName": "Pro",
+  "packageName": "Ultimate Deneme",
   "expiresAt": "2026-08-06T12:00:00",
-  "daysUntilExpiry": 7,
-  "price": 249.00,
+  "daysUntilExpiry": 15,
+  "price": 0.00,
   "currency": "TRY"
 }
 ```
 
 ## Kullanıcı UI
 
-1. `GET /trials/status` → `AVAILABLE` ise eligible kartlar (`trialDays` göster).
+1. `GET /trials/status` → `AVAILABLE` ise eligible kartlar (`validityDays` göster).
 2. Seçim → `POST /trials` + paket süresi/hakları onayı.
 3. `ACTIVE` banner: paket adı + bitiş / kalan gün.
 4. `TRIAL_EXPIRED` veya deneme kullanılmış → start gizli; ücretli satın almaya yönlendir.
