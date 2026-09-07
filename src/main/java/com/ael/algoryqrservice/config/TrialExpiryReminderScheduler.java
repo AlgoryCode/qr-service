@@ -1,9 +1,8 @@
 package com.ael.algoryqrservice.config;
 
-import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.model.TrialLog;
+import com.ael.algoryqrservice.model.enums.TrialLogStatus;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.service.TrialExpiryReminderDispatcher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,16 +15,16 @@ import java.util.List;
 @Component
 public class TrialExpiryReminderScheduler {
 
-    private final PurchaseRepository purchaseRepository;
+    private final TrialLogRepository trialLogRepository;
     private final TrialExpiryReminderDispatcher trialExpiryReminderDispatcher;
     private final String reminderZone;
 
     public TrialExpiryReminderScheduler(
-            PurchaseRepository purchaseRepository,
+            TrialLogRepository trialLogRepository,
             TrialExpiryReminderDispatcher trialExpiryReminderDispatcher,
             @Value("${trial.reminder.zone:Europe/Istanbul}") String reminderZone
     ) {
-        this.purchaseRepository = purchaseRepository;
+        this.trialLogRepository = trialLogRepository;
         this.trialExpiryReminderDispatcher = trialExpiryReminderDispatcher;
         this.reminderZone = reminderZone;
     }
@@ -40,22 +39,20 @@ public class TrialExpiryReminderScheduler {
 
     void sendTrialExpiryReminders(LocalDate currentDate) {
         LocalDate reminderDate = currentDate.plusDays(3);
-        List<Purchase> purchases =
-                purchaseRepository.findByPurchaseTypeAndStatusAndExpiresAtGreaterThanEqualAndExpiresAtLessThan(
-                        PurchaseType.TRIAL,
-                        PurchaseStatus.ACTIVE,
+        List<TrialLog> activeLogs =
+                trialLogRepository.findByStatusAndEndsAtGreaterThanEqualAndEndsAtLessThan(
+                        TrialLogStatus.ACTIVE,
                         reminderDate.atStartOfDay(),
                         reminderDate.plusDays(1).atStartOfDay()
                 );
-        purchases.forEach(purchase -> trialExpiryReminderDispatcher.sendIfNeeded(purchase.getId()));
+        activeLogs.forEach(log -> trialExpiryReminderDispatcher.sendIfNeeded(log.getId()));
 
-        List<Purchase> expiredPurchases = purchaseRepository
-                .findByPurchaseTypeAndStatusAndExpiresAtGreaterThanEqualAndExpiresAtLessThan(
-                        PurchaseType.TRIAL,
-                        PurchaseStatus.EXPIRED,
+        List<TrialLog> endedLogs = trialLogRepository
+                .findByStatusAndEndsAtGreaterThanEqualAndEndsAtLessThan(
+                        TrialLogStatus.ENDED,
                         currentDate.minusDays(1).atStartOfDay(),
                         currentDate.plusDays(1).atStartOfDay()
                 );
-        expiredPurchases.forEach(purchase -> trialExpiryReminderDispatcher.sendExpiredIfNeeded(purchase.getId()));
+        endedLogs.forEach(log -> trialExpiryReminderDispatcher.sendExpiredIfNeeded(log.getId()));
     }
 }

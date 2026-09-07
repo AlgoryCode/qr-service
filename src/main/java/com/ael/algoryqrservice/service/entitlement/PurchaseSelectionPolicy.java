@@ -44,7 +44,7 @@ public class PurchaseSelectionPolicy {
     }
 
     /**
-     * @return active subscription-like purchases: paid, trial or granted, but never add-ons or free plans.
+     * @return active subscription-like purchases: paid or granted, but never add-ons or free plans.
      */
     @Transactional(readOnly = true)
     public List<Purchase> usableSubscriptions(Long userId) {

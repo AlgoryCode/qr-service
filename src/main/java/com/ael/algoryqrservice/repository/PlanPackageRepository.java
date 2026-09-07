@@ -16,6 +16,15 @@ public interface PlanPackageRepository extends JpaRepository<PlanPackage, Long> 
 
     Optional<PlanPackage> findByCode(String code);
 
+    @Query("""
+            select distinct pkg
+            from PlanPackage pkg
+            left join fetch pkg.items item
+            left join fetch item.product
+            where pkg.code = :code
+            """)
+    Optional<PlanPackage> findByCodeWithItems(@Param("code") String code);
+
     boolean existsByCode(String code);
 
     List<PlanPackage> findByActiveTrueOrderByPriceAsc();

@@ -6,23 +6,18 @@ import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
-import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.TrialLogStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
-import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
-import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.trial.TrialSnapshotQuery;
 import com.ael.algoryqrservice.trial.TrialUseCases;
-import com.ael.algoryqrservice.trial.extend.ActiveTrialExtendHandler;
-import com.ael.algoryqrservice.trial.extend.ExpiredTrialExtendHandler;
-import com.ael.algoryqrservice.trial.extend.NeverStartedTrialExtendHandler;
-import com.ael.algoryqrservice.trial.extend.TrialExtendHandlerRegistry;
-import com.ael.algoryqrservice.trial.extend.TrialPurchaseExtender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,8 +33,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,121 +45,69 @@ class AdminTrialServiceTest {
     @Mock
     PurchaseRepository purchaseRepository;
     @Mock
+    TrialLogRepository trialLogRepository;
+    @Mock
     PlanPackageRepository packageRepository;
     @Mock
-    PackageEntitlementWriter entitlementWriter;
-    @Mock
-    PurchaseExpiryService purchaseExpiryService;
-    @Mock
-    PackageActivationService packageActivationService;
-    @Mock
-    PurchaseLogService purchaseLogService;
+    FulfillmentGrantService fulfillmentGrantService;
 
     AdminTrialService service;
 
     @BeforeEach
     void setUp() {
-        TrialSnapshotQuery snapshotQuery = new TrialSnapshotQuery(purchaseRepository, purchaseExpiryService);
-        TrialPurchaseExtender extender = new TrialPurchaseExtender(
-                purchaseRepository, packageRepository, entitlementWriter, purchaseLogService
-        );
-        TrialExtendHandlerRegistry registry = new TrialExtendHandlerRegistry(List.of(
-                new NeverStartedTrialExtendHandler(
-                        purchaseRepository, packageRepository, entitlementWriter, purchaseLogService, extender
-                ),
-                new ActiveTrialExtendHandler(purchaseRepository, extender),
-                new ExpiredTrialExtendHandler(purchaseRepository, extender)
-        ));
+        TrialSnapshotQuery snapshotQuery = new TrialSnapshotQuery(trialLogRepository, purchaseRepository);
         TrialUseCases useCases = new TrialUseCases(
                 userRepository,
-                purchaseRepository,
+                trialLogRepository,
+                packageRepository,
                 snapshotQuery,
-                registry,
-                packageActivationService,
-                purchaseExpiryService,
-                purchaseLogService
+                fulfillmentGrantService
         );
         service = new AdminTrialService(useCases);
     }
 
     @Test
-    void extendTrial_whenActiveTrial_thenAddDaysFromCurrentExpiry() {
+    void extendTrial_whenActiveLog_thenAddDaysFromCurrentExpiry() {
         User user = User.builder().id(7L).build();
         LocalDateTime currentExpiry = LocalDateTime.now().plusDays(5);
-        Purchase trial = Purchase.builder()
-                .id(10L)
-                .userId(7L)
-                .packageId(3L)
-                .packageName("Ultimate")
-                .purchaseType(PurchaseType.TRIAL)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(10))
-                .expiresAt(currentExpiry)
-                .build();
+        TrialLog log = activeLog(currentExpiry);
+        PlanPackage plan = ultimatePackage();
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(trial));
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.of(trial));
-        when(purchaseRepository.save(trial)).thenReturn(trial);
-        when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.empty());
+        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.of(log));
+        when(trialLogRepository.save(log)).thenReturn(log);
+        when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
 
         AdminUserDtos.ExtendTrialResponse result = service.extendTrial(7L, 15);
 
         assertThat(result.getDaysAdded()).isEqualTo(15);
-        assertThat(trial.getExpiresAt()).isEqualTo(currentExpiry.plusDays(15));
-        verify(packageActivationService).activatePurchasedPackage(trial);
+        assertThat(log.getEndsAt()).isEqualTo(currentExpiry.plusDays(15));
+        verify(fulfillmentGrantService).grantOnboardingFulfillment(log, plan);
+        verify(fulfillmentGrantService).extendOnboardingPeriod(log);
     }
 
     @Test
-    void extendTrial_whenExpiredTrial_thenReactivateFromNow() {
-        User user = User.builder().id(7L).build();
-        Purchase trial = Purchase.builder()
-                .id(10L)
-                .userId(7L)
-                .packageId(3L)
-                .packageName("Ultimate")
-                .purchaseType(PurchaseType.TRIAL)
-                .status(PurchaseStatus.EXPIRED)
-                .startsAt(LocalDateTime.now().minusDays(40))
-                .expiresAt(LocalDateTime.now().minusDays(10))
-                .build();
-
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.of(trial));
-        when(purchaseRepository.save(trial)).thenReturn(trial);
-        when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.empty());
-
-        service.extendTrial(7L, 30);
-
-        assertThat(trial.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
-        assertThat(trial.getExpiresAt()).isAfter(LocalDateTime.now().plusDays(29));
-    }
-
-    @Test
-    void extendTrial_whenNoTrial_thenGrantUltimateTrial() {
+    void extendTrial_whenNoLog_thenCreateOnboardingLog() {
         User user = User.builder().id(7L).build();
         PlanPackage ultimate = ultimatePackage();
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.empty());
-        when(packageRepository.findByCode(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)).thenReturn(Optional.of(ultimate));
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.empty());
+        when(packageRepository.findByCodeWithItems(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)).thenReturn(Optional.of(ultimate));
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(ultimate));
-        when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
-            Purchase purchase = invocation.getArgument(0);
-            purchase.setId(11L);
-            return purchase;
+        when(trialLogRepository.save(any())).thenAnswer(invocation -> {
+            TrialLog log = invocation.getArgument(0);
+            log.setId(11L);
+            return log;
         });
 
         AdminUserDtos.ExtendTrialResponse result = service.extendTrial(7L, 30);
 
         assertThat(result.getPackageName()).isEqualTo("Ultimate Deneme");
         assertThat(result.getDaysAdded()).isEqualTo(30);
-        verify(entitlementWriter).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
+        verify(fulfillmentGrantService).grantOnboardingFulfillment(any(), any());
     }
 
     @Test
@@ -183,68 +124,29 @@ class AdminTrialServiceTest {
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.empty());
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.extendTrial(7L, 30))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("ucretli paket");
-        verify(purchaseRepository, never()).save(any());
+        verify(trialLogRepository, never()).save(any());
     }
 
     @Test
-    void extendTrial_whenSystemGrantActive_thenReject() {
+    void endTrial_whenActive_thenMarkEnded() {
         User user = User.builder().id(7L).build();
-        Purchase grant = Purchase.builder()
-                .id(1L)
-                .userId(7L)
-                .purchaseType(PurchaseType.SYSTEM_GRANT)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(1))
-                .expiresAt(LocalDateTime.now().plusDays(20))
-                .build();
+        TrialLog log = activeLog(LocalDateTime.now().plusDays(5));
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(grant));
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.extendTrial(7L, 30))
-                .isInstanceOf(BadRequestException.class);
-    }
-
-    @Test
-    void endTrial_whenActive_thenExpireAndLog() {
-        User user = User.builder().id(7L).build();
-        Purchase trial = Purchase.builder()
-                .id(10L)
-                .userId(7L)
-                .packageId(3L)
-                .packageName("Ultimate")
-                .purchaseType(PurchaseType.TRIAL)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(10))
-                .expiresAt(LocalDateTime.now().plusDays(5))
-                .build();
-
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(trial));
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.of(trial));
+        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.of(log));
+        when(trialLogRepository.save(log)).thenReturn(log);
 
         AdminUserDtos.EndTrialResponse result = service.endTrial(7L);
 
         assertThat(result.getPurchaseId()).isEqualTo(10L);
-        assertThat(result.getPackageName()).isEqualTo("Ultimate");
-        assertThat(trial.getExpiresAt()).isBeforeOrEqualTo(LocalDateTime.now().plusSeconds(1));
-        verify(purchaseExpiryService).expire(trial);
-        verify(packageActivationService).ensureSubscriptionState(7L);
-        verify(purchaseLogService).log(
-                eq(10L),
-                eq(7L),
-                eq(PurchaseLogAction.TRIAL_ENDED),
-                anyString()
-        );
+        assertThat(log.getStatus()).isEqualTo(TrialLogStatus.ENDED);
+        verify(fulfillmentGrantService).expireFulfillmentForTrialLog(10L);
     }
 
     @Test
@@ -252,13 +154,25 @@ class AdminTrialServiceTest {
         User user = User.builder().id(7L).build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
-        when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
-                .thenReturn(Optional.empty());
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.endTrial(7L))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Aktif deneme");
-        verify(purchaseExpiryService, never()).expire(any());
+        verify(fulfillmentGrantService, never()).expireFulfillmentForTrialLog(any());
+    }
+
+    private static TrialLog activeLog(LocalDateTime endsAt) {
+        return TrialLog.builder()
+                .id(10L)
+                .userId(7L)
+                .packageId(3L)
+                .packageCode(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)
+                .status(TrialLogStatus.ACTIVE)
+                .startedAt(LocalDateTime.now().minusDays(10))
+                .endsAt(endsAt)
+                .durationDays(15)
+                .build();
     }
 
     private PlanPackage ultimatePackage() {

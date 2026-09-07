@@ -7,7 +7,6 @@ import com.ael.algoryqrservice.model.dto.QrNameResponse;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.enums.QrListScope;
 import com.ael.algoryqrservice.service.QrService;
-import com.ael.algoryqrservice.util.SecurityUtils;
 import com.google.zxing.WriterException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +19,6 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class QrController {
     private final QrService qrService;
-    private final SecurityUtils securityUtils;
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserQrs(
@@ -33,12 +31,6 @@ public class QrController {
         return ResponseEntity.ok(
                 qrService.getUserQrs(userId, includeImage, page, size, QrListScope.from(scope))
         );
-    }
-
-    @PostMapping("/create")
-    public ResponseEntity<?> createQr(@RequestBody QrRequest req) throws IOException, WriterException {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(qrService.createQR(req, userId));
     }
 
     @PutMapping("/update/{qrId}")

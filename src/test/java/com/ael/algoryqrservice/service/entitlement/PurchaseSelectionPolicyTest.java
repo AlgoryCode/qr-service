@@ -71,12 +71,12 @@ class PurchaseSelectionPolicyTest {
                 LocalDateTime.of(2026, 8, 15, 12, 59, 0).atZone(AppTime.ZONE).toInstant(),
                 AppTime.ZONE
         ));
-        Purchase trial = purchase(102L, PurchaseType.TRIAL, "ULTIMATE_PACKAGE");
-        trial.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23));
-        trial.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23));
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(trial));
+        Purchase paid = purchase(102L, PurchaseType.PAID, "ULTIMATE_PACKAGE");
+        paid.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23));
+        paid.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23));
+        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
 
-        assertThat(purchaseSelectionPolicy.usablePurchases(USER_ID)).containsExactly(trial);
+        assertThat(purchaseSelectionPolicy.usablePurchases(USER_ID)).containsExactly(paid);
     }
 
     @Test
@@ -85,10 +85,10 @@ class PurchaseSelectionPolicyTest {
                 LocalDateTime.of(2026, 8, 15, 9, 44, 30).atZone(AppTime.ZONE).toInstant(),
                 AppTime.ZONE
         ));
-        Purchase trial = purchase(102L, PurchaseType.TRIAL, "ULTIMATE_PACKAGE");
-        trial.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23));
-        trial.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23));
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(trial));
+        Purchase paid = purchase(102L, PurchaseType.PAID, "ULTIMATE_PACKAGE");
+        paid.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23));
+        paid.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23));
+        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
 
         assertThat(purchaseSelectionPolicy.usablePurchases(USER_ID)).isEmpty();
     }

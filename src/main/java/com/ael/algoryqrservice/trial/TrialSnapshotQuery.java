@@ -1,41 +1,42 @@
 package com.ael.algoryqrservice.trial;
 
-import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.trial.domain.TrialSnapshot;
 import com.ael.algoryqrservice.trial.domain.TrialSnapshotFactory;
+import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
 public class TrialSnapshotQuery {
 
+    private final TrialLogRepository trialLogRepository;
     private final PurchaseRepository purchaseRepository;
-    private final PurchaseExpiryService purchaseExpiryService;
 
     public TrialSnapshot forUser(Long userId) {
-        purchaseExpiryService.expireDueForUser(userId);
-        Optional<Purchase> trial = purchaseRepository
-                .findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(userId, PurchaseType.TRIAL);
-        boolean blocked = hasUsableNonTrialSubscription(userId);
-        return trial
-                .map(purchase -> TrialSnapshotFactory.from(
-                        purchase.getId(),
-                        purchase.getExpiresAt(),
-                        purchase.isUsable(),
-                        true,
-                        blocked
-                ))
-                .orElseGet(() -> TrialSnapshotFactory.from(null, null, false, false, blocked));
+        TrialLog log = trialLogRepository.findByUserId(userId).orElse(null);
+        boolean blocked = hasUsablePaidOrGrant(userId);
+        LocalDateTime now = AppTime.nowLocal();
+        if (log == null) {
+            return TrialSnapshotFactory.from(null, null, false, false, blocked);
+        }
+        return TrialSnapshotFactory.from(
+                log.getId(),
+                log.getEndsAt(),
+                log.isActiveAt(now),
+                true,
+                blocked
+        );
     }
 
-    private boolean hasUsableNonTrialSubscription(Long userId) {
+    private boolean hasUsablePaidOrGrant(Long userId) {
         return purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .anyMatch(purchase -> purchase.isUsable() && isBlockingPurchaseType(purchase.getPurchaseType()));
     }

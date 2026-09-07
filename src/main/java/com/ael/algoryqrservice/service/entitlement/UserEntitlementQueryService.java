@@ -107,9 +107,9 @@ public class UserEntitlementQueryService {
             LocalDateTime lastUsage,
             String productName
     ) {
-        boolean expired = purchase == null
-                || purchase.isEffectivelyExpired()
+        boolean expired = (purchase != null && purchase.isEffectivelyExpired())
                 || (detail.getExpiresAt() != null && detail.getExpiresAt().isBefore(AppTime.nowLocal()));
+        boolean usable = !expired && (purchase == null || purchase.isUsable());
         return UserEntitlementResponse.builder()
                 .id(detail.getId())
                 .productId(detail.getProductId())
@@ -123,9 +123,9 @@ public class UserEntitlementQueryService {
                 .startsAt(detail.getStartsAt())
                 .expiresAt(detail.getExpiresAt())
                 .lastUsage(lastUsage)
-                .purchaseStatus(purchase == null ? PurchaseStatus.EXPIRED : purchase.getStatus())
+                .purchaseStatus(purchase == null ? PurchaseStatus.ACTIVE : purchase.getStatus())
                 .expired(expired)
-                .usable(purchase != null && purchase.isUsable())
+                .usable(usable)
                 .createdAt(detail.getCreatedAt())
                 .build();
     }

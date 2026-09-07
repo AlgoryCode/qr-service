@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -96,26 +95,6 @@ public class AnalyticsController {
                 branchId, menuId, ownerId, effectiveFrom, effectiveTo));
     }
 
-    @PostMapping("/branch/{branchId}/smart-reports")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
-    public ResponseEntity<SmartReportDtos.SmartReportAccepted> createBranchSmartReport(
-            @PathVariable Long branchId,
-            @RequestParam(required = false) Long menuId,
-            @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
-    ) {
-        Long ownerId = securityUtils.getCurrentUser().getId();
-        SmartReportDtos.SmartReportAccepted accepted = smartReportService.enqueueForBranch(
-                branchId,
-                menuId,
-                ownerId,
-                body.from(),
-                body.to(),
-                body.locale(),
-                body.options()
-        );
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(accepted);
-    }
-
     @GetMapping("/menu/{menuId}/report")
     public ResponseEntity<AnalyticsDtos.MenuAnalyticsReportResponse> getMenuReport(
             @PathVariable Long menuId,
@@ -154,24 +133,6 @@ public class AnalyticsController {
         return ResponseEntity.ok(
                 analyticsService.getMenuWaiterPerformanceReport(menuId, ownerId, effectiveFrom, effectiveTo)
         );
-    }
-
-    @PostMapping("/menu/{menuId}/smart-reports")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
-    public ResponseEntity<SmartReportDtos.SmartReportAccepted> createSmartReport(
-            @PathVariable Long menuId,
-            @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
-    ) {
-        Long ownerId = securityUtils.getCurrentUser().getId();
-        SmartReportDtos.SmartReportAccepted accepted = smartReportService.enqueue(
-                menuId,
-                ownerId,
-                body.from(),
-                body.to(),
-                body.locale(),
-                body.options()
-        );
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(accepted);
     }
 
     @GetMapping("/smart-reports/quota")

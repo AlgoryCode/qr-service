@@ -97,7 +97,7 @@ class PurchaseExpiryServiceTest {
                 .id(10L)
                 .userId(USER_ID)
                 .packageName("Pro")
-                .purchaseType(PurchaseType.TRIAL)
+                .purchaseType(PurchaseType.PAID)
                 .status(PurchaseStatus.ACTIVE)
                 .startsAt(LocalDateTime.now().minusDays(8))
                 .expiresAt(LocalDateTime.now().minusMinutes(1))

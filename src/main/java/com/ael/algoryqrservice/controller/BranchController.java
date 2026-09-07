@@ -32,12 +32,6 @@ public class BranchController {
         return ResponseEntity.ok(branchService.listMine());
     }
 
-    @PostMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
-    public ResponseEntity<BranchDtos.Response> create(@Valid @RequestBody BranchDtos.CreateRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(branchService.create(request));
-    }
-
     @GetMapping("/{branchId}")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<BranchDtos.Response> get(@PathVariable Long branchId) {

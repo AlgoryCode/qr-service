@@ -18,6 +18,8 @@ public interface GrantFulfillmentRepository extends JpaRepository<GrantFulfillme
 
     Optional<GrantFulfillment> findByPurchaseId(Long purchaseId);
 
+    Optional<GrantFulfillment> findByTrialLogId(Long trialLogId);
+
     boolean existsByUserId(Long userId);
 
     List<GrantFulfillment> findByUserIdAndStatus(Long userId, GrantFulfillmentStatus status);

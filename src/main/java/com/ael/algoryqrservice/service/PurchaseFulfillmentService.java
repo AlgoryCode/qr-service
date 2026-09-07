@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.access.TrialLogCloser;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
@@ -43,6 +44,7 @@ public class PurchaseFulfillmentService {
     private final PackageActivationService packageActivationService;
     private final MenuPublicAccessService menuPublicAccessService;
     private final FulfillmentGrantService fulfillmentGrantService;
+    private final TrialLogCloser trialLogCloser;
 
     @Transactional
     public void initializeSchedule(Purchase purchase, String serviceName) {
@@ -132,11 +134,8 @@ public class PurchaseFulfillmentService {
             }
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
-        if (purchase.getPurchaseType() == PurchaseType.TRIAL) {
-            purchase.setPurchaseType(PurchaseType.PAID);
-            if (event.getAmount() != null) {
-                purchase.setPrice(event.getAmount());
-            }
+        if (purchase.getPurchaseType() == PurchaseType.PAID) {
+            trialLogCloser.endIfActive(purchase.getUserId());
         }
         purchase.setPaymentId(event.getPaymentId());
         applyCardSnapshotFromEvent(purchase, event);

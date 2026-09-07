@@ -901,8 +901,7 @@ public class PlanChangeService {
         purchaseExpiryService.expireDueForUser(userId);
         List<Purchase> usable = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
-                .filter(purchase -> purchase.getPurchaseType() == PurchaseType.PAID
-                        || purchase.getPurchaseType() == PurchaseType.TRIAL)
+                .filter(purchase -> purchase.getPurchaseType() == PurchaseType.PAID)
                 .filter(purchase -> !purchase.isSystemManaged())
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.FREE)
                 .toList();

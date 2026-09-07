@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -35,6 +36,7 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -94,9 +96,19 @@ public class SecurityConfig {
                         .failureHandler(googleFailureHandler)
                 )
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<ProductAccessGatewayFilter> productAccessGatewayFilterRegistration(
+            ProductAccessGatewayFilter filter
+    ) {
+        FilterRegistrationBean<ProductAccessGatewayFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     private AccessDeniedHandler accessDeniedHandler() {

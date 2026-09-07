@@ -220,32 +220,30 @@ class PurchaseServiceCancelTest {
     }
 
     @Test
-    void cancelMyPurchase_whenSubscriptionCancelFails_thenKeepActive() {
-        purchase.setPurchaseType(PurchaseType.TRIAL);
+    void cancelMyPurchase_whenPaidSubscription_thenRejectImmediateCancel() {
+        purchase.setPurchaseType(PurchaseType.PAID);
         purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
         purchase.setSubscriptionId("sub-1");
         when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
-        when(paymentServiceClient.cancelSubscription(20L, "sub-1"))
-                .thenThrow(new PaymentServiceException("Abonelik iptal edilemedi: 500"));
 
         assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 20L))
-                .isInstanceOf(PaymentServiceException.class);
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("donem sonu");
 
-        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+        verify(paymentServiceClient, never()).cancelSubscription(any(), any());
         verify(purchaseRepository, never()).save(any());
-        verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
     }
 
     @Test
-    void cancelMyPurchase_whenSubscriptionWithoutId_thenReject() {
-        purchase.setPurchaseType(PurchaseType.TRIAL);
+    void cancelMyPurchase_whenPaidSubscriptionWithoutId_thenRejectImmediateCancel() {
+        purchase.setPurchaseType(PurchaseType.PAID);
         purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
         purchase.setSubscriptionId(null);
         when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
 
         assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 20L))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("guvenli");
+                .hasMessageContaining("donem sonu");
 
         verify(paymentServiceClient, never()).cancelSubscription(any(), any());
         verify(purchaseRepository, never()).save(any());
