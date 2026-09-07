@@ -161,7 +161,7 @@ class TrialServiceTest {
 
     @Test
     void start_whenUltimateTrialEligible_thenGrantForTrialDays() {
-        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, 30);
+        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 30, 15);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         doNothing().when(trialUseCases).assertCanStart(7L);
@@ -221,7 +221,7 @@ class TrialServiceTest {
 
     @Test
     void startDigitalMenuPro_whenAvailable_thenPinTrialEligiblePackage() {
-        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_PACKAGE, 30, 30);
+        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 30, 15);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(packageRepository.findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc())
                 .thenReturn(Optional.of(plan));

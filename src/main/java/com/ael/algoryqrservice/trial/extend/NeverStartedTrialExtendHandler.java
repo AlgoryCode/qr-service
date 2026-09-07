@@ -41,20 +41,20 @@ public class NeverStartedTrialExtendHandler implements TrialExtendHandler {
 
     @Override
     public Purchase extend(Long userId, TrialSnapshot snapshot, int days) {
-        PlanPackage ultimate = packageRepository.findByCode(CatalogPackages.ULTIMATE_PACKAGE)
+        PlanPackage trialPackage = packageRepository.findByCode(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)
                 .flatMap(existing -> packageRepository.findByIdWithItems(existing.getId()))
                 .filter(planPackage -> planPackage.isActive() && !planPackage.isSystemManaged())
-                .orElseThrow(() -> new BadRequestException("Ultimate paketi bulunamadi veya aktif degil"));
+                .orElseThrow(() -> new BadRequestException("Ultimate deneme paketi bulunamadi veya aktif degil"));
 
         LocalDateTime startsAt = AppTime.nowLocal();
         try {
             Purchase purchase = purchaseRepository.saveAndFlush(Purchase.builder()
                     .userId(userId)
-                    .packageId(ultimate.getId())
-                    .packageCode(ultimate.getCode())
-                    .packageName(ultimate.getName())
+                    .packageId(trialPackage.getId())
+                    .packageCode(trialPackage.getCode())
+                    .packageName(trialPackage.getName())
                     .price(BigDecimal.ZERO)
-                    .currency(ultimate.getCurrency())
+                    .currency(trialPackage.getCurrency())
                     .purchaseType(PurchaseType.TRIAL)
                     .paymentStyle(PaymentStyle.ONE_TIME)
                     .billingPeriod(BillingPeriod.MONTHLY)
@@ -64,7 +64,7 @@ public class NeverStartedTrialExtendHandler implements TrialExtendHandler {
                     .expiresAt(startsAt.plusDays(days))
                     .build());
 
-            for (PlanPackageItem item : ultimate.getItems()) {
+            for (PlanPackageItem item : trialPackage.getItems()) {
                 entitlementWriter.grant(
                         purchase,
                         item.getProduct().getId(),

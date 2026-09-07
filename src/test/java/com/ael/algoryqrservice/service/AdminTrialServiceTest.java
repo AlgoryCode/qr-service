@@ -154,7 +154,7 @@ class AdminTrialServiceTest {
         when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
         when(purchaseRepository.findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(7L, PurchaseType.TRIAL))
                 .thenReturn(Optional.empty());
-        when(packageRepository.findByCode(CatalogPackages.ULTIMATE_PACKAGE)).thenReturn(Optional.of(ultimate));
+        when(packageRepository.findByCode(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)).thenReturn(Optional.of(ultimate));
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(ultimate));
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
@@ -164,7 +164,7 @@ class AdminTrialServiceTest {
 
         AdminUserDtos.ExtendTrialResponse result = service.extendTrial(7L, 30);
 
-        assertThat(result.getPackageName()).isEqualTo("Ultimate");
+        assertThat(result.getPackageName()).isEqualTo("Ultimate Deneme");
         assertThat(result.getDaysAdded()).isEqualTo(30);
         verify(entitlementWriter).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
     }
@@ -271,12 +271,12 @@ class AdminTrialServiceTest {
                 .build();
         return PlanPackage.builder()
                 .id(3L)
-                .code(CatalogPackages.ULTIMATE_PACKAGE)
-                .name("Ultimate")
-                .price(BigDecimal.TEN)
+                .code(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)
+                .name("Ultimate Deneme")
+                .price(BigDecimal.ZERO)
                 .currency("TRY")
                 .validityDays(30)
-                .trialDays(30)
+                .trialDays(15)
                 .active(true)
                 .trialEligible(true)
                 .systemManaged(false)

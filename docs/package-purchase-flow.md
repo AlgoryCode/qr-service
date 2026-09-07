@@ -32,6 +32,7 @@ Bu dok?man `algoryqr-service` i?inde paket sat?n alma, trial, free paket, ?deme 
 | `CatalogPackages.STARTER_PACKAGE` | Başlangıç paket kodu | `catalog/CatalogPackages.java` |
 | `CatalogPackages.PRO_PACKAGE` | Pro paket kodu | `catalog/CatalogPackages.java` |
 | `CatalogPackages.ULTIMATE_PACKAGE` | Ultimate paket kodu | `catalog/CatalogPackages.java` |
+| `CatalogPackages.ULTIMATE_TRIAL_PACKAGE` | 15 günlük Ultimate deneme paketi | `catalog/CatalogPackages.java` |
 | `CatalogProducts.QR_CREATE` | QR olusturma hakki | `catalog/CatalogProducts.java` |
 | `CatalogProducts.QR_MENU` | Dijital menu hakki | `catalog/CatalogProducts.java` |
 | `CatalogProducts.MENU_PRODUCT` | Menu urun hakki | `catalog/CatalogProducts.java` |
@@ -210,7 +211,7 @@ Durum sorgusu: `GET /trials/status` / `GET /trials/digital-menu-pro/status` → 
 ### Sınırlar
 
 - Kullanıcı başına **tek** trial (`uk_purchase_trial_user` + `trial_used`)
-- Seed: yalnızca Pro `trialEligible`; Ultimate deneme dışı
+- Seed: yalnızca `ULTIMATE_TRIAL_PACKAGE` `trialEligible=true`, `trialDays=15`; ücretli `ULTIMATE_PACKAGE` deneme dışı
 - Ödeme client’ı çağrılmaz
 - `expiresAt` sonrası haklar usable değildir; expire path Free’yi aynı işlemde restore eder + menu sync
 - `TrialExpiryReminderScheduler` — süresi yaklaşan ACTIVE trial için hatırlatma

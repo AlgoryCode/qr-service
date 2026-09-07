@@ -50,7 +50,8 @@ Başlatınca oluşan kayıt: `PurchaseType.TRIAL`, `price=0`, `ACTIVE`, `expires
 
 - **Başlangıç** (`STARTER_PACKAGE`): 5× `QR_CREATE`, 1× `QR_MENU`, 50× `MENU_PRODUCT` — 299 TRY/ay, yıllık 2988 TRY, `trialEligible=false`
 - **Pro** (`PRO_PACKAGE`): sınırsız `QR_CREATE`, `QR_MENU`, `MENU_PRODUCT` + `SMART_REPORTING` — 599 TRY/ay, yıllık 5643 TRY, `trialEligible=false`
-- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL`, `AI_MENU_IMPORT` — 3450 TRY/ay (KDV dahil), yıllık 31823.57 TRY, `trialEligible=true`, `trialDays=30`
+- **Ultimate** (`ULTIMATE_PACKAGE`): Pro + `SMART_ASSISTANT`, `SMART_SUMMARY`, `CUSTOM_DESIGN`, `WAITER_PANEL`, `AI_MENU_IMPORT` — 3450 TRY/ay (KDV dahil), yıllık 31823.57 TRY, `trialEligible=false`
+- **Ultimate Deneme** (`ULTIMATE_TRIAL_PACKAGE`): Ultimate ile aynı haklar — `purchasable=false`, `trialEligible=true`, `trialDays=15`
 
 Garson sipariş/adisyon modülü yalnızca Ultimate pakette (`WAITER_PANEL` / `WAITER_PANEL_OWNER`). Başlangıç ve Pro paketlerinde bu özellik yoktur.
 
@@ -86,7 +87,7 @@ Admin dashboard: Paketler → **Seed katalogu içe aktar**.
 | POST | `/trials` | `{ "packageId" }` ile TRIAL başlat |
 | GET | `/trials/status` | `AVAILABLE` / `ACTIVE` / `TRIAL_EXPIRED` + bitiş bilgisi |
 
-Legacy: `POST /trials/digital-menu-pro` denemeye açık en yüksek öncelikli paketi başlatır (Ultimate).
+Legacy: `POST /trials/digital-menu-pro` denemeye açık en yüksek öncelikli paketi başlatır (`ULTIMATE_TRIAL_PACKAGE`).
 
 ### Admin deneme uzatma
 
