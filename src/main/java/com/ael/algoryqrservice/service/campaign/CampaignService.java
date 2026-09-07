@@ -123,11 +123,9 @@ public class CampaignService {
                 Math.min(Math.max(size, 1), 50),
                 Sort.by(Sort.Direction.DESC, "issuedAt")
         );
-        Page<com.ael.algoryqrservice.model.CampaignReward> result = campaignRewardRepository.searchWinners(
-                campaignId,
-                trimmedQuery,
-                pageable
-        );
+        Page<com.ael.algoryqrservice.model.CampaignReward> result = trimmedQuery == null
+                ? campaignRewardRepository.findByCampaignId(campaignId, pageable)
+                : campaignRewardRepository.searchWinners(campaignId, trimmedQuery, pageable);
         List<Long> customerIds = result.getContent().stream()
                 .map(com.ael.algoryqrservice.model.CampaignReward::getCustomerId)
                 .distinct()
