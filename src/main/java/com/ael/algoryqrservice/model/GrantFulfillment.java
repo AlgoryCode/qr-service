@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_fulfillment", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_fulfillment_purchase_id", columnNames = "purchase_id")
+        @UniqueConstraint(name = "uk_fulfillment_purchase_id", columnNames = "purchase_id"),
+        @UniqueConstraint(name = "uk_fulfillment_trial_log_id", columnNames = "trial_log_id")
 }, indexes = {
         @Index(name = "idx_fulfillment_user_id", columnList = "user_id"),
         @Index(name = "idx_fulfillment_package_id", columnList = "package_id"),
@@ -29,8 +30,11 @@ public class GrantFulfillment {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "purchase_id", nullable = false, unique = true)
+    @Column(name = "purchase_id", unique = true)
     private Long purchaseId;
+
+    @Column(name = "trial_log_id", unique = true)
+    private Long trialLogId;
 
     @Column(name = "payment_id", length = 128)
     private String paymentId;

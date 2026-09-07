@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static com.ael.algoryqrservice.model.enums.FulfillmentDetailSource.ADDON_PURCHASE;
+import static com.ael.algoryqrservice.model.enums.FulfillmentDetailSource.ONBOARDING_PACKAGE;
 import static com.ael.algoryqrservice.model.enums.FulfillmentDetailSource.PACKAGE_INCLUDE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -39,7 +40,7 @@ class FeatureUsageSynchronizerTest {
         new QrCreateUsageSynchronizer(qrRepository, ledger).synchronize(USER_ID);
 
         verify(ledger).replaceUsedQuantity(
-                USER_ID, CatalogProducts.QR_CREATE, 5, List.of(PACKAGE_INCLUDE, ADDON_PURCHASE)
+                USER_ID, CatalogProducts.QR_CREATE, 5, List.of(PACKAGE_INCLUDE, ONBOARDING_PACKAGE, ADDON_PURCHASE)
         );
     }
 
@@ -50,7 +51,7 @@ class FeatureUsageSynchronizerTest {
         new MenuProductUsageSynchronizer(menuProductRepository, ledger).synchronize(USER_ID);
 
         verify(ledger).replaceUsedQuantity(
-                USER_ID, CatalogProducts.MENU_PRODUCT, 12, List.of(PACKAGE_INCLUDE, ADDON_PURCHASE)
+                USER_ID, CatalogProducts.MENU_PRODUCT, 12, List.of(PACKAGE_INCLUDE, ONBOARDING_PACKAGE, ADDON_PURCHASE)
         );
     }
 

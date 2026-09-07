@@ -1,13 +1,12 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseReminder;
+import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.enums.PurchaseReminderType;
-import com.ael.algoryqrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.model.enums.TrialLogStatus;
 import com.ael.algoryqrservice.repository.PurchaseReminderRepository;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +28,7 @@ import static org.mockito.Mockito.when;
 class TrialExpiryReminderDispatcherTest {
 
     @Mock
-    private PurchaseRepository purchaseRepository;
+    private TrialLogRepository trialLogRepository;
 
     @Mock
     private PurchaseReminderRepository purchaseReminderRepository;
@@ -45,7 +44,7 @@ class TrialExpiryReminderDispatcherTest {
     @BeforeEach
     void setUp() {
         dispatcher = new TrialExpiryReminderDispatcher(
-                purchaseRepository,
+                trialLogRepository,
                 purchaseReminderRepository,
                 userRepository,
                 notificationPublisherService,
@@ -55,14 +54,13 @@ class TrialExpiryReminderDispatcherTest {
 
     @Test
     void sendIfNeeded_whenEligibleAndUnsent_thenPersistAndPublishMandatoryReminder() {
-        LocalDateTime expiresAt = LocalDateTime.of(2026, 7, 19, 9, 0);
-        Purchase purchase = Purchase.builder()
+        LocalDateTime endsAt = LocalDateTime.of(2026, 7, 19, 9, 0);
+        TrialLog trialLog = TrialLog.builder()
                 .id(42L)
                 .userId(7L)
-                .purchaseType(PurchaseType.TRIAL)
-                .status(PurchaseStatus.ACTIVE)
-                .packageName("Dijital Menü PRO")
-                .expiresAt(expiresAt)
+                .packageCode("ULTIMATE_TRIAL_PACKAGE")
+                .status(TrialLogStatus.ACTIVE)
+                .endsAt(endsAt)
                 .build();
         User user = User.builder()
                 .id(7L)
@@ -71,7 +69,7 @@ class TrialExpiryReminderDispatcherTest {
                 .email("tarik@example.com")
                 .notifyMarketingEmails(false)
                 .build();
-        when(purchaseRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(purchase));
+        when(trialLogRepository.findById(42L)).thenReturn(Optional.of(trialLog));
         when(purchaseReminderRepository.existsByPurchaseIdAndReminderType(
                 42L,
                 PurchaseReminderType.PRO_TRIAL_EXPIRY_REMINDER
@@ -90,7 +88,7 @@ class TrialExpiryReminderDispatcherTest {
                 reminder.getEventId(),
                 "tarik@example.com",
                 "Tarik Hamarat",
-                "Dijital Menü PRO",
+                "ULTIMATE_TRIAL_PACKAGE",
                 "19.07.2026 09:00",
                 "https://app.algory.com/dashboard/digital-menu"
         );
@@ -98,13 +96,12 @@ class TrialExpiryReminderDispatcherTest {
 
     @Test
     void sendIfNeeded_whenAlreadySent_thenDoNotPublishAgain() {
-        Purchase purchase = Purchase.builder()
+        TrialLog trialLog = TrialLog.builder()
                 .id(42L)
-                .purchaseType(PurchaseType.TRIAL)
-                .status(PurchaseStatus.ACTIVE)
-                .expiresAt(LocalDateTime.of(2026, 7, 19, 9, 0))
+                .status(TrialLogStatus.ACTIVE)
+                .endsAt(LocalDateTime.of(2026, 7, 19, 9, 0))
                 .build();
-        when(purchaseRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(purchase));
+        when(trialLogRepository.findById(42L)).thenReturn(Optional.of(trialLog));
         when(purchaseReminderRepository.existsByPurchaseIdAndReminderType(
                 42L,
                 PurchaseReminderType.PRO_TRIAL_EXPIRY_REMINDER

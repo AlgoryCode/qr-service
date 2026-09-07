@@ -1,24 +1,25 @@
 package com.ael.algoryqrservice.trial;
 
+import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
-import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
-import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
-import com.ael.algoryqrservice.model.enums.PurchaseType;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.model.enums.TrialLogStatus;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
-import com.ael.algoryqrservice.service.PackageActivationService;
-import com.ael.algoryqrservice.service.PurchaseLogService;
-import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.trial.domain.TrialLifecycle;
 import com.ael.algoryqrservice.trial.domain.TrialPolicy;
 import com.ael.algoryqrservice.trial.domain.TrialSnapshot;
-import com.ael.algoryqrservice.trial.extend.TrialExtendHandlerRegistry;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -28,12 +29,10 @@ public class TrialUseCases {
     private static final int MAX_DAYS = 365;
 
     private final UserRepository userRepository;
-    private final PurchaseRepository purchaseRepository;
+    private final TrialLogRepository trialLogRepository;
+    private final PlanPackageRepository packageRepository;
     private final TrialSnapshotQuery trialSnapshotQuery;
-    private final TrialExtendHandlerRegistry trialExtendHandlerRegistry;
-    private final PackageActivationService packageActivationService;
-    private final PurchaseExpiryService purchaseExpiryService;
-    private final PurchaseLogService purchaseLogService;
+    private final FulfillmentGrantService fulfillmentGrantService;
 
     @Transactional
     public AdminUserDtos.ExtendTrialResponse extend(Long userId, int days) {
@@ -46,14 +45,19 @@ public class TrialUseCases {
             throw new BadRequestException("Aktif ucretli paket varken deneme uzatilamaz");
         }
 
-        Purchase trial = trialExtendHandlerRegistry.extend(userId, snapshot, days);
-        packageActivationService.activatePurchasedPackage(trial);
-        packageActivationService.ensureSubscriptionState(userId);
+        TrialLog log = trialLogRepository.findByUserId(userId)
+                .map(existing -> addDays(existing, days))
+                .orElseGet(() -> startForAdmin(userId, days));
+
+        PlanPackage planPackage = packageRepository.findByIdWithItems(log.getPackageId())
+                .orElseThrow(() -> new BadRequestException("Ultimate deneme paketi bulunamadi veya aktif degil"));
+        fulfillmentGrantService.grantOnboardingFulfillment(log, planPackage);
+        fulfillmentGrantService.extendOnboardingPeriod(log);
 
         return AdminUserDtos.ExtendTrialResponse.builder()
-                .purchaseId(trial.getId())
-                .packageName(trial.getPackageName())
-                .expiresAt(trial.getExpiresAt())
+                .purchaseId(log.getId())
+                .packageName(planPackage.getName())
+                .expiresAt(log.getEndsAt())
                 .daysAdded(days)
                 .build();
     }
@@ -68,42 +72,51 @@ public class TrialUseCases {
             throw new BadRequestException("Aktif deneme bulunamadi");
         }
 
-        Purchase trial = purchaseRepository
-                .findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(userId, PurchaseType.TRIAL)
+        TrialLog log = trialLogRepository.findByUserId(userId)
                 .orElseThrow(() -> new BadRequestException("Aktif deneme bulunamadi"));
-
-        trial.setExpiresAt(AppTime.nowLocal());
-        purchaseExpiryService.expire(trial);
-        packageActivationService.ensureSubscriptionState(userId);
-        purchaseLogService.log(
-                trial.getId(),
-                userId,
-                PurchaseLogAction.TRIAL_ENDED,
-                "Admin deneme surecini bitirdi. Bitis: " + trial.getExpiresAt()
-        );
+        log.setEndsAt(AppTime.nowLocal());
+        log.setStatus(TrialLogStatus.ENDED);
+        trialLogRepository.save(log);
+        fulfillmentGrantService.expireFulfillmentForTrialLog(log.getId());
 
         return AdminUserDtos.EndTrialResponse.builder()
-                .purchaseId(trial.getId())
-                .packageName(trial.getPackageName())
-                .expiresAt(trial.getExpiresAt())
+                .purchaseId(log.getId())
+                .packageName(log.getPackageCode())
+                .expiresAt(log.getEndsAt())
                 .build();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public TrialSnapshot snapshot(Long userId) {
         return trialSnapshotQuery.forUser(userId);
     }
 
-    @Transactional
-    public void assertCanStart(Long userId) {
-        TrialSnapshot snapshot = trialSnapshotQuery.forUser(userId);
-        if (TrialPolicy.canStart(snapshot)) {
-            return;
+    private TrialLog addDays(TrialLog log, int days) {
+        LocalDateTime now = AppTime.nowLocal();
+        LocalDateTime base = log.isActiveAt(now) ? log.getEndsAt() : now;
+        log.setStatus(TrialLogStatus.ACTIVE);
+        log.setEndsAt(base.plusDays(days));
+        if (log.getStartedAt() == null) {
+            log.setStartedAt(now);
         }
-        if (snapshot.lifecycle() == TrialLifecycle.BLOCKED_BY_PAID) {
-            throw new BadRequestException("Aktif ucretli paket varken deneme baslatilamaz");
-        }
-        throw new BadRequestException("Deneme hakki daha once kullanilmis");
+        log.setDurationDays(log.getDurationDays() + days);
+        return trialLogRepository.save(log);
+    }
+
+    private TrialLog startForAdmin(Long userId, int days) {
+        PlanPackage trialPackage = packageRepository.findByCodeWithItems(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)
+                .filter(planPackage -> planPackage.isActive() && !planPackage.isSystemManaged())
+                .orElseThrow(() -> new BadRequestException("Ultimate deneme paketi bulunamadi veya aktif degil"));
+        LocalDateTime now = AppTime.nowLocal();
+        return trialLogRepository.save(TrialLog.builder()
+                .userId(userId)
+                .packageId(trialPackage.getId())
+                .packageCode(trialPackage.getCode())
+                .startedAt(now)
+                .endsAt(now.plusDays(days))
+                .durationDays(days)
+                .status(TrialLogStatus.ACTIVE)
+                .build());
     }
 
     private void validateDays(int days) {

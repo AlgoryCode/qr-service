@@ -25,9 +25,17 @@ public class FulfillmentGateService {
     private static final List<FulfillmentDetailSource> ADDON_ONLY =
             List.of(FulfillmentDetailSource.ADDON_PURCHASE);
     private static final List<FulfillmentDetailSource> PACKAGE_THEN_ADDON =
-            List.of(FulfillmentDetailSource.PACKAGE_INCLUDE, FulfillmentDetailSource.ADDON_PURCHASE);
+            List.of(
+                    FulfillmentDetailSource.ONBOARDING_PACKAGE,
+                    FulfillmentDetailSource.PACKAGE_INCLUDE,
+                    FulfillmentDetailSource.ADDON_PURCHASE
+            );
     private static final List<FulfillmentDetailSource> ADDON_THEN_PACKAGE =
-            List.of(FulfillmentDetailSource.ADDON_PURCHASE, FulfillmentDetailSource.PACKAGE_INCLUDE);
+            List.of(
+                    FulfillmentDetailSource.ADDON_PURCHASE,
+                    FulfillmentDetailSource.ONBOARDING_PACKAGE,
+                    FulfillmentDetailSource.PACKAGE_INCLUDE
+            );
 
     private final FulfillmentQuotaStrategyFactory strategyFactory;
     private final FulfillmentLedger ledger;

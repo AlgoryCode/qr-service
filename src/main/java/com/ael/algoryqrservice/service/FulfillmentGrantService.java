@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.enums.FulfillmentDetailSource;
 import com.ael.algoryqrservice.model.enums.GrantFulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.ProductType;
@@ -76,6 +77,47 @@ public class FulfillmentGrantService {
         }
         log.info("Package fulfillment granted: userId={}, purchaseId={}, fulfillmentId={}",
                 purchase.getUserId(), purchase.getId(), fulfillment.getId());
+        return fulfillment;
+    }
+
+    @Transactional
+    public GrantFulfillment grantOnboardingFulfillment(TrialLog trialLog, PlanPackage planPackage) {
+        GrantFulfillment existing = grantFulfillmentRepository.findByTrialLogId(trialLog.getId()).orElse(null);
+        if (existing != null) {
+            synchronizeFulfillmentPeriod(existing, trialLog.getStartedAt(), trialLog.getEndsAt(), null);
+            return existing;
+        }
+        GrantFulfillment fulfillment = grantFulfillmentRepository.save(GrantFulfillment.builder()
+                .userId(trialLog.getUserId())
+                .trialLogId(trialLog.getId())
+                .packageId(trialLog.getPackageId())
+                .status(GrantFulfillmentStatus.ACTIVE)
+                .startsAt(trialLog.getStartedAt())
+                .expiresAt(trialLog.getEndsAt())
+                .build());
+
+        PlanPackage withItems = planPackageRepository.findByIdWithItems(planPackage.getId())
+                .orElse(planPackage);
+        for (PlanPackageItem item : withItems.getItems()) {
+            Product product = item.getProduct();
+            String featureCode = resolveFeatureCode(product);
+            fulfillmentDetailRepository.save(FulfillmentDetail.builder()
+                    .fulfillmentId(fulfillment.getId())
+                    .userId(trialLog.getUserId())
+                    .productId(product.getId())
+                    .productTypeId(ProductType.PACKAGE_PRODUCT)
+                    .featureCode(featureCode)
+                    .scopeCode(product.getScopeCode())
+                    .quantity(item.isUnlimited() ? 0 : item.getQuantity())
+                    .unlimited(item.isUnlimited())
+                    .usedQuantity(0)
+                    .source(FulfillmentDetailSource.ONBOARDING_PACKAGE)
+                    .startsAt(trialLog.getStartedAt())
+                    .expiresAt(trialLog.getEndsAt())
+                    .build());
+        }
+        log.info("Onboarding fulfillment granted: userId={}, trialLogId={}, fulfillmentId={}",
+                trialLog.getUserId(), trialLog.getId(), fulfillment.getId());
         return fulfillment;
     }
 
@@ -183,18 +225,45 @@ public class FulfillmentGrantService {
         }
     }
 
+    @Transactional
+    public void expireFulfillmentForTrialLog(Long trialLogId) {
+        grantFulfillmentRepository.findByTrialLogId(trialLogId).ifPresent(f -> {
+            if (f.getStatus() == GrantFulfillmentStatus.ACTIVE) {
+                f.setStatus(GrantFulfillmentStatus.EXPIRED);
+                grantFulfillmentRepository.save(f);
+                log.info("Onboarding fulfillment expired: fulfillmentId={}, trialLogId={}", f.getId(), trialLogId);
+            }
+        });
+    }
+
+    @Transactional
+    public void extendOnboardingPeriod(TrialLog trialLog) {
+        grantFulfillmentRepository.findByTrialLogId(trialLog.getId()).ifPresent(fulfillment ->
+                synchronizeFulfillmentPeriod(fulfillment, trialLog.getStartedAt(), trialLog.getEndsAt(), null)
+        );
+    }
+
     private void synchronizeFulfillmentPeriod(GrantFulfillment fulfillment, Purchase purchase) {
-        if (purchase.getExpiresAt() != null && !purchase.getExpiresAt().equals(fulfillment.getExpiresAt())) {
-            fulfillment.setStartsAt(purchase.getStartsAt());
-            fulfillment.setExpiresAt(purchase.getExpiresAt());
-            if (purchase.getPaymentId() != null) {
-                fulfillment.setPaymentId(purchase.getPaymentId());
+        synchronizeFulfillmentPeriod(fulfillment, purchase.getStartsAt(), purchase.getExpiresAt(), purchase.getPaymentId());
+    }
+
+    private void synchronizeFulfillmentPeriod(
+            GrantFulfillment fulfillment,
+            LocalDateTime startsAt,
+            LocalDateTime expiresAt,
+            String paymentId
+    ) {
+        if (expiresAt != null && !expiresAt.equals(fulfillment.getExpiresAt())) {
+            fulfillment.setStartsAt(startsAt);
+            fulfillment.setExpiresAt(expiresAt);
+            if (paymentId != null) {
+                fulfillment.setPaymentId(paymentId);
             }
             grantFulfillmentRepository.save(fulfillment);
             List<FulfillmentDetail> details = fulfillmentDetailRepository.findByFulfillmentId(fulfillment.getId());
             for (FulfillmentDetail detail : details) {
-                detail.setStartsAt(purchase.getStartsAt());
-                detail.setExpiresAt(purchase.getExpiresAt());
+                detail.setStartsAt(startsAt);
+                detail.setExpiresAt(expiresAt);
             }
             fulfillmentDetailRepository.saveAll(details);
         }

@@ -59,14 +59,14 @@ class PackageActivationServiceTest {
     }
 
     @Test
-    void ensureSubscriptionState_whenActiveTrialExists_thenReturnTrial() {
-        Purchase trial = subscription(102L, CatalogPackages.ULTIMATE_PACKAGE, PurchaseType.TRIAL);
-        when(purchaseSelectionPolicy.usableSubscriptions(USER_ID)).thenReturn(List.of(trial));
-        when(purchaseSelectionPolicy.highestPriority(List.of(trial))).thenReturn(Optional.of(trial));
+    void ensureSubscriptionState_whenActivePaidExists_thenReturnPaid() {
+        Purchase paid = subscription(102L, CatalogPackages.ULTIMATE_PACKAGE, PurchaseType.PAID);
+        when(purchaseSelectionPolicy.usableSubscriptions(USER_ID)).thenReturn(List.of(paid));
+        when(purchaseSelectionPolicy.highestPriority(List.of(paid))).thenReturn(Optional.of(paid));
 
         Optional<Purchase> result = packageActivationService.ensureSubscriptionState(USER_ID);
 
-        assertThat(result).contains(trial);
+        assertThat(result).contains(paid);
         verify(purchaseExpiryService).expireDueForUser(USER_ID);
         verify(menuPublicAccessService).syncForUser(USER_ID);
     }

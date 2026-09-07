@@ -52,22 +52,13 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findByUserIdAndStatus(Long userId, PurchaseStatus status);
 
+    List<Purchase> findByUserIdAndStatusAndPurchaseType(Long userId, PurchaseStatus status, PurchaseType purchaseType);
+
     boolean existsByUserIdAndStatus(Long userId, PurchaseStatus status);
 
     boolean existsByPackageIdAndStatus(Long packageId, PurchaseStatus status);
 
     boolean existsByPackageId(Long packageId);
-
-    boolean existsByUserIdAndPurchaseType(Long userId, PurchaseType purchaseType);
-
-    Optional<Purchase> findFirstByUserIdAndPurchaseTypeOrderByPurchasedAtDesc(Long userId, PurchaseType purchaseType);
-
-    List<Purchase> findByPurchaseTypeAndStatusAndExpiresAtGreaterThanEqualAndExpiresAtLessThan(
-            PurchaseType purchaseType,
-            PurchaseStatus status,
-            LocalDateTime windowStart,
-            LocalDateTime windowEnd
-    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select purchase from Purchase purchase where purchase.id = :purchaseId")

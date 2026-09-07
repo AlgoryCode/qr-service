@@ -65,7 +65,7 @@ class FulfillmentGateServiceTest {
                 USER_ID,
                 CatalogProducts.QR_CREATE,
                 1,
-                List.of(FulfillmentDetailSource.PACKAGE_INCLUDE, FulfillmentDetailSource.ADDON_PURCHASE),
+                List.of(FulfillmentDetailSource.ONBOARDING_PACKAGE, FulfillmentDetailSource.PACKAGE_INCLUDE, FulfillmentDetailSource.ADDON_PURCHASE),
                 UsageReference.of(FulfillmentReferenceType.QR, 34L)
         )).thenReturn(new FulfillmentConsumeResult(1, 333L, 21L));
 
@@ -133,7 +133,7 @@ class FulfillmentGateServiceTest {
                 USER_ID,
                 CatalogProducts.QR_MENU,
                 2,
-                List.of(FulfillmentDetailSource.ADDON_PURCHASE, FulfillmentDetailSource.PACKAGE_INCLUDE),
+                List.of(FulfillmentDetailSource.ADDON_PURCHASE, FulfillmentDetailSource.ONBOARDING_PACKAGE, FulfillmentDetailSource.PACKAGE_INCLUDE),
                 UsageReference.of(FulfillmentReferenceType.MENU, 3L)
         );
     }

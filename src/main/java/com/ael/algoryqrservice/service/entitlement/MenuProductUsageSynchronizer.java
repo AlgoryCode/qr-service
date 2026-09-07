@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 import static com.ael.algoryqrservice.model.enums.FulfillmentDetailSource.ADDON_PURCHASE;
+import static com.ael.algoryqrservice.model.enums.FulfillmentDetailSource.ONBOARDING_PACKAGE;
 import static com.ael.algoryqrservice.model.enums.FulfillmentDetailSource.PACKAGE_INCLUDE;
 
 /**
@@ -33,7 +34,7 @@ public class MenuProductUsageSynchronizer implements FeatureUsageSynchronizer {
                 userId,
                 featureCode(),
                 (int) Math.min(activeProducts, Integer.MAX_VALUE),
-                List.of(PACKAGE_INCLUDE, ADDON_PURCHASE)
+                List.of(PACKAGE_INCLUDE, ONBOARDING_PACKAGE, ADDON_PURCHASE)
         );
     }
 }

@@ -51,6 +51,10 @@ class PurchaseFulfillmentServiceTest {
     private PackageActivationService packageActivationService;
     @Mock
     private MenuPublicAccessService menuPublicAccessService;
+    @Mock
+    private FulfillmentGrantService fulfillmentGrantService;
+    @Mock
+    private com.ael.algoryqrservice.access.TrialLogCloser trialLogCloser;
 
     @InjectMocks
     private PurchaseFulfillmentService fulfillmentService;
