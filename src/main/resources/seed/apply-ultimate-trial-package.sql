@@ -1,5 +1,7 @@
--- ULTIMATE_TRIAL_PACKAGE: 15-day Ultimate trial (not purchasable).
--- Paid ULTIMATE_PACKAGE remains purchasable but is no longer trial-eligible.
+-- Apply ULTIMATE_TRIAL_PACKAGE on stage + prod (Flyway disabled in runtime).
+-- billing_period required.
+
+BEGIN;
 
 UPDATE tbl_plan_package
 SET trial_eligible = FALSE,
@@ -110,4 +112,15 @@ INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE
 FROM tbl_plan_package p
 JOIN tbl_product pr ON pr.code = 'AI_MENU_IMPORT'
+WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';
+
+COMMIT;
+
+SELECT code, trial_eligible, trial_days, purchasable, active, billing_period
+FROM tbl_plan_package
+WHERE code IN ('ULTIMATE_PACKAGE', 'ULTIMATE_TRIAL_PACKAGE');
+
+SELECT COUNT(*) AS trial_items
+FROM tbl_plan_package_item i
+JOIN tbl_plan_package p ON p.id = i.package_id
 WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';
