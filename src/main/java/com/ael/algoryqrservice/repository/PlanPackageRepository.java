@@ -20,10 +20,10 @@ public interface PlanPackageRepository extends JpaRepository<PlanPackage, Long> 
 
     List<PlanPackage> findByActiveTrueOrderByPriceAsc();
 
-    Optional<PlanPackage> findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc();
+    Optional<PlanPackage> findFirstByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc();
 
     @EntityGraph(attributePaths = {"items", "items.product"})
-    List<PlanPackage> findByTrialEligibleTrueAndActiveTrueAndSystemManagedFalseOrderByPriorityDesc();
+    List<PlanPackage> findByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc();
 
     @Query("""
             select distinct pkg

@@ -78,9 +78,6 @@ public class PlanPackage {
     @Column(name = "validity_days", nullable = false)
     private Integer validityDays;
 
-    @Column(name = "trial_days")
-    private Integer trialDays;
-
     @Column(nullable = false)
     @ColumnDefault("0")
     @Builder.Default
@@ -95,11 +92,6 @@ public class PlanPackage {
     @ColumnDefault("false")
     @Builder.Default
     private boolean systemManaged = false;
-
-    @Column(name = "trial_eligible", nullable = false)
-    @ColumnDefault("false")
-    @Builder.Default
-    private boolean trialEligible = false;
 
     @OneToMany(mappedBy = "planPackage", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

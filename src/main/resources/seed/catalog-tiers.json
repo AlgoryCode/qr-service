@@ -5,8 +5,8 @@
       "name": "QR Olusturma",
       "description": "QR kod olusturma hakki",
       "scopeCode": "QR_CREATE_OWNER",
-      "unitPrice": 4.00,
-      "vatRate": 20.00,
+      "unitPrice": 4.0,
+      "vatRate": 20.0,
       "countable": true,
       "active": true
     },
@@ -15,8 +15,8 @@
       "name": "QR Menu",
       "description": "Ek dijital menu olusturma hakki",
       "scopeCode": "QR_MENU_OWNER",
-      "unitPrice": 200.00,
-      "vatRate": 20.00,
+      "unitPrice": 200.0,
+      "vatRate": 20.0,
       "countable": true,
       "active": true
     },
@@ -25,8 +25,8 @@
       "name": "Ek Sube",
       "description": "Ek sube olusturma hakki",
       "scopeCode": "QR_BRANCH_OWNER",
-      "unitPrice": 600.00,
-      "vatRate": 20.00,
+      "unitPrice": 600.0,
+      "vatRate": 20.0,
       "countable": true,
       "active": true
     },
@@ -35,8 +35,8 @@
       "name": "Menu Urun Hakki",
       "description": "Dijital menude tanimlanabilecek urun sayisi",
       "scopeCode": "MENU_PRODUCT_OWNER",
-      "unitPrice": 2.00,
-      "vatRate": 20.00,
+      "unitPrice": 2.0,
+      "vatRate": 20.0,
       "countable": true,
       "active": true
     },
@@ -45,8 +45,8 @@
       "name": "Akilli Asistan",
       "description": "Akilli asistan erisimi",
       "scopeCode": "SMART_ASSISTANT_OWNER",
-      "unitPrice": 79.00,
-      "vatRate": 20.00,
+      "unitPrice": 79.0,
+      "vatRate": 20.0,
       "countable": false,
       "active": true
     },
@@ -55,8 +55,8 @@
       "name": "Akilli Ozet",
       "description": "Akilli ozet erisimi",
       "scopeCode": "SMART_SUMMARY_OWNER",
-      "unitPrice": 99.00,
-      "vatRate": 20.00,
+      "unitPrice": 99.0,
+      "vatRate": 20.0,
       "countable": false,
       "active": true
     },
@@ -65,8 +65,8 @@
       "name": "Akilli Raporlama",
       "description": "Akilli raporlama erisimi",
       "scopeCode": "SMART_REPORTING_OWNER",
-      "unitPrice": 129.00,
-      "vatRate": 20.00,
+      "unitPrice": 129.0,
+      "vatRate": 20.0,
       "countable": false,
       "active": true
     },
@@ -75,8 +75,8 @@
       "name": "Ozel Tasarim Menu",
       "description": "Butik marka tasarimi hazirlama hakki",
       "scopeCode": "CUSTOM_DESIGN_OWNER",
-      "unitPrice": 199.00,
-      "vatRate": 20.00,
+      "unitPrice": 199.0,
+      "vatRate": 20.0,
       "countable": false,
       "active": true
     },
@@ -85,8 +85,8 @@
       "name": "Garson Paneli",
       "description": "Garson siparis ve adisyon modulu erisimi",
       "scopeCode": "WAITER_PANEL_OWNER",
-      "unitPrice": 149.00,
-      "vatRate": 20.00,
+      "unitPrice": 149.0,
+      "vatRate": 20.0,
       "countable": false,
       "active": true
     },
@@ -95,8 +95,8 @@
       "name": "AI Menu Import",
       "description": "Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma",
       "scopeCode": "AI_MENU_IMPORT_OWNER",
-      "unitPrice": 0.00,
-      "vatRate": 20.00,
+      "unitPrice": 0.0,
+      "vatRate": 20.0,
       "countable": false,
       "active": true
     }
@@ -114,19 +114,33 @@
       ],
       "currency": "TRY",
       "validityDays": 30,
-      "trialDays": null,
       "priority": 50,
       "purchasable": true,
       "systemManaged": false,
-      "trialEligible": false,
       "active": true,
-      "lockPrice": 299.00,
-      "yearlyPrice": 2988.00,
+      "lockPrice": 299.0,
+      "yearlyPrice": 2988.0,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 5, "unlimited": false },
-        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
-        { "productCode": "MENU_PRODUCT", "quantity": 50, "unlimited": false }
+        {
+          "productCode": "QR_CREATE",
+          "quantity": 5,
+          "unlimited": false
+        },
+        {
+          "productCode": "QR_BRANCH",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "QR_MENU",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "MENU_PRODUCT",
+          "quantity": 50,
+          "unlimited": false
+        }
       ]
     },
     {
@@ -141,20 +155,38 @@
       ],
       "currency": "TRY",
       "validityDays": 30,
-      "trialDays": null,
       "priority": 100,
       "purchasable": true,
       "systemManaged": false,
-      "trialEligible": false,
       "active": true,
-      "lockPrice": 599.00,
-      "yearlyPrice": 5643.00,
+      "lockPrice": 599.0,
+      "yearlyPrice": 5643.0,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
-        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
-        { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true }
+        {
+          "productCode": "QR_CREATE",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "QR_BRANCH",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "QR_MENU",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "MENU_PRODUCT",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_REPORTING",
+          "quantity": 1,
+          "unlimited": true
+        }
       ]
     },
     {
@@ -174,25 +206,63 @@
       ],
       "currency": "TRY",
       "validityDays": 30,
-      "trialDays": null,
       "priority": 200,
       "purchasable": true,
       "systemManaged": false,
-      "trialEligible": false,
       "active": true,
-      "lockPrice": 3450.00,
+      "lockPrice": 3450.0,
       "yearlyPrice": 31823.57,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
-        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
-        { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_SUMMARY", "quantity": 1, "unlimited": true },
-        { "productCode": "CUSTOM_DESIGN", "quantity": 1, "unlimited": true },
-        { "productCode": "WAITER_PANEL", "quantity": 1, "unlimited": true },
-        { "productCode": "AI_MENU_IMPORT", "quantity": 1, "unlimited": true }
+        {
+          "productCode": "QR_CREATE",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "QR_BRANCH",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "QR_MENU",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "MENU_PRODUCT",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_REPORTING",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_ASSISTANT",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_SUMMARY",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "CUSTOM_DESIGN",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "WAITER_PANEL",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "AI_MENU_IMPORT",
+          "quantity": 1,
+          "unlimited": true
+        }
       ]
     },
     {
@@ -211,25 +281,63 @@
         "AI ile menu fotografından urun ekleme"
       ],
       "currency": "TRY",
-      "validityDays": 30,
-      "trialDays": 15,
+      "validityDays": 15,
       "priority": 190,
       "purchasable": false,
       "systemManaged": false,
-      "trialEligible": true,
       "active": true,
       "lockPrice": 0,
       "items": [
-        { "productCode": "QR_CREATE", "quantity": 1, "unlimited": true },
-        { "productCode": "QR_BRANCH", "quantity": 1, "unlimited": false },
-        { "productCode": "QR_MENU", "quantity": 1, "unlimited": false },
-        { "productCode": "MENU_PRODUCT", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_REPORTING", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_ASSISTANT", "quantity": 1, "unlimited": true },
-        { "productCode": "SMART_SUMMARY", "quantity": 1, "unlimited": true },
-        { "productCode": "CUSTOM_DESIGN", "quantity": 1, "unlimited": true },
-        { "productCode": "WAITER_PANEL", "quantity": 1, "unlimited": true },
-        { "productCode": "AI_MENU_IMPORT", "quantity": 1, "unlimited": true }
+        {
+          "productCode": "QR_CREATE",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "QR_BRANCH",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "QR_MENU",
+          "quantity": 1,
+          "unlimited": false
+        },
+        {
+          "productCode": "MENU_PRODUCT",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_REPORTING",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_ASSISTANT",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "SMART_SUMMARY",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "CUSTOM_DESIGN",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "WAITER_PANEL",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "AI_MENU_IMPORT",
+          "quantity": 1,
+          "unlimited": true
+        }
       ]
     },
     {
@@ -242,7 +350,6 @@
       "priority": 1,
       "purchasable": false,
       "systemManaged": true,
-      "trialEligible": false,
       "active": false,
       "lockPrice": 0,
       "items": []
@@ -257,9 +364,8 @@
       "priority": 300,
       "purchasable": false,
       "systemManaged": false,
-      "trialEligible": false,
       "active": false,
-      "lockPrice": 1299.00,
+      "lockPrice": 1299.0,
       "items": []
     }
   ]

@@ -1,5 +1,4 @@
--- Apply ULTIMATE_TRIAL_PACKAGE on stage + prod (Flyway disabled in runtime).
--- Duration = validity_days. Drops trial_* columns after upsert.
+-- Upsert ULTIMATE_TRIAL_PACKAGE (validity_days = trial duration), then drop trial_* columns.
 
 INSERT INTO tbl_plan_package (
     code, name, description, features,
@@ -104,12 +103,3 @@ WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';
 
 ALTER TABLE tbl_plan_package DROP COLUMN IF EXISTS trial_days;
 ALTER TABLE tbl_plan_package DROP COLUMN IF EXISTS trial_eligible;
-
-SELECT code, purchasable, active, validity_days
-FROM tbl_plan_package
-WHERE code IN ('ULTIMATE_PACKAGE', 'ULTIMATE_TRIAL_PACKAGE');
-
-SELECT COUNT(*) AS trial_items
-FROM tbl_plan_package_item i
-JOIN tbl_plan_package p ON p.id = i.package_id
-WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';

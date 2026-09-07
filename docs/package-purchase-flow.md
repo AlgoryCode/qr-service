@@ -199,19 +199,19 @@ Durum sorgusu: `GET /trials/status` / `GET /trials/digital-menu-pro/status` → 
 
 1. `user.trialUsed` veya daha önce `PurchaseType.TRIAL` var mı? Varsa reddet (tek sefer)
 2. Aktif usable `PAID` varken reddet
-3. Paket: `active && trialEligible && !systemManaged` + geçerli `trialDays` (legacy: sabit `PRO_PACKAGE`)
+3. Paket: `CatalogPackages.isTrialPackage(code)` (`ULTIMATE_TRIAL_PACKAGE`) + `active && !systemManaged` + geçerli `validityDays`
 4. `Purchase` oluşturulur:
    - `purchaseType=TRIAL`
    - `status=ACTIVE` (hemen)
    - fiyat 0
-   - `expiresAt = now + package.trialDays`
+   - `expiresAt = now + package.validityDays`
 5. `PackageActivationService.activatePurchasedPackage(purchase)` — diğer `ACTIVE` purchase’lar `SUPERSEDED`
 6. Paket item’ları için `EntitlementService.grant(...)`
 
 ### Sınırlar
 
 - Kullanıcı başına **tek** trial (`uk_purchase_trial_user` + `trial_used`)
-- Seed: yalnızca `ULTIMATE_TRIAL_PACKAGE` `trialEligible=true`, `trialDays=15`; ücretli `ULTIMATE_PACKAGE` deneme dışı
+- Seed: yalnızca `ULTIMATE_TRIAL_PACKAGE` deneme kodu; süre `validityDays=15`; ücretli `ULTIMATE_PACKAGE` deneme dışı
 - Ödeme client’ı çağrılmaz
 - `expiresAt` sonrası haklar usable değildir; expire path Free’yi aynı işlemde restore eder + menu sync
 - `TrialExpiryReminderScheduler` — süresi yaklaşan ACTIVE trial için hatırlatma
@@ -533,7 +533,7 @@ Menü QR silindiğinde `softDeleteQrAndLinkedMenu` → `release(QR_MENU, 1)` ile
 
 ### Senaryo 2 ? Trial ba?lat?p men? a?ma
 
-1. `POST /trials` (veya legacy `POST /trials/digital-menu-pro`) → TRIAL ACTIVE + grant (`trialDays`)
+1. `POST /trials` (veya legacy `POST /trials/digital-menu-pro`) → TRIAL ACTIVE + grant (`validityDays`)
 2. `POST /qr/create` type=`menu` → `consume(QR_MENU, 1)` + `consume(QR_CREATE, 1)` → `createMenuForQr` → sync
 3. Ek menü: `QR_MENU remainingQuantity > 0` olduğu sürece tekrar create edilebilir; kalan 0 ise 403
 4. Menü silinince `release(QR_MENU, 1)` ile slot açılır

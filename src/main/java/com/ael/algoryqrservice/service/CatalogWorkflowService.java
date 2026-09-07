@@ -41,11 +41,9 @@ public class CatalogWorkflowService {
         packageRequest.setFeatures(request.getFeatures());
         packageRequest.setCurrency(request.getCurrency());
         packageRequest.setValidityDays(request.resolvedValidityDays());
-        packageRequest.setTrialDays(request.getTrialDays());
         packageRequest.setPriority(request.getPriority());
         packageRequest.setActive(true);
         packageRequest.setPurchasable(true);
-        packageRequest.setTrialEligible(Boolean.TRUE.equals(request.getTrialEligible()));
         packageRequest.setPrice(request.getMonthlyPrice());
         packageRequest.setMonthlyDiscount(request.getMonthlyDiscount());
         packageRequest.setYearlyPrice(request.getYearlyPrice());

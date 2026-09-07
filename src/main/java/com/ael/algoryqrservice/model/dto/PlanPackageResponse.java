@@ -28,11 +28,9 @@ public class PlanPackageResponse {
     private String currency;
     private boolean active;
     private Integer validityDays;
-    private Integer trialDays;
     private Integer priority;
     private boolean purchasable;
     private boolean systemManaged;
-    private boolean trialEligible;
     private List<PaymentMode> allowedPaymentModes;
     private List<Integer> allowedInstallments;
     private List<InstallmentOptionResponse> installmentOptions;

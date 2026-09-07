@@ -3,11 +3,8 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
-import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
-import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
@@ -40,7 +37,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -90,14 +86,13 @@ class TrialServiceTest {
     }
 
     @Test
-    void start_whenPackageIdProvided_thenGrantForTrialDays() {
-        PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
+    void start_whenUltimateTrialPackage_thenGrantForValidityDays() {
+        PlanPackage plan = trialPackage(2L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 15);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         doNothing().when(trialUseCases).assertCanStart(7L);
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
         stubSavedCard(7L);
-        stubBootstrap(7L);
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
             purchase.setId(10L);
@@ -113,7 +108,7 @@ class TrialServiceTest {
         assertThat(captor.getValue().getPaymentMethodId()).isEqualTo(9L);
         assertThat(captor.getValue().getPackageId()).isEqualTo(2L);
         assertThat(captor.getValue().getExpiresAt())
-                .isEqualTo(captor.getValue().getStartsAt().plusDays(7));
+                .isEqualTo(captor.getValue().getStartsAt().plusDays(15));
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
         verify(packageActivationService).activatePurchasedPackage(any());
         verify(entitlementWriter).grant(any(), any(), any(), any(Integer.class), any(Boolean.class));
@@ -132,23 +127,9 @@ class TrialServiceTest {
         ));
     }
 
-    private void stubBootstrap(Long userId) {
-        when(billingAddressService.resolveDefaultSnapshot(userId)).thenReturn(BillingSnapshot.builder().build());
-        when(appProperties.getServiceName()).thenReturn("qr-service");
-        when(paymentRequestMapper.toCardVerificationRequest(any(), any(), any(), any(), any()))
-                .thenReturn(PaymentCardVerificationRequest.builder()
-                        .buyer(PaymentThreeDsRequest.BuyerPayload.builder()
-                                .id("7")
-                                .email("ada@example.com")
-                                .ip("127.0.0.1")
-                                .build())
-                        .build());
-    }
-
     @Test
-    void start_whenIneligiblePackage_thenReject() {
-        PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, 7);
-        plan.setTrialEligible(false);
+    void start_whenPaidPackage_thenReject() {
+        PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         stubEligibleUser(user);
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
@@ -160,33 +141,8 @@ class TrialServiceTest {
     }
 
     @Test
-    void start_whenUltimateTrialEligible_thenGrantForTrialDays() {
-        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 30, 15);
-        User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        doNothing().when(trialUseCases).assertCanStart(7L);
-        when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
-        stubSavedCard(7L);
-        stubBootstrap(7L);
-        when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
-            Purchase purchase = invocation.getArgument(0);
-            purchase.setId(10L);
-            return purchase;
-        });
-
-        TrialDtos.Status result = service.start(7L, 3L);
-
-        ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
-        verify(purchaseRepository).saveAndFlush(captor.capture());
-        assertThat(captor.getValue().getExpiresAt())
-                .isEqualTo(captor.getValue().getStartsAt().plusDays(30));
-        assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
-    }
-
-    @Test
-    void start_whenStarterNotTrialEligible_thenReject() {
-        PlanPackage plan = trialPackage(2L, CatalogPackages.STARTER_PACKAGE, 30, null);
-        plan.setTrialEligible(false);
+    void start_whenStarterPackage_thenReject() {
+        PlanPackage plan = trialPackage(2L, CatalogPackages.STARTER_PACKAGE, 30);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         stubEligibleUser(user);
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
@@ -197,15 +153,16 @@ class TrialServiceTest {
     }
 
     @Test
-    void start_whenMissingTrialDays_thenReject() {
-        PlanPackage plan = trialPackage(2L, CatalogPackages.PRO_PACKAGE, 30, null);
+    void start_whenMissingValidityDays_thenReject() {
+        PlanPackage plan = trialPackage(2L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 15);
+        plan.setValidityDays(null);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
         stubEligibleUser(user);
         when(packageRepository.findByIdWithItems(2L)).thenReturn(Optional.of(plan));
 
         assertThatThrownBy(() -> service.start(7L, 2L))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("trialDays");
+                .hasMessageContaining("validityDays");
     }
 
     @Test
@@ -220,14 +177,13 @@ class TrialServiceTest {
     }
 
     @Test
-    void startDigitalMenuPro_whenAvailable_thenPinTrialEligiblePackage() {
-        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 30, 15);
+    void startDigitalMenuPro_whenAvailable_thenPinUltimateTrialPackage() {
+        PlanPackage plan = trialPackage(3L, CatalogPackages.ULTIMATE_TRIAL_PACKAGE, 15);
         User user = User.builder().id(7L).provider(AuthProvider.GOOGLE).emailVerified(true).build();
-        when(packageRepository.findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc())
+        when(packageRepository.findFirstByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc())
                 .thenReturn(Optional.of(plan));
         when(packageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(plan));
         stubEligibleUser(user);
-        stubBootstrap(7L);
         when(purchaseRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             Purchase purchase = invocation.getArgument(0);
             purchase.setId(10L);
@@ -237,7 +193,7 @@ class TrialServiceTest {
         TrialDtos.Status result = service.startDigitalMenuPro(7L);
 
         assertThat(result.lifecycle()).isEqualTo(TrialDtos.Lifecycle.ACTIVE);
-        verify(packageRepository).findFirstByTrialEligibleTrueAndActiveTrueOrderByPriorityDesc();
+        verify(packageRepository).findFirstByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc();
     }
 
     @Test
@@ -276,7 +232,7 @@ class TrialServiceTest {
         verify(userRepository, never()).save(any());
     }
 
-    private PlanPackage trialPackage(Long id, String code, int validityDays, Integer trialDays) {
+    private PlanPackage trialPackage(Long id, String code, int validityDays) {
         Product product = Product.builder().id(7L).code("QR_CREATE").name("QR").build();
         PlanPackageItem item = PlanPackageItem.builder()
                 .id(1L)
@@ -284,19 +240,18 @@ class TrialServiceTest {
                 .quantity(30)
                 .unlimited(false)
                 .build();
+        boolean purchasable = !CatalogPackages.ULTIMATE_TRIAL_PACKAGE.equals(code);
         return PlanPackage.builder()
                 .id(id)
                 .code(code)
-                .name("PRO")
-                .price(BigDecimal.TEN)
+                .name(purchasable ? "Paid" : "Ultimate Deneme")
+                .price(purchasable ? BigDecimal.TEN : BigDecimal.ZERO)
                 .currency("TRY")
                 .validityDays(validityDays)
-                .trialDays(trialDays)
                 .active(true)
-                .trialEligible(true)
+                .purchasable(purchasable)
                 .systemManaged(false)
                 .items(new ArrayList<>(List.of(item)))
                 .build();
     }
 }
-
