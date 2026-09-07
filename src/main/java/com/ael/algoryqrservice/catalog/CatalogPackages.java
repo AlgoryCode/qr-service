@@ -8,6 +8,7 @@ public final class CatalogPackages {
     public static final String STARTER_PACKAGE = "STARTER_PACKAGE";
     public static final String PRO_PACKAGE = "PRO_PACKAGE";
     public static final String ULTIMATE_PACKAGE = "ULTIMATE_PACKAGE";
+    public static final String ULTIMATE_TRIAL_PACKAGE = "ULTIMATE_TRIAL_PACKAGE";
     public static final String CORPORATE_PACKAGE = "CORPORATE_PACKAGE";
 
     private CatalogPackages() {
