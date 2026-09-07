@@ -79,6 +79,8 @@ Yanıt: `{ productsUpserted, packagesUpserted, packageCodes }`.
 
 Admin dashboard: Paketler → **Seed katalogu içe aktar**.
 
+`ULTIMATE_TRIAL_PACKAGE` ayrıca Flyway `V89__ultimate_trial_package.sql` ile deploy’da otomatik eklenir; seed import şart değildir.
+
 ## Trial API
 
 | Method | Path | Davranış |
