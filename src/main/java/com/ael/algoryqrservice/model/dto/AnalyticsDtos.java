@@ -271,7 +271,9 @@ public class AnalyticsDtos {
             List<HourlyRevenuePoint> hourly,
             UnsoldCatalog unsold,
             RevenuePaymentBreakdown paymentBreakdown,
-            List<RevenuePersonnelRow> personnel
+            List<RevenuePersonnelRow> personnel,
+            List<ChannelShare> channels,
+            List<ChannelDailyPoint> channelDaily
     ) {
     }
 
@@ -284,6 +286,26 @@ public class AnalyticsDtos {
             BigDecimal fixedExpenseTotal,
             BigDecimal netRevenue,
             String currency
+    ) {
+    }
+
+    public record ChannelShare(
+            String code,
+            String label,
+            BigDecimal revenue,
+            long orderCount,
+            BigDecimal avgOrderValue,
+            BigDecimal sharePercent,
+            BigDecimal deltaVsPrevPercent,
+            boolean connected
+    ) {
+    }
+
+    public record ChannelDailyPoint(
+            LocalDate date,
+            String channelCode,
+            BigDecimal revenue,
+            long orderCount
     ) {
     }
 
