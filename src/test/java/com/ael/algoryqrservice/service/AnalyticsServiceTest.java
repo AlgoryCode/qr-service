@@ -339,6 +339,13 @@ class AnalyticsServiceTest {
         assertThat(report.hourly().get(14).revenue()).isEqualByComparingTo("260.00");
         assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("260.00");
         assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("0.00");
+        assertThat(report.channels()).hasSize(2);
+        assertThat(report.channels().get(0).code()).isEqualTo("IN_HOUSE");
+        assertThat(report.channels().get(0).revenue()).isEqualByComparingTo("260.00");
+        assertThat(report.channels().get(0).orderCount()).isEqualTo(1L);
+        assertThat(report.channels().get(1).code()).isEqualTo("UBER_EATS");
+        assertThat(report.channels().get(1).connected()).isFalse();
+        assertThat(report.channelDaily()).isNotEmpty();
     }
 
     @Test
@@ -361,16 +368,29 @@ class AnalyticsServiceTest {
         connection.setId(42L);
         connection.setUserId(ownerId);
         when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.of(connection));
-        when(uberEatsOrderRepository.sumRevenueByConnectionAndStatuses(
+        var order = com.ael.algoryqrservice.integration.ubereats.model.UberEatsOrder.builder()
+                .id(1L)
+                .connectionId(42L)
+                .externalOrderId("ext-1")
+                .packageStatus("accepted")
+                .totalAmount(new BigDecimal("175.50"))
+                .packageCreatedAt(LocalDateTime.of(2026, 8, 13, 12, 0))
+                .build();
+        when(uberEatsOrderRepository.findByConnectionAndStatuses(
                 eq(42L), any(), any(), eq(List.of("accepted", "prepared"))
-        )).thenReturn(new BigDecimal("175.50"));
+        )).thenReturn(List.of(order));
 
         AnalyticsDtos.MenuRevenueReportResponse report = service.getMenuRevenueReport(menuId, ownerId, day, day);
 
         assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("175.50");
         assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("175.50");
         assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("175.50");
-        verify(uberEatsOrderRepository).sumRevenueByConnectionAndStatuses(
+        assertThat(report.channels()).hasSize(2);
+        assertThat(report.channels().get(1).code()).isEqualTo("UBER_EATS");
+        assertThat(report.channels().get(1).connected()).isTrue();
+        assertThat(report.channels().get(1).revenue()).isEqualByComparingTo("175.50");
+        assertThat(report.channels().get(1).orderCount()).isEqualTo(1L);
+        verify(uberEatsOrderRepository).findByConnectionAndStatuses(
                 eq(42L), any(), any(), eq(List.of("accepted", "prepared"))
         );
     }

@@ -11,7 +11,10 @@ public record SmartReportGenerateMessage(
         UUID jobId,
         Long userId,
         Long menuId,
+        Long branchId,
         AnalyticsDtos.MenuAnalyticsReportResponse report,
+        AnalyticsDtos.MenuRevenueReportResponse revenue,
+        AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter,
         String locale,
         Map<String, Object> options
 ) {

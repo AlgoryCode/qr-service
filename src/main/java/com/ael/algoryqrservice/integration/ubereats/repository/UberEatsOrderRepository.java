@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface UberEatsOrderRepository
@@ -36,6 +37,34 @@ public interface UberEatsOrderRepository
               AND LOWER(o.packageStatus) IN :statuses
             """)
     BigDecimal sumRevenueByConnectionAndStatuses(
+            @Param("connectionId") Long connectionId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("statuses") Collection<String> statuses
+    );
+
+    @Query("""
+            SELECT COUNT(o)
+            FROM UberEatsOrder o
+            WHERE o.connectionId = :connectionId
+              AND o.packageCreatedAt BETWEEN :from AND :to
+              AND LOWER(o.packageStatus) IN :statuses
+            """)
+    long countByConnectionAndStatuses(
+            @Param("connectionId") Long connectionId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("statuses") Collection<String> statuses
+    );
+
+    @Query("""
+            SELECT o
+            FROM UberEatsOrder o
+            WHERE o.connectionId = :connectionId
+              AND o.packageCreatedAt BETWEEN :from AND :to
+              AND LOWER(o.packageStatus) IN :statuses
+            """)
+    List<UberEatsOrder> findByConnectionAndStatuses(
             @Param("connectionId") Long connectionId,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,

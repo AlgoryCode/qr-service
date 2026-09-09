@@ -41,8 +41,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -66,6 +68,18 @@ public class SmartReportService {
     private final ObjectMapper objectMapper;
 
     @Transactional
+    public SmartReportDtos.SmartReportAccepted enqueueForBranch(
+            Long branchId,
+            Long ownerId,
+            LocalDate from,
+            LocalDate to,
+            String locale,
+            SmartReportDtos.Options options
+    ) {
+        return enqueue(branchId, null, ownerId, from, to, locale, options, true);
+    }
+
+    @Transactional
     public SmartReportDtos.SmartReportAccepted enqueue(
             Long menuId,
             Long ownerId,
@@ -74,20 +88,7 @@ public class SmartReportService {
             String locale,
             SmartReportDtos.Options options
     ) {
-        return enqueue(null, menuId, ownerId, from, to, locale, options);
-    }
-
-    @Transactional
-    public SmartReportDtos.SmartReportAccepted enqueueForBranch(
-            Long branchId,
-            Long menuId,
-            Long ownerId,
-            LocalDate from,
-            LocalDate to,
-            String locale,
-            SmartReportDtos.Options options
-    ) {
-        return enqueue(branchId, menuId, ownerId, from, to, locale, options);
+        return enqueue(null, menuId, ownerId, from, to, locale, options, false);
     }
 
     private SmartReportDtos.SmartReportAccepted enqueue(
@@ -97,7 +98,8 @@ public class SmartReportService {
             LocalDate from,
             LocalDate to,
             String locale,
-            SmartReportDtos.Options options
+            SmartReportDtos.Options options,
+            boolean branchOnly
     ) {
         if (from == null || to == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from and to are required");
@@ -105,49 +107,53 @@ public class SmartReportService {
         if (from.isAfter(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must be on or before to");
         }
+        if (branchOnly && branchId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "branchId is required");
+        }
+        if (!branchOnly && menuId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "menuId is required");
+        }
 
         assertQuotaAvailable(ownerId);
 
-        AnalyticsDtos.MenuAnalyticsReportResponse report = branchId != null
-                ? analyticsService.getBranchReport(branchId, menuId, ownerId, from, to)
+        Long scopedMenuId = branchOnly ? null : menuId;
+        AnalyticsDtos.MenuAnalyticsReportResponse report = branchOnly
+                ? analyticsService.getBranchReport(branchId, null, ownerId, from, to)
                 : analyticsService.getMenuReport(menuId, ownerId, from, to);
+
+        AnalyticsDtos.MenuRevenueReportResponse revenue = branchOnly
+                ? analyticsService.getBranchRevenueReport(branchId, null, ownerId, from, to)
+                : analyticsService.getMenuRevenueReport(menuId, ownerId, from, to);
+
+        AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter = branchOnly
+                ? analyticsService.getBranchWaiterPerformanceReport(branchId, null, ownerId, from, to)
+                : analyticsService.getMenuWaiterPerformanceReport(menuId, ownerId, from, to);
 
         UUID processId = UUID.randomUUID();
         String resolvedLocale = locale == null || locale.isBlank() ? "tr" : locale.trim();
-        Long resolvedMenuId = report.menuId();
-        String menuName = report.menuName();
         Long resolvedBranchId = report.branchId() != null ? report.branchId() : branchId;
         String branchName = report.branchName();
-        if (menuName == null || menuName.isBlank()) {
-            menuName = branchName != null && !branchName.isBlank()
-                    ? branchName
-                    : (resolvedMenuId != null ? "Menu #" + resolvedMenuId : "Sube");
+        Long resolvedMenuId = branchOnly ? null : report.menuId();
+        String menuName = branchOnly ? null : report.menuName();
+        if (!branchOnly && (menuName == null || menuName.isBlank())) {
+            menuName = resolvedMenuId != null ? "Menu #" + resolvedMenuId : "Menu";
         }
-        Long payloadMenuId = resolvedMenuId != null ? resolvedMenuId : 0L;
-        AnalyticsDtos.MenuAnalyticsReportResponse aiReport = new AnalyticsDtos.MenuAnalyticsReportResponse(
-                payloadMenuId,
-                menuName,
-                report.branchId(),
-                report.branchName(),
-                report.from(),
-                report.to(),
-                report.kpis(),
-                report.daily(),
-                report.hourly(),
-                report.devices(),
-                report.topProducts(),
-                report.topCategories(),
-                report.categoryProductTree(),
-                report.sampleJourneys(),
-                report.funnel(),
-                report.feedback()
-        );
+
+        AnalyticsDtos.MenuAnalyticsReportResponse aiVisits = branchOnly
+                ? stripMenuIdentity(report, resolvedBranchId, branchName)
+                : withMenuIdentity(report, resolvedMenuId, menuName);
+        AnalyticsDtos.MenuRevenueReportResponse aiRevenue = branchOnly
+                ? stripMenuIdentity(revenue, resolvedBranchId, branchName)
+                : revenue;
+        AnalyticsDtos.MenuWaiterPerformanceReportResponse aiWaiter = branchOnly
+                ? stripMenuIdentity(waiter, resolvedBranchId, branchName)
+                : waiter;
 
         smartReportEventRepository.save(SmartReportEvent.builder()
                 .processId(processId)
                 .userId(ownerId)
                 .menuId(resolvedMenuId)
-                .menuName(resolvedMenuId != null ? menuName : null)
+                .menuName(menuName)
                 .branchId(resolvedBranchId)
                 .branchName(branchName)
                 .fromDate(from)
@@ -156,15 +162,29 @@ public class SmartReportService {
                 .status(SmartReportEvent.STATUS_QUEUED)
                 .build());
 
-        touchSmartReportLastUsage(ownerId, resolvedMenuId);
+        touchSmartReportLastUsage(ownerId, scopedMenuId != null ? scopedMenuId : resolvedBranchId);
+
+        Map<String, Object> optionsMap = SmartReportDtos.toOptionsMap(options);
+        if (branchOnly) {
+            Map<String, Object> branchOptions = optionsMap == null ? new HashMap<>() : new HashMap<>(optionsMap);
+            branchOptions.putIfAbsent("scope", "branch");
+            branchOptions.putIfAbsent(
+                    "focusAreas",
+                    List.of("şube siparişleri", "kanal kıyası", "ciro ve ürün satışları")
+            );
+            optionsMap = branchOptions;
+        }
 
         SmartReportGenerateMessage payload = new SmartReportGenerateMessage(
                 processId,
                 ownerId,
-                payloadMenuId,
-                aiReport,
+                resolvedMenuId,
+                resolvedBranchId,
+                aiVisits,
+                aiRevenue,
+                aiWaiter,
                 resolvedLocale,
-                SmartReportDtos.toOptionsMap(options)
+                optionsMap
         );
 
         try {
@@ -184,15 +204,112 @@ public class SmartReportService {
         }
 
         log.info(
-                "Smart report queued. processId={} branchId={} menuId={} userId={} from={} to={}",
+                "Smart report queued. processId={} branchId={} menuId={} branchOnly={} userId={} from={} to={}",
                 processId,
                 resolvedBranchId,
                 resolvedMenuId,
+                branchOnly,
                 ownerId,
                 from,
                 to
         );
         return new SmartReportDtos.SmartReportAccepted(processId, SmartReportEvent.STATUS_QUEUED);
+    }
+
+    private static AnalyticsDtos.MenuAnalyticsReportResponse stripMenuIdentity(
+            AnalyticsDtos.MenuAnalyticsReportResponse report,
+            Long branchId,
+            String branchName
+    ) {
+        return new AnalyticsDtos.MenuAnalyticsReportResponse(
+                null,
+                null,
+                branchId,
+                branchName,
+                report.from(),
+                report.to(),
+                report.kpis(),
+                report.daily(),
+                report.hourly(),
+                report.devices(),
+                report.topProducts(),
+                report.topCategories(),
+                report.categoryProductTree(),
+                report.sampleJourneys(),
+                report.funnel(),
+                report.feedback()
+        );
+    }
+
+    private static AnalyticsDtos.MenuAnalyticsReportResponse withMenuIdentity(
+            AnalyticsDtos.MenuAnalyticsReportResponse report,
+            Long menuId,
+            String menuName
+    ) {
+        return new AnalyticsDtos.MenuAnalyticsReportResponse(
+                menuId,
+                menuName,
+                report.branchId(),
+                report.branchName(),
+                report.from(),
+                report.to(),
+                report.kpis(),
+                report.daily(),
+                report.hourly(),
+                report.devices(),
+                report.topProducts(),
+                report.topCategories(),
+                report.categoryProductTree(),
+                report.sampleJourneys(),
+                report.funnel(),
+                report.feedback()
+        );
+    }
+
+    private static AnalyticsDtos.MenuRevenueReportResponse stripMenuIdentity(
+            AnalyticsDtos.MenuRevenueReportResponse report,
+            Long branchId,
+            String branchName
+    ) {
+        return new AnalyticsDtos.MenuRevenueReportResponse(
+                null,
+                null,
+                branchId,
+                branchName,
+                report.from(),
+                report.to(),
+                report.kpis(),
+                report.daily(),
+                report.products(),
+                report.categories(),
+                report.spotlight(),
+                report.hourly(),
+                report.unsold(),
+                report.paymentBreakdown(),
+                report.personnel(),
+                report.channels(),
+                report.channelDaily()
+        );
+    }
+
+    private static AnalyticsDtos.MenuWaiterPerformanceReportResponse stripMenuIdentity(
+            AnalyticsDtos.MenuWaiterPerformanceReportResponse report,
+            Long branchId,
+            String branchName
+    ) {
+        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+                null,
+                null,
+                branchId,
+                branchName,
+                report.from(),
+                report.to(),
+                report.kpis(),
+                report.waiters(),
+                report.daily(),
+                report.hourly(),
+                report.products()
+        );
     }
 
     @Transactional

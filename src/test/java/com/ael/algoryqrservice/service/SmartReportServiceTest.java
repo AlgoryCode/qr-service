@@ -81,6 +81,8 @@ class SmartReportServiceTest {
         LocalDate from = LocalDate.of(2026, 7, 1);
         LocalDate to = LocalDate.of(2026, 7, 2);
         when(analyticsService.getMenuReport(5L, 9L, from, to)).thenReturn(visitReport(5L, "Ogle", 2L, "Kadikoy"));
+        when(analyticsService.getMenuRevenueReport(5L, 9L, from, to)).thenReturn(emptyRevenue(5L, "Ogle", 2L, "Kadikoy"));
+        when(analyticsService.getMenuWaiterPerformanceReport(5L, 9L, from, to)).thenReturn(emptyWaiter(5L, "Ogle", 2L, "Kadikoy"));
 
         service.enqueue(5L, 9L, from, to, "tr", null);
 
@@ -98,8 +100,12 @@ class SmartReportServiceTest {
         LocalDate to = LocalDate.of(2026, 7, 2);
         when(analyticsService.getBranchReport(2L, null, 9L, from, to))
                 .thenReturn(visitReport(null, null, 2L, "Kadikoy"));
+        when(analyticsService.getBranchRevenueReport(2L, null, 9L, from, to))
+                .thenReturn(emptyRevenue(null, null, 2L, "Kadikoy"));
+        when(analyticsService.getBranchWaiterPerformanceReport(2L, null, 9L, from, to))
+                .thenReturn(emptyWaiter(null, null, 2L, "Kadikoy"));
 
-        service.enqueueForBranch(2L, null, 9L, from, to, "tr", null);
+        service.enqueueForBranch(2L, 9L, from, to, "tr", null);
 
         ArgumentCaptor<SmartReportEvent> captor = ArgumentCaptor.forClass(SmartReportEvent.class);
         verify(smartReportEventRepository).save(captor.capture());
@@ -107,6 +113,9 @@ class SmartReportServiceTest {
         assertThat(captor.getValue().getMenuName()).isNull();
         assertThat(captor.getValue().getBranchId()).isEqualTo(2L);
         assertThat(captor.getValue().getBranchName()).isEqualTo("Kadikoy");
+        verify(analyticsService).getBranchReport(2L, null, 9L, from, to);
+        verify(analyticsService).getBranchRevenueReport(2L, null, 9L, from, to);
+        verify(analyticsService).getBranchWaiterPerformanceReport(2L, null, 9L, from, to);
     }
 
     private AnalyticsDtos.MenuAnalyticsReportResponse visitReport(
@@ -136,6 +145,59 @@ class SmartReportServiceTest {
                         new AnalyticsDtos.ProductFeedbackSummary(
                                 BigDecimal.ZERO, 0L, List.of(), List.of(), List.of(), List.of())
                 )
+        );
+    }
+
+    private AnalyticsDtos.MenuRevenueReportResponse emptyRevenue(
+            Long menuId,
+            String menuName,
+            Long branchId,
+            String branchName
+    ) {
+        return new AnalyticsDtos.MenuRevenueReportResponse(
+                menuId,
+                menuName,
+                branchId,
+                branchName,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 2),
+                new AnalyticsDtos.RevenueKpis(BigDecimal.ZERO, 0L, 0L, BigDecimal.ZERO, "TRY"),
+                List.of(),
+                List.of(),
+                List.of(),
+                new AnalyticsDtos.RevenueSpotlight(null, null, null),
+                List.of(),
+                new AnalyticsDtos.UnsoldCatalog(0L, List.of()),
+                new AnalyticsDtos.RevenuePaymentBreakdown(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, "TRY"
+                ),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+    }
+
+    private AnalyticsDtos.MenuWaiterPerformanceReportResponse emptyWaiter(
+            Long menuId,
+            String menuName,
+            Long branchId,
+            String branchName
+    ) {
+        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+                menuId,
+                menuName,
+                branchId,
+                branchName,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 2),
+                new AnalyticsDtos.WaiterPerformanceKpis(
+                        0L, 0L, 0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO, BigDecimal.ZERO, 0L, "TRY"
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
         );
     }
 }
