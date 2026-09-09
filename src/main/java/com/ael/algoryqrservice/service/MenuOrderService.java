@@ -194,6 +194,12 @@ public class MenuOrderService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public MenuOrderDtos.OrderResponse merchantGet(Long menuId, Long orderId) {
+        requireOwnedMenu(menuId);
+        return toOrderResponse(requireOrderForMenu(menuId, orderId));
+    }
+
     @Transactional
     public MenuOrderDtos.OrderResponse merchantCancel(Long menuId, Long orderId) {
         requireOwnedMenu(menuId);
