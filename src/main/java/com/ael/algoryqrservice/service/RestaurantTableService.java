@@ -153,7 +153,7 @@ public class RestaurantTableService {
     }
 
     private String buildPublicUrl(Menu menu, String publicToken) {
-        return menuService.buildPublicUrl(menu) + "?t=" + publicToken;
+        return menuService.buildPublicUrl(menu) + "/content?t=" + publicToken;
     }
 
     private String generateQrImage(String publicUrl) {
