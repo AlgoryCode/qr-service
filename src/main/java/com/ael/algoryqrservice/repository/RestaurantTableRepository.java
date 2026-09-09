@@ -17,6 +17,8 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
 
     Optional<RestaurantTable> findByPublicTokenAndActiveTrue(String publicToken);
 
+    Optional<RestaurantTable> findByPublicToken(String publicToken);
+
     Optional<RestaurantTable> findByIdAndMenuId(Long id, Long menuId);
 
     Optional<RestaurantTable> findFirstByMenuIdAndNameIgnoreCaseAndActiveTrue(Long menuId, String name);

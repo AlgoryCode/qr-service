@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.Menu;
@@ -47,11 +48,7 @@ public class TableSessionService {
 
         RestaurantTable table;
         if (tableToken != null && !tableToken.isBlank()) {
-            table = restaurantTableRepository.findByPublicTokenAndActiveTrue(tableToken.trim())
-                    .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
-            if (!table.getMenuId().equals(menu.getMenuId())) {
-                throw new BadRequestException("Masa bu menüye ait değil");
-            }
+            table = resolveTableByToken(menu, tableToken.trim());
         } else {
             table = resolveWalkInTable(menu);
         }
@@ -76,6 +73,18 @@ public class TableSessionService {
                 .tableName(table.getName())
                 .expiresAt(session.getExpiresAt())
                 .build();
+    }
+
+    private RestaurantTable resolveTableByToken(Menu menu, String tableToken) {
+        RestaurantTable table = restaurantTableRepository.findByPublicToken(tableToken)
+                .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
+        if (!table.getMenuId().equals(menu.getMenuId())) {
+            throw new BadRequestException("Masa bu menüye ait değil");
+        }
+        if (!table.isActive()) {
+            throw new ForbiddenException("Bu masa şu anda hizmet vermemektedir");
+        }
+        return table;
     }
 
     private RestaurantTable resolveWalkInTable(Menu menu) {
