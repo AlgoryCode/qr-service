@@ -21,18 +21,33 @@ public class BatchReportReconcileScheduler {
     private final BatchReportService batchReportService;
     private final SmartReportService smartReportService;
 
-    @Scheduled(fixedDelayString = "${batch-reports.reconcile-interval-ms:120000}")
+    @Scheduled(fixedDelayString = "${batch-reports.reconcile-interval-ms:60000}")
     public void reconcile() {
-        for (BatchReport batch : batchReportService.findOpenBatches()) {
+        var openBatches = batchReportService.findOpenBatches();
+        log.info("Batch report reconcile tick. openBatchCount={}", openBatches.size());
+        for (BatchReport batch : openBatches) {
             try {
+                log.info(
+                        "Batch report reconcile start. batchId={} openaiBatchId={} localStatus={}",
+                        batch.getId(),
+                        batch.getOpenaiBatchId(),
+                        batch.getStatus()
+                );
                 BatchReportService.ReconcileOutcome outcome = batchReportService.reconcileOne(batch.getId());
+                log.info(
+                        "Batch report reconcile done. batchId={} remoteStatus={} itemOutcomes={}",
+                        batch.getId(),
+                        outcome == null ? null : outcome.status(),
+                        outcome == null || outcome.items() == null ? 0 : outcome.items().size()
+                );
                 applySmartReportOutcomes(outcome);
             } catch (Exception ex) {
                 log.warn(
                         "Batch report reconcile failed. batchId={} openaiBatchId={} error={}",
                         batch.getId(),
                         batch.getOpenaiBatchId(),
-                        ex.getMessage()
+                        ex.getMessage(),
+                        ex
                 );
             }
         }
@@ -48,6 +63,11 @@ public class BatchReportReconcileScheduler {
                 continue;
             }
             if (BatchReportItem.STATUS_COMPLETED.equals(item.status())) {
+                log.info(
+                        "Batch report applying smart-report completed. itemId={} resultChars={}",
+                        item.itemId(),
+                        item.resultText() == null ? 0 : item.resultText().length()
+                );
                 smartReportService.applyStatusEvent(new SmartReportStatusMessage(
                         item.itemId(),
                         SmartReportEvent.STATUS_COMPLETED,
@@ -61,6 +81,12 @@ public class BatchReportReconcileScheduler {
                 continue;
             }
             if (BatchReportItem.STATUS_FAILED.equals(item.status())) {
+                log.warn(
+                        "Batch report applying smart-report failed. itemId={} code={} message={}",
+                        item.itemId(),
+                        item.errorCode(),
+                        item.errorMessage()
+                );
                 smartReportService.applyStatusEvent(new SmartReportStatusMessage(
                         item.itemId(),
                         SmartReportEvent.STATUS_FAILED,
@@ -73,6 +99,7 @@ public class BatchReportReconcileScheduler {
                 ));
                 continue;
             }
+            log.info("Batch report applying smart-report processing. itemId={}", item.itemId());
             smartReportService.applyStatusEvent(new SmartReportStatusMessage(
                     item.itemId(),
                     SmartReportEvent.STATUS_PROCESSING,
