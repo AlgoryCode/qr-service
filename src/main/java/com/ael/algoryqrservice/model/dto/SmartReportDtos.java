@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,8 +59,21 @@ public final class SmartReportDtos {
             long used,
             long remaining,
             Instant resetsAt,
-            Instant lastUsage
+            Instant lastUsage,
+            int paidCredits,
+            String addonProductCode,
+            BigDecimal addonUnitPrice
     ) {
+        public SmartReportQuotaResponse(
+                String period,
+                int limit,
+                long used,
+                long remaining,
+                Instant resetsAt,
+                Instant lastUsage
+        ) {
+            this(period, limit, used, remaining, resetsAt, lastUsage, 0, null, null);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

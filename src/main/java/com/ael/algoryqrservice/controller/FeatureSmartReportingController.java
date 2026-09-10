@@ -23,7 +23,7 @@ public class FeatureSmartReportingController {
     private final SmartReportService smartReportService;
     private final SecurityUtils securityUtils;
 
-    @PostMapping("/analytics/branch/{branchId}/smart-reports")
+    @PostMapping("/branches/{branchId}/reports")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createBranchSmartReport(
             @PathVariable Long branchId,
@@ -41,7 +41,7 @@ public class FeatureSmartReportingController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(accepted);
     }
 
-    @PostMapping("/analytics/menu/{menuId}/smart-reports")
+    @PostMapping("/menus/{menuId}/reports")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createSmartReport(
             @PathVariable Long menuId,
