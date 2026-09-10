@@ -75,8 +75,8 @@ def upload_cover(token: str, category_id: int, image_path: Path) -> dict:
 
 
 def main() -> None:
-    admin = api_json("POST", "/dashboard/auth/login", body={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
-    impersonated = api_json("POST", f"/admin/users/{USER_ID}/impersonate", token=admin["accessToken"])
+    admin = api_json("POST", "/admin/auth/sessions", body={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+    impersonated = api_json("POST", f"/admin/users/{USER_ID}/impersonation-sessions", token=admin["accessToken"])
     token = impersonated["accessToken"]
 
     conn = psycopg2.connect(**PROD)

@@ -77,6 +77,15 @@ public class EmailVerificationService {
         return status();
     }
 
+    @Transactional
+    public void sendForAdmin(User user) {
+        requireBasic(user);
+        if (user.isEmailVerified()) {
+            throw new BadRequestException("E-posta zaten doğrulanmış");
+        }
+        issueCode(user, LocalDateTime.now());
+    }
+
     private void issueCode(User user, LocalDateTime now) {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         user.setEmailVerificationCodeHash(passwordEncoder.encode(code));

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/admin/catalog")
+@RequestMapping("/admin")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminCatalogWorkflowController {
@@ -33,7 +33,7 @@ public class AdminCatalogWorkflowController {
                 .body(catalogWorkflowService.createSellablePackage(request));
     }
 
-    @PostMapping("/import")
+    @PostMapping("/catalog-imports")
     public ResponseEntity<CatalogSeedDtos.ImportResult> importCatalog(
             @RequestParam(defaultValue = "false") boolean useClasspathSeed,
             @RequestBody(required = false) CatalogSeedDtos.Document document

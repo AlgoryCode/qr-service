@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.controller;
+package com.ael.algoryqrservice.controller.admin;
 
 import com.ael.algoryqrservice.model.DashboardUser;
 import com.ael.algoryqrservice.model.dto.AuthResponse;
@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,14 +24,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/dashboard/auth")
+@RequestMapping("/admin/auth")
 @RequiredArgsConstructor
-public class DashboardAuthController {
+public class AdminAuthController {
 
     private final DashboardAuthService dashboardAuthService;
     private final DashboardSecurityUtils dashboardSecurityUtils;
 
-    @PostMapping("/login")
+    @PostMapping("/sessions")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest
@@ -38,12 +39,12 @@ public class DashboardAuthController {
         return ResponseEntity.ok(dashboardAuthService.login(request, ClientInfo.from(httpRequest)));
     }
 
-    @PostMapping("/refresh")
+    @PostMapping("/sessions/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(dashboardAuthService.refresh(request));
     }
 
-    @PostMapping("/logout")
+    @DeleteMapping("/sessions")
     public ResponseEntity<Map<String, String>> logout(
             @RequestBody(required = false) LogoutRequest request,
             @RequestHeader(value = "Authorization", required = false) String authorization

@@ -162,6 +162,22 @@ class AdminTrialServiceTest {
         verify(fulfillmentGrantService, never()).expireFulfillmentForTrialLog(any());
     }
 
+    @Test
+    void updateTrial_whenEnded_thenEndTrial() {
+        User user = User.builder().id(7L).build();
+        TrialLog log = activeLog(LocalDateTime.now().plusDays(5));
+
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.of(log));
+        when(trialLogRepository.save(log)).thenReturn(log);
+
+        Object result = service.updateTrial(7L, AdminUserDtos.TrialUpdateRequest.builder().status("ENDED").build());
+
+        assertThat(result).isInstanceOf(AdminUserDtos.EndTrialResponse.class);
+        assertThat(log.getStatus()).isEqualTo(TrialLogStatus.ENDED);
+    }
+
     private static TrialLog activeLog(LocalDateTime endsAt) {
         return TrialLog.builder()
                 .id(10L)

@@ -61,7 +61,7 @@ public class AdminPaymentController {
         return ResponseEntity.ok(adminPaymentService.getPayment(conversationId));
     }
 
-    @PostMapping("/{conversationId}/refund")
+    @PostMapping("/{conversationId}/refunds")
     public ResponseEntity<AdminPaymentDtos.RefundResponse> refundPayment(
             @PathVariable String conversationId,
             @Valid @RequestBody(required = false) AdminPaymentDtos.RefundRequest request,

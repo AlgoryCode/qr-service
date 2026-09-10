@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.DashboardUser;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
@@ -36,6 +38,7 @@ public class AdminUserService {
     private final MenuRepository menuRepository;
     private final SessionService sessionService;
     private final TrialUseCases trialUseCases;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional(readOnly = true)
     public AdminUserDtos.UserPageResponse listUsers(String query, int page, int size) {
@@ -83,7 +86,59 @@ public class AdminUserService {
                 .qrCount(qrRepository.countByUserIdAndDeletedFalse(user.getId()))
                 .activeMenuCount(menuRepository.countActiveLiveMenusForUser(user.getId()))
                 .purchases(purchases)
+                .emailVerified(user.getProvider() == AuthProvider.BASIC ? user.isEmailVerified() : null)
                 .build();
+    }
+
+    @Transactional
+    public AdminUserDtos.UserDetailResponse updateUser(Long id, AdminUserDtos.UserUpdateRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı"));
+        applyName(user, request);
+        applyPhone(user, request);
+        boolean emailChanged = applyEmail(user, request);
+        userRepository.save(user);
+        if (emailChanged) {
+            emailVerificationService.sendForUser(user);
+        }
+        return getUserById(id);
+    }
+
+    private void applyName(User user, AdminUserDtos.UserUpdateRequest request) {
+        user.setFirstName(request.getFirstName().trim());
+        String lastName = request.getLastName() == null ? "" : request.getLastName().trim();
+        user.setLastName(lastName.isEmpty() ? null : lastName);
+    }
+
+    private void applyPhone(User user, AdminUserDtos.UserUpdateRequest request) {
+        String phone = request.getPhone() == null ? "" : request.getPhone().trim();
+        if (phone.isEmpty()) {
+            user.setPhone(null);
+            return;
+        }
+        if (!phone.equals(user.getPhone()) && userRepository.existsByPhoneAndIdNot(phone, user.getId())) {
+            throw new BadRequestException("Bu telefon numarası zaten kayıtlı");
+        }
+        user.setPhone(phone);
+    }
+
+    private boolean applyEmail(User user, AdminUserDtos.UserUpdateRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+        if (email.equalsIgnoreCase(user.getEmail())) {
+            return false;
+        }
+        if (user.getProvider() != AuthProvider.BASIC) {
+            throw new BadRequestException("Google hesabının e-posta adresi uygulama içinden değiştirilemez");
+        }
+        if (userRepository.existsByEmailAndIdNot(email, user.getId())) {
+            throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
+        }
+        user.setEmail(email);
+        user.setEmailVerified(false);
+        user.setEmailVerificationCodeHash(null);
+        user.setEmailVerificationExpiresAt(null);
+        user.setEmailVerificationSentAt(null);
+        return true;
     }
 
     @Transactional

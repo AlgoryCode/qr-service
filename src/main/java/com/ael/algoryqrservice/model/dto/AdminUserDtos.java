@@ -4,12 +4,14 @@ import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.trial.domain.TrialLifecycle;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -75,16 +77,53 @@ public final class AdminUserDtos {
         private long qrCount;
         private long activeMenuCount;
         private List<PurchaseResponse> purchases;
+        private Boolean emailVerified;
     }
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ExtendTrialRequest {
+    public static class UserUpdateRequest {
+        @NotBlank
+        private String firstName;
+        private String lastName;
+        @NotBlank
+        @Email
+        private String email;
+        private String phone;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TrialUpdateRequest {
         @Min(1)
         @Max(365)
-        private int days;
+        private Integer days;
+        private String status;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PackageUpdateRequest {
+        @NotBlank
+        private String status;
+        @Min(1)
+        @Max(3650)
+        private Integer days;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PasswordResetResponse {
+        private String temporaryPassword;
+        private boolean emailed;
     }
 
     @Data
@@ -106,16 +145,6 @@ public final class AdminUserDtos {
         private Long purchaseId;
         private String packageName;
         private LocalDateTime expiresAt;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ReactivatePackageRequest {
-        @Min(1)
-        @Max(3650)
-        private int days;
     }
 
     @Data
