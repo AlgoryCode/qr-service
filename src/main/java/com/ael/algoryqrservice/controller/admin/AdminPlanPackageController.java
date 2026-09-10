@@ -62,7 +62,7 @@ public class AdminPlanPackageController {
         return ResponseEntity.ok(planPackageService.removeItem(id, productId));
     }
 
-    @PostMapping("/{id}/publish")
+    @PostMapping("/{id}/publications")
     public ResponseEntity<PlanPackageResponse> publish(
             @PathVariable Long id,
             @RequestBody(required = false) PublishPackageRequest request
@@ -71,7 +71,7 @@ public class AdminPlanPackageController {
         return ResponseEntity.ok(planPackageService.publish(id, body));
     }
 
-    @PatchMapping("/{id}/status")
+    @PatchMapping("/{id}")
     public ResponseEntity<PlanPackageResponse> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, Boolean> body

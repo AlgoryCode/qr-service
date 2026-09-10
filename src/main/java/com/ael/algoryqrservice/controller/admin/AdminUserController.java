@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller.admin;
 
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
 import com.ael.algoryqrservice.service.AdminTrialService;
+import com.ael.algoryqrservice.service.AdminUserCredentialService;
 import com.ael.algoryqrservice.service.AdminUserPackageService;
 import com.ael.algoryqrservice.service.AdminUserService;
 import com.ael.algoryqrservice.util.ClientInfo;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +30,7 @@ public class AdminUserController {
     private final AdminUserService adminUserService;
     private final AdminTrialService adminTrialService;
     private final AdminUserPackageService adminUserPackageService;
+    private final AdminUserCredentialService adminUserCredentialService;
     private final DashboardSecurityUtils dashboardSecurityUtils;
 
     @GetMapping
@@ -44,7 +47,15 @@ public class AdminUserController {
         return ResponseEntity.ok(adminUserService.getUserById(id));
     }
 
-    @PostMapping("/{id}/impersonate")
+    @PatchMapping("/{id}")
+    public ResponseEntity<AdminUserDtos.UserDetailResponse> updateUser(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminUserDtos.UserUpdateRequest request
+    ) {
+        return ResponseEntity.ok(adminUserService.updateUser(id, request));
+    }
+
+    @PostMapping("/{id}/impersonation-sessions")
     public ResponseEntity<AdminUserDtos.ImpersonateResponse> impersonateUser(
             @PathVariable Long id,
             HttpServletRequest httpRequest
@@ -56,29 +67,30 @@ public class AdminUserController {
         ));
     }
 
-    @PostMapping("/{id}/trial/extend")
-    public ResponseEntity<AdminUserDtos.ExtendTrialResponse> extendTrial(
+    @PatchMapping("/{id}/trial")
+    public ResponseEntity<?> updateTrial(
             @PathVariable Long id,
-            @Valid @RequestBody AdminUserDtos.ExtendTrialRequest request
+            @Valid @RequestBody AdminUserDtos.TrialUpdateRequest request
     ) {
-        return ResponseEntity.ok(adminTrialService.extendTrial(id, request.getDays()));
+        return ResponseEntity.ok(adminTrialService.updateTrial(id, request));
     }
 
-    @PostMapping("/{id}/trial/end")
-    public ResponseEntity<AdminUserDtos.EndTrialResponse> endTrial(@PathVariable Long id) {
-        return ResponseEntity.ok(adminTrialService.endTrial(id));
-    }
-
-    @PostMapping("/{id}/package/deactivate")
-    public ResponseEntity<AdminUserDtos.PackageLifecycleResponse> deactivatePackage(@PathVariable Long id) {
-        return ResponseEntity.ok(adminUserPackageService.deactivate(id));
-    }
-
-    @PostMapping("/{id}/package/reactivate")
-    public ResponseEntity<AdminUserDtos.PackageLifecycleResponse> reactivatePackage(
+    @PatchMapping("/{id}/package")
+    public ResponseEntity<AdminUserDtos.PackageLifecycleResponse> updatePackage(
             @PathVariable Long id,
-            @Valid @RequestBody AdminUserDtos.ReactivatePackageRequest request
+            @Valid @RequestBody AdminUserDtos.PackageUpdateRequest request
     ) {
-        return ResponseEntity.ok(adminUserPackageService.reactivate(id, request.getDays()));
+        return ResponseEntity.ok(adminUserPackageService.updatePackage(id, request));
+    }
+
+    @PostMapping("/{id}/email-verifications")
+    public ResponseEntity<Void> sendEmailVerification(@PathVariable Long id) {
+        adminUserCredentialService.sendEmailVerification(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/password-resets")
+    public ResponseEntity<AdminUserDtos.PasswordResetResponse> resetPassword(@PathVariable Long id) {
+        return ResponseEntity.ok(adminUserCredentialService.resetPassword(id));
     }
 }

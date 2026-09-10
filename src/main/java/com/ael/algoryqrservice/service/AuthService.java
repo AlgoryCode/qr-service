@@ -95,7 +95,7 @@ public class AuthService {
     private User authenticate(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
         if (dashboardUserRepository.existsByEmailIgnoreCase(email)) {
-            throw new BadRequestException("Bu hesap dashboard girisi icindir. /dashboard/auth/login kullanin");
+            throw new BadRequestException("Bu hesap dashboard girisi icindir. /admin/auth/sessions kullanin");
         }
         if (menuWaiterRepository.existsByUsernameIgnoreCase(email)) {
             throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");

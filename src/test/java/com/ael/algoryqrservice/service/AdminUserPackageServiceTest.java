@@ -143,4 +143,28 @@ class AdminUserPackageServiceTest {
                 .hasMessageContaining("Aktiflestirilecek paket");
         verify(packageAccessRestorer, never()).restoreActive(any(), anyInt());
     }
+
+    @Test
+    void updatePackage_whenInactive_thenDeactivate() {
+        User user = User.builder().id(7L).build();
+        Purchase purchase = Purchase.builder()
+                .id(10L)
+                .userId(7L)
+                .packageName("Pro")
+                .purchaseType(PurchaseType.PAID)
+                .status(PurchaseStatus.ACTIVE)
+                .expiresAt(LocalDateTime.now().plusDays(20))
+                .build();
+
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(activePackageResolver.currentActive(7L)).thenReturn(Optional.of(purchase));
+
+        AdminUserDtos.PackageLifecycleResponse result = service.updatePackage(
+                7L,
+                AdminUserDtos.PackageUpdateRequest.builder().status("INACTIVE").build()
+        );
+
+        assertThat(result.getPurchaseId()).isEqualTo(10L);
+        verify(purchaseExpiryService).expire(purchase);
+    }
 }

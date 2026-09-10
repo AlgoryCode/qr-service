@@ -69,10 +69,10 @@ def api_json(method: str, path: str, token: str | None = None, body: dict | None
 
 
 def login_token() -> str:
-    admin = api_json("POST", "/dashboard/auth/login", body={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+    admin = api_json("POST", "/admin/auth/sessions", body={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
     impersonated = api_json(
         "POST",
-        f"/admin/users/{PROD_USER_ID}/impersonate",
+        f"/admin/users/{PROD_USER_ID}/impersonation-sessions",
         token=admin["accessToken"],
         body={},
     )

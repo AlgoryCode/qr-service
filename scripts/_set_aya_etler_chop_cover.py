@@ -87,8 +87,8 @@ def main() -> None:
     product_name, image_url, cat_id = picked
     print("PICKED", product_name, image_url, "cat", cat_id)
 
-    admin = api("POST", "/dashboard/auth/login", body={"email": "admin@example.com", "password": "Admin123!"})
-    token = api("POST", f"/admin/users/{USER_ID}/impersonate", token=admin["accessToken"], body={})["accessToken"]
+    admin = api("POST", "/admin/auth/sessions", body={"email": "admin@example.com", "password": "Admin123!"})
+    token = api("POST", f"/admin/users/{USER_ID}/impersonation-sessions", token=admin["accessToken"], body={})["accessToken"]
 
     req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=60, context=SSL_CTX) as resp:

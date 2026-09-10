@@ -46,12 +46,12 @@ def api(method: str, path: str, token: str | None = None, body: dict | None = No
 def main() -> None:
     admin = api(
         "POST",
-        "/dashboard/auth/login",
+        "/admin/auth/sessions",
         body={"email": "admin@example.com", "password": "Admin123!"},
     )
     imp = api(
         "POST",
-        "/admin/users/21/impersonate",
+        "/admin/users/21/impersonation-sessions",
         token=admin["accessToken"],
         body={},
     )

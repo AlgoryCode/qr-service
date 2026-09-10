@@ -41,6 +41,29 @@ public class NotificationPublisherService {
         log.info("Password change code notification queued. email={}", maskEmail(email));
     }
 
+    public void publishTemporaryPassword(String email, String userName, String temporaryPassword) {
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("userName", userName);
+        templateData.put("temporaryPassword", temporaryPassword);
+
+        NotificationRequestMessage message = new NotificationRequestMessage(
+                UUID.randomUUID(),
+                pushNotificationProperties.getChannels(),
+                serviceName,
+                MESSAGE_TYPE_PASSWORD_RESET,
+                new NotificationRecipientsMessage(email, List.of(), List.of()),
+                "Geçici Şifre",
+                templateData,
+                true
+        );
+        rabbitTemplate.convertAndSend(
+                pushNotificationProperties.getMessaging().getExchange(),
+                pushNotificationProperties.getMessaging().getRoutingKey(),
+                message
+        );
+        log.info("Temporary password notification queued. email={}", maskEmail(email));
+    }
+
     public void publishEmailChangeCode(String email, String userName, String code, int validityMinutes) {
         publishVerificationCode(
                 email,
