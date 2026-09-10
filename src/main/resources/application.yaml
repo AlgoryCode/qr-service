@@ -143,6 +143,9 @@ ai-service:
   read-timeout: ${AI_SERVICE_READ_TIMEOUT:60s}
   reindex-batch-size: ${AI_SERVICE_REINDEX_BATCH_SIZE:100}
 
+batch-reports:
+  reconcile-interval-ms: ${BATCH_REPORTS_RECONCILE_INTERVAL_MS:120000}
+
 integration:
   rabbitmq:
     exchange: ${INTEGRATION_EVENTS_EXCHANGE:integration.events}

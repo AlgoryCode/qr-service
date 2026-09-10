@@ -2,10 +2,8 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
-import com.ael.algoryqrservice.config.SmartReportRabbitProperties;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.TooManyRequestsException;
-import com.ael.algoryqrservice.messaging.dto.SmartReportGenerateMessage;
 import com.ael.algoryqrservice.messaging.dto.SmartReportStatusMessage;
 import com.ael.algoryqrservice.model.FulfillmentDetail;
 import com.ael.algoryqrservice.model.FulfillmentUsageLog;
@@ -23,12 +21,10 @@ import com.ael.algoryqrservice.repository.SmartReportEventRepository;
 import com.ael.algoryqrservice.repository.SmartReportResultRepository;
 import com.ael.algoryqrservice.util.AppTime;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -59,8 +55,7 @@ public class SmartReportService {
 
     private final AnalyticsService analyticsService;
     private final SmartReportModelInputBuilder smartReportModelInputBuilder;
-    private final RabbitTemplate rabbitTemplate;
-    private final SmartReportRabbitProperties smartReportRabbitProperties;
+    private final BatchReportService batchReportService;
     private final SmartReportQuotaProperties quotaProperties;
     private final SmartReportEventRepository smartReportEventRepository;
     private final SmartReportResultRepository smartReportResultRepository;
@@ -186,33 +181,25 @@ public class SmartReportService {
                 optionsMap
         );
 
-        SmartReportGenerateMessage payload = new SmartReportGenerateMessage(
-                processId,
+        Map<String, Object> payload = objectMapper.convertValue(input, new TypeReference<>() {
+        });
+        batchReportService.createSubmittedBatch(
                 ownerId,
-                resolvedMenuId,
-                resolvedBranchId,
-                input,
-                resolvedLocale
+                List.of(new BatchReportService.BatchReportItemDraft(
+                        processId,
+                        payload,
+                        resolvedBranchId,
+                        branchName,
+                        resolvedMenuId,
+                        menuName,
+                        from,
+                        to,
+                        resolvedLocale
+                ))
         );
 
-        try {
-            byte[] body = objectMapper.writeValueAsBytes(payload);
-            MessageProperties properties = new MessageProperties();
-            properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
-            properties.setContentEncoding("UTF-8");
-            properties.setDeliveryMode(MessageProperties.DEFAULT_DELIVERY_MODE);
-            Message message = new Message(body, properties);
-            rabbitTemplate.send(smartReportRabbitProperties.getQueue(), message);
-        } catch (JsonProcessingException ex) {
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Smart report message serialization failed",
-                    ex
-            );
-        }
-
         log.info(
-                "Smart report queued. processId={} branchId={} menuId={} branchOnly={} userId={} from={} to={}",
+                "Smart report batch submitted. processId={} branchId={} menuId={} branchOnly={} userId={} from={} to={}",
                 processId,
                 resolvedBranchId,
                 resolvedMenuId,
