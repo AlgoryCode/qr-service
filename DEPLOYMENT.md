@@ -149,7 +149,7 @@ Packages and products are managed dynamically via admin APIs. Codes are strings 
 
 ### Purchase fulfillment
 
-Successful payment grants entitlements from the purchased package items (quantity/unlimited). Feature endpoints consume or check scopes by product/scope code.
+Successful payment grants entitlements from the purchased package items (quantity/unlimited). Feature endpoints under `/features/{PRODUCT_CODE}` are gated by `ProductAccessGatewayFilter` (package membership), `@RequiresProductScope`, and service-layer consume/period quota. See `docs/feature-gateway.md`.
 
 ## Dashboard users (qr-dashboard-ui)
 

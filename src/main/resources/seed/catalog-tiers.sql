@@ -40,6 +40,27 @@ INSERT INTO tbl_product (code, name, description, active, scope_code, consumable
 SELECT 'AI_MENU_IMPORT', 'AI Menu Import', 'Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma', TRUE, 'AI_MENU_IMPORT_OWNER', FALSE, 0.00, 20.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'AI_MENU_IMPORT');
 
+INSERT INTO tbl_product (
+    code, name, description, active, scope_code, type_id, feature_code,
+    consumable, addon_purchasable, requires_count_sync, unit_price, vat_rate, created_at, updated_at
+)
+SELECT
+    'SMART_REPORTING_ADDON',
+    'Ek Akilli Rapor',
+    'Haftalik ucretsiz hak disinda ek akilli rapor',
+    TRUE,
+    'SMART_REPORTING_OWNER',
+    'ADDON_PRODUCT',
+    'SMART_REPORTING',
+    TRUE,
+    TRUE,
+    FALSE,
+    200.00,
+    20.00,
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'SMART_REPORTING_ADDON');
+
 UPDATE tbl_product SET unit_price = 4.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_CREATE';
 UPDATE tbl_product SET name = 'QR Menu', description = 'QR menu olusturma hakki', scope_code = 'QR_MENU_OWNER',
     unit_price = 200.00, vat_rate = 20.00, active = TRUE, consumable = TRUE, updated_at = NOW() WHERE code = 'QR_MENU';
@@ -60,6 +81,21 @@ UPDATE tbl_product SET name = 'Garson Paneli', description = 'Garson siparis ve 
 UPDATE tbl_product SET name = 'AI Menu Import', description = 'Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma',
     scope_code = 'AI_MENU_IMPORT_OWNER', unit_price = 0.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW()
 WHERE code = 'AI_MENU_IMPORT';
+
+UPDATE tbl_product SET
+    name = 'Ek Akilli Rapor',
+    description = 'Haftalik ucretsiz hak disinda ek akilli rapor',
+    scope_code = 'SMART_REPORTING_OWNER',
+    type_id = 'ADDON_PRODUCT',
+    feature_code = 'SMART_REPORTING',
+    consumable = TRUE,
+    addon_purchasable = TRUE,
+    requires_count_sync = FALSE,
+    unit_price = 200.00,
+    vat_rate = 20.00,
+    active = TRUE,
+    updated_at = NOW()
+WHERE code = 'SMART_REPORTING_ADDON';
 
 UPDATE tbl_plan_package SET active = FALSE, purchasable = FALSE, updated_at = NOW()
 WHERE code IN ('FREE_PACKAGE', 'CORPORATE_PACKAGE');
@@ -167,4 +203,18 @@ SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.co
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'WAITER_PANEL' WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
-SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'AI_MENU_IMPORT' WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';
+SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'AI_MENU_IMPORT' WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE'
+AND NOT EXISTS (
+    SELECT 1 FROM tbl_plan_package_item i
+    WHERE i.package_id = p.id AND i.product_id = pr.id
+);
+
+INSERT INTO tbl_plan_package_addon (package_id, product_id, active, created_at)
+SELECT p.id, pr.id, TRUE, NOW()
+FROM tbl_plan_package p
+JOIN tbl_product pr ON pr.code = 'SMART_REPORTING_ADDON'
+WHERE p.code IN ('STARTER_PACKAGE', 'PRO_PACKAGE', 'ULTIMATE_PACKAGE', 'ULTIMATE_TRIAL_PACKAGE')
+AND NOT EXISTS (
+    SELECT 1 FROM tbl_plan_package_addon a
+    WHERE a.package_id = p.id AND a.product_id = pr.id
+);

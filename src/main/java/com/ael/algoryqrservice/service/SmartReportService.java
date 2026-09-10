@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.model.FulfillmentUsageLog;
 import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.SmartReportResult;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.model.dto.FulfillmentConsumeResult;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
 import com.ael.algoryqrservice.model.dto.SmartReportModelDtos;
 import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
@@ -35,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -386,13 +388,20 @@ public class SmartReportService {
         long used = smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(userId, periodStart);
         int limit = Math.max(quotaProperties.getQuotaLimit(), 0);
         long remaining = Math.max(limit - used, 0);
+        int paidCredits = Math.max(fulfillmentGateService.remainingQuantity(userId, CatalogProducts.SMART_REPORTING, true), 0);
+        BigDecimal addonUnitPrice = productRepository.findByCode(CatalogProducts.SMART_REPORTING_ADDON)
+                .map(com.ael.algoryqrservice.model.Product::getUnitPrice)
+                .orElse(new BigDecimal("200.00"));
         return new SmartReportDtos.SmartReportQuotaResponse(
                 quotaProperties.getQuotaPeriod().name(),
                 limit,
                 used,
                 remaining,
                 resetsAt,
-                resolveLastUsage(userId)
+                resolveLastUsage(userId),
+                paidCredits,
+                CatalogProducts.SMART_REPORTING_ADDON,
+                addonUnitPrice
         );
     }
 
@@ -562,27 +571,25 @@ public class SmartReportService {
 
     private void assertQuotaAvailable(Long userId) {
         SmartReportDtos.SmartReportQuotaResponse quota = getQuota(userId);
-        if (quota.remaining() <= 0) {
-            String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK
-                    ? "Bu haftaki akilli rapor hakkiniz kullanildi"
-                    : "Bugunku akilli rapor hakkiniz kullanildi";
-            throw new TooManyRequestsException(message);
+        if (quota.remaining() > 0) {
+            return;
         }
-        if (quota.limit() == 1 && isLastUsageWithinPeriod(quota.lastUsage())) {
-            String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK
-                    ? "Bu haftaki akilli rapor hakkiniz kullanildi"
-                    : "Bugunku akilli rapor hakkiniz kullanildi";
-            throw new TooManyRequestsException(message);
+        if (quota.paidCredits() > 0) {
+            FulfillmentConsumeResult consumed = fulfillmentGateService.consumeAddon(
+                    userId,
+                    CatalogProducts.SMART_REPORTING,
+                    1,
+                    FulfillmentReferenceType.FEATURE,
+                    null
+            );
+            if (consumed.fullyConsumed(1)) {
+                return;
+            }
         }
-    }
-
-    private boolean isLastUsageWithinPeriod(Instant lastUsage) {
-        if (lastUsage == null) {
-            return false;
-        }
-        ZoneId zone = zoneId();
-        LocalDateTime periodStart = periodStart(zone);
-        return !lastUsage.isBefore(periodStart.atZone(zone).toInstant());
+        String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK
+                ? "Bu haftaki ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin."
+                : "Bugunku ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin.";
+        throw new TooManyRequestsException(message);
     }
 
     private ZoneId zoneId() {

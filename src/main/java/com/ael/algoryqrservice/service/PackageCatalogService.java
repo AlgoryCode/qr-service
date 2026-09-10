@@ -25,6 +25,7 @@ public class PackageCatalogService {
 
     private static final BigDecimal BRANCH_PRICE = new BigDecimal("600.00");
     private static final BigDecimal MENU_PRICE = new BigDecimal("200.00");
+    private static final BigDecimal SMART_REPORT_EXTRA_PRICE = new BigDecimal("200.00");
     private static final BigDecimal VAT = new BigDecimal("20.00");
 
     private final ProductRepository productRepository;
@@ -44,6 +45,7 @@ public class PackageCatalogService {
         ensureProduct(CatalogProducts.WAITER_PANEL,   "Garson Paneli",      CatalogScopes.WAITER_PANEL_OWNER,   false, ProductType.PACKAGE_PRODUCT, CatalogProducts.WAITER_PANEL,   false, false);
         ensureProduct(CatalogProducts.QR_MENU_ADDON,  "Ek Dijital Menu",    CatalogScopes.QR_MENU_OWNER,        true,  ProductType.ADDON_PRODUCT,   CatalogProducts.QR_MENU,        true,  false);
         ensureProduct(CatalogProducts.QR_BRANCH_ADDON,"Ek Sube Hakki",      CatalogScopes.QR_BRANCH_OWNER,      true,  ProductType.ADDON_PRODUCT,   CatalogProducts.QR_BRANCH,      true,  false);
+        ensureProduct(CatalogProducts.SMART_REPORTING_ADDON, "Ek Akilli Rapor", CatalogScopes.SMART_REPORTING_OWNER, true, ProductType.ADDON_PRODUCT, CatalogProducts.SMART_REPORTING, true, false);
         ensureBranchBilling();
     }
 
@@ -51,6 +53,14 @@ public class PackageCatalogService {
     public void ensureBranchBilling() {
         upsertAddonPrice(CatalogProducts.QR_BRANCH_ADDON, "Ek Sube", "Ek sube olusturma hakki", CatalogScopes.QR_BRANCH_OWNER, CatalogProducts.QR_BRANCH, BRANCH_PRICE);
         upsertAddonPrice(CatalogProducts.QR_MENU_ADDON, "QR Menu", "Ek dijital menu olusturma hakki", CatalogScopes.QR_MENU_OWNER, CatalogProducts.QR_MENU, MENU_PRICE);
+        upsertAddonPrice(
+                CatalogProducts.SMART_REPORTING_ADDON,
+                "Ek Akilli Rapor",
+                "Haftalik ucretsiz hak disinda ek akilli rapor",
+                CatalogScopes.SMART_REPORTING_OWNER,
+                CatalogProducts.SMART_REPORTING,
+                SMART_REPORT_EXTRA_PRICE
+        );
         upsertPrice(CatalogProducts.QR_BRANCH, "Ek Sube", "Ek sube olusturma hakki", CatalogScopes.QR_BRANCH_OWNER, true, BRANCH_PRICE);
         upsertPrice(CatalogProducts.QR_MENU, "QR Menu", "Ek dijital menu olusturma hakki", CatalogScopes.QR_MENU_OWNER, true, MENU_PRICE);
         syncPackage(CatalogPackages.STARTER_PACKAGE, List.of("50 urun hakki", "1 ucretsiz sube", "Sube basi 1 ucretsiz menu", "Standart sablonlar"));
@@ -65,6 +75,7 @@ public class PackageCatalogService {
                 "Akilli ozet",
                 "Ozel tasarim menu"
         ));
+        syncPackageAddons(CatalogPackages.ULTIMATE_TRIAL_PACKAGE);
     }
 
     private void syncPackage(String packageCode, List<String> features) {
@@ -92,8 +103,17 @@ public class PackageCatalogService {
             }
         }
         planPackageRepository.save(planPackage);
+        syncPackageAddons(packageCode);
+    }
+
+    private void syncPackageAddons(String packageCode) {
+        PlanPackage planPackage = planPackageRepository.findByCode(packageCode).orElse(null);
+        if (planPackage == null) {
+            return;
+        }
         ensurePackageAddon(planPackage, CatalogProducts.QR_MENU_ADDON);
         ensurePackageAddon(planPackage, CatalogProducts.QR_BRANCH_ADDON);
+        ensurePackageAddon(planPackage, CatalogProducts.SMART_REPORTING_ADDON);
     }
 
     private void upsertPrice(
@@ -136,6 +156,7 @@ public class PackageCatalogService {
         product.setFeatureCode(featureCode);
         product.setTypeId(ProductType.ADDON_PRODUCT);
         product.setConsumable(true);
+        product.setAddonPurchasable(true);
         product.setActive(true);
         product.setUnitPrice(unitPrice);
         product.setVatRate(VAT);

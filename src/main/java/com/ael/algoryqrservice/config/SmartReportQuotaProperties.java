@@ -16,7 +16,7 @@ public class SmartReportQuotaProperties {
         WEEK
     }
 
-    private QuotaPeriod quotaPeriod = QuotaPeriod.DAY;
+    private QuotaPeriod quotaPeriod = QuotaPeriod.WEEK;
     private int quotaLimit = 1;
     private String zone = "Europe/Istanbul";
 }

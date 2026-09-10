@@ -15,6 +15,7 @@ public final class CatalogProducts {
 
     public static final String QR_MENU_ADDON = "QR_MENU_ADDON";
     public static final String QR_BRANCH_ADDON = "QR_BRANCH_ADDON";
+    public static final String SMART_REPORTING_ADDON = "SMART_REPORTING_ADDON";
 
     private CatalogProducts() {
     }

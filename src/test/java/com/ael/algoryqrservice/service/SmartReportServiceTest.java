@@ -1,13 +1,17 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
 import com.ael.algoryqrservice.config.SmartReportRabbitProperties;
+import com.ael.algoryqrservice.exception.TooManyRequestsException;
 import com.ael.algoryqrservice.messaging.dto.SmartReportGenerateMessage;
 import com.ael.algoryqrservice.messaging.dto.SmartReportStatusMessage;
 import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.SmartReportResult;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.model.dto.FulfillmentConsumeResult;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
+import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
@@ -32,8 +36,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -84,11 +93,18 @@ class SmartReportServiceTest {
                 smartReportCompletionNotifier,
                 objectMapper
         );
-        when(smartReportEventRepository.save(any(SmartReportEvent.class)))
+        org.mockito.Mockito.lenient()
+                .when(smartReportEventRepository.save(any(SmartReportEvent.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         org.mockito.Mockito.lenient()
                 .when(smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(any(), any()))
                 .thenReturn(0L);
+        org.mockito.Mockito.lenient()
+                .when(fulfillmentGateService.remainingQuantity(any(), anyString(), org.mockito.ArgumentMatchers.eq(true)))
+                .thenReturn(0);
+        org.mockito.Mockito.lenient()
+                .when(productRepository.findByCode(anyString()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -140,6 +156,53 @@ class SmartReportServiceTest {
         assertThat(payload.input().revenue()).isNotNull();
         assertThat(payload.input().visits()).isNotNull();
         assertThat(payload.input().waiter()).isNotNull();
+    }
+
+    @Test
+    void enqueueForBranch_whenFreeExhaustedAndPaidCredit_thenConsumeAddon() {
+        LocalDate from = LocalDate.of(2026, 7, 1);
+        LocalDate to = LocalDate.of(2026, 7, 2);
+        when(smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(any(), any())).thenReturn(5L);
+        when(fulfillmentGateService.remainingQuantity(eq(9L), eq(CatalogProducts.SMART_REPORTING), eq(true)))
+                .thenReturn(1);
+        when(fulfillmentGateService.consumeAddon(
+                eq(9L),
+                eq(CatalogProducts.SMART_REPORTING),
+                eq(1),
+                eq(FulfillmentReferenceType.FEATURE),
+                isNull()
+        )).thenReturn(new FulfillmentConsumeResult(1, 11L, 22L));
+        when(analyticsService.getBranchReport(2L, null, 9L, from, to))
+                .thenReturn(visitReport(null, null, 2L, "Kadikoy"));
+        when(analyticsService.getBranchRevenueReport(2L, null, 9L, from, to))
+                .thenReturn(emptyRevenue(null, null, 2L, "Kadikoy"));
+        when(analyticsService.getBranchWaiterPerformanceReport(2L, null, 9L, from, to))
+                .thenReturn(emptyWaiter(null, null, 2L, "Kadikoy"));
+
+        service.enqueueForBranch(2L, 9L, from, to, "tr", null);
+
+        verify(fulfillmentGateService).consumeAddon(
+                eq(9L),
+                eq(CatalogProducts.SMART_REPORTING),
+                eq(1),
+                eq(FulfillmentReferenceType.FEATURE),
+                isNull()
+        );
+        verify(smartReportEventRepository).save(any(SmartReportEvent.class));
+    }
+
+    @Test
+    void enqueueForBranch_whenFreeAndPaidExhausted_thenTooManyRequests() {
+        LocalDate from = LocalDate.of(2026, 7, 1);
+        LocalDate to = LocalDate.of(2026, 7, 2);
+        when(smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(any(), any())).thenReturn(5L);
+        when(fulfillmentGateService.remainingQuantity(eq(9L), eq(CatalogProducts.SMART_REPORTING), eq(true)))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> service.enqueueForBranch(2L, 9L, from, to, "tr", null))
+                .isInstanceOf(TooManyRequestsException.class);
+        verify(fulfillmentGateService, never()).consumeAddon(any(), anyString(), anyInt(), any(), any());
+        verify(rabbitTemplate, never()).send(anyString(), any(Message.class));
     }
 
     @Test

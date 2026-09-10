@@ -114,7 +114,7 @@ Abonelik durumu (`PackageActivationService.ensureSubscriptionState`):
 
 | Method | Path | Controller | Not |
 |--------|------|------------|-----|
-| `POST` | `/qr/create` | `QrController` ? `QrService.createQR` | Scope + consume; menu için `QR_MENU` kotası |
+| `POST` | `/features/QR_MENU/qrs` | `FeatureQrController` → `QrService.createQR` | Scope + consume; menu için `QR_MENU` kotası |
 | `PUT` | `/qr/update/{qrId}` | `QrService.updateQr` | Soft-delete + yeniden create |
 | `DELETE` | `/qr/delete/{qrId}` | `QrService.deleteQrByQrId` | QR + ba?l? Menu soft-delete |
 | `GET` | `/menu/public/id/{qrId}` | `MenuController` ? `MenuService.getPublicMenuByQrId` | Public gate |
@@ -415,7 +415,7 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 
 ### Endpoint
 
-`POST /qr/create` ? `QrController` ? `QrService.createQR(req, userId)`
+`POST /features/QR_MENU/qrs` → `FeatureQrController` → `QrService.createQR(req, userId)`
 
 ### Metot s?ras?
 
@@ -528,13 +528,13 @@ Menü QR silindiğinde `softDeleteQrAndLinkedMenu` → `release(QR_MENU, 1)` ile
 ### Senaryo 1 ? Yeni kullan?c?
 
 1. `POST /auth/register` ? `ensureFreePackage`
-2. `POST /qr/create` (link) ? `QR_CREATE` consume
+2. `POST /features/QR_MENU/qrs` (link) → `QR_CREATE` consume
 3. Menu owner API auth ile acilir (ayri QR_MENU scope yok)
 
 ### Senaryo 2 ? Trial ba?lat?p men? a?ma
 
 1. `POST /trials` (veya legacy `POST /trials/digital-menu-pro`) → TRIAL ACTIVE + grant (`validityDays`)
-2. `POST /qr/create` type=`menu` → `consume(QR_MENU, 1)` + `consume(QR_CREATE, 1)` → `createMenuForQr` → sync
+2. `POST /features/QR_MENU/qrs` type=`menu` → `consume(QR_MENU, 1)` + `consume(QR_CREATE, 1)` → `createMenuForQr` → sync
 3. Ek menü: `QR_MENU remainingQuantity > 0` olduğu sürece tekrar create edilebilir; kalan 0 ise 403
 4. Menü silinince `release(QR_MENU, 1)` ile slot açılır
 

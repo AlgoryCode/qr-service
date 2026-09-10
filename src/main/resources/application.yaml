@@ -113,7 +113,7 @@ app:
       enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:false}
       only-if-empty: ${APP_SEED_MENU_PRODUCTS_ONLY_IF_EMPTY:true}
   smart-report:
-    quota-period: ${SMART_REPORT_QUOTA_PERIOD:DAY}
+    quota-period: ${SMART_REPORT_QUOTA_PERIOD:WEEK}
     quota-limit: ${SMART_REPORT_QUOTA_LIMIT:1}
     zone: ${SMART_REPORT_QUOTA_ZONE:Europe/Istanbul}
 

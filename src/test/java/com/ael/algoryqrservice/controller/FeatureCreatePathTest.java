@@ -15,7 +15,7 @@ class FeatureCreatePathTest {
     void createMappings_whenFeatureControllers_thenUseFeaturesPrefix() {
         assertThat(FeatureQrController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/features/QR_MENU");
-        assertThat(postPaths(FeatureQrController.class)).containsExactly("/qr/create");
+        assertThat(postPaths(FeatureQrController.class)).containsExactly("/qrs");
 
         assertThat(FeatureBranchController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/features/QR_BRANCH");
@@ -23,6 +23,10 @@ class FeatureCreatePathTest {
 
         assertThat(FeatureSmartReportingController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/features/SMART_REPORTING");
+        assertThat(postPaths(FeatureSmartReportingController.class)).containsExactlyInAnyOrder(
+                "/branches/{branchId}/reports",
+                "/menus/{menuId}/reports"
+        );
         assertThat(FeatureAiMenuImportController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/features/AI_MENU_IMPORT");
     }
