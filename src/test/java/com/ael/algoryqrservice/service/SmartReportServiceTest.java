@@ -2,10 +2,9 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
-import com.ael.algoryqrservice.config.SmartReportRabbitProperties;
 import com.ael.algoryqrservice.exception.TooManyRequestsException;
-import com.ael.algoryqrservice.messaging.dto.SmartReportGenerateMessage;
 import com.ael.algoryqrservice.messaging.dto.SmartReportStatusMessage;
+import com.ael.algoryqrservice.model.BatchReport;
 import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.SmartReportResult;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
@@ -25,8 +24,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -39,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -52,7 +50,7 @@ class SmartReportServiceTest {
     @Mock
     private AnalyticsService analyticsService;
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private BatchReportService batchReportService;
     @Mock
     private SmartReportEventRepository smartReportEventRepository;
     @Mock
@@ -73,16 +71,13 @@ class SmartReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        SmartReportRabbitProperties rabbitProperties = new SmartReportRabbitProperties();
-        rabbitProperties.setQueue("smart_report.generate");
         SmartReportQuotaProperties quotaProperties = new SmartReportQuotaProperties();
         quotaProperties.setQuotaLimit(5);
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         service = new SmartReportService(
                 analyticsService,
                 new SmartReportModelInputBuilder(),
-                rabbitTemplate,
-                rabbitProperties,
+                batchReportService,
                 quotaProperties,
                 smartReportEventRepository,
                 smartReportResultRepository,
@@ -105,6 +100,14 @@ class SmartReportServiceTest {
         org.mockito.Mockito.lenient()
                 .when(productRepository.findByCode(anyString()))
                 .thenReturn(Optional.empty());
+        org.mockito.Mockito.lenient()
+                .when(batchReportService.createSubmittedBatch(anyLong(), any()))
+                .thenReturn(BatchReport.builder()
+                        .id(UUID.randomUUID())
+                        .userId(9L)
+                        .openaiBatchId("batch_test")
+                        .status(BatchReport.STATUS_PENDING)
+                        .build());
     }
 
     @Test
@@ -126,7 +129,7 @@ class SmartReportServiceTest {
     }
 
     @Test
-    void enqueueForBranch_whenBranchTotal_thenPublishesCanonicalInput() throws Exception {
+    void enqueueForBranch_whenBranchTotal_thenSubmitsBatchWithCanonicalInput() {
         LocalDate from = LocalDate.of(2026, 7, 1);
         LocalDate to = LocalDate.of(2026, 7, 2);
         when(analyticsService.getBranchReport(2L, null, 9L, from, to))
@@ -145,17 +148,13 @@ class SmartReportServiceTest {
         assertThat(captor.getValue().getBranchId()).isEqualTo(2L);
         assertThat(captor.getValue().getBranchName()).isEqualTo("Kadikoy");
 
-        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
-        verify(rabbitTemplate).send(anyString(), messageCaptor.capture());
-        SmartReportGenerateMessage payload = objectMapper.readValue(
-                messageCaptor.getValue().getBody(),
-                SmartReportGenerateMessage.class
-        );
-        assertThat(payload.input()).isNotNull();
-        assertThat(payload.input().meta().branchId()).isEqualTo(2L);
-        assertThat(payload.input().revenue()).isNotNull();
-        assertThat(payload.input().visits()).isNotNull();
-        assertThat(payload.input().waiter()).isNotNull();
+        ArgumentCaptor<List<BatchReportService.BatchReportItemDraft>> draftsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(batchReportService).createSubmittedBatch(eq(9L), draftsCaptor.capture());
+        BatchReportService.BatchReportItemDraft draft = draftsCaptor.getValue().getFirst();
+        assertThat(draft.branchId()).isEqualTo(2L);
+        assertThat(draft.payload()).containsKeys("meta", "revenue", "visits", "waiter");
+        assertThat(draft.id()).isEqualTo(captor.getValue().getProcessId());
     }
 
     @Test
@@ -202,7 +201,7 @@ class SmartReportServiceTest {
         assertThatThrownBy(() -> service.enqueueForBranch(2L, 9L, from, to, "tr", null))
                 .isInstanceOf(TooManyRequestsException.class);
         verify(fulfillmentGateService, never()).consumeAddon(any(), anyString(), anyInt(), any(), any());
-        verify(rabbitTemplate, never()).send(anyString(), any(Message.class));
+        verify(batchReportService, never()).createSubmittedBatch(anyLong(), any());
     }
 
     @Test
