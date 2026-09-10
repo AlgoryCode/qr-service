@@ -4,6 +4,8 @@ import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -77,5 +79,66 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
             MenuOrderStatus status,
             LocalDateTime start,
             LocalDateTime end
+    );
+
+    @EntityGraph(attributePaths = "items")
+    List<MenuOrder> findByMenuIdInAndCreatedAtBetweenOrderByCreatedAtAsc(
+            Collection<Long> menuIds,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    @Query("""
+            SELECT o.status, COUNT(o) FROM MenuOrder o
+            WHERE o.menuId IN :menuIds
+              AND o.createdAt >= :fromDt
+              AND o.createdAt <= :toDt
+            GROUP BY o.status
+            """)
+    List<Object[]> countByStatusForMenuIds(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("fromDt") LocalDateTime fromDt,
+            @Param("toDt") LocalDateTime toDt
+    );
+
+    @Query("""
+            SELECT o.cancelledByWaiterId, COUNT(o) FROM MenuOrder o
+            WHERE o.menuId IN :menuIds
+              AND o.status IN :statuses
+              AND COALESCE(o.cancelledAt, o.rejectedAt) >= :fromDt
+              AND COALESCE(o.cancelledAt, o.rejectedAt) <= :toDt
+            GROUP BY o.cancelledByWaiterId
+            """)
+    List<Object[]> countCancellationsByWaiter(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("statuses") Collection<MenuOrderStatus> statuses,
+            @Param("fromDt") LocalDateTime fromDt,
+            @Param("toDt") LocalDateTime toDt
+    );
+
+    @Query("""
+            SELECT COUNT(DISTINCT o.customerId) FROM MenuOrder o
+            WHERE o.menuId IN :menuIds
+              AND o.customerId IS NOT NULL
+              AND o.createdAt >= :fromDt
+              AND o.createdAt <= :toDt
+            """)
+    long countDistinctCustomers(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("fromDt") LocalDateTime fromDt,
+            @Param("toDt") LocalDateTime toDt
+    );
+
+    @Query("""
+            SELECT COUNT(o) FROM MenuOrder o
+            WHERE o.menuId IN :menuIds
+              AND o.customerId IS NOT NULL
+              AND o.createdAt >= :fromDt
+              AND o.createdAt <= :toDt
+            """)
+    long countIdentifiedCustomerOrders(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("fromDt") LocalDateTime fromDt,
+            @Param("toDt") LocalDateTime toDt
     );
 }

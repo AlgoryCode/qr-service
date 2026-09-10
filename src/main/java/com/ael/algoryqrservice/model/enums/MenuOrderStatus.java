@@ -4,6 +4,9 @@ public enum MenuOrderStatus {
     DRAFT,
     SUBMITTED,
     CONFIRMED,
+    PREPARING,
+    READY,
+    SERVED,
     REJECTED,
     CANCELLED
 }

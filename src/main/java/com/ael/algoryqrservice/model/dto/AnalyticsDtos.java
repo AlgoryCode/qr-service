@@ -119,8 +119,14 @@ public class AnalyticsDtos {
     public record FunnelCounts(
             long menuOpens,
             long categoryViews,
-            long productViews
+            long productViews,
+            long addToCart,
+            long checkoutStarts,
+            long orderSubmitted
     ) {
+        public FunnelCounts(long menuOpens, long categoryViews, long productViews) {
+            this(menuOpens, categoryViews, productViews, 0L, 0L, 0L);
+        }
     }
 
     public record ScoreHistogramBucket(
@@ -371,6 +377,337 @@ public class AnalyticsDtos {
             List<DailyRevenuePoint> daily,
             List<HourlyRevenuePoint> hourly,
             List<WaiterPerformanceProduct> products
+    ) {
+    }
+
+    public record AnalyticsCoverage(
+            boolean kitchenMetrics,
+            boolean discounts,
+            boolean shifts,
+            boolean cartToOrderFunnel,
+            boolean coversPerTable
+    ) {
+        public static AnalyticsCoverage current() {
+            return new AnalyticsCoverage(true, true, true, true, true);
+        }
+    }
+
+    public record AnalyticsPeriod(
+            LocalDate from,
+            LocalDate to,
+            LocalDate previousFrom,
+            LocalDate previousTo
+    ) {
+    }
+
+    public record SummaryOverview(
+            BigDecimal grossRevenue,
+            BigDecimal netRevenue,
+            BigDecimal tipTotal,
+            long orderCount,
+            long completedOrderCount,
+            long cancelledOrderCount,
+            BigDecimal avgBasket,
+            long activeOpenTables,
+            Double occupancyRatio,
+            double cancelRate,
+            Double revenueVsPreviousPct,
+            String currency
+    ) {
+    }
+
+    public record SalesTeaser(
+            List<HourlyRevenuePoint> hourlyRevenue,
+            List<RevenueProduct> topProducts,
+            List<RevenueCategory> categoryShare
+    ) {
+    }
+
+    public record StaffTeaser(
+            List<WaiterPerformanceRow> topWaitersByRevenue,
+            Double unassignedRevenueShare
+    ) {
+    }
+
+    public record OperationsTeaser(
+            long openBills,
+            long confirmedOrders
+    ) {
+    }
+
+    public record TablesTeaser(
+            List<TableAnalyticsRow> topTablesByRevenue,
+            Double avgTurnMinutes
+    ) {
+    }
+
+    public record QrTeaser(
+            long sessions,
+            long menuOpens,
+            long productViews,
+            FunnelCounts browseFunnel
+    ) {
+    }
+
+    public record SummaryAnalyticsResponse(
+            Long menuId,
+            String menuName,
+            Long branchId,
+            String branchName,
+            AnalyticsPeriod period,
+            SummaryOverview overview,
+            SalesTeaser salesTeaser,
+            StaffTeaser staffTeaser,
+            OperationsTeaser operationsTeaser,
+            TablesTeaser tablesTeaser,
+            QrTeaser qrTeaser,
+            AnalyticsCoverage coverage
+    ) {
+    }
+
+    public record StatusCount(
+            String status,
+            long count
+    ) {
+    }
+
+    public record HourlyOrderPoint(
+            int hour,
+            long orderCount
+    ) {
+    }
+
+    public record DailyOrderPoint(
+            LocalDate date,
+            long orderCount
+    ) {
+    }
+
+    public record OrdersAnalytics(
+            List<StatusCount> countsByStatus,
+            List<HourlyOrderPoint> hourly,
+            List<DailyOrderPoint> daily,
+            double avgItemsPerOrder,
+            double cancelRate,
+            BigDecimal aov,
+            long totalOrders,
+            long completedOrders,
+            long cancelledOrders
+    ) {
+    }
+
+    public record StaffRankingRow(
+            Long waiterId,
+            String displayName,
+            BigDecimal revenue,
+            long orderCount,
+            int rank
+    ) {
+    }
+
+    public record StaffAnalytics(
+            WaiterPerformanceKpis kpis,
+            List<WaiterPerformanceRow> rows,
+            List<StaffRankingRow> ranking,
+            List<HourlyRevenuePoint> hourly,
+            List<WaiterPerformanceProduct> products
+    ) {
+    }
+
+    public record ProductCoPurchaseCompanion(
+            Long productId,
+            String name,
+            long togetherCount,
+            double sharePercent
+    ) {
+    }
+
+    public record ProductCoPurchase(
+            Long productId,
+            String name,
+            long billCount,
+            List<ProductCoPurchaseCompanion> companions
+    ) {
+    }
+
+    public record ProductsAnalytics(
+            List<RevenueProduct> top,
+            List<RevenueProduct> bottom,
+            List<RevenueCategory> byCategory,
+            List<HourlyRevenuePoint> hourly,
+            List<ProductCoPurchase> coPurchase,
+            UnsoldCatalog unsold
+    ) {
+    }
+
+    public record TableAnalyticsRow(
+            Long tableId,
+            String tableName,
+            BigDecimal revenue,
+            long orderCount,
+            long billCount,
+            BigDecimal avgCheck,
+            Double avgDwellMinutes,
+            long closedBills,
+            long qrOrderCount,
+            long staffOrderCount,
+            Integer capacity,
+            Integer coverCountTotal,
+            BigDecimal revenuePerCover
+    ) {
+    }
+
+    public record TablesAnalytics(
+            List<TableAnalyticsRow> perTable,
+            Double avgDwellMinutes,
+            Double turnRate,
+            long qrOrderCount,
+            long staffOrderCount,
+            Double qrOrderSharePercent,
+            Double occupancyRatio,
+            BigDecimal avgRevenuePerCover
+    ) {
+    }
+
+    public record QrAnalytics(
+            ReportKpis kpis,
+            FunnelCounts funnel,
+            List<NamedCount> devices,
+            List<TopProduct> topViewed,
+            List<SampleJourney> journeys
+    ) {
+    }
+
+    public record FinanceAnalytics(
+            BigDecimal grossRevenue,
+            BigDecimal tipRevenue,
+            BigDecimal cashRevenue,
+            BigDecimal cardRevenue,
+            BigDecimal fixedExpenses,
+            BigDecimal netRevenue,
+            BigDecimal orderTotalAmount,
+            BigDecimal collectedAmount,
+            BigDecimal discountTotal,
+            BigDecimal refundTotal,
+            BigDecimal voidTotal,
+            List<ChannelShare> channels,
+            RevenuePaymentBreakdown paymentBreakdown,
+            String currency
+    ) {
+    }
+
+    public record CancellationByWaiter(
+            Long waiterId,
+            String displayName,
+            long cancelCount
+    ) {
+    }
+
+    public record CancellationsAnalytics(
+            List<StatusCount> byStatus,
+            List<CancellationByWaiter> byWaiter,
+            long totalCancelled,
+            long totalRejected
+    ) {
+    }
+
+    public record CustomersAnalytics(
+            long identifiedCustomerOrderCount,
+            long distinctIdentifiedCustomers,
+            long anonymousSessions,
+            long repeatAnonymousSessions,
+            long newAnonymousVisitors,
+            long returningAnonymousVisitors,
+            Double identifiedOrderSharePercent
+    ) {
+    }
+
+    public record DrillDownLink(
+            Long billId,
+            Long orderId,
+            Long tableId,
+            Long waiterId,
+            Long productId,
+            LocalDateTime paidAt,
+            BigDecimal amount
+    ) {
+    }
+
+    public record DashboardAnalytics(
+            SummaryOverview overview,
+            List<DailyRevenuePoint> daily,
+            List<HourlyRevenuePoint> hourly,
+            AnalyticsPeriod previousPeriod,
+            BigDecimal previousGrossRevenue
+    ) {
+    }
+
+    public record KitchenStageKpis(
+            Double avgConfirmToPrepareMinutes,
+            Double avgPrepareToReadyMinutes,
+            Double avgReadyToServeMinutes,
+            Double avgConfirmToServeMinutes,
+            long preparingCount,
+            long readyCount,
+            long servedCount,
+            long delayedCount,
+            double delayRatePercent
+    ) {
+    }
+
+    public record KitchenHourlyLoad(
+            int hour,
+            long orderCount,
+            Double avgPrepMinutes
+    ) {
+    }
+
+    public record KitchenAnalytics(
+            KitchenStageKpis kpis,
+            List<KitchenHourlyLoad> hourlyLoad,
+            long delayThresholdMinutes
+    ) {
+    }
+
+    public record ShiftSummaryRow(
+            Long shiftId,
+            LocalDateTime openedAt,
+            LocalDateTime closedAt,
+            String status,
+            BigDecimal openingFloat,
+            BigDecimal closingCash,
+            BigDecimal revenue,
+            long orderCount,
+            long waiterCount
+    ) {
+    }
+
+    public record ShiftsAnalytics(
+            List<ShiftSummaryRow> shifts,
+            BigDecimal totalRevenue,
+            long totalOrders
+    ) {
+    }
+
+    public record FullAnalyticsResponse(
+            Long menuId,
+            String menuName,
+            Long branchId,
+            String branchName,
+            AnalyticsPeriod period,
+            AnalyticsCoverage coverage,
+            DashboardAnalytics dashboard,
+            OrdersAnalytics orders,
+            StaffAnalytics staff,
+            ProductsAnalytics products,
+            TablesAnalytics tables,
+            QrAnalytics qr,
+            FinanceAnalytics finance,
+            CancellationsAnalytics cancellations,
+            KitchenAnalytics kitchen,
+            ShiftsAnalytics shifts,
+            CustomersAnalytics customers,
+            List<DrillDownLink> drillDownHints
     ) {
     }
 }

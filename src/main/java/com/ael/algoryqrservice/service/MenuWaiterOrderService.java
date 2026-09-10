@@ -13,7 +13,10 @@ import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.OrderAuditAction;
+import com.ael.algoryqrservice.model.enums.OrderSource;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
@@ -50,6 +53,7 @@ public class MenuWaiterOrderService {
     private final CampaignEvaluationService campaignEvaluationService;
     private final MenuProductOptionService menuProductOptionService;
     private final WaiterAccessService waiterAccessService;
+    private final OrderAuditService orderAuditService;
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listPending() {
@@ -140,6 +144,9 @@ public class MenuWaiterOrderService {
                         EnumSet.of(
                                 MenuOrderStatus.SUBMITTED,
                                 MenuOrderStatus.CONFIRMED,
+                                MenuOrderStatus.PREPARING,
+                                MenuOrderStatus.READY,
+                                MenuOrderStatus.SERVED,
                                 MenuOrderStatus.REJECTED,
                                 MenuOrderStatus.CANCELLED
                         ),
@@ -160,6 +167,12 @@ public class MenuWaiterOrderService {
         order.setStatus(MenuOrderStatus.CONFIRMED);
         order.setConfirmedAt(LocalDateTime.now());
         order.setWaiterId(waiter.getId());
+        if (order.getCreatedByWaiterId() == null) {
+            order.setCreatedByWaiterId(waiter.getId());
+        }
+        if (order.getOrderSource() == null) {
+            order.setOrderSource(OrderSource.QR);
+        }
         order.setUpdatedAt(LocalDateTime.now());
 
         TableBill bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), waiter.getId());
@@ -168,35 +181,105 @@ public class MenuWaiterOrderService {
         tableBillService.addItemsFromOrder(bill, saved, waiter.getId());
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
         menuOrderRepository.save(saved);
+        orderAuditService.record(saved, OrderAuditAction.CONFIRMED, waiter.getId(), null);
         campaignEvaluationService.onOrderConfirmed(saved);
         return menuOrderService.toOrderResponse(saved);
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse reject(Long orderId) {
+    public MenuOrderDtos.OrderResponse reject(Long orderId, MenuOrderDtos.CancelOrderRequest request) {
         MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
         MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
             throw new BadRequestException("Sadece gönderilmiş siparişler reddedilebilir");
         }
+        LocalDateTime now = LocalDateTime.now();
         order.setStatus(MenuOrderStatus.REJECTED);
-        order.setRejectedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
-        return menuOrderService.toOrderResponse(menuOrderRepository.save(order));
+        order.setRejectedAt(now);
+        order.setCancelledByWaiterId(waiter.getId());
+        if (request != null) {
+            order.setCancelReason(request.getReason() != null ? request.getReason() : CancelReason.OTHER);
+            order.setCancelReasonNote(trimToNull(request.getReasonNote()));
+        }
+        order.setUpdatedAt(now);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.REJECTED, waiter.getId(), null);
+        return menuOrderService.toOrderResponse(saved);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse reject(Long orderId) {
+        return reject(orderId, null);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse cancel(Long orderId, MenuOrderDtos.CancelOrderRequest request) {
+        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
+        if (!MenuOrderService.isCancellable(order.getStatus())) {
+            throw new BadRequestException("Bu sipariş iptal edilemez");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        order.setStatus(MenuOrderStatus.CANCELLED);
+        order.setCancelledAt(now);
+        order.setRejectedAt(now);
+        order.setCancelledByWaiterId(waiter.getId());
+        if (request != null) {
+            order.setCancelReason(request.getReason() != null ? request.getReason() : CancelReason.OTHER);
+            order.setCancelReasonNote(trimToNull(request.getReasonNote()));
+        } else {
+            order.setCancelReason(CancelReason.OTHER);
+        }
+        order.setUpdatedAt(now);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.CANCELLED, waiter.getId(), null);
+        return menuOrderService.toOrderResponse(saved);
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse cancel(Long orderId) {
+        return cancel(orderId, null);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse markPreparing(Long orderId) {
+        return transitionKitchen(orderId, MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse markReady(Long orderId) {
+        return transitionKitchen(orderId, MenuOrderStatus.PREPARING, MenuOrderStatus.READY);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse markServed(Long orderId) {
+        return transitionKitchen(orderId, MenuOrderStatus.READY, MenuOrderStatus.SERVED);
+    }
+
+    private MenuOrderDtos.OrderResponse transitionKitchen(
+            Long orderId,
+            MenuOrderStatus expected,
+            MenuOrderStatus next
+    ) {
         MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
         MenuOrder order = requireOrderForWaiter(orderId, waiter);
-        if (order.getStatus() != MenuOrderStatus.CONFIRMED && order.getStatus() != MenuOrderStatus.SUBMITTED) {
-            throw new BadRequestException("Bu sipariş iptal edilemez");
+        if (order.getStatus() != expected) {
+            throw new BadRequestException("Sipariş durumu bu geçiş için uygun değil: " + order.getStatus());
         }
-        order.setStatus(MenuOrderStatus.CANCELLED);
-        order.setRejectedAt(LocalDateTime.now());
-        order.setWaiterId(waiter.getId());
-        order.setUpdatedAt(LocalDateTime.now());
-        return menuOrderService.toOrderResponse(menuOrderRepository.save(order));
+        LocalDateTime now = LocalDateTime.now();
+        order.setStatus(next);
+        if (next == MenuOrderStatus.PREPARING) {
+            order.setPreparedAt(now);
+        } else if (next == MenuOrderStatus.READY) {
+            order.setReadyAt(now);
+        } else if (next == MenuOrderStatus.SERVED) {
+            order.setServedAt(now);
+        }
+        order.setUpdatedAt(now);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.STATUS_CHANGED, waiter.getId(),
+                "{\"from\":\"" + expected + "\",\"to\":\"" + next + "\"}");
+        return menuOrderService.toOrderResponse(saved);
     }
 
     @Transactional(readOnly = true)

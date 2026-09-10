@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.service.AnalyticsService;
 import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.SmartReportService;
+import com.ael.algoryqrservice.service.UnifiedAnalyticsService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -33,6 +34,7 @@ import java.util.UUID;
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
+    private final UnifiedAnalyticsService unifiedAnalyticsService;
     private final SmartReportService smartReportService;
     private final EntitlementService entitlementService;
     private final SecurityUtils securityUtils;
@@ -49,6 +51,36 @@ public class AnalyticsController {
         String userAgent = analyticsService.extractUserAgent(request);
         analyticsService.recordEvents(menuId, body, ip, userAgent);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/branch/{branchId}/summary")
+    public ResponseEntity<AnalyticsDtos.SummaryAnalyticsResponse> getBranchSummary(
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        requireOrderAnalyticsScope(ownerId);
+        return ResponseEntity.ok(unifiedAnalyticsService.getBranchSummary(
+                branchId, menuId, ownerId, effectiveFrom, effectiveTo));
+    }
+
+    @GetMapping("/branch/{branchId}/full")
+    public ResponseEntity<AnalyticsDtos.FullAnalyticsResponse> getBranchFull(
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long menuId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        Long ownerId = securityUtils.getCurrentUser().getId();
+        requireOrderAnalyticsScope(ownerId);
+        return ResponseEntity.ok(unifiedAnalyticsService.getBranchFull(
+                branchId, menuId, ownerId, effectiveFrom, effectiveTo));
     }
 
     @GetMapping("/branch/{branchId}/report")

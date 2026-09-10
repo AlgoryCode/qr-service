@@ -49,6 +49,51 @@ public final class MenuOrderDtos {
 
         @Size(max = 1000)
         private String note;
+
+        private UUID analyticsSessionId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SubmitOrderRequest {
+        private UUID analyticsSessionId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CancelOrderRequest {
+        private com.ael.algoryqrservice.model.enums.CancelReason reason;
+
+        @Size(max = 1000)
+        private String reasonNote;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BillAdjustmentRequest {
+        @NotNull
+        private Long billId;
+
+        private Long orderId;
+
+        @NotNull
+        private com.ael.algoryqrservice.model.enums.BillAdjustmentType adjustmentType;
+
+        @NotNull
+        @Min(0)
+        private BigDecimal amount;
+
+        @Size(max = 64)
+        private String reason;
+
+        @Size(max = 1000)
+        private String reasonNote;
     }
 
     @Data
@@ -69,6 +114,9 @@ public final class MenuOrderDtos {
 
         @Size(max = 2000)
         private String waiterNote;
+
+        @Min(1)
+        private Integer coverCount;
     }
 
     @Data
@@ -112,18 +160,28 @@ public final class MenuOrderDtos {
         private String customerName;
         private String customerEmail;
         private MenuOrderStatus status;
+        private com.ael.algoryqrservice.model.enums.OrderSource orderSource;
         private BigDecimal totalAmount;
         private String currency;
         private String note;
         private Long waiterId;
+        private Long createdByWaiterId;
+        private Long cancelledByWaiterId;
         private String waiterName;
         private String waiterNote;
         private Long billId;
         private BigDecimal commissionAmount;
+        private UUID analyticsSessionId;
         private List<OrderItemResponse> items;
         private LocalDateTime submittedAt;
         private LocalDateTime confirmedAt;
+        private LocalDateTime preparedAt;
+        private LocalDateTime readyAt;
+        private LocalDateTime servedAt;
         private LocalDateTime rejectedAt;
+        private LocalDateTime cancelledAt;
+        private com.ael.algoryqrservice.model.enums.CancelReason cancelReason;
+        private String cancelReasonNote;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private CampaignDtos.OrderCampaignSummary campaignSummary;

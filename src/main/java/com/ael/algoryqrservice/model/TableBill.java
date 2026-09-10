@@ -56,6 +56,9 @@ public class TableBill {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    @Column(name = "cover_count")
+    private Integer coverCount;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 10)
     private TableBillPaymentMethod paymentMethod;

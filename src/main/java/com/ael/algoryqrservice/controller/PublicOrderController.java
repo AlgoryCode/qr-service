@@ -39,10 +39,12 @@ public class PublicOrderController {
     @PostMapping("/{publicId}/orders/submit")
     public ResponseEntity<MenuOrderDtos.OrderResponse> submitOrder(
             @PathVariable String publicId,
-            @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken
+            @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken,
+            @RequestBody(required = false) MenuOrderDtos.SubmitOrderRequest request
     ) {
         Long qrId = menuService.requirePublicQrId(publicId);
-        return ResponseEntity.ok(menuOrderService.submit(qrId, tableSessionToken));
+        java.util.UUID sessionId = request == null ? null : request.getAnalyticsSessionId();
+        return ResponseEntity.ok(menuOrderService.submit(qrId, tableSessionToken, sessionId));
     }
 
     @GetMapping("/{publicId}/orders/{orderId}")

@@ -76,6 +76,7 @@ public final class SmartReportDtos {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AiReportSection(
+            String key,
             String heading,
             String body
     ) {
