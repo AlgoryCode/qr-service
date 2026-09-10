@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -46,8 +47,8 @@ public class BatchReportService {
     private final BatchReportRepository batchReportRepository;
     private final BatchReportItemRepository batchReportItemRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public BatchReport createSubmittedBatch(Long userId, List<BatchReportItemDraft> drafts) {
         if (drafts == null || drafts.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "items are required");
@@ -67,11 +68,19 @@ public class BatchReportService {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "ai-service did not return openaiBatchId");
         }
 
+        return transactionTemplate.execute(status -> persistCreatedBatch(userId, drafts, created.getOpenaiBatchId()));
+    }
+
+    private BatchReport persistCreatedBatch(
+            Long userId,
+            List<BatchReportItemDraft> drafts,
+            String openaiBatchId
+    ) {
         UUID batchId = UUID.randomUUID();
         BatchReport batch = BatchReport.builder()
                 .id(batchId)
                 .userId(userId)
-                .openaiBatchId(created.getOpenaiBatchId())
+                .openaiBatchId(openaiBatchId)
                 .status(BatchReport.STATUS_PENDING)
                 .requestTotal(drafts.size())
                 .requestCompleted(0)
@@ -98,7 +107,7 @@ public class BatchReportService {
         log.info(
                 "Batch report created. batchId={} openaiBatchId={} userId={} itemCount={}",
                 batchId,
-                created.getOpenaiBatchId(),
+                openaiBatchId,
                 userId,
                 drafts.size()
         );
@@ -124,38 +133,109 @@ public class BatchReportService {
         return batchReportRepository.findByStatusInOrderByUpdatedAtAsc(OPEN_STATUSES);
     }
 
-    @Transactional
     public ReconcileOutcome reconcileOne(UUID batchId) {
-        BatchReport batch = batchReportRepository.findById(batchId).orElse(null);
-        if (batch == null || !OPEN_STATUSES.contains(normalizeStatus(batch.getStatus()))) {
+        BatchSnapshot snapshot = transactionTemplate.execute(status -> loadOpenBatchSnapshot(batchId));
+        if (snapshot == null) {
             return ReconcileOutcome.empty();
         }
 
-        AiBatchReportClientDtos.StatusResponse remote = aiServiceClient.getBatchReportStatus(batch.getOpenaiBatchId());
+        AiBatchReportClientDtos.StatusResponse remote;
+        try {
+            remote = aiServiceClient.getBatchReportStatus(snapshot.openaiBatchId());
+        } catch (Exception ex) {
+            log.warn(
+                    "Batch report status call failed. batchId={} openaiBatchId={} error={}",
+                    snapshot.batchId(),
+                    snapshot.openaiBatchId(),
+                    ex.getMessage(),
+                    ex
+            );
+            throw ex;
+        }
         if (remote == null || remote.getStatus() == null || remote.getStatus().isBlank()) {
             log.warn(
                     "Batch report status empty. batchId={} openaiBatchId={}",
-                    batch.getId(),
-                    batch.getOpenaiBatchId()
+                    snapshot.batchId(),
+                    snapshot.openaiBatchId()
             );
             return ReconcileOutcome.empty();
         }
 
         String remoteStatus = normalizeStatus(remote.getStatus());
         AiBatchReportClientDtos.RequestCounts counts = remote.getRequestCounts();
-        int total = counts == null || counts.getTotal() == null ? batch.getRequestTotal() : counts.getTotal();
+        int total = counts == null || counts.getTotal() == null ? snapshot.requestTotal() : counts.getTotal();
         int completed = counts == null || counts.getCompleted() == null ? 0 : counts.getCompleted();
         int failed = counts == null || counts.getFailed() == null ? 0 : counts.getFailed();
         log.info(
                 "Batch report remote status. batchId={} openaiBatchId={} localStatus={} remoteStatus={} total={} completed={} failed={}",
-                batch.getId(),
-                batch.getOpenaiBatchId(),
-                batch.getStatus(),
+                snapshot.batchId(),
+                snapshot.openaiBatchId(),
+                snapshot.localStatus(),
                 remoteStatus,
                 total,
                 completed,
                 failed
         );
+
+        List<AiBatchReportClientDtos.ResultItem> remoteResults = List.of();
+        if (BatchReport.STATUS_COMPLETED.equals(remoteStatus)) {
+            try {
+                remoteResults = aiServiceClient.getBatchReportResults(snapshot.openaiBatchId());
+                log.info(
+                        "Batch report results fetched. batchId={} openaiBatchId={} resultCount={}",
+                        snapshot.batchId(),
+                        snapshot.openaiBatchId(),
+                        remoteResults.size()
+                );
+            } catch (Exception ex) {
+                log.warn(
+                        "Batch report results call failed. batchId={} openaiBatchId={} error={}",
+                        snapshot.batchId(),
+                        snapshot.openaiBatchId(),
+                        ex.getMessage(),
+                        ex
+                );
+                throw ex;
+            }
+        }
+
+        List<AiBatchReportClientDtos.ResultItem> resultsForPersist = remoteResults;
+        ReconcileOutcome outcome = transactionTemplate.execute(status -> persistRemoteState(
+                snapshot.batchId(),
+                remoteStatus,
+                total,
+                completed,
+                failed,
+                resultsForPersist
+        ));
+        return outcome == null ? ReconcileOutcome.empty() : outcome;
+    }
+
+    private BatchSnapshot loadOpenBatchSnapshot(UUID batchId) {
+        BatchReport batch = batchReportRepository.findById(batchId).orElse(null);
+        if (batch == null || !OPEN_STATUSES.contains(normalizeStatus(batch.getStatus()))) {
+            return null;
+        }
+        return new BatchSnapshot(
+                batch.getId(),
+                batch.getOpenaiBatchId(),
+                normalizeStatus(batch.getStatus()),
+                nullSafe(batch.getRequestTotal())
+        );
+    }
+
+    private ReconcileOutcome persistRemoteState(
+            UUID batchId,
+            String remoteStatus,
+            int total,
+            int completed,
+            int failed,
+            List<AiBatchReportClientDtos.ResultItem> remoteResults
+    ) {
+        BatchReport batch = batchReportRepository.findById(batchId).orElse(null);
+        if (batch == null) {
+            return ReconcileOutcome.empty();
+        }
 
         boolean changed = !Objects.equals(normalizeStatus(batch.getStatus()), remoteStatus)
                 || !Objects.equals(batch.getRequestTotal(), total)
@@ -183,7 +263,7 @@ public class BatchReportService {
 
         List<ItemOutcome> itemOutcomes = new ArrayList<>();
         if (BatchReport.STATUS_COMPLETED.equals(remoteStatus)) {
-            itemOutcomes.addAll(applyResults(batch));
+            itemOutcomes.addAll(applyResults(batch, remoteResults));
         } else if (isFailedTerminal(remoteStatus)) {
             itemOutcomes.addAll(markItemsFailed(batch, "OpenAI batch status: " + remoteStatus));
         } else if (changed && isProcessing(remoteStatus)) {
@@ -197,9 +277,10 @@ public class BatchReportService {
         return new ReconcileOutcome(batch.getId(), remoteStatus, itemOutcomes);
     }
 
-    private List<ItemOutcome> applyResults(BatchReport batch) {
-        List<AiBatchReportClientDtos.ResultItem> results =
-                aiServiceClient.getBatchReportResults(batch.getOpenaiBatchId());
+    private List<ItemOutcome> applyResults(
+            BatchReport batch,
+            List<AiBatchReportClientDtos.ResultItem> results
+    ) {
         Map<UUID, BatchReportItem> itemsById = new HashMap<>();
         for (BatchReportItem item : batchReportItemRepository.findByBatchIdOrderByCreatedAtAsc(batch.getId())) {
             itemsById.put(item.getId(), item);
@@ -408,6 +489,14 @@ public class BatchReportService {
             LocalDate from,
             LocalDate to,
             String locale
+    ) {
+    }
+
+    private record BatchSnapshot(
+            UUID batchId,
+            String openaiBatchId,
+            String localStatus,
+            int requestTotal
     ) {
     }
 
