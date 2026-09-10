@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -24,6 +25,9 @@ public final class RestaurantTableDtos {
         private String name;
 
         private Integer tableNumber;
+
+        @Min(1)
+        private Integer capacity;
     }
 
     @Data
@@ -35,6 +39,9 @@ public final class RestaurantTableDtos {
         private String name;
 
         private Integer tableNumber;
+
+        @Min(1)
+        private Integer capacity;
 
         private Boolean active;
     }
@@ -48,6 +55,7 @@ public final class RestaurantTableDtos {
         private Long menuId;
         private String name;
         private Integer tableNumber;
+        private Integer capacity;
         private String publicToken;
         private String publicUrl;
         private String qrImageBase64;

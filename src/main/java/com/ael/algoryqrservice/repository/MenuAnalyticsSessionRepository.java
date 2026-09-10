@@ -101,4 +101,28 @@ public interface MenuAnalyticsSessionRepository extends JpaRepository<MenuAnalyt
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );
+
+    @Query("""
+            select count(distinct s.ipHash) from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+              and s.ipHash is not null
+            """)
+    long countDistinctIpHashByMenuIdInAndPeriod(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select count(s.ipHash) from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+              and s.ipHash is not null
+            group by s.ipHash
+            having count(s) > 1
+            """)
+    List<Long> countRepeatSessionGroupsByIpHash(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }

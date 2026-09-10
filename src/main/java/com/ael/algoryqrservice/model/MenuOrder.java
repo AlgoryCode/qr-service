@@ -1,6 +1,8 @@
 package com.ael.algoryqrservice.model;
 
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.CancelReason;
+import com.ael.algoryqrservice.model.enums.OrderSource;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -16,7 +18,8 @@ import java.util.UUID;
         @Index(name = "idx_menu_order_menu_status", columnList = "menu_id, status"),
         @Index(name = "idx_menu_order_customer_menu", columnList = "customer_id, menu_id"),
         @Index(name = "idx_menu_order_table_session", columnList = "table_session_id"),
-        @Index(name = "idx_menu_order_submitted_at", columnList = "submitted_at")
+        @Index(name = "idx_menu_order_submitted_at", columnList = "submitted_at"),
+        @Index(name = "idx_menu_order_analytics_session", columnList = "analytics_session_id")
 })
 @Getter
 @Setter
@@ -47,6 +50,10 @@ public class MenuOrder {
     @Column(nullable = false, length = 20)
     private MenuOrderStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_source", length = 16)
+    private OrderSource orderSource;
+
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     @ColumnDefault("0")
     @Builder.Default
@@ -63,6 +70,12 @@ public class MenuOrder {
     @Column(name = "waiter_id")
     private Long waiterId;
 
+    @Column(name = "created_by_waiter_id")
+    private Long createdByWaiterId;
+
+    @Column(name = "cancelled_by_waiter_id")
+    private Long cancelledByWaiterId;
+
     @Column(name = "waiter_note", columnDefinition = "text")
     private String waiterNote;
 
@@ -72,14 +85,36 @@ public class MenuOrder {
     @Column(name = "commission_amount", precision = 12, scale = 2)
     private BigDecimal commissionAmount;
 
+    @Column(name = "analytics_session_id", columnDefinition = "uuid")
+    private UUID analyticsSessionId;
+
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 
+    @Column(name = "prepared_at")
+    private LocalDateTime preparedAt;
+
+    @Column(name = "ready_at")
+    private LocalDateTime readyAt;
+
+    @Column(name = "served_at")
+    private LocalDateTime servedAt;
+
     @Column(name = "rejected_at")
     private LocalDateTime rejectedAt;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancel_reason", length = 64)
+    private CancelReason cancelReason;
+
+    @Column(name = "cancel_reason_note", columnDefinition = "text")
+    private String cancelReasonNote;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

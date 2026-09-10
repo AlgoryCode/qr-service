@@ -1,9 +1,8 @@
 package com.ael.algoryqrservice.messaging.dto;
 
-import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.model.dto.SmartReportModelDtos;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import java.util.Map;
 import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -12,10 +11,7 @@ public record SmartReportGenerateMessage(
         Long userId,
         Long menuId,
         Long branchId,
-        AnalyticsDtos.MenuAnalyticsReportResponse report,
-        AnalyticsDtos.MenuRevenueReportResponse revenue,
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter,
-        String locale,
-        Map<String, Object> options
+        SmartReportModelDtos.SmartReportModelInput input,
+        String locale
 ) {
 }

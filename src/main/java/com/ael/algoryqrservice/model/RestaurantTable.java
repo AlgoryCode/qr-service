@@ -34,6 +34,9 @@ public class RestaurantTable {
     @Column(name = "table_number")
     private Integer tableNumber;
 
+    @Column
+    private Integer capacity;
+
     @Column(name = "public_token", nullable = false, unique = true, length = 64)
     private String publicToken;
 

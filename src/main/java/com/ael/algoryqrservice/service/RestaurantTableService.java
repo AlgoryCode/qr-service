@@ -59,6 +59,7 @@ public class RestaurantTableService {
                 .menuId(menu.getMenuId())
                 .name(request.getName().trim())
                 .tableNumber(request.getTableNumber())
+                .capacity(request.getCapacity())
                 .publicToken(publicToken)
                 .qrImageBase64(qrImageBase64)
                 .active(true)
@@ -88,6 +89,9 @@ public class RestaurantTableService {
             }
             if (request.getTableNumber() != null) {
                 table.setTableNumber(request.getTableNumber());
+            }
+            if (request.getCapacity() != null) {
+                table.setCapacity(request.getCapacity());
             }
             if (request.getActive() != null) {
                 table.setActive(request.getActive());
@@ -127,6 +131,7 @@ public class RestaurantTableService {
                 .menuId(table.getMenuId())
                 .name(table.getName())
                 .tableNumber(table.getTableNumber())
+                .capacity(table.getCapacity())
                 .publicToken(table.getPublicToken())
                 .publicUrl(buildPublicUrl(menu, table.getPublicToken()))
                 .qrImageBase64(table.getQrImageBase64())

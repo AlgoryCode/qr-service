@@ -45,4 +45,14 @@ public interface TableBillRepository extends JpaRepository<TableBill, Long>, Jpa
             LocalDateTime start,
             LocalDateTime end
     );
+
+    long countByMenuIdInAndStatus(Collection<Long> menuIds, TableBillStatus status);
+
+    @EntityGraph(attributePaths = "items")
+    List<TableBill> findByMenuIdInAndStatusAndClosedAtBetweenOrderByClosedAtAsc(
+            Collection<Long> menuIds,
+            TableBillStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
 }

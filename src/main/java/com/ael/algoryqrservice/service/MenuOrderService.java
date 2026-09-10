@@ -15,6 +15,9 @@ import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableSession;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.OrderAuditAction;
+import com.ael.algoryqrservice.model.enums.OrderSource;
+import com.ael.algoryqrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.repository.CustomerRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
@@ -38,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,6 +59,7 @@ public class MenuOrderService {
     private final WaiterCommissionService waiterCommissionService;
     private final CampaignEvaluationService campaignEvaluationService;
     private final MenuProductOptionService menuProductOptionService;
+    private final OrderAuditService orderAuditService;
     private final SecurityUtils securityUtils;
 
     @Transactional
@@ -82,6 +87,9 @@ public class MenuOrderService {
         TableSession session = requireSessionForQr(qrId, tableSessionToken);
         MenuOrder order = getOrCreateDraftEntity(session);
         applyCartItems(order, session.getMenuId(), request.getItems());
+        if (request.getAnalyticsSessionId() != null) {
+            order.setAnalyticsSessionId(request.getAnalyticsSessionId());
+        }
         order.setNote(trimToNull(request.getNote()));
         order.setUpdatedAt(LocalDateTime.now());
         return toOrderResponse(menuOrderRepository.save(order));
@@ -107,6 +115,10 @@ public class MenuOrderService {
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
 
         TableBill bill = tableBillService.getOrOpenBill(menuId, table.getId(), waiterId);
+        if (request.getCoverCount() != null && request.getCoverCount() > 0) {
+            bill.setCoverCount(request.getCoverCount());
+            tableBillService.saveBill(bill);
+        }
         TableSession session = tableBillService.resolveBillSession(bill);
 
         LocalDateTime now = LocalDateTime.now();
@@ -116,7 +128,9 @@ public class MenuOrderService {
                 .tableSessionId(session.getId())
                 .billId(bill.getId())
                 .status(MenuOrderStatus.CONFIRMED)
+                .orderSource(OrderSource.WAITER)
                 .waiterId(waiterId)
+                .createdByWaiterId(waiterId)
                 .note(trimToNull(request.getNote()))
                 .waiterNote(trimToNull(request.getWaiterNote()))
                 .totalAmount(BigDecimal.ZERO)
@@ -133,12 +147,13 @@ public class MenuOrderService {
         tableBillService.addItemsFromOrder(bill, saved, waiterId);
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
         menuOrderRepository.save(saved);
+        orderAuditService.record(saved, OrderAuditAction.CREATED, waiterId, null);
         campaignEvaluationService.onOrderConfirmed(saved);
         return toOrderResponse(saved);
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse submit(Long qrId, String tableSessionToken) {
+    public MenuOrderDtos.OrderResponse submit(Long qrId, String tableSessionToken, UUID analyticsSessionId) {
         TableSession session = requireSessionForQr(qrId, tableSessionToken);
         MenuOrder order = menuOrderRepository
                 .findByTableSessionIdAndStatus(session.getId(), MenuOrderStatus.DRAFT)
@@ -150,17 +165,27 @@ public class MenuOrderService {
 
         LocalDateTime now = LocalDateTime.now();
         order.setStatus(MenuOrderStatus.CONFIRMED);
+        order.setOrderSource(OrderSource.QR);
         order.setSubmittedAt(now);
         order.setConfirmedAt(now);
         order.setUpdatedAt(now);
+        if (analyticsSessionId != null) {
+            order.setAnalyticsSessionId(analyticsSessionId);
+        }
         securityUtils.findCurrentCustomerId().ifPresent(order::setCustomerId);
 
         TableBill bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), null);
         order.setBillId(bill.getId());
         MenuOrder saved = menuOrderRepository.save(order);
         tableBillService.addItemsFromOrder(bill, saved, null);
+        orderAuditService.record(saved, OrderAuditAction.CREATED, null, "{\"source\":\"QR\"}");
         campaignEvaluationService.onOrderConfirmed(saved);
         return toOrderResponse(saved);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse submit(Long qrId, String tableSessionToken) {
+        return submit(qrId, tableSessionToken, null);
     }
 
     @Transactional(readOnly = true)
@@ -180,6 +205,9 @@ public class MenuOrderService {
                             menuId,
                             List.of(
                                     MenuOrderStatus.CONFIRMED,
+                                    MenuOrderStatus.PREPARING,
+                                    MenuOrderStatus.READY,
+                                    MenuOrderStatus.SERVED,
                                     MenuOrderStatus.SUBMITTED,
                                     MenuOrderStatus.CANCELLED
                             )
@@ -201,16 +229,44 @@ public class MenuOrderService {
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse merchantCancel(Long menuId, Long orderId) {
+    public MenuOrderDtos.OrderResponse merchantCancel(
+            Long menuId,
+            Long orderId,
+            MenuOrderDtos.CancelOrderRequest request
+    ) {
         requireOwnedMenu(menuId);
         MenuOrder order = requireOrderForMenu(menuId, orderId);
-        if (order.getStatus() != MenuOrderStatus.CONFIRMED && order.getStatus() != MenuOrderStatus.SUBMITTED) {
+        if (!isCancellable(order.getStatus())) {
             throw new BadRequestException("Bu sipariş iptal edilemez");
         }
+        LocalDateTime now = LocalDateTime.now();
         order.setStatus(MenuOrderStatus.CANCELLED);
-        order.setRejectedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
-        return toOrderResponse(menuOrderRepository.save(order));
+        order.setCancelledAt(now);
+        order.setRejectedAt(now);
+        if (request != null) {
+            order.setCancelReason(request.getReason() != null ? request.getReason() : CancelReason.OTHER);
+            order.setCancelReasonNote(trimToNull(request.getReasonNote()));
+        } else {
+            order.setCancelReason(CancelReason.OTHER);
+        }
+        order.setUpdatedAt(now);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.CANCELLED, null, null);
+        return toOrderResponse(saved);
+    }
+
+    public static boolean isCancellable(MenuOrderStatus status) {
+        return status == MenuOrderStatus.CONFIRMED
+                || status == MenuOrderStatus.SUBMITTED
+                || status == MenuOrderStatus.PREPARING
+                || status == MenuOrderStatus.READY;
+    }
+
+    public static boolean isActiveKitchen(MenuOrderStatus status) {
+        return status == MenuOrderStatus.CONFIRMED
+                || status == MenuOrderStatus.PREPARING
+                || status == MenuOrderStatus.READY
+                || status == MenuOrderStatus.SERVED;
     }
 
     @Transactional(readOnly = true)
@@ -425,18 +481,28 @@ public class MenuOrderService {
                 .customerName(customerName)
                 .customerEmail(customerEmail)
                 .status(order.getStatus())
+                .orderSource(order.getOrderSource())
                 .totalAmount(order.getTotalAmount())
                 .currency(order.getCurrency())
                 .note(order.getNote())
                 .waiterId(order.getWaiterId())
+                .createdByWaiterId(order.getCreatedByWaiterId())
+                .cancelledByWaiterId(order.getCancelledByWaiterId())
                 .waiterName(waiterName)
                 .waiterNote(order.getWaiterNote())
                 .billId(order.getBillId())
                 .commissionAmount(order.getCommissionAmount())
+                .analyticsSessionId(order.getAnalyticsSessionId())
                 .items(items)
                 .submittedAt(order.getSubmittedAt())
                 .confirmedAt(order.getConfirmedAt())
+                .preparedAt(order.getPreparedAt())
+                .readyAt(order.getReadyAt())
+                .servedAt(order.getServedAt())
                 .rejectedAt(order.getRejectedAt())
+                .cancelledAt(order.getCancelledAt())
+                .cancelReason(order.getCancelReason())
+                .cancelReasonNote(order.getCancelReasonNote())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .campaignSummary(campaignEvaluationService.summarizeOrder(order))

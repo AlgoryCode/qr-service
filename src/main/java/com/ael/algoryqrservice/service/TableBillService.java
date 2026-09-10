@@ -98,6 +98,12 @@ public class TableBillService {
     }
 
     @Transactional
+    public TableBill saveBill(TableBill bill) {
+        bill.setUpdatedAt(LocalDateTime.now());
+        return tableBillRepository.save(bill);
+    }
+
+    @Transactional
     public TableBill addItemsFromOrder(TableBill bill, MenuOrder order, Long waiterId) {
         if (bill.getStatus() != TableBillStatus.OPEN) {
             throw new BadRequestException("Kapalı adisyona kalem eklenemez");

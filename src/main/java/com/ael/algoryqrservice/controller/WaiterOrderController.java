@@ -62,13 +62,34 @@ public class WaiterOrderController {
     }
 
     @PostMapping("/{orderId}/reject")
-    public ResponseEntity<MenuOrderDtos.OrderResponse> reject(@PathVariable Long orderId) {
-        return ResponseEntity.ok(menuWaiterOrderService.reject(orderId));
+    public ResponseEntity<MenuOrderDtos.OrderResponse> reject(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) MenuOrderDtos.CancelOrderRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterOrderService.reject(orderId, request));
     }
 
     @PostMapping("/{orderId}/cancel")
-    public ResponseEntity<MenuOrderDtos.OrderResponse> cancel(@PathVariable Long orderId) {
-        return ResponseEntity.ok(menuWaiterOrderService.cancel(orderId));
+    public ResponseEntity<MenuOrderDtos.OrderResponse> cancel(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) MenuOrderDtos.CancelOrderRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterOrderService.cancel(orderId, request));
+    }
+
+    @PostMapping("/{orderId}/preparing")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markPreparing(@PathVariable Long orderId) {
+        return ResponseEntity.ok(menuWaiterOrderService.markPreparing(orderId));
+    }
+
+    @PostMapping("/{orderId}/ready")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markReady(@PathVariable Long orderId) {
+        return ResponseEntity.ok(menuWaiterOrderService.markReady(orderId));
+    }
+
+    @PostMapping("/{orderId}/served")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markServed(@PathVariable Long orderId) {
+        return ResponseEntity.ok(menuWaiterOrderService.markServed(orderId));
     }
 
     @GetMapping("/{orderId}")

@@ -13,6 +13,7 @@ import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.SmartReportResult;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
+import com.ael.algoryqrservice.model.dto.SmartReportModelDtos;
 import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
@@ -55,6 +56,7 @@ import java.util.UUID;
 public class SmartReportService {
 
     private final AnalyticsService analyticsService;
+    private final SmartReportModelInputBuilder smartReportModelInputBuilder;
     private final RabbitTemplate rabbitTemplate;
     private final SmartReportRabbitProperties smartReportRabbitProperties;
     private final SmartReportQuotaProperties quotaProperties;
@@ -167,7 +169,6 @@ public class SmartReportService {
         Map<String, Object> optionsMap = SmartReportDtos.toOptionsMap(options);
         if (branchOnly) {
             Map<String, Object> branchOptions = optionsMap == null ? new HashMap<>() : new HashMap<>(optionsMap);
-            branchOptions.putIfAbsent("scope", "branch");
             branchOptions.putIfAbsent(
                     "focusAreas",
                     List.of("şube siparişleri", "kanal kıyası", "ciro ve ürün satışları")
@@ -175,16 +176,21 @@ public class SmartReportService {
             optionsMap = branchOptions;
         }
 
-        SmartReportGenerateMessage payload = new SmartReportGenerateMessage(
-                processId,
-                ownerId,
-                resolvedMenuId,
-                resolvedBranchId,
+        SmartReportModelDtos.SmartReportModelInput input = smartReportModelInputBuilder.build(
                 aiVisits,
                 aiRevenue,
                 aiWaiter,
                 resolvedLocale,
                 optionsMap
+        );
+
+        SmartReportGenerateMessage payload = new SmartReportGenerateMessage(
+                processId,
+                ownerId,
+                resolvedMenuId,
+                resolvedBranchId,
+                input,
+                resolvedLocale
         );
 
         try {
@@ -416,9 +422,11 @@ public class SmartReportService {
     public SmartReportDtos.SmartReportDetailResponse getJobDetail(Long userId, UUID jobId) {
         SmartReportEvent event = smartReportEventRepository.findByProcessIdAndUserId(jobId, userId)
                 .orElseThrow(() -> new NotFoundException("Akilli rapor bulunamadi: " + jobId));
-        String resultText = smartReportResultRepository.findByProcessId(event.getProcessId())
+        String storedResult = smartReportResultRepository.findByProcessId(event.getProcessId())
                 .map(SmartReportResult::getResultText)
                 .orElse(null);
+        SmartReportDtos.AiSmartReportResult parsed = parseResultText(storedResult);
+        String resultText = displayResultText(parsed, storedResult);
         return new SmartReportDtos.SmartReportDetailResponse(
                 event.getProcessId(),
                 event.getMenuId(),
@@ -430,7 +438,7 @@ public class SmartReportService {
                 event.getLocale(),
                 event.getCreatedAt(),
                 event.getStatus(),
-                parseResultText(resultText),
+                parsed,
                 resultText,
                 event.getErrorCode(),
                 event.getErrorMessage(),
@@ -438,6 +446,13 @@ public class SmartReportService {
                 toInstant(event.getUpdatedAt()),
                 toInstant(event.getCompletedAt())
         );
+    }
+
+    private static String displayResultText(SmartReportDtos.AiSmartReportResult parsed, String stored) {
+        if (parsed != null && parsed.rawMarkdown() != null && !parsed.rawMarkdown().isBlank()) {
+            return parsed.rawMarkdown().trim();
+        }
+        return stored;
     }
 
     private void upsertResult(SmartReportEvent event, String resultText) {
@@ -494,24 +509,32 @@ public class SmartReportService {
     }
 
     private String resolveResultText(SmartReportStatusMessage event) {
+        if (event.result() != null) {
+            SmartReportDtos.AiSmartReportResult result = event.result();
+            String markdown = result.rawMarkdown();
+            if ((markdown == null || markdown.isBlank())
+                    && event.resultText() != null
+                    && !event.resultText().isBlank()) {
+                result = new SmartReportDtos.AiSmartReportResult(
+                        result.title(),
+                        result.summary(),
+                        result.sections(),
+                        event.resultText().trim(),
+                        result.model(),
+                        result.promptVersion(),
+                        result.usage()
+                );
+            }
+            try {
+                return objectMapper.writeValueAsString(result);
+            } catch (JsonProcessingException ex) {
+                throw new IllegalArgumentException("Smart report result serialization failed", ex);
+            }
+        }
         if (event.resultText() != null && !event.resultText().isBlank()) {
             return event.resultText().trim();
         }
-        if (event.result() == null) {
-            return null;
-        }
-        if (event.result().rawMarkdown() != null && !event.result().rawMarkdown().isBlank()) {
-            try {
-                return objectMapper.writeValueAsString(event.result());
-            } catch (JsonProcessingException ex) {
-                return event.result().rawMarkdown().trim();
-            }
-        }
-        try {
-            return objectMapper.writeValueAsString(event.result());
-        } catch (JsonProcessingException ex) {
-            throw new IllegalArgumentException("Smart report result serialization failed", ex);
-        }
+        return null;
     }
 
     private SmartReportDtos.AiSmartReportResult parseResultText(String resultText) {

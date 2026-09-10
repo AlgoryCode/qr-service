@@ -129,9 +129,10 @@ public class WaiterPanelController {
     @PostMapping("/menu/{menuId}/orders/{orderId}/cancel")
     public ResponseEntity<MenuOrderDtos.OrderResponse> cancelOrder(
             @PathVariable Long menuId,
-            @PathVariable Long orderId
+            @PathVariable Long orderId,
+            @RequestBody(required = false) MenuOrderDtos.CancelOrderRequest request
     ) {
-        return ResponseEntity.ok(menuOrderService.merchantCancel(menuId, orderId));
+        return ResponseEntity.ok(menuOrderService.merchantCancel(menuId, orderId, request));
     }
 
     @GetMapping("/menu/{menuId}/customers")

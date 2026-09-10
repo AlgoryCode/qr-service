@@ -278,6 +278,13 @@ public class AnalyticsService {
                 categoryNames
         );
 
+        long addToCart = eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                menuIds, MenuAnalyticsEventType.ADD_TO_CART, fromDt, toDt);
+        long checkoutStarts = eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                menuIds, MenuAnalyticsEventType.CHECKOUT_START, fromDt, toDt);
+        long orderSubmitted = eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
+                menuIds, MenuAnalyticsEventType.ORDER_SUBMITTED, fromDt, toDt);
+
         AnalyticsDtos.ReportFeedback feedback = menuFeedbackService.buildReportFeedback(menuIds, from, to);
 
         return new AnalyticsDtos.MenuAnalyticsReportResponse(
@@ -301,7 +308,8 @@ public class AnalyticsService {
                 topCategories,
                 tree,
                 journeys,
-                new AnalyticsDtos.FunnelCounts(menuOpens, categoryViews, productViews),
+                new AnalyticsDtos.FunnelCounts(
+                        menuOpens, categoryViews, productViews, addToCart, checkoutStarts, orderSubmitted),
                 feedback
         );
     }
@@ -931,6 +939,12 @@ public class AnalyticsService {
                 throw new BadRequestException("SERVES_FILTER icin servesPeople zorunludur");
             }
         }
+        if (item.type() == MenuAnalyticsEventType.ADD_TO_CART
+                || item.type() == MenuAnalyticsEventType.REMOVE_FROM_CART) {
+            if (item.productId() == null) {
+                throw new BadRequestException(item.type() + " icin productId zorunludur");
+            }
+        }
     }
 
     private Menu requirePublicMenu(Long menuId) {
@@ -1303,6 +1317,17 @@ public class AnalyticsService {
             case SERVES_FILTER -> event.getServesPeople() == null
                     ? "Kisi sayisi filtresi"
                     : event.getServesPeople() + " kisilik filtre";
+            case QR_SCAN -> "QR tarama";
+            case ADD_TO_CART -> productNames.getOrDefault(
+                    event.getProductId(),
+                    "Sepete eklendi #" + event.getProductId()
+            );
+            case REMOVE_FROM_CART -> productNames.getOrDefault(
+                    event.getProductId(),
+                    "Sepetten cikarildi #" + event.getProductId()
+            );
+            case CHECKOUT_START -> "Checkout basladi";
+            case ORDER_SUBMITTED -> "Siparis gonderildi";
         };
     }
 
