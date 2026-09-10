@@ -133,6 +133,11 @@ public class BatchReportService {
 
         AiBatchReportClientDtos.StatusResponse remote = aiServiceClient.getBatchReportStatus(batch.getOpenaiBatchId());
         if (remote == null || remote.getStatus() == null || remote.getStatus().isBlank()) {
+            log.warn(
+                    "Batch report status empty. batchId={} openaiBatchId={}",
+                    batch.getId(),
+                    batch.getOpenaiBatchId()
+            );
             return ReconcileOutcome.empty();
         }
 
@@ -141,6 +146,16 @@ public class BatchReportService {
         int total = counts == null || counts.getTotal() == null ? batch.getRequestTotal() : counts.getTotal();
         int completed = counts == null || counts.getCompleted() == null ? 0 : counts.getCompleted();
         int failed = counts == null || counts.getFailed() == null ? 0 : counts.getFailed();
+        log.info(
+                "Batch report remote status. batchId={} openaiBatchId={} localStatus={} remoteStatus={} total={} completed={} failed={}",
+                batch.getId(),
+                batch.getOpenaiBatchId(),
+                batch.getStatus(),
+                remoteStatus,
+                total,
+                completed,
+                failed
+        );
 
         boolean changed = !Objects.equals(normalizeStatus(batch.getStatus()), remoteStatus)
                 || !Objects.equals(batch.getRequestTotal(), total)
@@ -156,6 +171,14 @@ public class BatchReportService {
                 batch.setCompletedAt(LocalDateTime.now());
             }
             batchReportRepository.save(batch);
+            log.info(
+                    "Batch report local status updated. batchId={} status={} total={} completed={} failed={}",
+                    batch.getId(),
+                    remoteStatus,
+                    total,
+                    completed,
+                    failed
+            );
         }
 
         List<ItemOutcome> itemOutcomes = new ArrayList<>();

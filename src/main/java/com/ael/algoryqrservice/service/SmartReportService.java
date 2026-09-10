@@ -453,15 +453,16 @@ public class SmartReportService {
 
     private void upsertResult(SmartReportEvent event, String resultText) {
         SmartReportResult existing = smartReportResultRepository.findByProcessId(event.getProcessId()).orElse(null);
+        Long menuId = event.getMenuId() != null ? event.getMenuId() : 0L;
         if (existing == null) {
             smartReportResultRepository.save(SmartReportResult.builder()
-                    .menuId(event.getMenuId())
+                    .menuId(menuId)
                     .processId(event.getProcessId())
                     .resultText(resultText)
                     .build());
             return;
         }
-        existing.setMenuId(event.getMenuId());
+        existing.setMenuId(menuId);
         existing.setResultText(resultText);
         smartReportResultRepository.save(existing);
     }
