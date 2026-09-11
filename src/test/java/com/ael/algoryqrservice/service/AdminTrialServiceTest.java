@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
+import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.TrialLogStatus;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +53,8 @@ class AdminTrialServiceTest {
     PlanPackageRepository packageRepository;
     @Mock
     FulfillmentGrantService fulfillmentGrantService;
+    @Mock
+    PurchaseLogService purchaseLogService;
 
     AdminTrialService service;
 
@@ -61,7 +66,8 @@ class AdminTrialServiceTest {
                 trialLogRepository,
                 packageRepository,
                 snapshotQuery,
-                fulfillmentGrantService
+                fulfillmentGrantService,
+                purchaseLogService
         );
         service = new AdminTrialService(useCases);
     }
@@ -85,6 +91,7 @@ class AdminTrialServiceTest {
         assertThat(log.getEndsAt()).isEqualTo(currentExpiry.plusDays(15));
         verify(fulfillmentGrantService).grantOnboardingFulfillment(log, plan);
         verify(fulfillmentGrantService).extendOnboardingPeriod(log);
+        verify(purchaseLogService).log(eq(10L), eq(7L), eq(PurchaseLogAction.TRIAL_EXTENDED), anyString());
     }
 
     @Test

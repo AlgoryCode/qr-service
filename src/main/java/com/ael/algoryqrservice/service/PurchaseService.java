@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.coupon.CouponRedemptionService;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
@@ -44,6 +45,7 @@ import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import com.ael.algoryqrservice.service.entitlement.UserEntitlementQueryService;
+import com.ael.algoryqrservice.purchase.lifecycle.PackagePeriodExtender;
 import com.ael.algoryqrservice.purchase.lifecycle.RemoteSubscriptionCanceller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,6 +92,8 @@ public class PurchaseService {
     private final PlatformTransactionManager transactionManager;
     private final BranchQuotaService branchQuotaService;
     private final RemoteSubscriptionCanceller remoteSubscriptionCanceller;
+    private final PackagePeriodExtender packagePeriodExtender;
+    private final CouponRedemptionService couponRedemptionService;
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -120,6 +124,9 @@ public class PurchaseService {
         if (chargeAmount == null || chargeAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Paket fiyati gecersiz");
         }
+        BigDecimal listPrice = chargeAmount;
+        String couponCode = request.getCouponCode();
+        boolean applyCoupon = couponCode != null && !couponCode.isBlank();
         CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), request.getPaymentMethodId());
         String conversationId = paymentRequestMapper.newPaymentAttemptId(user.getId());
         Purchase purchase = purchaseRepository.save(Purchase.builder()
@@ -128,6 +135,7 @@ public class PurchaseService {
                 .packageCode(planPackage.getCode())
                 .packageName(planPackage.getName())
                 .price(chargeAmount)
+                .listPrice(listPrice)
                 .currency(planPackage.getCurrency())
                 .paymentMode(PaymentMode.CHECKOUT_FORM)
                 .paymentStyle(paymentStyle)
@@ -143,6 +151,21 @@ public class PurchaseService {
                 .paymentConversationId(conversationId)
                 .status(PurchaseStatus.PENDING)
                 .build());
+
+        if (applyCoupon) {
+            CouponRedemptionService.AppliedCoupon applied = couponRedemptionService.reserve(
+                    couponCode, user.getId(), purchase.getId(), listPrice);
+            purchase.setCouponId(applied.coupon().getId());
+            purchase.setDiscountAmount(applied.quote().discountAmount());
+            purchase.setPrice(applied.quote().payable());
+            purchaseRepository.save(purchase);
+            purchaseLogService.log(
+                    purchase.getId(),
+                    user.getId(),
+                    PurchaseLogAction.COUPON_APPLIED,
+                    applied.coupon().getCode() + " kuponu uygulandi. Indirim: " + applied.quote().discountAmount()
+            );
+        }
 
         purchaseFulfillmentService.initializeSchedule(purchase, appProperties.getServiceName());
 
@@ -189,6 +212,7 @@ public class PurchaseService {
             purchase.setStatus(PurchaseStatus.FAILED);
             purchase.setPaymentConversationId(null);
             purchaseRepository.save(purchase);
+            couponRedemptionService.release(purchase);
             purchaseLogService.log(
                     purchase.getId(),
                     user.getId(),
@@ -220,6 +244,7 @@ public class PurchaseService {
         PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
         purchaseFulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
         planChangeService.onPurchaseActivated(purchase);
+        couponRedemptionService.consume(purchase);
 
         purchaseLogService.log(
                 purchase.getId(),
@@ -279,6 +304,7 @@ public class PurchaseService {
                 purchase.setPaymentId(event.getPaymentId());
             }
             purchaseRepository.save(purchase);
+            couponRedemptionService.release(purchase);
             String reason = event.getFailureReason() == null || event.getFailureReason().isBlank()
                     ? "ödeme başarısız"
                     : event.getFailureReason();
@@ -577,6 +603,7 @@ public class PurchaseService {
             purchase.setStatus(PurchaseStatus.CANCELLED);
             purchase.setCancellationReason(PurchaseCancellationReason.PAYMENT_TIMEOUT);
             purchaseRepository.save(purchase);
+            couponRedemptionService.release(purchase);
             purchaseLogService.log(
                     purchase.getId(),
                     purchase.getUserId(),
@@ -783,34 +810,12 @@ public class PurchaseService {
     public PurchaseResponse extendSubscriptionForAdmin(Long purchaseId, int days) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
-        if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
-            throw new BadRequestException("Bu satın alım abonelik değil");
+        if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+            throw new BadRequestException("Eklenti vadesi host paket ile birlikte uzatilir");
         }
-        if (days < 1 || days > 3650) {
-            throw new BadRequestException("Uzatma süresi 1-3650 gün arasında olmalı");
-        }
-        LocalDateTime base = purchase.getExpiresAt() != null
-                && purchase.getExpiresAt().isAfter(LocalDateTime.now())
-                ? purchase.getExpiresAt()
-                : LocalDateTime.now();
-        purchase.setExpiresAt(base.plusDays(days));
-        purchase.setStatus(PurchaseStatus.ACTIVE);
-        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
-        purchase.setSubscriptionGraceEndsAt(null);
-        purchase.setSubscriptionStatusReason("admin_extension");
-        purchase.setSubscriptionStatusChangedAt(LocalDateTime.now());
-        purchase.setSubscriptionStatusChangedBy("admin");
-        purchase.setCancelAtPeriodEnd(false);
-        purchaseRepository.save(purchase);
-        packageActivationService.ensureSubscriptionState(purchase.getUserId());
-        menuPublicAccessService.syncForUser(purchase.getUserId());
-        purchaseLogService.log(
-                purchase.getId(),
-                purchase.getUserId(),
-                PurchaseLogAction.PURCHASE_COMPLETED,
-                purchase.getPackageName() + " aboneliği admin tarafından " + days + " gün uzatıldı"
-        );
-        return toResponse(purchase);
+        Purchase extended = packagePeriodExtender.extend(purchase, days);
+        packageActivationService.ensureSubscriptionState(extended.getUserId());
+        return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
 
     private void requireExpirable(PurchaseStatus status) {
@@ -1241,6 +1246,9 @@ public class PurchaseService {
             purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
         }
         purchaseRepository.save(purchase);
+        if (previousStatus == PurchaseStatus.PENDING) {
+            couponRedemptionService.release(purchase);
+        }
 
         boolean needsCleanup = previousStatus == PurchaseStatus.ACTIVE
                 || previousStatus == PurchaseStatus.EXPIRED

@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class PackageAccessRestorer {
     private final PurchaseRepository purchaseRepository;
     private final PlanPackageRepository packageRepository;
     private final PackageEntitlementWriter entitlementWriter;
+    private final FulfillmentGrantService fulfillmentGrantService;
 
     public Purchase restoreActive(Purchase purchase, int days) {
         LocalDateTime now = AppTime.nowLocal();
@@ -35,6 +37,7 @@ public class PackageAccessRestorer {
         purchase.setCancelAtPeriodEnd(false);
         purchaseRepository.save(purchase);
         entitlementWriter.synchronizePeriod(purchase);
+        fulfillmentGrantService.extendPurchasePeriod(purchase);
         if (purchase.getPackageId() != null) {
             packageRepository.findByIdWithItems(purchase.getPackageId())
                     .ifPresent(planPackage -> entitlementWriter.ensureEntitlementsForPackage(purchase, planPackage));

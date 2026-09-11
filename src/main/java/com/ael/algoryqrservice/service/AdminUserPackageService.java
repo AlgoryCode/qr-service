@@ -18,6 +18,12 @@ public class AdminUserPackageService {
             Long userId,
             AdminUserDtos.PackageUpdateRequest request
     ) {
+        if (request.getStatus() == null || request.getStatus().isBlank()) {
+            if (request.getDays() == null) {
+                throw new BadRequestException("days veya status gerekli");
+            }
+            return extend(userId, request.getDays());
+        }
         return switch (request.getStatus().toUpperCase(Locale.ROOT)) {
             case "INACTIVE" -> deactivate(userId);
             case "ACTIVE" -> {
@@ -36,5 +42,9 @@ public class AdminUserPackageService {
 
     public AdminUserDtos.PackageLifecycleResponse reactivate(Long userId, int days) {
         return userPackageLifecycleUseCases.reactivate(userId, days);
+    }
+
+    public AdminUserDtos.PackageLifecycleResponse extend(Long userId, int days) {
+        return userPackageLifecycleUseCases.extend(userId, days);
     }
 }

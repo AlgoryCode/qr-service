@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -30,6 +31,9 @@ public class PurchaseRequest {
 
     /** Kullanıcının düzenli ödeme için kayıtlı kart kullanma onayı. */
     private Boolean recurringConsent = false;
+
+    @Size(max = 32)
+    private String couponCode;
 
     @Valid
     private BillingAddressDtos.Request inlineBillingAddress;

@@ -5,10 +5,13 @@ import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
 import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
+import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.PackageActivationService;
 import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.trial.TrialUseCases;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,9 +27,12 @@ public class UserPackageLifecycleUseCases {
     private static final int MAX_DAYS = 3650;
 
     private final UserRepository userRepository;
+    private final TrialLogRepository trialLogRepository;
     private final ActivePackageResolver activePackageResolver;
     private final RemoteSubscriptionCanceller remoteSubscriptionCanceller;
     private final PackageAccessRestorer packageAccessRestorer;
+    private final PackagePeriodExtender packagePeriodExtender;
+    private final TrialUseCases trialUseCases;
     private final PurchaseExpiryService purchaseExpiryService;
     private final PackageActivationService packageActivationService;
     private final PurchaseLogService purchaseLogService;
@@ -63,6 +69,29 @@ public class UserPackageLifecycleUseCases {
                 "Admin paket aktiflestirdi. " + days + " gun. Bitis: " + restored.getExpiresAt()
         );
         return toResponse(restored, days);
+    }
+
+    @Transactional
+    public AdminUserDtos.PackageLifecycleResponse extend(Long userId, int days) {
+        requireUser(userId);
+        validateDays(days);
+        Optional<Purchase> active = activePackageResolver.currentActive(userId);
+        if (active.isPresent()) {
+            Purchase extended = packagePeriodExtender.extend(active.get(), days);
+            syncAccess(userId);
+            return toResponse(extended, days);
+        }
+        if (!trialLogRepository.existsByUserId(userId)) {
+            throw new BadRequestException("Uzatilacak paket bulunamadi");
+        }
+        AdminUserDtos.ExtendTrialResponse trial = trialUseCases.extend(userId, days);
+        return AdminUserDtos.PackageLifecycleResponse.builder()
+                .purchaseId(trial.getPurchaseId())
+                .packageName(trial.getPackageName())
+                .status(PurchaseStatus.ACTIVE)
+                .expiresAt(trial.getExpiresAt())
+                .daysAdded(days)
+                .build();
     }
 
     private void requireUser(Long userId) {

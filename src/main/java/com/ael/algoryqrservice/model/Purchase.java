@@ -55,6 +55,15 @@ public class Purchase {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
+    @Column(name = "list_price", precision = 12, scale = 2)
+    private BigDecimal listPrice;
+
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "coupon_id")
+    private Long couponId;
+
     @Column(nullable = false, length = 3)
     private String currency;
 

@@ -110,7 +110,6 @@ public final class AdminUserDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PackageUpdateRequest {
-        @NotBlank
         private String status;
         @Min(1)
         @Max(3650)
