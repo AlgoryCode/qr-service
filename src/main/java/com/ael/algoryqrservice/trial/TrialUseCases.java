@@ -6,12 +6,13 @@ import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
+import com.ael.algoryqrservice.model.enums.PurchaseLogAction;
 import com.ael.algoryqrservice.model.enums.TrialLogStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
-import com.ael.algoryqrservice.trial.domain.TrialLifecycle;
+import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.trial.domain.TrialPolicy;
 import com.ael.algoryqrservice.trial.domain.TrialSnapshot;
 import com.ael.algoryqrservice.util.AppTime;
@@ -33,6 +34,7 @@ public class TrialUseCases {
     private final PlanPackageRepository packageRepository;
     private final TrialSnapshotQuery trialSnapshotQuery;
     private final FulfillmentGrantService fulfillmentGrantService;
+    private final PurchaseLogService purchaseLogService;
 
     @Transactional
     public AdminUserDtos.ExtendTrialResponse extend(Long userId, int days) {
@@ -53,6 +55,12 @@ public class TrialUseCases {
                 .orElseThrow(() -> new BadRequestException("Ultimate deneme paketi bulunamadi veya aktif degil"));
         fulfillmentGrantService.grantOnboardingFulfillment(log, planPackage);
         fulfillmentGrantService.extendOnboardingPeriod(log);
+        purchaseLogService.log(
+                log.getId(),
+                userId,
+                PurchaseLogAction.TRIAL_EXTENDED,
+                planPackage.getName() + " denemesi admin tarafindan " + days + " gun uzatildi"
+        );
 
         return AdminUserDtos.ExtendTrialResponse.builder()
                 .purchaseId(log.getId())

@@ -9,10 +9,13 @@ import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.purchase.lifecycle.ActivePackageResolver;
 import com.ael.algoryqrservice.purchase.lifecycle.PackageAccessRestorer;
+import com.ael.algoryqrservice.purchase.lifecycle.PackagePeriodExtender;
 import com.ael.algoryqrservice.purchase.lifecycle.RemoteSubscriptionCanceller;
 import com.ael.algoryqrservice.purchase.lifecycle.UserPackageLifecycleUseCases;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.trial.TrialUseCases;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,11 +42,17 @@ class AdminUserPackageServiceTest {
     @Mock
     UserRepository userRepository;
     @Mock
+    TrialLogRepository trialLogRepository;
+    @Mock
     ActivePackageResolver activePackageResolver;
     @Mock
     RemoteSubscriptionCanceller remoteSubscriptionCanceller;
     @Mock
     PackageAccessRestorer packageAccessRestorer;
+    @Mock
+    PackagePeriodExtender packagePeriodExtender;
+    @Mock
+    TrialUseCases trialUseCases;
     @Mock
     PurchaseExpiryService purchaseExpiryService;
     @Mock
@@ -57,9 +66,12 @@ class AdminUserPackageServiceTest {
     void setUp() {
         UserPackageLifecycleUseCases useCases = new UserPackageLifecycleUseCases(
                 userRepository,
+                trialLogRepository,
                 activePackageResolver,
                 remoteSubscriptionCanceller,
                 packageAccessRestorer,
+                packagePeriodExtender,
+                trialUseCases,
                 purchaseExpiryService,
                 packageActivationService,
                 purchaseLogService
@@ -166,5 +178,61 @@ class AdminUserPackageServiceTest {
 
         assertThat(result.getPurchaseId()).isEqualTo(10L);
         verify(purchaseExpiryService).expire(purchase);
+    }
+
+    @Test
+    void updatePackage_whenDaysOnlyAndPaid_thenExtend() {
+        User user = User.builder().id(7L).build();
+        Purchase purchase = Purchase.builder()
+                .id(10L)
+                .userId(7L)
+                .packageName("Pro")
+                .status(PurchaseStatus.ACTIVE)
+                .expiresAt(LocalDateTime.now().plusDays(5))
+                .build();
+        Purchase extended = Purchase.builder()
+                .id(10L)
+                .userId(7L)
+                .packageName("Pro")
+                .status(PurchaseStatus.ACTIVE)
+                .expiresAt(purchase.getExpiresAt().plusDays(20))
+                .build();
+
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(activePackageResolver.currentActive(7L)).thenReturn(Optional.of(purchase));
+        when(packagePeriodExtender.extend(purchase, 20)).thenReturn(extended);
+
+        AdminUserDtos.PackageLifecycleResponse result = service.updatePackage(
+                7L,
+                AdminUserDtos.PackageUpdateRequest.builder().days(20).build()
+        );
+
+        assertThat(result.getDaysAdded()).isEqualTo(20);
+        assertThat(result.getPurchaseId()).isEqualTo(10L);
+        verify(packagePeriodExtender).extend(purchase, 20);
+        verify(packageActivationService).ensureSubscriptionState(7L);
+    }
+
+    @Test
+    void updatePackage_whenDaysOnlyAndTrial_thenExtendTrial() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(User.builder().id(7L).build()));
+        when(activePackageResolver.currentActive(7L)).thenReturn(Optional.empty());
+        when(trialLogRepository.existsByUserId(7L)).thenReturn(true);
+        when(trialUseCases.extend(7L, 15)).thenReturn(AdminUserDtos.ExtendTrialResponse.builder()
+                .purchaseId(11L)
+                .packageName("Ultimate Deneme")
+                .expiresAt(LocalDateTime.now().plusDays(15))
+                .daysAdded(15)
+                .build());
+
+        AdminUserDtos.PackageLifecycleResponse result = service.updatePackage(
+                7L,
+                AdminUserDtos.PackageUpdateRequest.builder().days(15).build()
+        );
+
+        assertThat(result.getPurchaseId()).isEqualTo(11L);
+        assertThat(result.getPackageName()).isEqualTo("Ultimate Deneme");
+        assertThat(result.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+        verify(trialUseCases).extend(7L, 15);
     }
 }

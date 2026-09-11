@@ -27,6 +27,10 @@ import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
+import com.ael.algoryqrservice.coupon.CouponRedemptionService;
+import com.ael.algoryqrservice.coupon.domain.CouponQuote;
+import com.ael.algoryqrservice.model.Coupon;
+import com.ael.algoryqrservice.purchase.lifecycle.PackagePeriodExtender;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,6 +95,10 @@ class PurchaseServicePaymentEventTest {
     private BillingSubscriptionProperties billingSubscriptionProperties;
     @Mock
     private PaymentClientProperties paymentClientProperties;
+    @Mock
+    private PackagePeriodExtender packagePeriodExtender;
+    @Mock
+    private CouponRedemptionService couponRedemptionService;
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -182,6 +190,7 @@ class PurchaseServicePaymentEventTest {
                 org.mockito.ArgumentMatchers.eq(event),
                 any()
         );
+        verify(couponRedemptionService).consume(purchase);
         verify(paymentEventInboxRepository).save(any());
     }
 
@@ -547,6 +556,58 @@ class PurchaseServicePaymentEventTest {
         Purchase lastSaved = captor.getAllValues().get(captor.getAllValues().size() - 1);
         assertThat(lastSaved.getStatus()).isEqualTo(PurchaseStatus.FAILED);
         assertThat(lastSaved.getPaymentConversationId()).isNull();
+        verify(couponRedemptionService).release(any(Purchase.class));
+    }
+
+    @Test
+    void purchase_whenCoupon_thenChargePayable() {
+        User user = User.builder().id(20L).firstName("A").email("a@test.com").build();
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPackageId(30L);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setBillingPeriod(BillingPeriod.MONTHLY);
+        request.setBillingAddressId(1L);
+        request.setCouponCode("SAVE10");
+        planPackage.setPurchasable(true);
+        planPackage.setSystemManaged(false);
+        planPackage.setPrice(new BigDecimal("100.00"));
+        planPackage.setYearlyPrice(new BigDecimal("1000.00"));
+        Coupon coupon = Coupon.builder().id(4L).code("SAVE10").build();
+        CouponQuote quote = new CouponQuote(new BigDecimal("100.00"), new BigDecimal("10.00"), new BigDecimal("90.00"));
+        when(planPackageService.findActivePackage(30L)).thenReturn(planPackage);
+        when(billingAddressService.resolveSnapshot(eq(20L), eq(1L), any())).thenReturn(null);
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
+            Purchase saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(10L);
+            }
+            return saved;
+        });
+        when(couponRedemptionService.reserve(eq("SAVE10"), eq(20L), eq(10L), any()))
+                .thenReturn(new CouponRedemptionService.AppliedCoupon(coupon, quote));
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conversation-10");
+        when(paymentRequestMapper.toDebtCheckoutFormRequest(
+                any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
+                eq("conversation-10"), eq(1)
+        )).thenReturn(PaymentCheckoutFormRequest.builder().build());
+        PaymentCheckoutFormResponse checkout = new PaymentCheckoutFormResponse();
+        checkout.setConversationId("conversation-10");
+        checkout.setToken("tok");
+        when(paymentServiceClient.initializeCheckoutForm(eq(20L), any()))
+                .thenReturn(checkout);
+
+        PurchaseInitiateResponse response = purchaseService.purchase(user, request, "127.0.0.1");
+
+        assertThat(response.getPurchaseId()).isEqualTo(10L);
+        ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseRepository, atLeastOnce()).save(captor.capture());
+        Purchase withCoupon = captor.getAllValues().stream()
+                .filter(item -> item.getCouponId() != null)
+                .reduce((first, second) -> second)
+                .orElseThrow();
+        assertThat(withCoupon.getPrice()).isEqualByComparingTo("90.00");
+        assertThat(withCoupon.getDiscountAmount()).isEqualByComparingTo("10.00");
+        verify(purchaseLogService).log(eq(10L), eq(20L), eq(PurchaseLogAction.COUPON_APPLIED), any());
     }
 
     private PaymentCompletedEventDto refundedEvent() {

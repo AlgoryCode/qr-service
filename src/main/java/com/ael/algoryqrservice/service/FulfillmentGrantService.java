@@ -238,9 +238,24 @@ public class FulfillmentGrantService {
 
     @Transactional
     public void extendOnboardingPeriod(TrialLog trialLog) {
-        grantFulfillmentRepository.findByTrialLogId(trialLog.getId()).ifPresent(fulfillment ->
-                synchronizeFulfillmentPeriod(fulfillment, trialLog.getStartedAt(), trialLog.getEndsAt(), null)
-        );
+        grantFulfillmentRepository.findByTrialLogId(trialLog.getId()).ifPresent(fulfillment -> {
+            if (fulfillment.getStatus() == GrantFulfillmentStatus.EXPIRED) {
+                fulfillment.setStatus(GrantFulfillmentStatus.ACTIVE);
+            }
+            synchronizeFulfillmentPeriod(fulfillment, trialLog.getStartedAt(), trialLog.getEndsAt(), null);
+            grantFulfillmentRepository.save(fulfillment);
+        });
+    }
+
+    @Transactional
+    public void extendPurchasePeriod(Purchase purchase) {
+        grantFulfillmentRepository.findByPurchaseId(purchase.getId()).ifPresent(fulfillment -> {
+            if (fulfillment.getStatus() == GrantFulfillmentStatus.EXPIRED) {
+                fulfillment.setStatus(GrantFulfillmentStatus.ACTIVE);
+            }
+            synchronizeFulfillmentPeriod(fulfillment, purchase);
+            grantFulfillmentRepository.save(fulfillment);
+        });
     }
 
     private void synchronizeFulfillmentPeriod(GrantFulfillment fulfillment, Purchase purchase) {

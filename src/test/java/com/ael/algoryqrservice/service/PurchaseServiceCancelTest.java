@@ -14,6 +14,8 @@ import com.ael.algoryqrservice.model.enums.PurchaseCancellationReason;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
+import com.ael.algoryqrservice.coupon.CouponRedemptionService;
+import com.ael.algoryqrservice.purchase.lifecycle.PackagePeriodExtender;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +74,10 @@ class PurchaseServiceCancelTest {
     private MenuPublicAccessService menuPublicAccessService;
     @Mock
     private SubscriptionRefundPolicy subscriptionRefundPolicy;
+    @Mock
+    private PackagePeriodExtender packagePeriodExtender;
+    @Mock
+    private CouponRedemptionService couponRedemptionService;
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
