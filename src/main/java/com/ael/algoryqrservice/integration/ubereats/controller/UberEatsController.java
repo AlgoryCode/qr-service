@@ -5,10 +5,12 @@ import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.ael.algoryqrservice.integration.ubereats.service.UberEatsConnectionService;
 import com.ael.algoryqrservice.integration.ubereats.service.UberEatsMenuQueryService;
 import com.ael.algoryqrservice.integration.ubereats.service.UberEatsOrderService;
+import com.ael.algoryqrservice.integration.ubereats.service.UberEatsProductCommandService;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +34,7 @@ public class UberEatsController {
     private final UberEatsConnectionService connectionService;
     private final UberEatsMenuQueryService menuQueryService;
     private final UberEatsOrderService orderService;
+    private final UberEatsProductCommandService productCommandService;
 
     @GetMapping("/connections")
     public ResponseEntity<List<UberEatsDtos.ConnectionResponse>> listConnections() {
@@ -67,6 +70,13 @@ public class UberEatsController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(menuQueryService.listProducts(q, page, size));
+    }
+
+    @PostMapping("/products")
+    public ResponseEntity<UberEatsDtos.ProductResponse> createProduct(
+            @Valid @RequestBody UberEatsDtos.CreateProductRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(productCommandService.create(request));
     }
 
     @GetMapping("/orders")

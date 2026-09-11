@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -138,5 +139,81 @@ class UberEatsPayloadMapperTest {
         assertThat(mapper.toOrderItems(root).getFirst().getQuantity()).isEqualTo(2);
         assertThat(mapper.toOrderItems(root).getFirst().getDetail()).contains("Limon");
         assertThat(mapper.toOrderNodes(root)).hasSize(1);
+    }
+
+    @Test
+    void toUpsertBody_whenRequiredModifierGroup_thenMapOptionsAndMinSelect() {
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Cheeseburger")
+                .description("Dana köfte")
+                .price(new BigDecimal("220"))
+                .categoryName("Burger")
+                .available(true)
+                .modifierGroups(List.of(
+                        UberEatsDtos.ModifierGroupRequest.builder()
+                                .name("Sos seçimi")
+                                .required(true)
+                                .minSelect(1)
+                                .maxSelect(1)
+                                .options(List.of(
+                                        UberEatsDtos.ModifierOptionRequest.builder()
+                                                .name("Cheddar")
+                                                .price(new BigDecimal("8"))
+                                                .build()
+                                ))
+                                .build()
+                ))
+                .build();
+
+        var body = mapper.toUpsertBody(request);
+
+        assertThat(body.get("name")).isEqualTo("Cheeseburger");
+        assertThat(body.get("categoryName")).isEqualTo("Burger");
+        assertThat(body.get("selling")).isEqualTo(true);
+        assertThat(body.get("status")).isEqualTo("ACTIVE");
+        assertThat(body).containsKey("modifierProducts");
+        assertThat(body).doesNotContainKey("extraIngredients");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> groups = (List<Map<String, Object>>) body.get("modifierProducts");
+        assertThat(groups).hasSize(1);
+        assertThat(groups.getFirst().get("name")).isEqualTo("Sos seçimi");
+        assertThat(groups.getFirst().get("required")).isEqualTo(true);
+        assertThat(groups.getFirst().get("minSelect")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> options = (List<Map<String, Object>>) groups.getFirst().get("modifierOptions");
+        assertThat(options.getFirst().get("name")).isEqualTo("Cheddar");
+        assertThat((BigDecimal) options.getFirst().get("price")).isEqualByComparingTo("8");
+    }
+
+    @Test
+    void toUpsertBody_whenOptionalGroup_thenAlsoWriteExtraIngredients() {
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Pizza")
+                .categoryName("Pizzalar")
+                .available(false)
+                .modifierGroups(List.of(
+                        UberEatsDtos.ModifierGroupRequest.builder()
+                                .name("Ekstralar")
+                                .required(false)
+                                .minSelect(0)
+                                .maxSelect(3)
+                                .options(List.of(
+                                        UberEatsDtos.ModifierOptionRequest.builder()
+                                                .name("Mantar")
+                                                .price(new BigDecimal("12"))
+                                                .build()
+                                ))
+                                .build()
+                ))
+                .build();
+
+        var body = mapper.toUpsertBody(request);
+
+        assertThat(body.get("selling")).isEqualTo(false);
+        assertThat(body.get("status")).isEqualTo("PASSIVE");
+        assertThat(body).containsKey("extraIngredients");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> extras = (List<Map<String, Object>>) body.get("extraIngredients");
+        assertThat(extras.getFirst().get("name")).isEqualTo("Mantar");
     }
 }

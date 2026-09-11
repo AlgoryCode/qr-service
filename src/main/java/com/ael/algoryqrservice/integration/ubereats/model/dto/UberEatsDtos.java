@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.integration.ubereats.model.dto;
 
 import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnectionStatus;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -152,5 +153,49 @@ public final class UberEatsDtos {
         private String apiKey;
         private String apiSecret;
         private String restaurantId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CreateProductRequest {
+        @NotBlank
+        private String name;
+        private String description;
+        private BigDecimal price;
+        private String currency;
+        @NotBlank
+        private String categoryName;
+        private String imageUrl;
+        private Boolean available;
+        @Valid
+        @Builder.Default
+        private List<ModifierGroupRequest> modifierGroups = new ArrayList<>();
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModifierGroupRequest {
+        @NotBlank
+        private String name;
+        private boolean required;
+        private Integer minSelect;
+        private Integer maxSelect;
+        @Valid
+        @Builder.Default
+        private List<ModifierOptionRequest> options = new ArrayList<>();
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModifierOptionRequest {
+        @NotBlank
+        private String name;
+        private BigDecimal price;
     }
 }
