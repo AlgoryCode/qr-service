@@ -77,3 +77,4 @@ google:
   oauth:
     frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
     handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}
+    android-client-id: ${GOOGLE_ANDROID_CLIENT_ID:}

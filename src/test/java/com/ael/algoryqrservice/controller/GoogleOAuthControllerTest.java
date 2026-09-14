@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
 import com.ael.algoryqrservice.service.GoogleAuthHandoffService;
 import com.ael.algoryqrservice.service.GoogleAuthSessionService;
+import com.ael.algoryqrservice.service.GoogleIdTokenAuthService;
 import com.ael.algoryqrservice.util.ClientInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,13 +32,15 @@ class GoogleOAuthControllerTest {
     private GoogleAuthSessionService authSessionService;
     @Mock
     private GoogleAuthHandoffService handoffService;
+    @Mock
+    private GoogleIdTokenAuthService idTokenAuthService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new GoogleAuthController(authSessionService, handoffService))
+                .standaloneSetup(new GoogleAuthController(authSessionService, handoffService, idTokenAuthService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -71,6 +74,27 @@ class GoogleOAuthControllerTest {
                         .content("""
                                 {
                                   "ticket": "opaque-ticket"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh"));
+    }
+
+    @Test
+    void idToken_whenValid_thenReturnJwtTokens() throws Exception {
+        when(idTokenAuthService.authenticate(eq("google-id-token"), eq(GoogleAuthIntent.LOGIN), any(ClientInfo.class)))
+                .thenReturn(AuthResponse.builder()
+                        .accessToken("access")
+                        .refreshToken("refresh")
+                        .build());
+
+        mockMvc.perform(post("/google-auth/id-token")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "idToken": "google-id-token",
+                                  "intent": "login"
                                 }
                                 """))
                 .andExpect(status().isOk())
