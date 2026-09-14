@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.AuthResponse;
+import com.ael.algoryqrservice.model.dto.GoogleAuthIdTokenRequest;
 import com.ael.algoryqrservice.model.dto.GoogleAuthRedeemRequest;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
 import com.ael.algoryqrservice.security.GoogleOAuthPaths;
 import com.ael.algoryqrservice.service.GoogleAuthHandoffService;
 import com.ael.algoryqrservice.service.GoogleAuthSessionService;
+import com.ael.algoryqrservice.service.GoogleIdTokenAuthService;
 import com.ael.algoryqrservice.util.ClientInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -26,6 +28,7 @@ public class GoogleAuthController {
 
     private final GoogleAuthSessionService authSessionService;
     private final GoogleAuthHandoffService handoffService;
+    private final GoogleIdTokenAuthService idTokenAuthService;
 
     @GetMapping("/authorize")
     public RedirectView authorize(
@@ -46,6 +49,20 @@ public class GoogleAuthController {
     ) {
         return ResponseEntity.ok(
                 handoffService.redeem(request.ticket(), ClientInfo.from(servletRequest))
+        );
+    }
+
+    @PostMapping("/id-token")
+    public ResponseEntity<AuthResponse> idToken(
+            @Valid @RequestBody GoogleAuthIdTokenRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return ResponseEntity.ok(
+                idTokenAuthService.authenticate(
+                        request.idToken(),
+                        GoogleAuthIntent.from(request.intent()),
+                        ClientInfo.from(servletRequest)
+                )
         );
     }
 }

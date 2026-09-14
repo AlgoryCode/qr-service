@@ -38,3 +38,4 @@ google:
   oauth:
     frontend-callback-url: http://localhost:3000/api/auth/google/callback
     handoff-ticket-ttl: PT2M
+    android-client-id: test-android-client
