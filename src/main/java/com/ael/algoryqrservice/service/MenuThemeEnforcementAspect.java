@@ -37,6 +37,8 @@ public class MenuThemeEnforcementAspect {
         if (themeId.isEmpty() || CatalogThemes.isCustomTheme(themeId)) {
             return;
         }
+        // Teması hiç atanmamış eski deneme hesapları için varsayılan temayı verir.
+        menuThemeService.ensureDefaultThemeAssigned(qr.getUserId());
         menuThemeService.requireAssignedTheme(qr.getUserId(), themeId);
     }
 

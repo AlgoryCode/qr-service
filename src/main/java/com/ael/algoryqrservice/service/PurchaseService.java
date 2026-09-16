@@ -40,6 +40,7 @@ import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
+import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.service.entitlement.EntitlementMaintenanceService;
 import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
@@ -47,6 +48,8 @@ import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
 import com.ael.algoryqrservice.service.entitlement.UserEntitlementQueryService;
 import com.ael.algoryqrservice.purchase.lifecycle.PackagePeriodExtender;
 import com.ael.algoryqrservice.purchase.lifecycle.RemoteSubscriptionCanceller;
+import com.ael.algoryqrservice.model.TrialLog;
+import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -94,6 +97,7 @@ public class PurchaseService {
     private final RemoteSubscriptionCanceller remoteSubscriptionCanceller;
     private final PackagePeriodExtender packagePeriodExtender;
     private final CouponRedemptionService couponRedemptionService;
+    private final TrialLogRepository trialLogRepository;
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -718,6 +722,9 @@ public class PurchaseService {
                     .map(this::toSummary)
                     .orElse(null);
         }
+        if (activePackage == null) {
+            activePackage = resolveActiveTrialSummary(userId, entitlements);
+        }
 
         List<PurchaseSummaryResponse> addonPurchases = purchaseRepository
                 .findByUserIdOrderByPurchasedAtDesc(userId)
@@ -747,6 +754,65 @@ public class PurchaseService {
                 .menuQuota(branchQuotaService.menuQuota(userId))
                 .fulfillmentDetails(fulfillmentDetails)
                 .fulfillmentActive(fulfillmentActive)
+                .build();
+    }
+
+    /**
+     * Deneme (TrialLog) satın alma kaydı oluşturmaz; abonelik ekranı için özet üretir.
+     */
+    private PurchaseSummaryResponse resolveActiveTrialSummary(
+            Long userId,
+            List<UserEntitlementResponse> entitlements
+    ) {
+        LocalDateTime now = AppTime.nowLocal();
+        TrialLog trial = trialLogRepository.findByUserId(userId).orElse(null);
+        if (trial == null || !trial.isActiveAt(now)) {
+            return null;
+        }
+
+        PlanPackage planPackage = null;
+        try {
+            planPackage = planPackageService.findPackage(trial.getPackageId());
+        } catch (BadRequestException ignored) {
+            // Paket kataloğundan silinmiş olabilir; TrialLog alanlarıyla devam et.
+        }
+
+        Integer daysUntilExpiry = null;
+        if (trial.getEndsAt() != null) {
+            daysUntilExpiry = (int) java.time.temporal.ChronoUnit.DAYS.between(
+                    now.toLocalDate(),
+                    trial.getEndsAt().toLocalDate()
+            );
+        }
+        boolean expiryApproaching = trial.getEndsAt() != null
+                && !trial.getEndsAt().isAfter(now.plusDays(APPROACHING_DAYS));
+
+        List<UserEntitlementResponse> products = entitlements == null
+                ? List.of()
+                : entitlements.stream()
+                .filter(item -> item.isUsable() && !item.isExpired())
+                .toList();
+
+        return PurchaseSummaryResponse.builder()
+                .purchaseId(null)
+                .userId(userId)
+                .packageId(trial.getPackageId())
+                .packageCode(trial.getPackageCode())
+                .packageName(planPackage != null ? planPackage.getName() : trial.getPackageCode())
+                .price(BigDecimal.ZERO)
+                .currency(planPackage != null ? planPackage.getCurrency() : "TRY")
+                .status(PurchaseStatus.ACTIVE)
+                .purchaseType(PurchaseType.TRIAL)
+                .paymentStyle(null)
+                .startsAt(trial.getStartedAt())
+                .expiresAt(trial.getEndsAt())
+                .purchasedAt(trial.getStartedAt())
+                .daysUntilExpiry(daysUntilExpiry)
+                .expiryApproaching(expiryApproaching)
+                .expired(false)
+                .usable(true)
+                .products(products)
+                .installments(List.of())
                 .build();
     }
 

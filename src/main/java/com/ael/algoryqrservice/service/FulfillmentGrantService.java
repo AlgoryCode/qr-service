@@ -33,6 +33,7 @@ public class FulfillmentGrantService {
     private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final PlanPackageRepository planPackageRepository;
     private final ProductRepository productRepository;
+    private final MenuThemeService menuThemeService;
 
     @Transactional
     public GrantFulfillment grantPackageFulfillment(Purchase purchase, PlanPackage planPackage) {
@@ -43,6 +44,7 @@ public class FulfillmentGrantService {
         if (existing != null) {
             log.debug("Fulfillment already exists for purchaseId={}", purchase.getId());
             synchronizeFulfillmentPeriod(existing, purchase);
+            menuThemeService.ensureDefaultThemeAssigned(purchase.getUserId());
             return existing;
         }
         GrantFulfillment fulfillment = grantFulfillmentRepository.save(GrantFulfillment.builder()
@@ -77,6 +79,7 @@ public class FulfillmentGrantService {
         }
         log.info("Package fulfillment granted: userId={}, purchaseId={}, fulfillmentId={}",
                 purchase.getUserId(), purchase.getId(), fulfillment.getId());
+        menuThemeService.ensureDefaultThemeAssigned(purchase.getUserId());
         return fulfillment;
     }
 
@@ -85,6 +88,7 @@ public class FulfillmentGrantService {
         GrantFulfillment existing = grantFulfillmentRepository.findByTrialLogId(trialLog.getId()).orElse(null);
         if (existing != null) {
             synchronizeFulfillmentPeriod(existing, trialLog.getStartedAt(), trialLog.getEndsAt(), null);
+            menuThemeService.ensureDefaultThemeAssigned(trialLog.getUserId());
             return existing;
         }
         GrantFulfillment fulfillment = grantFulfillmentRepository.save(GrantFulfillment.builder()
@@ -118,6 +122,7 @@ public class FulfillmentGrantService {
         }
         log.info("Onboarding fulfillment granted: userId={}, trialLogId={}, fulfillmentId={}",
                 trialLog.getUserId(), trialLog.getId(), fulfillment.getId());
+        menuThemeService.ensureDefaultThemeAssigned(trialLog.getUserId());
         return fulfillment;
     }
 

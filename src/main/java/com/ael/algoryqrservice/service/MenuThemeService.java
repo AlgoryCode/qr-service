@@ -86,6 +86,19 @@ public class MenuThemeService {
         }
     }
 
+    /**
+     * Atanmış teması olmayan üyeye varsayılan temayı verir (idempotent).
+     * Deneme / paket başlangıcında ve menü oluşturma güvenlik ağında kullanılır.
+     */
+    @Transactional
+    public List<ThemeDtos.ThemeResponse> ensureDefaultThemeAssigned(Long userId) {
+        requireExistingUser(userId);
+        if (!userThemeAssignmentRepository.findByUserId(userId).isEmpty()) {
+            return listAssignedThemes(userId);
+        }
+        return assignThemes(userId, List.of(CatalogThemes.DEFAULT_THEME_CODE), null);
+    }
+
     @Transactional
     public List<ThemeDtos.ThemeResponse> assignThemes(Long userId, List<String> themeCodes, Long assignedBy) {
         requireExistingUser(userId);
