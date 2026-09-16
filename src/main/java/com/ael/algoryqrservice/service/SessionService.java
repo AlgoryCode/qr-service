@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.model.UserSession;
 import com.ael.algoryqrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.model.dto.SessionPageResponse;
 import com.ael.algoryqrservice.model.dto.SessionResponse;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.repository.UserSessionRepository;
 import com.ael.algoryqrservice.security.AccessTokenBlacklistService;
@@ -38,6 +39,11 @@ public class SessionService {
 
     @Transactional
     public SessionTokens createSession(User user, ClientInfo clientInfo) {
+        return createSession(user, clientInfo, user.getProvider());
+    }
+
+    @Transactional
+    public SessionTokens createSession(User user, ClientInfo clientInfo, AuthProvider loginProvider) {
         UUID sessionId = UUID.randomUUID();
         String rawRefreshToken = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
@@ -55,6 +61,7 @@ public class SessionService {
                 .userAgent(clientInfo.userAgent())
                 .device(clientInfo.device())
                 .deviceType(clientInfo.deviceType())
+                .provider(loginProvider)
                 .build();
 
         sessionRepository.save(session);
@@ -97,6 +104,7 @@ public class SessionService {
                 .userAgent(clientInfo.userAgent())
                 .device(clientInfo.device())
                 .deviceType(clientInfo.deviceType())
+                .provider(user.getProvider())
                 .impersonatorDashboardUserId(impersonatorDashboardUserId)
                 .build();
 
@@ -293,6 +301,7 @@ public class SessionService {
                 .userAgent(session.getUserAgent())
                 .device(session.getDevice())
                 .deviceType(session.getDeviceType())
+                .provider(session.getProvider())
                 .build();
     }
 

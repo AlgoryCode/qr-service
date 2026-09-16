@@ -83,7 +83,7 @@ class GoogleOAuthUserServiceTest {
                 clientInfo()
         ))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("farklı bir giriş yöntemiyle");
+                .hasMessageContaining("e-posta/şifre ile kayıtlı");
     }
 
     @Test
@@ -113,6 +113,55 @@ class GoogleOAuthUserServiceTest {
     }
 
     @Test
+    void resolve_whenMobileRegisterAndEmailFree_thenCreateMobileGoogleUserWithClientInfo() {
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.MOBILE_GOOGLE, "sub-1"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.empty());
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            user.setId(NEXT_ID.incrementAndGet());
+            return user;
+        });
+        ClientInfo clientInfo = new ClientInfo("203.0.113.10", "AlgoryQR/1.0 Android", "Pixel 8", "MOBILE");
+
+        User result = googleOAuthUserService.resolve(
+                GoogleAuthIntent.REGISTER,
+                identity("sub-1", "user@example.com", true),
+                clientInfo,
+                AuthProvider.MOBILE_GOOGLE
+        );
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(captor.capture());
+        User saved = captor.getValue();
+        assertThat(saved.getProvider()).isEqualTo(AuthProvider.MOBILE_GOOGLE);
+        assertThat(saved.getRegistrationIpAddress()).isEqualTo("203.0.113.10");
+        assertThat(saved.getRegistrationUserAgent()).isEqualTo("AlgoryQR/1.0 Android");
+        assertThat(saved.getRegistrationDevice()).isEqualTo("Pixel 8");
+        assertThat(saved.getRegistrationDeviceType()).isEqualTo("MOBILE");
+        assertThat(result.getId()).isNotNull();
+    }
+
+    @Test
+    void resolve_whenMobileLoginAndWebGoogleUserExists_thenReturnExistingUser() {
+        User existing = googleUser("sub-1", "user@example.com");
+        when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
+                .thenReturn(Optional.of(existing));
+
+        User result = googleOAuthUserService.resolve(
+                GoogleAuthIntent.LOGIN,
+                identity("sub-1", "user@example.com", true),
+                clientInfo(),
+                AuthProvider.MOBILE_GOOGLE
+        );
+
+        assertThat(result).isSameAs(existing);
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void resolve_whenRegisterAndBasicEmailExists_thenThrowProviderConflict() {
         when(userRepository.findByProviderAndProviderSubject(AuthProvider.GOOGLE, "sub-1"))
                 .thenReturn(Optional.empty());
@@ -124,7 +173,7 @@ class GoogleOAuthUserServiceTest {
                 clientInfo()
         ))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("farklı bir giriş yöntemiyle");
+                .hasMessageContaining("e-posta/şifre ile kayıtlı");
     }
 
     @Test

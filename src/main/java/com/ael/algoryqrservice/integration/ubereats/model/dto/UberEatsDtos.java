@@ -71,6 +71,8 @@ public final class UberEatsDtos {
         private String currency;
         private String imageUrl;
         private boolean available;
+        @Builder.Default
+        private List<ModifierGroupRequest> modifierGroups = new ArrayList<>();
     }
 
     @Data

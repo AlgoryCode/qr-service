@@ -27,65 +27,99 @@ public class GoogleOAuthUserService {
 
     @Transactional
     public User resolve(GoogleAuthIntent intent, GoogleOidcIdentity identity, ClientInfo clientInfo) {
+        return resolve(intent, identity, clientInfo, AuthProvider.GOOGLE);
+    }
+
+    @Transactional
+    public User resolve(
+            GoogleAuthIntent intent,
+            GoogleOidcIdentity identity,
+            ClientInfo clientInfo,
+            AuthProvider authProvider
+    ) {
         requireVerifiedEmail(identity);
+        AuthProvider googleProvider = requireGoogleProvider(authProvider);
         return switch (intent) {
             case LOGIN -> login(identity);
-            case REGISTER -> register(identity, clientInfo);
+            case REGISTER -> register(identity, clientInfo, googleProvider);
             case CUSTOMER_LOGIN, CUSTOMER_REGISTER ->
                     throw new BadRequestException("Geçersiz uygulama Google kimlik doğrulama amacı");
         };
     }
 
     private User login(GoogleOidcIdentity identity) {
-        Optional<User> googleUser = userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        );
+        Optional<User> googleUser = findGoogleUser(identity.subject());
         if (googleUser.isPresent()) {
             return googleUser.get();
         }
 
         Optional<User> existingByEmail = userRepository.findByEmail(identity.email());
-        if (existingByEmail.isPresent() && existingByEmail.get().getProvider() != AuthProvider.GOOGLE) {
+        if (existingByEmail.isPresent() && !isGoogleProvider(existingByEmail.get().getProvider())) {
             throw new BadRequestException(providerConflictMessage(existingByEmail.get().getProvider()));
         }
 
         throw new UnauthorizedException("Bu e-posta adresi ile Google hesabı kayıtlı değil");
     }
 
-    private User register(GoogleOidcIdentity identity, ClientInfo clientInfo) {
-        Optional<User> existingGoogleUser = userRepository.findByProviderAndProviderSubject(
-                AuthProvider.GOOGLE,
-                identity.subject()
-        );
-        if (existingGoogleUser.isPresent()) {
+    private User register(GoogleOidcIdentity identity, ClientInfo clientInfo, AuthProvider authProvider) {
+        if (findGoogleUser(identity.subject()).isPresent()) {
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
 
         Optional<User> existingByEmail = userRepository.findByEmail(identity.email());
         if (existingByEmail.isPresent()) {
-            if (existingByEmail.get().getProvider() != AuthProvider.GOOGLE) {
+            if (!isGoogleProvider(existingByEmail.get().getProvider())) {
                 throw new BadRequestException(providerConflictMessage(existingByEmail.get().getProvider()));
             }
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
 
-        User user = userRepository.saveAndFlush(User.builder()
+        User user = userRepository.saveAndFlush(newGoogleUser(identity, clientInfo, authProvider));
+        packageActivationService.ensureSubscriptionState(user.getId());
+        return user;
+    }
+
+    private static User newGoogleUser(
+            GoogleOidcIdentity identity,
+            ClientInfo clientInfo,
+            AuthProvider authProvider
+    ) {
+        return User.builder()
                 .firstName(identity.firstName())
                 .lastName(identity.lastName())
                 .email(identity.email())
                 .password(null)
                 .emailVerified(true)
                 .role(UserRole.USER)
-                .provider(AuthProvider.GOOGLE)
+                .provider(authProvider)
                 .providerSubject(identity.subject())
                 .registrationIpAddress(clientInfo.ipAddress())
                 .registrationUserAgent(clientInfo.userAgent())
                 .registrationDevice(clientInfo.device())
                 .registrationDeviceType(clientInfo.deviceType())
-                .build());
-        packageActivationService.ensureSubscriptionState(user.getId());
-        return user;
+                .build();
+    }
+
+    private Optional<User> findGoogleUser(String subject) {
+        Optional<User> googleUser = userRepository.findByProviderAndProviderSubject(
+                AuthProvider.GOOGLE,
+                subject
+        );
+        if (googleUser.isPresent()) {
+            return googleUser;
+        }
+        return userRepository.findByProviderAndProviderSubject(AuthProvider.MOBILE_GOOGLE, subject);
+    }
+
+    private static AuthProvider requireGoogleProvider(AuthProvider authProvider) {
+        if (authProvider == null || !authProvider.isGoogle()) {
+            throw new BadRequestException("Geçersiz Google kimlik doğrulama yöntemi");
+        }
+        return authProvider;
+    }
+
+    private static boolean isGoogleProvider(AuthProvider provider) {
+        return provider != null && provider.isGoogle();
     }
 
     private void requireVerifiedEmail(GoogleOidcIdentity identity) {

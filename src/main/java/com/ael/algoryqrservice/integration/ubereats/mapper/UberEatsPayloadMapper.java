@@ -54,6 +54,16 @@ public class UberEatsPayloadMapper {
         return body;
     }
 
+    public Map<String, Object> toUpdateBody(String productId, UberEatsDtos.CreateProductRequest request) {
+        Map<String, Object> body = toUpsertBody(request);
+        if (hasText(productId)) {
+            body.put("id", productId.trim());
+        }
+        body.putIfAbsent("modifierProducts", List.of());
+        body.putIfAbsent("extraIngredients", List.of());
+        return body;
+    }
+
     public Map<String, Object> toUpsertBody(JsonNode productData) {
         if (productData == null || productData.isNull()) {
             return new LinkedHashMap<>();
@@ -77,8 +87,15 @@ public class UberEatsPayloadMapper {
             UberEatsDtos.CreateProductRequest request
     ) {
         List<UberEatsDtos.ProductResponse> products = toProducts(response);
+        List<UberEatsDtos.ModifierGroupRequest> groups = request.getModifierGroups() == null
+                ? List.of()
+                : request.getModifierGroups();
         if (!products.isEmpty()) {
-            return products.getFirst();
+            UberEatsDtos.ProductResponse created = products.getFirst();
+            if (created.getModifierGroups() == null || created.getModifierGroups().isEmpty()) {
+                created.setModifierGroups(groups);
+            }
+            return created;
         }
         String id = firstText(response, "id", "productId");
         return UberEatsDtos.ProductResponse.builder()
@@ -90,6 +107,7 @@ public class UberEatsPayloadMapper {
                 .currency(request.getCurrency() == null ? "TRY" : request.getCurrency())
                 .imageUrl(request.getImageUrl())
                 .available(request.getAvailable() == null || request.getAvailable())
+                .modifierGroups(groups)
                 .build();
     }
 
@@ -151,13 +169,7 @@ public class UberEatsPayloadMapper {
             return product;
         }
         JsonNode full = catalog.get(id);
-        if (full == null) {
-            return product;
-        }
-        if (productName(product) != null) {
-            return product;
-        }
-        return full;
+        return full == null ? product : full;
     }
 
     private String productId(JsonNode product) {
@@ -383,26 +395,59 @@ public class UberEatsPayloadMapper {
     }
 
     private void appendModifierGroupsFromNode(Map<String, Object> body, JsonNode productData) {
-        JsonNode groups = firstNode(productData, "modifierGroups");
-        if (groups == null || !groups.isArray()) {
-            return;
+        appendModifierGroups(body, toModifierGroups(productData));
+    }
+
+    private List<UberEatsDtos.ModifierGroupRequest> toModifierGroups(JsonNode product) {
+        if (product == null || product.isNull()) {
+            return List.of();
         }
+        JsonNode groups = firstNode(product, "modifierGroups", "modifierProducts");
+        if (groups != null && groups.isArray() && !groups.isEmpty()) {
+            return parseGroupArray(groups);
+        }
+        List<UberEatsDtos.ModifierOptionRequest> extras = parseOptionNodes(firstNode(product, "extraIngredients"));
+        if (extras.isEmpty()) {
+            return List.of();
+        }
+        return List.of(UberEatsDtos.ModifierGroupRequest.builder()
+                .name("Ekstralar")
+                .required(false)
+                .minSelect(0)
+                .maxSelect(Math.max(1, extras.size()))
+                .options(extras)
+                .build());
+    }
+
+    private List<UberEatsDtos.ModifierGroupRequest> parseGroupArray(JsonNode groups) {
         List<UberEatsDtos.ModifierGroupRequest> parsed = new ArrayList<>();
         for (JsonNode group : groups) {
+            String name = firstText(group, "name", "title");
+            List<UberEatsDtos.ModifierOptionRequest> options = parseModifierOptions(group);
+            if (name == null || options.isEmpty()) {
+                continue;
+            }
             parsed.add(UberEatsDtos.ModifierGroupRequest.builder()
-                    .name(firstText(group, "name"))
+                    .name(name)
                     .required(Boolean.TRUE.equals(firstBoolean(group, "required")))
                     .minSelect(firstInteger(group, "minSelect"))
                     .maxSelect(firstInteger(group, "maxSelect"))
-                    .options(parseModifierOptions(group))
+                    .options(options)
                     .build());
         }
-        appendModifierGroups(body, parsed);
+        return parsed;
     }
 
     private List<UberEatsDtos.ModifierOptionRequest> parseModifierOptions(JsonNode group) {
+        return parseOptionNodes(firstNode(group, "options", "modifierOptions"));
+    }
+
+    private List<UberEatsDtos.ModifierOptionRequest> parseOptionNodes(JsonNode optionsNode) {
+        if (optionsNode == null || !optionsNode.isArray()) {
+            return List.of();
+        }
         List<UberEatsDtos.ModifierOptionRequest> options = new ArrayList<>();
-        for (JsonNode option : listNodes(group, "options", "modifierOptions")) {
+        for (JsonNode option : optionsNode) {
             String name = firstText(option, "name", "title");
             if (name == null) {
                 continue;
@@ -563,6 +608,7 @@ public class UberEatsPayloadMapper {
                         "product.imageUrl"
                 ))
                 .available(isAvailable(product))
+                .modifierGroups(toModifierGroups(product))
                 .build());
     }
 

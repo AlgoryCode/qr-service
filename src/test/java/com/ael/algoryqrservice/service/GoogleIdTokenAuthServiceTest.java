@@ -41,13 +41,18 @@ class GoogleIdTokenAuthServiceTest {
                 .id(7L)
                 .email("user@example.com")
                 .role(UserRole.USER)
-                .provider(AuthProvider.GOOGLE)
+                .provider(AuthProvider.MOBILE_GOOGLE)
                 .providerSubject("sub-1")
                 .build();
         ClientInfo clientInfo = new ClientInfo("127.0.0.1", "Android", "Pixel", "MOBILE");
         when(googleIdTokenVerifier.verify("id-token")).thenReturn(identity);
-        when(googleOAuthUserService.resolve(GoogleAuthIntent.LOGIN, identity, clientInfo)).thenReturn(user);
-        when(sessionService.createSession(user, clientInfo))
+        when(googleOAuthUserService.resolve(
+                GoogleAuthIntent.LOGIN,
+                identity,
+                clientInfo,
+                AuthProvider.MOBILE_GOOGLE
+        )).thenReturn(user);
+        when(sessionService.createSession(user, clientInfo, AuthProvider.MOBILE_GOOGLE))
                 .thenReturn(new SessionService.SessionTokens(null, "access", "refresh", user));
         when(sessionService.buildAuthResponse("access", "refresh"))
                 .thenReturn(AuthResponse.builder().accessToken("access").refreshToken("refresh").build());
@@ -56,7 +61,7 @@ class GoogleIdTokenAuthServiceTest {
 
         assertThat(response.getAccessToken()).isEqualTo("access");
         assertThat(response.getRefreshToken()).isEqualTo("refresh");
-        verify(sessionService).createSession(user, clientInfo);
+        verify(sessionService).createSession(user, clientInfo, AuthProvider.MOBILE_GOOGLE);
     }
 
     @Test

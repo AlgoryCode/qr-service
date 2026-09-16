@@ -105,7 +105,7 @@ public class AuthService {
         if (user.getRole() == UserRole.WAITER) {
             throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");
         }
-        if (user.getProvider() == AuthProvider.GOOGLE) {
+        if (user.getProvider() != null && user.getProvider().isGoogle()) {
             throw new BadRequestException(GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE);
         }
         if (user.getProvider() != AuthProvider.BASIC) {

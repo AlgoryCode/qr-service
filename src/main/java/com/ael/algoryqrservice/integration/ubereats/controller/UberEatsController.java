@@ -79,6 +79,14 @@ public class UberEatsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(productCommandService.create(request));
     }
 
+    @PutMapping("/products/{productId}")
+    public ResponseEntity<UberEatsDtos.ProductResponse> updateProduct(
+            @PathVariable String productId,
+            @Valid @RequestBody UberEatsDtos.CreateProductRequest request
+    ) {
+        return ResponseEntity.ok(productCommandService.update(productId, request));
+    }
+
     @GetMapping("/orders")
     public ResponseEntity<UberEatsDtos.OrderPageResponse> orders(
             @RequestParam(required = false) String status,

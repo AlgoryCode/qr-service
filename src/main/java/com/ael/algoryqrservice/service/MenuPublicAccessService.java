@@ -1,20 +1,17 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
+import com.ael.algoryqrservice.access.AccessSession;
+import com.ael.algoryqrservice.access.PackageProductCatalog;
+import com.ael.algoryqrservice.access.SessionAccessService;
+import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
-import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
-import org.springframework.context.annotation.Lazy;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
+@RequiredArgsConstructor
 public class MenuPublicAccessService {
 
     public record AccessDecision(boolean allowed, MenuPublicAccessDisabledReason reason) {
@@ -27,43 +24,21 @@ public class MenuPublicAccessService {
         }
     }
 
-    private final EntitlementService entitlementService;
-    private final PurchaseRepository purchaseRepository;
-    private final PurchaseFulfillmentRepository purchaseFulfillmentRepository;
+    private final SessionAccessService sessionAccessService;
+    private final PackageProductCatalog packageProductCatalog;
     private final MenuRepository menuRepository;
 
-    public MenuPublicAccessService(
-            @Lazy EntitlementService entitlementService,
-            PurchaseRepository purchaseRepository,
-            PurchaseFulfillmentRepository purchaseFulfillmentRepository,
-            MenuRepository menuRepository
-    ) {
-        this.entitlementService = entitlementService;
-        this.purchaseRepository = purchaseRepository;
-        this.purchaseFulfillmentRepository = purchaseFulfillmentRepository;
-        this.menuRepository = menuRepository;
-    }
-
-    @Transactional(readOnly = true)
+    @Transactional
     public AccessDecision evaluate(Long userId) {
         if (userId == null) {
             return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
         }
-        if (!entitlementService.hasScope(userId, CatalogScopes.QR_CREATE_OWNER)) {
-            return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
+        AccessSession session = sessionAccessService.resolve(userId);
+        if (!session.isAllow()) {
+            return AccessDecision.deny(disabledReason(session.decision()));
         }
-
-        List<Purchase> activePurchases = purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE)
-                .stream()
-                .filter(Purchase::isUsable)
-                .toList();
-        if (activePurchases.isEmpty()) {
+        if (!packageProductCatalog.containsProduct(session.packageCode(), CatalogProducts.QR_MENU)) {
             return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
-        }
-
-        List<Long> purchaseIds = activePurchases.stream().map(Purchase::getId).toList();
-        if (purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(purchaseIds, FulfillmentStatus.OVERDUE)) {
-            return AccessDecision.deny(MenuPublicAccessDisabledReason.INSTALLMENT_OVERDUE);
         }
         return AccessDecision.allow();
     }
@@ -98,5 +73,14 @@ public class MenuPublicAccessService {
     @Transactional
     public void syncAllMenuOwners() {
         syncForUsers(menuRepository.findDistinctUserIdsByDeletedFalse());
+    }
+
+    private static MenuPublicAccessDisabledReason disabledReason(
+            com.ael.algoryqrservice.model.enums.AccessDecision decision
+    ) {
+        return switch (decision) {
+            case REQUIRE_PAYMENT -> MenuPublicAccessDisabledReason.INSTALLMENT_OVERDUE;
+            case START_PACKAGE, REQUIRE_PURCHASE, ALLOW -> MenuPublicAccessDisabledReason.PACKAGE_INACTIVE;
+        };
     }
 }

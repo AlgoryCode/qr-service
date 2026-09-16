@@ -43,7 +43,7 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "provider", nullable = false, length = 16)
+    @Column(name = "provider", nullable = false, length = 32)
     @ColumnDefault("'BASIC'")
     @Builder.Default
     private AuthProvider provider = AuthProvider.BASIC;
