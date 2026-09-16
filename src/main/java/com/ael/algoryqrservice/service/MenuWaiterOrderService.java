@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.RestaurantArea;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
@@ -20,6 +21,7 @@ import com.ael.algoryqrservice.model.enums.OrderSource;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.repository.RestaurantAreaRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.service.campaign.CampaignEvaluationService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ public class MenuWaiterOrderService {
 
     private final MenuOrderRepository menuOrderRepository;
     private final RestaurantTableRepository restaurantTableRepository;
+    private final RestaurantAreaRepository restaurantAreaRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuOrderService menuOrderService;
     private final MenuCategoryService menuCategoryService;
@@ -83,6 +86,9 @@ public class MenuWaiterOrderService {
 
         List<RestaurantTable> tables = restaurantTableRepository
                 .findByMenuIdInOrderByTableNumberAscNameAsc(menuIds);
+        Map<Long, String> areaNames = restaurantAreaRepository
+                .findByMenuIdInOrderBySortOrderAscIdAsc(menuIds).stream()
+                .collect(Collectors.toMap(RestaurantArea::getId, RestaurantArea::getName, (a, b) -> a));
 
         List<MenuOrder> pendingOrders = menuOrderRepository
                 .findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.SUBMITTED);
@@ -114,6 +120,8 @@ public class MenuWaiterOrderService {
                             .menuName(showMenuName && menu != null ? menu.getBusinessName() : null)
                             .tableName(table.getName())
                             .tableNumber(table.getTableNumber())
+                            .areaId(table.getAreaId())
+                            .areaName(table.getAreaId() != null ? areaNames.get(table.getAreaId()) : null)
                             .active(table.isActive())
                             .pendingOrderCount(tablePending.size())
                             .latestPendingOrderId(latest != null ? latest.getId() : null)

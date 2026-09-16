@@ -1,16 +1,26 @@
 package com.ael.algoryqrservice.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.ColumnDefault;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_restaurant_table", indexes = {
-        @Index(name = "idx_restaurant_table_menu_id", columnList = "menu_id")
-}, uniqueConstraints = {
-        @UniqueConstraint(columnNames = "public_token")
+@Table(name = "tbl_restaurant_area", indexes = {
+        @Index(name = "idx_restaurant_area_menu_id", columnList = "menu_id")
 })
 @Getter
 @Setter
@@ -18,7 +28,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RestaurantTable {
+public class RestaurantArea {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,28 +38,12 @@ public class RestaurantTable {
     @Column(name = "menu_id", nullable = false)
     private Long menuId;
 
-    @Column(name = "area_id")
-    private Long areaId;
-
     @Column(nullable = false, length = 120)
     private String name;
 
-    @Column(name = "table_number")
-    private Integer tableNumber;
-
-    @Column
-    private Integer capacity;
-
-    @Column(name = "public_token", nullable = false, unique = true, length = 64)
-    private String publicToken;
-
-    @Column(name = "qr_image_base64", columnDefinition = "text")
-    private String qrImageBase64;
-
-    @Column(nullable = false)
-    @ColumnDefault("true")
+    @Column(name = "sort_order", nullable = false)
     @Builder.Default
-    private boolean active = true;
+    private int sortOrder = 0;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

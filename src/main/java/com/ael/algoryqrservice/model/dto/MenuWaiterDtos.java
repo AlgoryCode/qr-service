@@ -185,6 +185,8 @@ public final class MenuWaiterDtos {
         private String menuName;
         private String tableName;
         private Integer tableNumber;
+        private Long areaId;
+        private String areaName;
         private boolean active;
         private int pendingOrderCount;
         private Long latestPendingOrderId;

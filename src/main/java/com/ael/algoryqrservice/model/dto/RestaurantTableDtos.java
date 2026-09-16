@@ -28,6 +28,8 @@ public final class RestaurantTableDtos {
 
         @Min(1)
         private Integer capacity;
+
+        private Long areaId;
     }
 
     @Data
@@ -44,6 +46,8 @@ public final class RestaurantTableDtos {
         private Integer capacity;
 
         private Boolean active;
+
+        private Long areaId;
     }
 
     @Data
@@ -53,6 +57,8 @@ public final class RestaurantTableDtos {
     public static class TableResponse {
         private Long id;
         private Long menuId;
+        private Long areaId;
+        private String areaName;
         private String name;
         private Integer tableNumber;
         private Integer capacity;
