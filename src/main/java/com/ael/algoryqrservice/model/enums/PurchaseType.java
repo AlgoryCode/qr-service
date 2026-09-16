@@ -4,5 +4,6 @@ public enum PurchaseType {
     FREE,
     PAID,
     SYSTEM_GRANT,
-    ADD_ON
+    ADD_ON,
+    TRIAL
 }

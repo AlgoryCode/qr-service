@@ -47,4 +47,10 @@ class CatalogThemesTest {
         assertThat(CatalogThemes.isCustomTheme("")).isFalse();
         assertThat(CatalogThemes.isCustomTheme("   ")).isFalse();
     }
+
+    @Test
+    void defaultThemeCode_isLuxury() {
+        assertThat(CatalogThemes.DEFAULT_THEME_CODE).isEqualTo("luxury");
+        assertThat(CatalogThemes.isPresetTheme(CatalogThemes.DEFAULT_THEME_CODE)).isTrue();
+    }
 }

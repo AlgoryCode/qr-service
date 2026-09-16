@@ -5,6 +5,12 @@ import java.util.Set;
 
 public final class CatalogThemes {
 
+    /**
+     * Yeni üye / deneme başlangıcında otomatik atanan varsayılan tema.
+     * Kullanıcı menü oluşturduktan sonra başka temaya geçebilir veya özelleştirebilir.
+     */
+    public static final String DEFAULT_THEME_CODE = "luxury";
+
     /** Hazır menü şablonları — paket kısıtı olmadan seçilebilir. */
     public static final Set<String> PRESET_THEME_IDS = Set.of(
             "soft",
