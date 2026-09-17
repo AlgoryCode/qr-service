@@ -26,4 +26,11 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     Optional<RestaurantTable> findFirstByMenuIdAndNameIgnoreCaseAndActiveTrue(Long menuId, String name);
 
     Optional<RestaurantTable> findFirstByMenuIdAndActiveTrueOrderByTableNumberAscNameAsc(Long menuId);
+
+    Optional<RestaurantTable> findFirstByMenuIdAndNameIgnoreCaseAndActiveTrueAndDeletedFalse(
+            Long menuId,
+            String name
+    );
+
+    Optional<RestaurantTable> findFirstByMenuIdAndActiveTrueAndDeletedFalseOrderByTableNumberAscNameAsc(Long menuId);
 }

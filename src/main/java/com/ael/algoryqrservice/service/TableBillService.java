@@ -68,6 +68,7 @@ public class TableBillService {
     @Transactional
     public TableBill openBill(Long menuId, Long tableId, Long waiterId) {
         RestaurantTable table = restaurantTableRepository.findByIdAndMenuId(tableId, menuId)
+                .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
         if (!table.isActive()) {
             throw new BadRequestException("Masa aktif değil");

@@ -45,6 +45,13 @@ public class RestaurantAreaSchemaInitializer implements BeanPostProcessor {
             statement.execute(
                     "CREATE INDEX IF NOT EXISTS idx_restaurant_table_area_id ON tbl_restaurant_table (area_id)"
             );
+            statement.execute("ALTER TABLE tbl_restaurant_table ADD COLUMN IF NOT EXISTS layout_x DOUBLE PRECISION");
+            statement.execute("ALTER TABLE tbl_restaurant_table ADD COLUMN IF NOT EXISTS layout_y DOUBLE PRECISION");
+            statement.execute("ALTER TABLE tbl_restaurant_table ADD COLUMN IF NOT EXISTS layout_rotation INTEGER");
+            statement.execute("ALTER TABLE tbl_restaurant_table ADD COLUMN IF NOT EXISTS layout_shape VARCHAR(20)");
+            statement.execute(
+                    "ALTER TABLE tbl_restaurant_table ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"
+            );
             log.info("Ensured restaurant area schema");
         } catch (Exception e) {
             throw new IllegalStateException("Restaurant area schema could not be initialized", e);

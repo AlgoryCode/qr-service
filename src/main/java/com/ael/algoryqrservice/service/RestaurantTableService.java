@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +35,7 @@ public class RestaurantTableService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int TOKEN_BYTES = 32;
+    private static final Set<String> LAYOUT_SHAPES = Set.of("ROUND", "SQUARE", "RECTANGLE");
 
     private final RestaurantTableRepository restaurantTableRepository;
     private final RestaurantAreaRepository restaurantAreaRepository;
@@ -49,6 +51,7 @@ public class RestaurantTableService {
                 .findByMenuIdOrderBySortOrderAscIdAsc(menu.getMenuId()).stream()
                 .collect(Collectors.toMap(RestaurantArea::getId, RestaurantArea::getName));
         return restaurantTableRepository.findByMenuIdOrderByTableNumberAscNameAsc(menu.getMenuId()).stream()
+                .filter(table -> !table.isDeleted())
                 .map(table -> toTableResponse(table, menu, areaNames.get(table.getAreaId())))
                 .toList();
     }
@@ -77,9 +80,14 @@ public class RestaurantTableService {
                 .name(name)
                 .tableNumber(request.getTableNumber())
                 .capacity(request.getCapacity())
+                .layoutX(clampPercent(request.getLayoutX()))
+                .layoutY(clampPercent(request.getLayoutY()))
+                .layoutRotation(normalizeRotation(request.getLayoutRotation()))
+                .layoutShape(normalizeLayoutShape(request.getLayoutShape()))
                 .publicToken(publicToken)
                 .qrImageBase64(qrImageBase64)
                 .active(true)
+                .deleted(false)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -126,6 +134,18 @@ public class RestaurantTableService {
                 }
                 table.setAreaId(areaId);
             }
+            if (request.getLayoutX() != null) {
+                table.setLayoutX(clampPercent(request.getLayoutX()));
+            }
+            if (request.getLayoutY() != null) {
+                table.setLayoutY(clampPercent(request.getLayoutY()));
+            }
+            if (request.getLayoutRotation() != null) {
+                table.setLayoutRotation(normalizeRotation(request.getLayoutRotation()));
+            }
+            if (request.getLayoutShape() != null) {
+                table.setLayoutShape(normalizeLayoutShape(request.getLayoutShape()));
+            }
         }
 
         table.setUpdatedAt(LocalDateTime.now());
@@ -150,7 +170,7 @@ public class RestaurantTableService {
     public void deleteTable(Long menuId, Long tableId) {
         Menu menu = requireOwnedMenu(menuId);
         RestaurantTable table = requireTable(menu.getMenuId(), tableId);
-        table.setActive(false);
+        table.setDeleted(true);
         table.setUpdatedAt(LocalDateTime.now());
         restaurantTableRepository.save(table);
     }
@@ -168,6 +188,10 @@ public class RestaurantTableService {
                 .name(table.getName())
                 .tableNumber(table.getTableNumber())
                 .capacity(table.getCapacity())
+                .layoutX(table.getLayoutX())
+                .layoutY(table.getLayoutY())
+                .layoutRotation(table.getLayoutRotation())
+                .layoutShape(table.getLayoutShape())
                 .publicToken(table.getPublicToken())
                 .publicUrl(buildPublicUrl(menu, table.getPublicToken()))
                 .qrImageBase64(table.getQrImageBase64())
@@ -175,6 +199,35 @@ public class RestaurantTableService {
                 .createdAt(table.getCreatedAt())
                 .updatedAt(table.getUpdatedAt())
                 .build();
+    }
+
+    private static Double clampPercent(Double value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.max(0d, Math.min(100d, value));
+    }
+
+    private static Integer normalizeRotation(Integer rotation) {
+        if (rotation == null) {
+            return null;
+        }
+        int normalized = rotation % 360;
+        if (normalized < 0) {
+            normalized += 360;
+        }
+        return normalized;
+    }
+
+    private static String normalizeLayoutShape(String shape) {
+        if (shape == null || shape.isBlank()) {
+            return null;
+        }
+        String normalized = shape.trim().toUpperCase(Locale.ROOT);
+        if (!LAYOUT_SHAPES.contains(normalized)) {
+            throw new BadRequestException("Geçersiz masa şekli");
+        }
+        return normalized;
     }
 
     private Long resolveAreaId(Long menuId, Long areaId) {
@@ -188,6 +241,7 @@ public class RestaurantTableService {
 
     private boolean tableNameTaken(Long menuId, Long areaId, String name, Long excludeId) {
         return restaurantTableRepository.findByMenuIdOrderByTableNumberAscNameAsc(menuId).stream()
+                .filter(table -> !table.isDeleted())
                 .filter(table -> Objects.equals(table.getAreaId(), areaId))
                 .filter(table -> excludeId == null || !excludeId.equals(table.getId()))
                 .anyMatch(table -> namesEqual(table.getName(), name));
@@ -226,6 +280,7 @@ public class RestaurantTableService {
 
     private RestaurantTable requireTable(Long menuId, Long tableId) {
         return restaurantTableRepository.findByIdAndMenuId(tableId, menuId)
+                .filter(table -> !table.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
     }
 
