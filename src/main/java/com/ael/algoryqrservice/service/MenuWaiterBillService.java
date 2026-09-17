@@ -96,6 +96,7 @@ public class MenuWaiterBillService {
     private RestaurantTable requireTableForCurrentWaiter(Long tableId) {
         MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
         RestaurantTable table = restaurantTableRepository.findById(tableId)
+                .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
         waiterAccessService.requireMenuInWaiterBranch(table.getMenuId(), waiter);
         return table;

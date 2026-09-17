@@ -78,6 +78,9 @@ public class TableSessionService {
     private RestaurantTable resolveTableByToken(Menu menu, String tableToken) {
         RestaurantTable table = restaurantTableRepository.findByPublicToken(tableToken)
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
+        if (table.isDeleted()) {
+            throw new NotFoundException("Masa bulunamadı");
+        }
         if (!table.getMenuId().equals(menu.getMenuId())) {
             throw new BadRequestException("Masa bu menüye ait değil");
         }
@@ -89,8 +92,8 @@ public class TableSessionService {
 
     private RestaurantTable resolveWalkInTable(Menu menu) {
         return restaurantTableRepository
-                .findFirstByMenuIdAndNameIgnoreCaseAndActiveTrue(menu.getMenuId(), WALK_IN_TABLE_NAME)
-                .or(() -> restaurantTableRepository.findFirstByMenuIdAndActiveTrueOrderByTableNumberAscNameAsc(menu.getMenuId()))
+                .findFirstByMenuIdAndNameIgnoreCaseAndActiveTrueAndDeletedFalse(menu.getMenuId(), WALK_IN_TABLE_NAME)
+                .or(() -> restaurantTableRepository.findFirstByMenuIdAndActiveTrueAndDeletedFalseOrderByTableNumberAscNameAsc(menu.getMenuId()))
                 .orElseGet(() -> {
                     LocalDateTime now = LocalDateTime.now();
                     String publicToken = generateToken();
@@ -101,6 +104,7 @@ public class TableSessionService {
                             .publicToken(publicToken)
                             .qrImageBase64(null)
                             .active(true)
+                            .deleted(false)
                             .createdAt(now)
                             .updatedAt(now)
                             .build();

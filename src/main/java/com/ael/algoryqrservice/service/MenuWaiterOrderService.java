@@ -99,6 +99,7 @@ public class MenuWaiterOrderService {
         Map<Long, TableBill> openBillsByTable = tableBillService.findOpenBillsByMenuIds(menuIds);
 
         return tables.stream()
+                .filter(table -> !table.isDeleted())
                 .map(table -> {
                     List<MenuOrder> tablePending = pendingByTable.getOrDefault(table.getId(), List.of());
                     MenuOrder latest = tablePending.stream()
@@ -356,6 +357,7 @@ public class MenuWaiterOrderService {
 
     private RestaurantTable requireTableForWaiter(Long tableId, MenuWaiter waiter) {
         RestaurantTable table = restaurantTableRepository.findById(tableId)
+                .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
         waiterAccessService.requireMenuInWaiterBranch(table.getMenuId(), waiter);
         return table;
