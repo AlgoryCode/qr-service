@@ -31,7 +31,7 @@ public class EmailVerificationService {
     @Transactional(readOnly = true)
     public EmailVerificationDtos.Status status() {
         User user = securityUtils.getCurrentUser();
-        return new EmailVerificationDtos.Status(user.isEmailVerified(), user.getEmail(), user.getEmailVerificationExpiresAt());
+        return toStatus(user);
     }
 
     @Transactional
@@ -39,15 +39,21 @@ public class EmailVerificationService {
         User user = securityUtils.getCurrentUser();
         requireBasic(user);
         if (user.isEmailVerified()) {
-            return status();
+            return toStatus(user);
         }
-        LocalDateTime now = LocalDateTime.now();
-        if (user.getEmailVerificationSentAt() != null
-                && user.getEmailVerificationSentAt().plusMinutes(1).isAfter(now)) {
-            throw new BadRequestException("Yeni doğrulama kodu için lütfen biraz bekleyin");
-        }
-        issueCode(user, now);
-        return status();
+        sendCodeWithCooldown(user);
+        return toStatus(user);
+    }
+
+    @Transactional
+    public void resendByEmail(EmailVerificationDtos.ResendByEmailRequest request) {
+        String email = request.email().trim().toLowerCase();
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getProvider() != AuthProvider.BASIC || user.isEmailVerified()) {
+                return;
+            }
+            sendCodeWithCooldown(user);
+        });
     }
 
     @Transactional
@@ -61,20 +67,21 @@ public class EmailVerificationService {
     public EmailVerificationDtos.Status verify(EmailVerificationDtos.VerifyRequest request) {
         User user = securityUtils.getCurrentUser();
         requireBasic(user);
-        LocalDateTime now = LocalDateTime.now();
-        if (user.getEmailVerificationCodeHash() == null
-                || user.getEmailVerificationExpiresAt() == null
-                || !user.getEmailVerificationExpiresAt().isAfter(now)) {
-            throw new BadRequestException("Doğrulama kodunun süresi dolmuş. Yeni kod isteyin.");
+        applyVerification(user, request.code());
+        return toStatus(user);
+    }
+
+    @Transactional
+    public EmailVerificationDtos.Status verifyByEmail(EmailVerificationDtos.PublicVerifyRequest request) {
+        String email = request.email().trim().toLowerCase();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Geçersiz doğrulama kodu"));
+        requireBasic(user);
+        if (user.isEmailVerified()) {
+            return toStatus(user);
         }
-        if (!passwordEncoder.matches(request.code().trim(), user.getEmailVerificationCodeHash())) {
-            throw new BadRequestException("Geçersiz doğrulama kodu");
-        }
-        user.setEmailVerified(true);
-        user.setEmailVerificationCodeHash(null);
-        user.setEmailVerificationExpiresAt(null);
-        userRepository.save(user);
-        return status();
+        applyVerification(user, request.code());
+        return toStatus(user);
     }
 
     @Transactional
@@ -86,6 +93,31 @@ public class EmailVerificationService {
         issueCode(user, LocalDateTime.now());
     }
 
+    private void sendCodeWithCooldown(User user) {
+        LocalDateTime now = LocalDateTime.now();
+        if (user.getEmailVerificationSentAt() != null
+                && user.getEmailVerificationSentAt().plusMinutes(1).isAfter(now)) {
+            throw new BadRequestException("Yeni doğrulama kodu için lütfen biraz bekleyin");
+        }
+        issueCode(user, now);
+    }
+
+    private void applyVerification(User user, String rawCode) {
+        LocalDateTime now = LocalDateTime.now();
+        if (user.getEmailVerificationCodeHash() == null
+                || user.getEmailVerificationExpiresAt() == null
+                || !user.getEmailVerificationExpiresAt().isAfter(now)) {
+            throw new BadRequestException("Doğrulama kodunun süresi dolmuş. Yeni kod isteyin.");
+        }
+        if (!passwordEncoder.matches(rawCode.trim(), user.getEmailVerificationCodeHash())) {
+            throw new BadRequestException("Geçersiz doğrulama kodu");
+        }
+        user.setEmailVerified(true);
+        user.setEmailVerificationCodeHash(null);
+        user.setEmailVerificationExpiresAt(null);
+        userRepository.save(user);
+    }
+
     private void issueCode(User user, LocalDateTime now) {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         user.setEmailVerificationCodeHash(passwordEncoder.encode(code));
@@ -95,6 +127,14 @@ public class EmailVerificationService {
         notificationPublisherService.publishEmailVerificationCode(
                 user.getEmail(), user.getDisplayName().isBlank() ? "Kullanıcı" : user.getDisplayName(),
                 code, codeValidityMinutes);
+    }
+
+    private EmailVerificationDtos.Status toStatus(User user) {
+        return new EmailVerificationDtos.Status(
+                user.isEmailVerified(),
+                user.getEmail(),
+                user.getEmailVerificationExpiresAt()
+        );
     }
 
     private void requireBasic(User user) {
