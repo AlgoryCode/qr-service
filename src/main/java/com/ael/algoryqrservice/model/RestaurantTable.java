@@ -28,6 +28,9 @@ public class RestaurantTable {
     @Column(name = "menu_id", nullable = false)
     private Long menuId;
 
+    @Column(name = "area_id")
+    private Long areaId;
+
     @Column(nullable = false, length = 120)
     private String name;
 
@@ -36,6 +39,18 @@ public class RestaurantTable {
 
     @Column
     private Integer capacity;
+
+    @Column(name = "layout_x")
+    private Double layoutX;
+
+    @Column(name = "layout_y")
+    private Double layoutY;
+
+    @Column(name = "layout_rotation")
+    private Integer layoutRotation;
+
+    @Column(name = "layout_shape", length = 20)
+    private String layoutShape;
 
     @Column(name = "public_token", nullable = false, unique = true, length = 64)
     private String publicToken;
@@ -47,6 +62,11 @@ public class RestaurantTable {
     @ColumnDefault("true")
     @Builder.Default
     private boolean active = true;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean deleted = false;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

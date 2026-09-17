@@ -80,7 +80,7 @@ public class UnifiedAnalyticsAggregates {
             return 0L;
         }
         return restaurantTableRepository.findByMenuIdInOrderByTableNumberAscNameAsc(menuIds).stream()
-                .filter(RestaurantTable::isActive)
+                .filter(table -> table.isActive() && !table.isDeleted())
                 .count();
     }
 

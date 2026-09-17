@@ -3,11 +3,13 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.model.dto.RestaurantAreaDtos;
 import com.ael.algoryqrservice.model.dto.RestaurantTableDtos;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.MenuOrderService;
 import com.ael.algoryqrservice.service.MenuWaiterService;
 import com.ael.algoryqrservice.service.MerchantCustomerService;
+import com.ael.algoryqrservice.service.RestaurantAreaService;
 import com.ael.algoryqrservice.service.RestaurantTableService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class WaiterPanelController {
 
     private final MenuWaiterService menuWaiterService;
     private final RestaurantTableService restaurantTableService;
+    private final RestaurantAreaService restaurantAreaService;
     private final MenuOrderService menuOrderService;
     private final MerchantCustomerService merchantCustomerService;
 
@@ -68,6 +71,37 @@ public class WaiterPanelController {
             @PathVariable Long waiterId
     ) {
         menuWaiterService.deleteWaiter(branchId, waiterId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/menu/{menuId}/areas")
+    public ResponseEntity<List<RestaurantAreaDtos.AreaResponse>> listAreas(@PathVariable Long menuId) {
+        return ResponseEntity.ok(restaurantAreaService.listAreas(menuId));
+    }
+
+    @PostMapping("/menu/{menuId}/areas")
+    public ResponseEntity<RestaurantAreaDtos.AreaResponse> createArea(
+            @PathVariable Long menuId,
+            @Valid @RequestBody RestaurantAreaDtos.CreateAreaRequest request
+    ) {
+        return ResponseEntity.status(201).body(restaurantAreaService.createArea(menuId, request));
+    }
+
+    @PatchMapping("/menu/{menuId}/areas/{areaId}")
+    public ResponseEntity<RestaurantAreaDtos.AreaResponse> updateArea(
+            @PathVariable Long menuId,
+            @PathVariable Long areaId,
+            @RequestBody RestaurantAreaDtos.UpdateAreaRequest request
+    ) {
+        return ResponseEntity.ok(restaurantAreaService.updateArea(menuId, areaId, request));
+    }
+
+    @DeleteMapping("/menu/{menuId}/areas/{areaId}")
+    public ResponseEntity<Void> deleteArea(
+            @PathVariable Long menuId,
+            @PathVariable Long areaId
+    ) {
+        restaurantAreaService.deleteArea(menuId, areaId);
         return ResponseEntity.noContent().build();
     }
 

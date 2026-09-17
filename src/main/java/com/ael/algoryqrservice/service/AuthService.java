@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
@@ -29,6 +30,9 @@ public class AuthService {
 
     private static final String GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE =
             "Bu e-posta adresi Google ile kayıtlı. Lütfen Google ile giriş yapın.";
+    static final String EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
+    private static final String EMAIL_NOT_VERIFIED_MESSAGE =
+            "E-posta adresiniz onaylanmamış. Lütfen e-postanıza gelen kodu doğrulayın.";
 
     private final UserRepository userRepository;
     private final DashboardUserRepository dashboardUserRepository;
@@ -88,8 +92,15 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
         User user = authenticate(request);
+        requireEmailVerified(user);
         packageActivationService.ensureSubscriptionState(user.getId());
         return createAuthResponse(user, clientInfo);
+    }
+
+    private void requireEmailVerified(User user) {
+        if (user.getProvider() == AuthProvider.BASIC && !user.isEmailVerified()) {
+            throw new ForbiddenException(EMAIL_NOT_VERIFIED_CODE, EMAIL_NOT_VERIFIED_MESSAGE);
+        }
     }
 
     private User authenticate(LoginRequest request) {

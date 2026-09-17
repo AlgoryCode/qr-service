@@ -106,6 +106,7 @@ public class MenuOrderService {
         }
 
         RestaurantTable table = restaurantTableRepository.findByIdAndMenuId(request.getTableId(), menuId)
+                .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
         if (!table.isActive()) {
             throw new BadRequestException("Masa aktif değil");
