@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.service.AuthService;
+import com.ael.algoryqrservice.service.EmailVerificationService;
 import com.ael.algoryqrservice.util.ClientInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -10,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,6 +20,7 @@ import java.util.UUID;
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailVerificationService emailVerificationService;
 
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(
@@ -36,6 +37,21 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         return ResponseEntity.ok(authService.login(request, ClientInfo.from(httpRequest)));
+    }
+
+    @PostMapping("/email-verification/resend")
+    public ResponseEntity<Map<String, String>> resendEmailVerification(
+            @Valid @RequestBody EmailVerificationDtos.ResendByEmailRequest request
+    ) {
+        emailVerificationService.resendByEmail(request);
+        return ResponseEntity.ok(Map.of("message", "Doğrulama kodu gönderildi"));
+    }
+
+    @PostMapping("/email-verification/verify")
+    public ResponseEntity<EmailVerificationDtos.Status> verifyEmail(
+            @Valid @RequestBody EmailVerificationDtos.PublicVerifyRequest request
+    ) {
+        return ResponseEntity.ok(emailVerificationService.verifyByEmail(request));
     }
 
     @PostMapping("/refresh")
