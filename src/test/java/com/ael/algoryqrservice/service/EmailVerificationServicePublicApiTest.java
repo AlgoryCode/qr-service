@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.EmailVerificationDtos;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.security.EmailVerificationGate;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,6 +39,10 @@ class EmailVerificationServicePublicApiTest {
     PasswordEncoder passwordEncoder;
     @Mock
     NotificationPublisherService notificationPublisherService;
+    @Mock
+    EmailVerificationAttemptGuard attemptGuard;
+    @Mock
+    EmailVerificationGate emailVerificationGate;
 
     EmailVerificationService service;
 
@@ -46,7 +52,9 @@ class EmailVerificationServicePublicApiTest {
                 securityUtils,
                 userRepository,
                 passwordEncoder,
-                notificationPublisherService
+                notificationPublisherService,
+                attemptGuard,
+                emailVerificationGate
         );
         ReflectionTestUtils.setField(service, "codeValidityMinutes", 15);
     }
@@ -106,6 +114,8 @@ class EmailVerificationServicePublicApiTest {
         assertThat(status.verified()).isTrue();
         assertThat(user.isEmailVerified()).isTrue();
         assertThat(user.getEmailVerificationCodeHash()).isNull();
+        verify(attemptGuard).reset(user);
+        verify(emailVerificationGate).markVerified(1L);
     }
 
     @Test
@@ -124,5 +134,51 @@ class EmailVerificationServicePublicApiTest {
         assertThatThrownBy(() -> service.verifyByEmail(
                 new EmailVerificationDtos.PublicVerifyRequest("user@example.com", "000000")
         )).isInstanceOf(BadRequestException.class);
+
+        verify(attemptGuard).registerFailure(1L);
+        verify(emailVerificationGate, never()).markVerified(any());
+    }
+
+    @Test
+    void verifyByEmail_whenAttemptsLocked_thenBadRequestWithoutCodeCheck() {
+        User user = User.builder()
+                .id(1L)
+                .email("user@example.com")
+                .provider(AuthProvider.BASIC)
+                .emailVerified(false)
+                .emailVerificationCodeHash("hash")
+                .emailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10))
+                .emailVerificationLockedUntil(LocalDateTime.now().plusMinutes(5))
+                .build();
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(attemptGuard.isLocked(eq(user), any(LocalDateTime.class))).thenReturn(true);
+
+        assertThatThrownBy(() -> service.verifyByEmail(
+                new EmailVerificationDtos.PublicVerifyRequest("user@example.com", "123456")
+        )).isInstanceOf(BadRequestException.class);
+
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(attemptGuard, never()).registerFailure(any());
+    }
+
+    @Test
+    void resendByEmail_whenAttemptsLocked_thenNoCodeSent() {
+        User user = User.builder()
+                .id(1L)
+                .email("user@example.com")
+                .provider(AuthProvider.BASIC)
+                .emailVerified(false)
+                .emailVerificationLockedUntil(LocalDateTime.now().plusMinutes(5))
+                .build();
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(attemptGuard.isLocked(eq(user), any(LocalDateTime.class))).thenReturn(true);
+
+        assertThatThrownBy(() -> service.resendByEmail(
+                new EmailVerificationDtos.ResendByEmailRequest("user@example.com")
+        )).isInstanceOf(BadRequestException.class);
+
+        verify(notificationPublisherService, never()).publishEmailVerificationCode(
+                anyString(), anyString(), anyString(), anyInt()
+        );
     }
 }

@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.dto.BranchDtos;
 import com.ael.algoryqrservice.model.dto.ProductImageDtos;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
@@ -37,7 +38,8 @@ public class BranchService {
     public BranchDtos.ListResponse listMine() {
         Long userId = securityUtils.getCurrentUserId();
         List<Branch> branches = branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(userId);
-        Map<Long, List<Menu>> menusByBranch = menuRepository.findByUserIdAndDeletedFalseOrderByMenuIdAsc(userId)
+        Map<Long, List<Menu>> menusByBranch = menuRepository
+                .findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(userId, MenuChannel.QR)
                 .stream()
                 .filter(menu -> menu.getBranchId() != null)
                 .collect(Collectors.groupingBy(Menu::getBranchId));
@@ -54,7 +56,7 @@ public class BranchService {
     @Transactional(readOnly = true)
     public BranchDtos.Response getMine(Long branchId) {
         Branch branch = requireOwned(branchId);
-        return toResponse(branch, menuRepository.findByBranchIdAndDeletedFalse(branch.getId()));
+        return toResponse(branch, menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
     }
 
     @Transactional
@@ -91,7 +93,7 @@ public class BranchService {
         if (request.getActive() != null) {
             branch.setActive(request.getActive());
         }
-        return toResponse(branchRepository.save(branch), menuRepository.findByBranchIdAndDeletedFalse(branch.getId()));
+        return toResponse(branchRepository.save(branch), menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
     }
 
     @Transactional
@@ -105,7 +107,7 @@ public class BranchService {
         if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(uploaded.objectKey())) {
             productImageStorageService.deleteQuietly(previousKey);
         }
-        return toResponse(branch, menuRepository.findByBranchIdAndDeletedFalse(branch.getId()));
+        return toResponse(branch, menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
     }
 
     @Transactional
@@ -118,7 +120,7 @@ public class BranchService {
         if (previousKey != null && !previousKey.isBlank()) {
             productImageStorageService.deleteQuietly(previousKey);
         }
-        return toResponse(branch, menuRepository.findByBranchIdAndDeletedFalse(branch.getId()));
+        return toResponse(branch, menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
     }
 
     @Transactional
@@ -145,7 +147,8 @@ public class BranchService {
         if (source.getPhotoUrl() == null || source.getPhotoUrl().isBlank()) {
             throw new BadRequestException("Önce şube fotoğrafı yükleyin");
         }
-        for (Menu menu : menuRepository.findByUserIdAndDeletedFalseOrderByMenuIdAsc(source.getUserId())) {
+        for (Menu menu : menuRepository
+                .findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(source.getUserId(), MenuChannel.QR)) {
             menu.setLogoUrl(source.getPhotoUrl());
             menu.setLogoKey(source.getPhotoKey());
             menuRepository.save(menu);
@@ -156,7 +159,7 @@ public class BranchService {
     @Transactional
     public void delete(Long branchId) {
         Branch branch = requireOwned(branchId);
-        for (Menu menu : menuRepository.findByBranchIdAndDeletedFalse(branch.getId())) {
+        for (Menu menu : menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR)) {
             Qr qr = qrRepository.findById(menu.getQrId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
             menuQrSoftDeleteService.softDeleteMenuQr(qr);

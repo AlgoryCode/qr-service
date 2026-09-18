@@ -30,8 +30,12 @@ public class OnboardingPackageController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public AccessSessionResponse start(@Valid @RequestBody(required = false) OnboardingPackageStartRequest request) {
-        Long packageId = request == null ? null : request.packageId();
-        return onboardingPackageService.start(securityUtils.getCurrentUserId(), packageId);
+    public AccessSessionResponse start(@Valid @RequestBody OnboardingPackageStartRequest request) {
+        return onboardingPackageService.start(
+                securityUtils.getCurrentUserId(),
+                request.packageId(),
+                request.businessType(),
+                request.usagePurpose()
+        );
     }
 }

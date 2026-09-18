@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.exception.AuthErrorCodes;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
@@ -10,12 +11,14 @@ import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.repository.DashboardUserRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.security.LoginAttemptGuard;
 import com.ael.algoryqrservice.util.ClientInfo;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,9 +33,6 @@ public class AuthService {
 
     private static final String GOOGLE_ACCOUNT_BASIC_LOGIN_MESSAGE =
             "Bu e-posta adresi Google ile kayıtlı. Lütfen Google ile giriş yapın.";
-    static final String EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
-    private static final String EMAIL_NOT_VERIFIED_MESSAGE =
-            "E-posta adresiniz onaylanmamış. Lütfen e-postanıza gelen kodu doğrulayın.";
 
     private final UserRepository userRepository;
     private final DashboardUserRepository dashboardUserRepository;
@@ -44,6 +44,7 @@ public class AuthService {
     private final PackageActivationService packageActivationService;
     private final UserAccessProfileService userAccessProfileService;
     private final EmailVerificationService emailVerificationService;
+    private final LoginAttemptGuard loginAttemptGuard;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request, ClientInfo clientInfo) {
@@ -99,12 +100,16 @@ public class AuthService {
 
     private void requireEmailVerified(User user) {
         if (user.getProvider() == AuthProvider.BASIC && !user.isEmailVerified()) {
-            throw new ForbiddenException(EMAIL_NOT_VERIFIED_CODE, EMAIL_NOT_VERIFIED_MESSAGE);
+            throw new ForbiddenException(
+                    AuthErrorCodes.EMAIL_NOT_VERIFIED,
+                    AuthErrorCodes.EMAIL_NOT_VERIFIED_MESSAGE
+            );
         }
     }
 
     private User authenticate(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
+        loginAttemptGuard.assertNotBlocked(email);
         if (dashboardUserRepository.existsByEmailIgnoreCase(email)) {
             throw new BadRequestException("Bu hesap dashboard girisi icindir. /admin/auth/sessions kullanin");
         }
@@ -123,9 +128,15 @@ public class AuthService {
             throw new BadRequestException("Bu hesap farklı bir giriş yöntemiyle oluşturulmuş");
         }
 
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(email, request.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
+            );
+        } catch (AuthenticationException ex) {
+            loginAttemptGuard.registerFailure(email);
+            throw ex;
+        }
+        loginAttemptGuard.reset(email);
 
         return user;
     }

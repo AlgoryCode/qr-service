@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
@@ -58,7 +59,7 @@ public class WaiterAccessService {
         if (waiter.getBranchId() == null) {
             return List.of();
         }
-        return menuRepository.findByBranchIdAndDeletedFalse(waiter.getBranchId());
+        return menuRepository.findByBranchIdAndChannelAndDeletedFalse(waiter.getBranchId(), MenuChannel.QR);
     }
 
     public List<Long> menuIdsForWaiter(MenuWaiter waiter) {

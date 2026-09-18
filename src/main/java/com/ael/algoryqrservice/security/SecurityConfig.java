@@ -37,6 +37,8 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
+    private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
+    private final AuthRateLimitGatewayFilter authRateLimitGatewayFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -55,8 +57,14 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/auth/register",
+                                "/auth/login",
+                                "/auth/refresh",
+                                "/auth/logout",
+                                "/auth/email-verification/resend",
+                                "/auth/email-verification/verify"
+                        ).permitAll()
                         .requestMatchers("/customer/auth/**").permitAll()
                         .requestMatchers("/waiter/auth/login", "/waiter/auth/refresh", "/waiter/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.POST, "/admin/auth/sessions").permitAll()
@@ -66,6 +74,7 @@ public class SecurityConfig {
                         .requestMatchers(GoogleOAuthPaths.LEGACY_CALLBACK).permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/menu/public/**").permitAll()
+                        .requestMatchers("/store/public/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/campaign/claim").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/tags").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/allergens").permitAll()
@@ -96,7 +105,9 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class);
+                .addFilterBefore(authRateLimitGatewayFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(emailVerificationGatewayFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -106,6 +117,24 @@ public class SecurityConfig {
             ProductAccessGatewayFilter filter
     ) {
         FilterRegistrationBean<ProductAccessGatewayFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<EmailVerificationGatewayFilter> emailVerificationGatewayFilterRegistration(
+            EmailVerificationGatewayFilter filter
+    ) {
+        FilterRegistrationBean<EmailVerificationGatewayFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AuthRateLimitGatewayFilter> authRateLimitGatewayFilterRegistration(
+            AuthRateLimitGatewayFilter filter
+    ) {
+        FilterRegistrationBean<AuthRateLimitGatewayFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

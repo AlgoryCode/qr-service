@@ -12,6 +12,7 @@ import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import com.ael.algoryqrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
@@ -103,6 +104,8 @@ class MenuServiceTest {
     private MenuPublicIdGenerator menuPublicIdGenerator;
     @Mock
     private MenuProductOptionService menuProductOptionService;
+    @Mock
+    private MenuCatalogCloneService menuCatalogCloneService;
 
     @InjectMocks
     private MenuService menuService;
@@ -214,7 +217,7 @@ class MenuServiceTest {
     }
 
     @Test
-    void createMenuForQr_whenSourceMenuIdProvided_thenCopyProducts() {
+    void createMenuForQr_whenSourceMenuIdProvided_thenDelegateToCatalogClone() {
         Qr qr = Qr.builder().qrId(50L).userId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
@@ -224,77 +227,21 @@ class MenuServiceTest {
         QrRequest request = new QrRequest();
         request.setDetails(details);
 
-        Menu sourceMenu = Menu.builder().menuId(12L).userId(7L).active(true).deleted(false).build();
-        MenuProduct sourceProduct = MenuProduct.builder()
-                .productId(100L)
-                .menuId(12L)
-                .name("Latte")
-                .description("Sütlü kahve")
-                .price(new BigDecimal("150"))
-                .currency("TRY")
-                .subCategoryId(3L)
-                .sortOrder(0)
-                .available(true)
-                .chefRecommended(true)
-                .tagIds(Set.of(8L))
-                .allergenIds(Set.of(2L))
-                .nutrition(sampleNutrition())
-                .build();
-
         when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> {
             Menu menu = invocation.getArgument(0);
             menu.setMenuId(99L);
             return menu;
         });
-        when(menuRepository.findById(12L)).thenReturn(Optional.of(sourceMenu));
-        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
-                .thenReturn(List.of(sourceProduct));
-        when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(menuCategoryService.cloneTaxonomyToMenu(12L, 99L))
-                .thenReturn(new MenuCategoryService.TaxonomyCloneResult(Map.of(1L, 10L), Map.of(3L, 30L)));
-        doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
 
         Menu saved = menuService.createMenuForQr(qr, request);
 
         assertThat(saved.getBusinessName()).isEqualTo("Yeni Şube");
-        verify(entitlementService).assertMenuProductCreationAllowed(7L, 1);
+        assertThat(saved.getChannel()).isEqualTo(MenuChannel.QR);
 
-        ArgumentCaptor<MenuProduct> productCaptor = ArgumentCaptor.forClass(MenuProduct.class);
-        verify(menuProductRepository, times(1)).save(productCaptor.capture());
-        MenuProduct copied = productCaptor.getValue();
-        assertThat(copied.getMenuId()).isEqualTo(99L);
-        assertThat(copied.getName()).isEqualTo("Latte");
-        assertThat(copied.getSubCategoryId()).isEqualTo(30L);
-        assertThat(copied.getTagIds()).containsExactly(8L);
-        assertThat(copied.getAllergenIds()).containsExactly(2L);
-        assertThat(copied.getRatingAvg()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(copied.getRatingCount()).isZero();
-        verify(menuProductPairingService).copyPairings(any(), eq(Map.of(1L, 10L)), eq(Map.of(3L, 30L)));
-    }
-
-    @Test
-    void createMenuForQr_whenSourceMenuNotOwned_thenThrow() {
-        Qr qr = Qr.builder().qrId(50L).userId(7L).build();
-        Map<String, Object> details = new HashMap<>();
-        details.put("themeId", "soft");
-        details.put("branchId", 3L);
-        details.put("businessName", "Yeni Şube");
-        details.put("sourceMenuId", 12L);
-        QrRequest request = new QrRequest();
-        request.setDetails(details);
-
-        Menu sourceMenu = Menu.builder().menuId(12L).userId(99L).active(true).deleted(false).build();
-
-        when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> {
-            Menu menu = invocation.getArgument(0);
-            menu.setMenuId(99L);
-            return menu;
-        });
-        when(menuRepository.findById(12L)).thenReturn(Optional.of(sourceMenu));
-
-        assertThatThrownBy(() -> menuService.createMenuForQr(qr, request))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("erişim");
+        ArgumentCaptor<Menu> targetCaptor = ArgumentCaptor.forClass(Menu.class);
+        verify(menuCatalogCloneService).cloneInto(targetCaptor.capture(), eq(12L), eq(7L));
+        assertThat(targetCaptor.getValue().getMenuId()).isEqualTo(99L);
+        verify(menuProductRepository, times(0)).save(any(MenuProduct.class));
     }
 
     @Test

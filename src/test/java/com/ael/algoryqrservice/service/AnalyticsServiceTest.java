@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
 import com.ael.algoryqrservice.model.MenuProduct;
@@ -462,7 +463,7 @@ class AnalyticsServiceTest {
         second.setBusinessName("Aksam");
         when(branchService.requireOwnedForUser(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
-        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L, 6L)), any(), any())).thenReturn(10L);
         when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
                 eq(List.of(5L, 6L)), eq(MenuAnalyticsEventType.MENU_OPEN), any(), any())).thenReturn(12L);
@@ -516,7 +517,7 @@ class AnalyticsServiceTest {
         second.setBranchId(branchId);
         when(branchService.requireOwnedForUser(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
-        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(3L);
         when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(any(), any(), any(), any())).thenReturn(0L);
         when(eventRepository.avgProductsPerSessionByMenuIds(eq(List.of(5L)), any(), any())).thenReturn(0d);
@@ -553,7 +554,7 @@ class AnalyticsServiceTest {
         Long branchId = 2L;
         when(branchService.requireOwnedForUser(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
-        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(publicMenu(5L, ownerId)));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(publicMenu(5L, ownerId)));
 
         assertThatThrownBy(() -> service.getBranchReport(
                 branchId, 99L, ownerId, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1)
@@ -573,7 +574,7 @@ class AnalyticsServiceTest {
         second.setBranchId(branchId);
         when(branchService.requireOwnedForUser(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
-        when(menuRepository.findByBranchIdAndDeletedFalse(branchId)).thenReturn(List.of(first, second));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
                 .thenReturn(List.of());
         when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());

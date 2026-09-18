@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.WorkShift;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.dto.WorkShiftDtos;
 import com.ael.algoryqrservice.model.enums.WorkShiftStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
@@ -140,7 +141,7 @@ public class WorkShiftService {
         if (shift.getMenuId() != null) {
             return List.of(shift.getMenuId());
         }
-        return menuRepository.findByBranchIdAndDeletedFalse(shift.getBranchId()).stream()
+        return menuRepository.findByBranchIdAndChannelAndDeletedFalse(shift.getBranchId(), MenuChannel.QR).stream()
                 .map(Menu::getMenuId)
                 .toList();
     }

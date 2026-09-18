@@ -21,7 +21,7 @@ Frontend BFF (`algoryqr-web-site` `/api/features/...`) yalnizca proxy eder; pake
 - `PackageProductCatalog.containsProduct(packageCode, productCode)` false ise 403 (`PRODUCT_NOT_IN_PACKAGE`).
 - **Consume yapmaz.** Basarisiz islemde hak dusumunu geri almak filter katmaninda guvenilmez; membership-only kalir.
 
-Security zinciri: `JwtAuthenticationFilter` → `ProductAccessGatewayFilter` (`SecurityConfig`). Servlet auto-registration kapalı; filter yalnizca Spring Security chain icinde.
+Security zinciri: `JwtAuthenticationFilter` → `ProductAccessGatewayFilter` (`SecurityConfig`). Servlet auto-registration kapalı; filter yalnizca Spring Security chain icinde. Kimlik/e-posta onayi kapisi ayri dokumanda: `auth-gateway.md`.
 
 ### Katman 2 — `@RequiresProductScope`
 

@@ -10,7 +10,9 @@ import com.ael.algoryqrservice.model.dto.AccessSessionResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
+import com.ael.algoryqrservice.model.enums.BusinessType;
 import com.ael.algoryqrservice.model.enums.TrialLogStatus;
+import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
@@ -36,7 +38,18 @@ public class OnboardingPackageService {
     private final FulfillmentGrantService fulfillmentGrantService;
 
     @Transactional
-    public AccessSessionResponse start(Long userId, Long packageId) {
+    public AccessSessionResponse start(
+            Long userId,
+            Long packageId,
+            BusinessType businessType,
+            UsagePurpose usagePurpose
+    ) {
+        if (businessType == null) {
+            throw new BadRequestException("Isletme tipi zorunludur");
+        }
+        if (usagePurpose == null) {
+            throw new BadRequestException("Kullanim amaci zorunludur");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadRequestException("Kullanici bulunamadi"));
         if (user.getProvider() == AuthProvider.BASIC && !user.isEmailVerified()) {
@@ -54,6 +67,10 @@ public class OnboardingPackageService {
         if (paid != null && paid.isUsable()) {
             throw new BadRequestException("Aktif ucretli paket varken deneme baslatilamaz");
         }
+
+        user.setBusinessType(businessType);
+        user.setUsagePurpose(usagePurpose);
+        userRepository.save(user);
 
         PlanPackage planPackage = loadOnboardingPackage(packageId);
         LocalDateTime endsAt = now.plusDays(planPackage.getValidityDays());

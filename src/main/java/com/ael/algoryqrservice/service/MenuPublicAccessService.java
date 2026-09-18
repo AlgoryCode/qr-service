@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.access.AccessSession;
 import com.ael.algoryqrservice.access.PackageProductCatalog;
 import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import lombok.RequiredArgsConstructor;
@@ -72,7 +73,7 @@ public class MenuPublicAccessService {
 
     @Transactional
     public void syncAllMenuOwners() {
-        syncForUsers(menuRepository.findDistinctUserIdsByDeletedFalse());
+        syncForUsers(menuRepository.findDistinctUserIdsByChannel(MenuChannel.QR));
     }
 
     private static MenuPublicAccessDisabledReason disabledReason(

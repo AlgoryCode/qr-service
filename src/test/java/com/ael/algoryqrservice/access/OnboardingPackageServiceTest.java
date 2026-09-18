@@ -9,9 +9,11 @@ import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
+import com.ael.algoryqrservice.model.enums.BusinessType;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.TrialLogStatus;
+import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
@@ -80,7 +82,7 @@ class OnboardingPackageServiceTest {
         when(userRepository.findById(7L)).thenReturn(Optional.of(googleUser(NOW.minusDays(2))));
         when(trialLogRepository.existsByUserId(7L)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.start(7L, 3L))
+        assertThatThrownBy(() -> service.start(7L, 3L, BusinessType.RESTAURANT, UsagePurpose.DIGITAL_MENU))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("daha once");
         verify(trialLogRepository, never()).saveAndFlush(any());
@@ -90,7 +92,7 @@ class OnboardingPackageServiceTest {
     void start_whenAccountOlderThanFifteenDays_thenReject() {
         when(userRepository.findById(7L)).thenReturn(Optional.of(googleUser(NOW.minusDays(16))));
 
-        assertThatThrownBy(() -> service.start(7L, 3L))
+        assertThatThrownBy(() -> service.start(7L, 3L, BusinessType.RESTAURANT, UsagePurpose.DIGITAL_MENU))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("penceresi");
     }
@@ -101,7 +103,7 @@ class OnboardingPackageServiceTest {
         when(trialLogRepository.existsByUserId(7L)).thenReturn(false);
         when(sessionAccessService.governingPaid(7L)).thenReturn(Optional.of(usablePaid()));
 
-        assertThatThrownBy(() -> service.start(7L, 3L))
+        assertThatThrownBy(() -> service.start(7L, 3L, BusinessType.RESTAURANT, UsagePurpose.DIGITAL_MENU))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("ucretli paket");
     }
@@ -109,7 +111,8 @@ class OnboardingPackageServiceTest {
     @Test
     void start_whenEligible_thenInsertLogWithoutPurchase() {
         PlanPackage plan = onboardingPackage();
-        when(userRepository.findById(7L)).thenReturn(Optional.of(googleUser(NOW.minusDays(2))));
+        User user = googleUser(NOW.minusDays(2));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(trialLogRepository.existsByUserId(7L)).thenReturn(false);
         when(sessionAccessService.governingPaid(7L)).thenReturn(Optional.empty());
         when(packageRepository.findByCodeWithItems(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)).thenReturn(Optional.of(plan));
@@ -125,13 +128,23 @@ class OnboardingPackageServiceTest {
                 null
         ));
 
-        service.start(7L, 3L);
+        service.start(7L, 3L, BusinessType.CAFE, UsagePurpose.WAITER_ORDERS);
 
+        assertThat(user.getBusinessType()).isEqualTo(BusinessType.CAFE);
+        assertThat(user.getUsagePurpose()).isEqualTo(UsagePurpose.WAITER_ORDERS);
+        verify(userRepository).save(user);
         ArgumentCaptor<TrialLog> captor = ArgumentCaptor.forClass(TrialLog.class);
         verify(trialLogRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getPackageCode()).isEqualTo(CatalogPackages.ULTIMATE_TRIAL_PACKAGE);
         assertThat(captor.getValue().getStatus()).isEqualTo(TrialLogStatus.ACTIVE);
         verify(fulfillmentGrantService).grantOnboardingFulfillment(captor.getValue(), plan);
+    }
+
+    @Test
+    void start_whenBusinessTypeMissing_thenReject() {
+        assertThatThrownBy(() -> service.start(7L, 3L, null, UsagePurpose.DIGITAL_MENU))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Isletme tipi");
     }
 
     private static User googleUser(LocalDateTime createdAt) {

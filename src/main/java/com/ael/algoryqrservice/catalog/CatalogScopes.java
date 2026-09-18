@@ -12,6 +12,7 @@ public final class CatalogScopes {
     public static final String CUSTOM_DESIGN_OWNER = "CUSTOM_DESIGN_OWNER";
     public static final String WAITER_PANEL_OWNER = "WAITER_PANEL_OWNER";
     public static final String AI_MENU_IMPORT_OWNER = "AI_MENU_IMPORT_OWNER";
+    public static final String ONLINE_ORDER_OWNER = "ONLINE_ORDER_OWNER";
 
     private CatalogScopes() {
     }
