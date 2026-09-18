@@ -1,0 +1,3 @@
+ALTER TABLE tbl_user
+    ADD COLUMN IF NOT EXISTS business_type VARCHAR(32),
+    ADD COLUMN IF NOT EXISTS usage_purpose VARCHAR(64);

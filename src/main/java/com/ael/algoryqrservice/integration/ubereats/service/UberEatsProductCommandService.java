@@ -19,23 +19,32 @@ public class UberEatsProductCommandService {
     private final UberEatsClient uberEatsClient;
     private final UberEatsPayloadMapper payloadMapper;
 
-    /**
-     * Creates a product on the connected Uber Eats partner menu.
-     *
-     * @param request validated item payload
-     * @return partner product after upsert
-     */
     public UberEatsDtos.ProductResponse create(UberEatsDtos.CreateProductRequest request) {
+        validate(request);
+        return upsert(payloadMapper.toUpsertBody(request), request);
+    }
+
+    public UberEatsDtos.ProductResponse update(String productId, UberEatsDtos.CreateProductRequest request) {
+        if (productId == null || productId.isBlank()) {
+            throw new BadRequestException("productId zorunludur");
+        }
+        validate(request);
+        return upsert(payloadMapper.toUpdateBody(productId, request), request);
+    }
+
+    private UberEatsDtos.ProductResponse upsert(Map<String, Object> body, UberEatsDtos.CreateProductRequest request) {
+        UberEatsConnection connection = connectionService.requireConnected();
+        UberEatsDtos.Credentials credentials = connectionService.decrypt(connection);
+        JsonNode response = uberEatsClient.upsertMenuProduct(credentials, body);
+        return payloadMapper.toCreatedProduct(response, request);
+    }
+
+    private void validate(UberEatsDtos.CreateProductRequest request) {
         if (request == null || request.getName() == null || request.getName().isBlank()) {
             throw new BadRequestException("name zorunludur");
         }
         if (request.getCategoryName() == null || request.getCategoryName().isBlank()) {
             throw new BadRequestException("Kategori zorunludur");
         }
-        UberEatsConnection connection = connectionService.requireConnected();
-        UberEatsDtos.Credentials credentials = connectionService.decrypt(connection);
-        Map<String, Object> body = payloadMapper.toUpsertBody(request);
-        JsonNode response = uberEatsClient.upsertMenuProduct(credentials, body);
-        return payloadMapper.toCreatedProduct(response, request);
     }
 }

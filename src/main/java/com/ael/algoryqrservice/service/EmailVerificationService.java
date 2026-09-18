@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.EmailVerificationDtos;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.security.EmailVerificationGate;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +25,8 @@ public class EmailVerificationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationPublisherService notificationPublisherService;
+    private final EmailVerificationAttemptGuard attemptGuard;
+    private final EmailVerificationGate emailVerificationGate;
 
     @Value("${app.email-verification.code-validity-minutes:15}")
     private int codeValidityMinutes;
@@ -95,6 +98,7 @@ public class EmailVerificationService {
 
     private void sendCodeWithCooldown(User user) {
         LocalDateTime now = LocalDateTime.now();
+        requireNotLocked(user, now);
         if (user.getEmailVerificationSentAt() != null
                 && user.getEmailVerificationSentAt().plusMinutes(1).isAfter(now)) {
             throw new BadRequestException("Yeni doğrulama kodu için lütfen biraz bekleyin");
@@ -104,22 +108,35 @@ public class EmailVerificationService {
 
     private void applyVerification(User user, String rawCode) {
         LocalDateTime now = LocalDateTime.now();
+        requireNotLocked(user, now);
         if (user.getEmailVerificationCodeHash() == null
                 || user.getEmailVerificationExpiresAt() == null
                 || !user.getEmailVerificationExpiresAt().isAfter(now)) {
             throw new BadRequestException("Doğrulama kodunun süresi dolmuş. Yeni kod isteyin.");
         }
         if (!passwordEncoder.matches(rawCode.trim(), user.getEmailVerificationCodeHash())) {
+            attemptGuard.registerFailure(user.getId());
             throw new BadRequestException("Geçersiz doğrulama kodu");
         }
         user.setEmailVerified(true);
         user.setEmailVerificationCodeHash(null);
         user.setEmailVerificationExpiresAt(null);
+        attemptGuard.reset(user);
         userRepository.save(user);
+        emailVerificationGate.markVerified(user.getId());
+    }
+
+    private void requireNotLocked(User user, LocalDateTime now) {
+        if (attemptGuard.isLocked(user, now)) {
+            throw new BadRequestException(
+                    "Çok fazla hatalı deneme yapıldı. Lütfen bir süre sonra yeni kod isteyin."
+            );
+        }
     }
 
     private void issueCode(User user, LocalDateTime now) {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
+        attemptGuard.reset(user);
         user.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         user.setEmailVerificationExpiresAt(now.plusMinutes(codeValidityMinutes));
         user.setEmailVerificationSentAt(now);

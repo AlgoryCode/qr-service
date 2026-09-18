@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -102,26 +103,26 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
             """)
     List<Object[]> countActiveLiveMenusGroupedByBranch(@Param("userId") Long userId);
 
-    List<Menu> findByUserIdAndDeletedFalseOrderByMenuIdAsc(Long userId);
+    List<Menu> findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(Long userId, MenuChannel channel);
 
-    List<Menu> findByBranchIdAndDeletedFalse(Long branchId);
-
-    List<Menu> findByUserIdAndBranchIdIsNullAndDeletedFalse(Long userId);
+    List<Menu> findByBranchIdAndChannelAndDeletedFalse(Long branchId, MenuChannel channel);
 
     @Query("""
             select distinct menu.userId
             from Menu menu
             where menu.deleted = false
+              and menu.channel = :channel
             """)
-    List<Long> findDistinctUserIdsByDeletedFalse();
+    List<Long> findDistinctUserIdsByChannel(@Param("channel") MenuChannel channel);
 
     @Query("""
             select menu.menuId
             from Menu menu
             where menu.userId = :userId
               and menu.deleted = false
+              and menu.channel = :channel
             """)
-    List<Long> findMenuIdsByUserId(@Param("userId") Long userId);
+    List<Long> findMenuIdsByUserIdAndChannel(@Param("userId") Long userId, @Param("channel") MenuChannel channel);
 
     @Modifying(clearAutomatically = false, flushAutomatically = true)
     @Query("""

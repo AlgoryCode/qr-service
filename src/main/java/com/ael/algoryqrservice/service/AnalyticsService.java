@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.MenuProduct;
@@ -982,7 +983,7 @@ public class AnalyticsService {
 
     private ReportScope resolveBranchScope(Long branchId, Long menuId, Long ownerId) {
         Branch branch = branchService.requireOwnedForUser(branchId, ownerId);
-        List<Menu> menus = menuRepository.findByBranchIdAndDeletedFalse(branch.getId());
+        List<Menu> menus = menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR);
         if (menuId != null) {
             Menu menu = menus.stream()
                     .filter(item -> menuId.equals(item.getMenuId()))

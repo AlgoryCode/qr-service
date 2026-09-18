@@ -99,6 +99,16 @@
       "vatRate": 20.0,
       "countable": false,
       "active": true
+    },
+    {
+      "code": "ONLINE_ORDER",
+      "name": "Online Siparis",
+      "description": "Gizli adresli paket servis magazasi, siparis paneli ve kurye yonetimi",
+      "scopeCode": "ONLINE_ORDER_OWNER",
+      "unitPrice": 179.0,
+      "vatRate": 20.0,
+      "countable": false,
+      "active": true
     }
   ],
   "packages": [
@@ -262,6 +272,11 @@
           "productCode": "AI_MENU_IMPORT",
           "quantity": 1,
           "unlimited": true
+        },
+        {
+          "productCode": "ONLINE_ORDER",
+          "quantity": 1,
+          "unlimited": true
         }
       ]
     },
@@ -335,6 +350,11 @@
         },
         {
           "productCode": "AI_MENU_IMPORT",
+          "quantity": 1,
+          "unlimited": true
+        },
+        {
+          "productCode": "ONLINE_ORDER",
           "quantity": 1,
           "unlimited": true
         }

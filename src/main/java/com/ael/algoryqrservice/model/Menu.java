@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -24,8 +25,13 @@ public class Menu extends QrBaseModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long menuId;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private Long qrId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    @Builder.Default
+    private MenuChannel channel = MenuChannel.QR;
 
     @Column(name = "public_id", nullable = false, unique = true, length = 32)
     private String publicId;

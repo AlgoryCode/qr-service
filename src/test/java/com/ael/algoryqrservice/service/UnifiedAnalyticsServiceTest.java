@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,7 +160,7 @@ class UnifiedAnalyticsServiceTest {
         Branch branch = Branch.builder().id(1L).name("Merkez").build();
         when(branchService.requireOwnedForUser(1L, 9L)).thenReturn(branch);
         Menu menu = Menu.builder().menuId(5L).businessName("Lokanta").branchId(1L).build();
-        when(menuRepository.findByBranchIdAndDeletedFalse(1L)).thenReturn(List.of(menu));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(1L, MenuChannel.QR)).thenReturn(List.of(menu));
     }
 
     private void stubEmptyReports(LocalDate from, LocalDate to) {

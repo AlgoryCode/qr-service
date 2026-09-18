@@ -84,6 +84,14 @@ app:
   service-name: ${APP_SERVICE_NAME:qr-service}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
+  email-verification:
+    code-validity-minutes: ${EMAIL_VERIFICATION_CODE_VALIDITY_MINUTES:15}
+    max-attempts: ${EMAIL_VERIFICATION_MAX_ATTEMPTS:5}
+    lock-minutes: ${EMAIL_VERIFICATION_LOCK_MINUTES:15}
+  auth-gateway:
+    rate-limit-enabled: ${AUTH_GATEWAY_RATE_LIMIT_ENABLED:true}
+    login-max-failures: ${AUTH_GATEWAY_LOGIN_MAX_FAILURES:10}
+    login-failure-window-minutes: ${AUTH_GATEWAY_LOGIN_FAILURE_WINDOW_MINUTES:15}
   storage:
     filer-url: ${STORAGE_FILER_URL:http://localhost:8888}
     s3-endpoint: ${STORAGE_S3_ENDPOINT:}

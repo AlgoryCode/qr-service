@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.dto.BranchDtos;
 import com.ael.algoryqrservice.repository.BranchRepository;
@@ -52,7 +53,7 @@ class BranchServiceTest {
         Menu menu = Menu.builder().menuId(4L).userId(7L).qrId(90L).branchId(15L).build();
         Qr qr = Qr.builder().qrId(90L).userId(7L).build();
         when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
-        when(menuRepository.findByBranchIdAndDeletedFalse(15L)).thenReturn(List.of(menu));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of(menu));
         when(qrRepository.findById(90L)).thenReturn(Optional.of(qr));
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -68,7 +69,7 @@ class BranchServiceTest {
         when(securityUtils.getCurrentUserId()).thenReturn(7L);
         Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").build();
         when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
-        when(menuRepository.findByBranchIdAndDeletedFalse(15L)).thenReturn(List.of());
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         branchService.delete(15L);
@@ -148,7 +149,7 @@ class BranchServiceTest {
         when(branchRepository.findByIdAndUserIdAndDeletedFalse(1L, 7L)).thenReturn(java.util.Optional.of(source));
         when(branchRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(List.of(source, other));
         when(branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(7L)).thenReturn(List.of(source, other));
-        when(menuRepository.findByUserIdAndDeletedFalseOrderByMenuIdAsc(7L)).thenReturn(List.of());
+        when(menuRepository.findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(7L, MenuChannel.QR)).thenReturn(List.of());
         when(branchQuotaService.branchQuota(7L)).thenReturn(BranchDtos.Quota.builder().canCreate(false).build());
         when(branchQuotaService.menuQuota(7L)).thenReturn(BranchDtos.MenuQuota.builder().build());
 

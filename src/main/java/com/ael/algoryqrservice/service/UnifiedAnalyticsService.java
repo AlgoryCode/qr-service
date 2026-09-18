@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -166,7 +167,7 @@ public class UnifiedAnalyticsService {
 
     private Collection<Long> resolveMenuIds(Long branchId, Long menuId, Long ownerId) {
         var branch = branchService.requireOwnedForUser(branchId, ownerId);
-        List<Menu> menus = menuRepository.findByBranchIdAndDeletedFalse(branch.getId());
+        List<Menu> menus = menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR);
         if (menuId == null) {
             return menus.stream().map(Menu::getMenuId).toList();
         }

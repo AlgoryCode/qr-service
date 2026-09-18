@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,5 @@ public class SessionResponse {
     private String userAgent;
     private String device;
     private String deviceType;
+    private AuthProvider provider;
 }

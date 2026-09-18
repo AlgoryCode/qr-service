@@ -105,4 +105,67 @@ class UberEatsProductCommandServiceTest {
         assertThat(created.getId()).isEqualTo("p-9");
         assertThat(created.getName()).isEqualTo("Cheeseburger");
     }
+
+    @Test
+    void update_whenProductIdBlank_thenThrow() {
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Burger")
+                .categoryName("Burger")
+                .build();
+
+        assertThatThrownBy(() -> productCommandService.update("  ", request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("productId zorunludur");
+        verify(uberEatsClient, never()).upsertMenuProduct(any(), any());
+    }
+
+    @Test
+    void update_whenValid_thenUpsertWithProductId() throws Exception {
+        UberEatsConnection connection = new UberEatsConnection();
+        connection.setId(3L);
+        UberEatsDtos.Credentials credentials = UberEatsDtos.Credentials.builder()
+                .sellerId("seller-1")
+                .apiKey("key")
+                .apiSecret("secret")
+                .restaurantId("r-1")
+                .build();
+        when(connectionService.requireConnected()).thenReturn(connection);
+        when(connectionService.decrypt(connection)).thenReturn(credentials);
+        when(uberEatsClient.upsertMenuProduct(eq(credentials), any()))
+                .thenReturn(objectMapper.readTree("""
+                        { "id": "p-1", "name": "Cheeseburger", "price": 240, "categoryName": "Menü" }
+                        """));
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Cheeseburger")
+                .price(new BigDecimal("240"))
+                .categoryName("Menü")
+                .available(true)
+                .modifierGroups(java.util.List.of(
+                        UberEatsDtos.ModifierGroupRequest.builder()
+                                .name("Sos")
+                                .required(true)
+                                .minSelect(1)
+                                .maxSelect(1)
+                                .options(java.util.List.of(
+                                        UberEatsDtos.ModifierOptionRequest.builder()
+                                                .name("Cheddar")
+                                                .price(new BigDecimal("8"))
+                                                .build()
+                                ))
+                                .build()
+                ))
+                .build();
+
+        UberEatsDtos.ProductResponse updated = productCommandService.update("p-1", request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(uberEatsClient).upsertMenuProduct(eq(credentials), captor.capture());
+        assertThat(captor.getValue().get("id")).isEqualTo("p-1");
+        assertThat(captor.getValue().get("categoryName")).isEqualTo("Menü");
+        assertThat(captor.getValue()).containsKey("modifierProducts");
+        assertThat(updated.getId()).isEqualTo("p-1");
+        assertThat(updated.getCategoryName()).isEqualTo("Menü");
+        assertThat(updated.getModifierGroups()).hasSize(1);
+    }
 }

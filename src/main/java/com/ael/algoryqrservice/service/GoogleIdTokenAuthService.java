@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.model.dto.GoogleOidcIdentity;
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.GoogleAuthIntent;
 import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,8 @@ public class GoogleIdTokenAuthService {
             throw new BadRequestException("Google kimlik doğrulama amacı geçersiz");
         }
         GoogleOidcIdentity identity = googleIdTokenVerifier.verify(idToken);
-        User user = googleOAuthUserService.resolve(intent, identity, clientInfo);
-        SessionService.SessionTokens tokens = sessionService.createSession(user, clientInfo);
+        User user = googleOAuthUserService.resolve(intent, identity, clientInfo, AuthProvider.MOBILE_GOOGLE);
+        SessionService.SessionTokens tokens = sessionService.createSession(user, clientInfo, AuthProvider.MOBILE_GOOGLE);
         return sessionService.buildAuthResponse(tokens.accessToken(), tokens.refreshToken());
     }
 }

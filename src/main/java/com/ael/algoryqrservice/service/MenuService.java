@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.Menu;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuProduct;
@@ -75,6 +76,7 @@ public class MenuService {
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final MenuProductPairingService menuProductPairingService;
     private final MenuProductOptionService menuProductOptionService;
+    private final MenuCatalogCloneService menuCatalogCloneService;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
@@ -118,78 +120,12 @@ public class MenuService {
         menu = menuRepository.save(menu);
         Long sourceMenuId = longValue(details.get("sourceMenuId"));
         if (sourceMenuId != null) {
-            copyProductsFromSourceMenu(menu, sourceMenuId, qr.getUserId());
+            menuCatalogCloneService.cloneInto(menu, sourceMenuId, qr.getUserId());
         } else {
             createProductsFromDetails(menu, details.get("products"));
         }
         menuPublicAccessService.syncForUser(menu.getUserId());
         return menu;
-    }
-
-    private void copyProductsFromSourceMenu(Menu targetMenu, Long sourceMenuId, Long userId) {
-        Menu sourceMenu = menuRepository.findById(sourceMenuId)
-                .filter(menu -> !menu.isDeleted())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Kaynak menü bulunamadı"));
-        if (!userId.equals(sourceMenu.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
-        }
-        if (!sourceMenu.isActive()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yalnızca aktif menülerden kopyalama yapılabilir");
-        }
-
-        List<MenuProduct> sourceProducts = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(sourceMenuId);
-        if (sourceProducts.isEmpty()) {
-            return;
-        }
-        entitlementService.assertMenuProductCreationAllowed(userId, sourceProducts.size());
-
-        MenuCategoryService.TaxonomyCloneResult taxonomyClone = menuCategoryService.cloneTaxonomyToMenu(
-                sourceMenuId,
-                targetMenu.getMenuId()
-        );
-        Map<Long, Long> sourceSubToTargetSub = taxonomyClone.subCategoryIds();
-
-        Map<Long, Long> sourceToTarget = new HashMap<>();
-        for (MenuProduct source : sourceProducts) {
-            Long targetSubId = sourceSubToTargetSub.get(source.getSubCategoryId());
-            if (targetSubId == null) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Kaynak ürün kategorisi hedef menüye kopyalanamadı: " + source.getName()
-                );
-            }
-            Set<Long> tagIds = source.getTagIds() == null ? new HashSet<>() : new HashSet<>(source.getTagIds());
-            Set<Long> allergenIds = source.getAllergenIds() == null ? new HashSet<>() : new HashSet<>(source.getAllergenIds());
-            MenuProduct copy = MenuProduct.builder()
-                    .menuId(targetMenu.getMenuId())
-                    .name(source.getName())
-                    .description(source.getDescription())
-                    .price(source.getPrice())
-                    .currency(source.getCurrency())
-                    .subCategoryId(targetSubId)
-                    .tagIds(tagIds)
-                    .allergenIds(allergenIds)
-                    .chefRecommended(source.isChefRecommended())
-                    .sortOrder(source.getSortOrder())
-                    .imageUrl(resolveProductImageUrl(source.getImageUrl()))
-                    .available(source.isAvailable())
-                    .servesPeopleMin(source.getServesPeopleMin())
-                    .servesPeopleMax(source.getServesPeopleMax())
-                    .nutrition(source.getNutrition())
-                    .ratingAvg(BigDecimal.ZERO)
-                    .ratingCount(0L)
-                    .build();
-            MenuProduct saved = menuProductRepository.save(copy);
-            sourceToTarget.put(source.getProductId(), saved.getProductId());
-        }
-        menuProductPairingService.copyPairings(
-                sourceToTarget,
-                taxonomyClone.categoryIds(),
-                sourceSubToTargetSub
-        );
-        menuProductOptionService.copyOptions(sourceToTarget);
-        usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
     }
 
     private void createProductsFromDetails(Menu menu, Object productsRaw) {
@@ -337,6 +273,7 @@ public class MenuService {
     @Transactional(readOnly = true)
     public Menu requireActivePublicMenu(String publicId) {
         Menu menu = menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse(publicId)
+                .filter(candidate -> candidate.getChannel() == MenuChannel.QR)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
         ensurePublicAccess(menu);
         return menu;
@@ -778,7 +715,7 @@ public class MenuService {
 
     @Transactional
     public MenuDtos.MenuProfileResponse updateMenu(Long menuId, MenuDtos.MenuUpdateRequest request) throws Exception {
-        Menu menu = ensureOwnedMenu(menuId);
+        Menu menu = ensureOwnedQrMenu(menuId);
         Qr qr = qrRepository.findById(menu.getQrId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
 
@@ -830,7 +767,7 @@ public class MenuService {
 
     @Transactional
     public void deleteMenu(Long menuId) {
-        Menu menu = ensureOwnedMenu(menuId);
+        Menu menu = ensureOwnedQrMenu(menuId);
         Qr qr = qrRepository.findById(menu.getQrId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
         menuQrSoftDeleteService.softDeleteMenuQr(qr);
@@ -975,6 +912,14 @@ public class MenuService {
     private Menu ensureOwnedMenu(Long menuId) {
         Menu menu = ensureMenuExists(menuId);
         requireOwnership(menu);
+        return menu;
+    }
+
+    private Menu ensureOwnedQrMenu(Long menuId) {
+        Menu menu = ensureOwnedMenu(menuId);
+        if (menu.getChannel() != MenuChannel.QR) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bu menü QR menüsü değil");
+        }
         return menu;
     }
 

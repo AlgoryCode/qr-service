@@ -1,9 +1,13 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.access.AccessSession;
+import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.model.UserAccountingEntry;
 import com.ael.algoryqrservice.model.dto.UserAccountingDtos;
+import com.ael.algoryqrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.model.enums.AccountingEntryType;
 import com.ael.algoryqrservice.model.enums.AccountingSourceType;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.repository.MenuOrderItemRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -48,6 +52,8 @@ class UserAccountingServiceTest {
     private MenuOrderItemRepository menuOrderItemRepository;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private SessionAccessService sessionAccessService;
 
     @InjectMocks
     private UserAccountingService userAccountingService;
@@ -55,6 +61,7 @@ class UserAccountingServiceTest {
     @BeforeEach
     void setUp() {
         when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(AccessDecision.ALLOW, null, null, null));
     }
 
     @Test
@@ -90,7 +97,7 @@ class UserAccountingServiceTest {
                 .updatedAt(closedAt.minusDays(1))
                 .build();
 
-        when(menuRepository.findMenuIdsByUserId(7L)).thenReturn(List.of(5L));
+        when(menuRepository.findMenuIdsByUserIdAndChannel(7L, MenuChannel.QR)).thenReturn(List.of(5L));
         when(menuRepository.findById(5L)).thenReturn(Optional.of(com.ael.algoryqrservice.model.Menu.builder()
                 .menuId(5L)
                 .userId(7L)
@@ -126,7 +133,7 @@ class UserAccountingServiceTest {
 
     @Test
     void listForCurrentUser_whenGiderFilter_thenReturnsOnlyMatching() {
-        when(menuRepository.findMenuIdsByUserId(7L)).thenReturn(List.of(5L));
+        when(menuRepository.findMenuIdsByUserIdAndChannel(7L, MenuChannel.QR)).thenReturn(List.of(5L));
         when(userAccountingEntryRepository.findAll(any(Specification.class))).thenReturn(List.of());
 
         UserAccountingDtos.EntryPageResponse response = userAccountingService.listForCurrentUser(

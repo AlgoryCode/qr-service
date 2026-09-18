@@ -1,6 +1,8 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
@@ -10,6 +12,7 @@ import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.UserAccountingEntry;
 import com.ael.algoryqrservice.model.dto.UserAccountingDtos;
 import com.ael.algoryqrservice.model.enums.AccountingEntryType;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.AccountingSourceType;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.MenuOrderItemRepository;
@@ -49,6 +52,13 @@ public class UserAccountingService {
     private final MenuOrderRepository menuOrderRepository;
     private final MenuOrderItemRepository menuOrderItemRepository;
     private final SecurityUtils securityUtils;
+    private final SessionAccessService sessionAccessService;
+
+    private void requireAllowAccess(Long userId) {
+        if (!sessionAccessService.resolve(userId).isAllow()) {
+            throw new ForbiddenException("Muhasebe icin aktif paket veya deneme gereklidir");
+        }
+    }
 
     @Transactional
     public UserAccountingDtos.EntryResponse createManual(UserAccountingDtos.CreateRequest request) {
@@ -60,6 +70,7 @@ public class UserAccountingService {
         }
 
         Long userId = securityUtils.getCurrentUserId();
+        requireAllowAccess(userId);
         String title = requireText(request.getTitle(), "Başlık zorunludur", 200);
         BigDecimal amount = requirePositiveAmount(request.getAmount());
         LocalDateTime occurredAt = request.getOccurredAt();
@@ -165,6 +176,7 @@ public class UserAccountingService {
             int size
     ) {
         Long userId = securityUtils.getCurrentUserId();
+        requireAllowAccess(userId);
         AccountingEntryType typeFilter = parseTypeFilter(type);
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
         LocalDateTime toDt = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
@@ -213,6 +225,7 @@ public class UserAccountingService {
     @Transactional(readOnly = true)
     public UserAccountingDtos.EntryDetailResponse getDetailForCurrentUser(Long entryId) {
         Long userId = securityUtils.getCurrentUserId();
+        requireAllowAccess(userId);
         UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
                 .filter(e -> e.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Kayıt bulunamadı"));
@@ -277,6 +290,7 @@ public class UserAccountingService {
     @Transactional
     public void deleteManual(Long entryId) {
         Long userId = securityUtils.getCurrentUserId();
+        requireAllowAccess(userId);
         UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
                 .filter(e -> e.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Kayıt bulunamadı"));
@@ -339,7 +353,7 @@ public class UserAccountingService {
     }
 
     private Map<Long, String> resolveMenuNames(Long userId) {
-        List<Long> menuIds = menuRepository.findMenuIdsByUserId(userId);
+        List<Long> menuIds = menuRepository.findMenuIdsByUserIdAndChannel(userId, MenuChannel.QR);
         Map<Long, String> menuNames = new HashMap<>();
         for (Long menuId : menuIds) {
             menuRepository.findById(menuId)

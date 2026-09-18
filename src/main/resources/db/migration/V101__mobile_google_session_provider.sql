@@ -1,0 +1,5 @@
+ALTER TABLE tbl_user ALTER COLUMN provider TYPE VARCHAR(32);
+ALTER TABLE tbl_customer ALTER COLUMN provider TYPE VARCHAR(32);
+
+ALTER TABLE tbl_user_session
+    ADD COLUMN IF NOT EXISTS provider VARCHAR(32);

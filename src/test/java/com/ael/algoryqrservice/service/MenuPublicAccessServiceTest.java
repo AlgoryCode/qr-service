@@ -1,21 +1,20 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.model.Purchase;
-import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
+import com.ael.algoryqrservice.access.AccessSession;
+import com.ael.algoryqrservice.access.PackageProductCatalog;
+import com.ael.algoryqrservice.access.SessionAccessService;
+import com.ael.algoryqrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
-import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
-import com.ael.algoryqrservice.repository.PurchaseRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,29 +29,20 @@ import static org.mockito.Mockito.when;
 class MenuPublicAccessServiceTest {
 
     @Mock
-    private EntitlementService entitlementService;
+    private SessionAccessService sessionAccessService;
     @Mock
-    private PurchaseRepository purchaseRepository;
-    @Mock
-    private PurchaseFulfillmentRepository purchaseFulfillmentRepository;
+    private PackageProductCatalog packageProductCatalog;
     @Mock
     private MenuRepository menuRepository;
 
+    @InjectMocks
     private MenuPublicAccessService service;
 
-    @BeforeEach
-    void setUp() {
-        service = new MenuPublicAccessService(
-                entitlementService,
-                purchaseRepository,
-                purchaseFulfillmentRepository,
-                menuRepository
-        );
-    }
-
     @Test
-    void evaluate_whenNoMenuScope_thenPackageInactive() {
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(false);
+    void evaluate_whenSessionRequiresPurchase_thenPackageInactive() {
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.REQUIRE_PURCHASE, null, null, null
+        ));
 
         MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
 
@@ -61,18 +51,13 @@ class MenuPublicAccessServiceTest {
     }
 
     @Test
-    void evaluate_whenOverdueInstallment_thenInstallmentOverdue() {
-        Purchase purchase = Purchase.builder()
-                .id(11L)
-                .userId(7L)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(1))
-                .expiresAt(LocalDateTime.now().plusDays(10))
-                .build();
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(purchase));
-        when(purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(List.of(11L), FulfillmentStatus.OVERDUE))
-                .thenReturn(true);
+    void evaluate_whenSessionRequiresPayment_thenInstallmentOverdue() {
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.REQUIRE_PAYMENT,
+                "PRO_PACKAGE",
+                LocalDateTime.now().plusDays(10),
+                LocalDateTime.now().plusDays(3)
+        ));
 
         MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
 
@@ -81,18 +66,48 @@ class MenuPublicAccessServiceTest {
     }
 
     @Test
-    void evaluate_whenScopeAndNoOverdue_thenAllow() {
-        Purchase purchase = Purchase.builder()
-                .id(11L)
-                .userId(7L)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(1))
-                .expiresAt(LocalDateTime.now().plusDays(10))
-                .build();
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(purchase));
-        when(purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(List.of(11L), FulfillmentStatus.OVERDUE))
+    void evaluate_whenUltimateTrialAllowsAndContainsQrMenu_thenAllow() {
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.ALLOW,
+                CatalogPackages.ULTIMATE_TRIAL_PACKAGE,
+                LocalDateTime.now().plusDays(15),
+                null
+        ));
+        when(packageProductCatalog.containsProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.QR_MENU))
+                .thenReturn(true);
+
+        MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(decision.reason()).isNull();
+    }
+
+    @Test
+    void evaluate_whenAllowButQrMenuNotInPackage_thenPackageInactive() {
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.ALLOW,
+                CatalogPackages.ULTIMATE_TRIAL_PACKAGE,
+                LocalDateTime.now().plusDays(15),
+                null
+        ));
+        when(packageProductCatalog.containsProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.QR_MENU))
                 .thenReturn(false);
+
+        MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).isEqualTo(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
+    }
+
+    @Test
+    void evaluate_whenPaidPackageAllows_thenAllow() {
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.ALLOW,
+                "PRO_PACKAGE",
+                LocalDateTime.now().plusDays(20),
+                null
+        ));
+        when(packageProductCatalog.containsProduct("PRO_PACKAGE", CatalogProducts.QR_MENU)).thenReturn(true);
 
         MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
 
@@ -102,17 +117,14 @@ class MenuPublicAccessServiceTest {
 
     @Test
     void syncForUser_whenAllowed_thenEnableMenus() {
-        Purchase purchase = Purchase.builder()
-                .id(11L)
-                .userId(7L)
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(1))
-                .expiresAt(LocalDateTime.now().plusDays(10))
-                .build();
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(true);
-        when(purchaseRepository.findByUserIdAndStatus(7L, PurchaseStatus.ACTIVE)).thenReturn(List.of(purchase));
-        when(purchaseFulfillmentRepository.existsByPurchaseIdInAndStatus(List.of(11L), FulfillmentStatus.OVERDUE))
-                .thenReturn(false);
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.ALLOW,
+                CatalogPackages.ULTIMATE_TRIAL_PACKAGE,
+                LocalDateTime.now().plusDays(15),
+                null
+        ));
+        when(packageProductCatalog.containsProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.QR_MENU))
+                .thenReturn(true);
 
         service.syncForUser(7L);
 
@@ -128,7 +140,9 @@ class MenuPublicAccessServiceTest {
 
     @Test
     void syncForUser_whenPackageInactive_thenDisableWithReason() {
-        when(entitlementService.hasScope(7L, CatalogScopes.QR_CREATE_OWNER)).thenReturn(false);
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.REQUIRE_PURCHASE, null, null, null
+        ));
 
         service.syncForUser(7L);
 

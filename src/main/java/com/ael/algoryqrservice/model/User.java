@@ -1,6 +1,8 @@
 package com.ael.algoryqrservice.model;
 
 import com.ael.algoryqrservice.model.enums.AuthProvider;
+import com.ael.algoryqrservice.model.enums.BusinessType;
+import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -43,7 +45,7 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "provider", nullable = false, length = 16)
+    @Column(name = "provider", nullable = false, length = 32)
     @ColumnDefault("'BASIC'")
     @Builder.Default
     private AuthProvider provider = AuthProvider.BASIC;
@@ -126,6 +128,20 @@ public class User {
 
     @Column(name = "email_verification_sent_at")
     private LocalDateTime emailVerificationSentAt;
+
+    @Column(name = "email_verification_attempts", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private int emailVerificationAttempts = 0;
+
+    @Column(name = "email_verification_locked_until")
+    private LocalDateTime emailVerificationLockedUntil;
+
+    @Column(name = "business_type", length = 32)
+    private BusinessType businessType;
+
+    @Column(name = "usage_purpose", length = 64)
+    private UsagePurpose usagePurpose;
 
     public String getDisplayName() {
         StringBuilder name = new StringBuilder();

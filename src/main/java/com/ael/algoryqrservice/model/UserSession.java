@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -57,6 +58,10 @@ public class UserSession {
 
     @Column(name = "device_type")
     private String deviceType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", length = 32)
+    private AuthProvider provider;
 
     @Column(name = "impersonator_dashboard_user_id")
     private Long impersonatorDashboardUserId;
