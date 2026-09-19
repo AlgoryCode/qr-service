@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.MenuProductOptionGroup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -16,6 +17,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MenuProductOptionServiceTest {
@@ -54,6 +57,23 @@ class MenuProductOptionServiceTest {
                 com.ael.algoryqrservice.model.SelectedMenuOption.builder().optionId(5L).build(),
                 com.ael.algoryqrservice.model.SelectedMenuOption.builder().optionId(2L).build()
         ))).isEqualTo("10:2,5");
+    }
+
+    @Test
+    void overwriteOnto_whenTargetsPresent_thenReplaceCopies() {
+        MenuProductOptionGroup source = sizeGroup();
+        source.setProductId(10L);
+        when(optionGroupRepository.findByProductIdOrderBySortOrderAscIdAsc(10L)).thenReturn(List.of(source));
+
+        service.overwriteOnto(10L, List.of(10L, 20L));
+
+        verify(optionGroupRepository).deleteByProductId(20L);
+        ArgumentCaptor<List<MenuProductOptionGroup>> captor = ArgumentCaptor.captor();
+        verify(optionGroupRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().getFirst().getProductId()).isEqualTo(20L);
+        assertThat(captor.getValue().getFirst().getName()).isEqualTo("Boyut");
+        assertThat(captor.getValue().getFirst().getOptions()).hasSize(2);
     }
 
     private static MenuProductOptionGroup sizeGroup() {

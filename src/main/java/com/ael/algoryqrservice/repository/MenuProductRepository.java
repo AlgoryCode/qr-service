@@ -78,6 +78,8 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
 
     boolean existsByMenuIdAndNameIgnoreCaseAndDeletedFalse(Long menuId, String name);
 
+    List<MenuProduct> findByMenuIdAndNameIgnoreCaseAndDeletedFalse(Long menuId, String name);
+
     @Query("""
             select menu, product
             from Menu menu

@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.service.FulfillmentMigrationService;
+import com.ael.algoryqrservice.service.PackageFulfillmentSynchronizer;
 import com.ael.algoryqrservice.util.WritableTransactionGuard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,8 @@ class EntitlementMaintenanceServiceTest {
     @Mock
     private FulfillmentMigrationService fulfillmentMigrationService;
     @Mock
+    private PackageFulfillmentSynchronizer packageFulfillmentSynchronizer;
+    @Mock
     private FeatureUsageSyncRegistry usageSyncRegistry;
     @Mock
     private WritableTransactionGuard writableTransactionGuard;
@@ -53,7 +56,13 @@ class EntitlementMaintenanceServiceTest {
 
         maintenanceService.repairUser(USER_ID);
 
-        verifyNoInteractions(selectionPolicy, entitlementWriter, fulfillmentMigrationService, usageSyncRegistry);
+        verifyNoInteractions(
+                selectionPolicy,
+                entitlementWriter,
+                fulfillmentMigrationService,
+                packageFulfillmentSynchronizer,
+                usageSyncRegistry
+        );
     }
 
     @Test
@@ -79,6 +88,7 @@ class EntitlementMaintenanceServiceTest {
         verify(entitlementWriter).ensureEntitlementsForPackage(subscription, planPackage);
         verify(fulfillmentGrantService).repairAddonFulfillmentsForUser(USER_ID);
         verify(fulfillmentMigrationService).backfillUser(USER_ID);
+        verify(packageFulfillmentSynchronizer).appendMissingProducts(USER_ID);
         verify(usageSyncRegistry).synchronizeAll(USER_ID);
     }
 
