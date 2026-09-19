@@ -21,37 +21,44 @@ class StoreUrlBuilderTest {
     }
 
     @Test
-    void buildUrl_whenMerchantGiven_thenJoinStoreNoSlugAndToken() {
+    void buildUrl_whenMerchantGiven_thenJoinStoreNoAndToken() {
         Merchant merchant = Merchant.builder()
                 .storeNo(10427L)
                 .slug("kebapci-mehmet")
-                .publicToken("9fK2xQ7mZa")
+                .publicToken("Gw2AenXEevm3rFfW")
                 .build();
 
-        assertThat(storeUrlBuilder.buildHandle(merchant)).isEqualTo("10427-kebapci-mehmet-9fK2xQ7mZa");
+        assertThat(storeUrlBuilder.buildHandle(merchant)).isEqualTo("10427-Gw2AenXEevm3rFfW");
         assertThat(storeUrlBuilder.buildUrl(merchant))
-                .isEqualTo("https://algoryqr.com/store/10427-kebapci-mehmet-9fK2xQ7mZa");
+                .isEqualTo("https://algoryqr.com/store/10427-Gw2AenXEevm3rFfW");
     }
 
     @Test
-    void parse_whenSlugContainsDashes_thenSplitOnFirstAndLastDash() {
-        Optional<StoreHandle> parsed = storeUrlBuilder.parse("10427-kebapci-mehmet-9fK2xQ7mZa");
+    void parse_whenHandleIsStoreNoAndToken_thenSplitOnDash() {
+        Optional<StoreHandle> parsed = storeUrlBuilder.parse("10427-Gw2AenXEevm3rFfW");
 
         assertThat(parsed).isPresent();
         assertThat(parsed.get().storeNo()).isEqualTo(10427L);
-        assertThat(parsed.get().slug()).isEqualTo("kebapci-mehmet");
-        assertThat(parsed.get().token()).isEqualTo("9fK2xQ7mZa");
+        assertThat(parsed.get().token()).isEqualTo("Gw2AenXEevm3rFfW");
+    }
+
+    @Test
+    void parse_whenLegacyHandleContainsSlug_thenKeepStoreNoAndToken() {
+        Optional<StoreHandle> parsed = storeUrlBuilder.parse("10427-kebapci-mehmet-Gw2AenXEevm3rFfW");
+
+        assertThat(parsed).isPresent();
+        assertThat(parsed.get().storeNo()).isEqualTo(10427L);
+        assertThat(parsed.get().token()).isEqualTo("Gw2AenXEevm3rFfW");
     }
 
     @Test
     void parse_whenStoreNoIsNotNumeric_thenEmpty() {
-        assertThat(storeUrlBuilder.parse("abc-kebapci-token")).isEmpty();
+        assertThat(storeUrlBuilder.parse("abc-Gw2AenXEevm3rFfW")).isEmpty();
     }
 
     @Test
     void parse_whenHandleIsIncomplete_thenEmpty() {
-        assertThat(storeUrlBuilder.parse("10427-kebapci")).isEmpty();
-        assertThat(storeUrlBuilder.parse("10427-kebapci-")).isEmpty();
+        assertThat(storeUrlBuilder.parse("10427-")).isEmpty();
         assertThat(storeUrlBuilder.parse("10427")).isEmpty();
         assertThat(storeUrlBuilder.parse("")).isEmpty();
         assertThat(storeUrlBuilder.parse(null)).isEmpty();
