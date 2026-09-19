@@ -79,7 +79,7 @@ public final class StoreDtos {
     }
 
     @Builder
-    public record MenuOption(Long menuId, String businessName, int productCount) {
+    public record MenuOption(Long menuId, String businessName, int productCount, String branchName) {
     }
 
     @Builder

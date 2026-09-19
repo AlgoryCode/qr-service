@@ -54,3 +54,51 @@ WHERE pu.status = 'ACTIVE'
       WHERE ue.purchase_id = pu.id
         AND ue.product_id = pr.id
   );
+
+INSERT INTO tbl_fulfillment_detail (
+    fulfillment_id, user_id, product_id, product_type_id,
+    feature_code, scope_code, quantity, unlimited, used_quantity,
+    source, starts_at, expires_at, version, created_at
+)
+SELECT
+    f.id,
+    f.user_id,
+    pr.id,
+    'PACKAGE_PRODUCT',
+    'ONLINE_ORDER',
+    'ONLINE_ORDER_OWNER',
+    0,
+    TRUE,
+    0,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM tbl_fulfillment_detail d
+            WHERE d.fulfillment_id = f.id
+              AND d.source = 'ONBOARDING_PACKAGE'
+        ) OR f.trial_log_id IS NOT NULL
+            THEN 'ONBOARDING_PACKAGE'
+        ELSE 'PACKAGE_INCLUDE'
+    END,
+    f.starts_at,
+    f.expires_at,
+    0,
+    NOW()
+FROM tbl_fulfillment f
+JOIN tbl_plan_package pkg
+  ON pkg.id = f.package_id
+ AND pkg.code IN ('ULTIMATE_PACKAGE', 'ULTIMATE_TRIAL_PACKAGE')
+JOIN tbl_product pr ON pr.code = 'ONLINE_ORDER'
+WHERE f.status = 'ACTIVE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM tbl_fulfillment_detail addon
+      WHERE addon.fulfillment_id = f.id
+        AND addon.source = 'ADDON_PURCHASE'
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM tbl_fulfillment_detail d
+      WHERE d.fulfillment_id = f.id
+        AND (d.feature_code = 'ONLINE_ORDER' OR d.scope_code = 'ONLINE_ORDER_OWNER')
+  );

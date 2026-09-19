@@ -6,6 +6,8 @@ import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.store.model.Merchant;
+import com.ael.algoryqrservice.store.repository.MerchantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ public class MenuCatalogCloneService {
     private final ProductImageStorageService productImageStorageService;
     private final EntitlementService entitlementService;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
+    private final MerchantRepository merchantRepository;
 
     @Transactional
     public int cloneInto(Menu targetMenu, Long sourceMenuId, Long userId) {
@@ -58,7 +61,11 @@ public class MenuCatalogCloneService {
                         "Kaynak ürün kategorisi hedef menüye kopyalanamadı: " + source.getName()
                 );
             }
-            MenuProduct saved = menuProductRepository.save(copyProduct(source, targetMenu.getMenuId(), targetSubCategoryId));
+            MenuProduct saved = menuProductRepository.saveAndFlush(
+                    copyProduct(source, targetMenu.getMenuId(), targetSubCategoryId));
+            if (saved.getProductId() == null) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Ürün kopyalanamadı");
+            }
             productIds.put(source.getProductId(), saved.getProductId());
         }
 
@@ -66,6 +73,34 @@ public class MenuCatalogCloneService {
         menuProductOptionService.copyOptions(productIds);
         usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
         return productIds.size();
+    }
+
+    @Transactional
+    public void mirrorOptionsToStoreCatalog(
+            Long userId,
+            Long sourceMenuId,
+            Long sourceProductId,
+            String productName
+    ) {
+        if (userId == null || sourceMenuId == null || sourceProductId == null) {
+            return;
+        }
+        if (productName == null || productName.isBlank()) {
+            return;
+        }
+        Merchant merchant = merchantRepository.findByUserIdAndDeletedFalse(userId).orElse(null);
+        if (merchant == null || merchant.getCatalogMenuId() == null) {
+            return;
+        }
+        if (merchant.getCatalogMenuId().equals(sourceMenuId)) {
+            return;
+        }
+        List<Long> targetIds = menuProductRepository
+                .findByMenuIdAndNameIgnoreCaseAndDeletedFalse(merchant.getCatalogMenuId(), productName.trim())
+                .stream()
+                .map(MenuProduct::getProductId)
+                .toList();
+        menuProductOptionService.overwriteOnto(sourceProductId, targetIds);
     }
 
     @Transactional(readOnly = true)

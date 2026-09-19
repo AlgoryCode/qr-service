@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,13 +44,14 @@ public class MerchantSetupService {
     public StoreDtos.SetupPrefillResponse prefill() {
         Long userId = securityUtils.getCurrentUserId();
         List<Branch> branches = branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(userId);
-        List<Menu> menus = menuRepository
-                .findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(userId, MenuChannel.QR);
+        List<Menu> menus = cloneableMenus(userId);
+        Map<Long, String> branchNames = branches.stream()
+                .collect(Collectors.toMap(Branch::getId, Branch::getName, (left, right) -> left));
         return StoreDtos.SetupPrefillResponse.builder()
                 .alreadySetUp(merchantRepository.existsByUserIdAndDeletedFalse(userId))
                 .suggested(suggestBusinessInfo(branches, menus))
                 .branches(branches.stream().map(this::toBranchOption).toList())
-                .menus(menus.stream().map(this::toMenuOption).toList())
+                .menus(menus.stream().map(menu -> toMenuOption(menu, branchNames)).toList())
                 .build();
     }
 
@@ -127,11 +130,19 @@ public class MerchantSetupService {
                 .build();
     }
 
-    private StoreDtos.MenuOption toMenuOption(Menu menu) {
+    private List<Menu> cloneableMenus(Long userId) {
+        return menuRepository.findActiveMenusWithQrByUserId(userId).stream()
+                .map(row -> (Menu) row[0])
+                .filter(menu -> menu.getChannel() != MenuChannel.STORE)
+                .toList();
+    }
+
+    private StoreDtos.MenuOption toMenuOption(Menu menu, Map<Long, String> branchNames) {
         return StoreDtos.MenuOption.builder()
                 .menuId(menu.getMenuId())
                 .businessName(menu.getBusinessName())
                 .productCount((int) menuProductRepository.countByMenuIdAndDeletedFalse(menu.getMenuId()))
+                .branchName(menu.getBranchId() == null ? null : branchNames.get(menu.getBranchId()))
                 .build();
     }
 

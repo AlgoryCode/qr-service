@@ -2,7 +2,9 @@
 -- tbl_menu_order because that flow is bound to tables, sessions and waiters.
 -- Safe to run manually on stage/prod while Flyway remains disabled.
 
-CREATE TABLE IF NOT EXISTS store_orders (
+ALTER TABLE IF EXISTS store_orders RENAME TO tbl_merchant_store_order;
+
+CREATE TABLE IF NOT EXISTS tbl_merchant_store_order (
     id BIGSERIAL PRIMARY KEY,
     merchant_id BIGINT NOT NULL,
     order_no VARCHAR(32) NOT NULL,
@@ -44,27 +46,32 @@ CREATE TABLE IF NOT EXISTS store_orders (
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE tbl_merchant_store_order ADD COLUMN IF NOT EXISTS public_token VARCHAR(32);
+UPDATE tbl_merchant_store_order
+SET public_token = replace(gen_random_uuid()::text, '-', '')
+WHERE public_token IS NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uk_store_order_public_token
-    ON store_orders (public_token);
+    ON tbl_merchant_store_order (public_token);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_store_order_merchant_no
-    ON store_orders (merchant_id, order_no);
+    ON tbl_merchant_store_order (merchant_id, order_no);
 
 CREATE INDEX IF NOT EXISTS idx_store_order_merchant_status
-    ON store_orders (merchant_id, status);
+    ON tbl_merchant_store_order (merchant_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_store_order_merchant_created
-    ON store_orders (merchant_id, created_at);
+    ON tbl_merchant_store_order (merchant_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_store_order_customer
-    ON store_orders (customer_id);
+    ON tbl_merchant_store_order (customer_id);
 
 CREATE INDEX IF NOT EXISTS idx_store_order_courier
-    ON store_orders (courier_id);
+    ON tbl_merchant_store_order (courier_id);
 
 CREATE TABLE IF NOT EXISTS store_order_items (
     id BIGSERIAL PRIMARY KEY,
-    order_id BIGINT NOT NULL REFERENCES store_orders (id) ON DELETE CASCADE,
+    order_id BIGINT NOT NULL REFERENCES tbl_merchant_store_order (id) ON DELETE CASCADE,
     product_id BIGINT NOT NULL,
     product_name VARCHAR(255) NOT NULL,
     unit_price NUMERIC(12, 2) NOT NULL,
@@ -79,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_store_order_item_order
 
 CREATE TABLE IF NOT EXISTS store_order_status_history (
     id BIGSERIAL PRIMARY KEY,
-    order_id BIGINT NOT NULL REFERENCES store_orders (id) ON DELETE CASCADE,
+    order_id BIGINT NOT NULL REFERENCES tbl_merchant_store_order (id) ON DELETE CASCADE,
     from_status VARCHAR(24),
     to_status VARCHAR(24) NOT NULL,
     changed_by_type VARCHAR(16) NOT NULL,
