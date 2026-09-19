@@ -79,6 +79,9 @@ public class MenuOrder {
     @Column(name = "waiter_note", columnDefinition = "text")
     private String waiterNote;
 
+    @Column(name = "kitchen_note", columnDefinition = "text")
+    private String kitchenNote;
+
     @Column(name = "bill_id")
     private Long billId;
 

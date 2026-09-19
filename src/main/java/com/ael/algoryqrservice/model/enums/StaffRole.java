@@ -1,7 +1,6 @@
 package com.ael.algoryqrservice.model.enums;
 
-public enum OrderSource {
-    QR,
+public enum StaffRole {
     WAITER,
-    UBER_EATS
+    KITCHEN
 }

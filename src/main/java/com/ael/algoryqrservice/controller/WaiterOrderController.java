@@ -34,6 +34,11 @@ public class WaiterOrderController {
         return ResponseEntity.ok(menuWaiterOrderService.listTodayHistory());
     }
 
+    @GetMapping("/ready")
+    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listReady() {
+        return ResponseEntity.ok(menuWaiterOrderService.listReady());
+    }
+
     @GetMapping("/catalog")
     public ResponseEntity<MenuWaiterDtos.CatalogResponse> listCatalog(@RequestParam Long tableId) {
         return ResponseEntity.ok(menuWaiterOrderService.listCatalog(tableId));

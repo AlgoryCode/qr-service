@@ -23,6 +23,11 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
 
     List<MenuOrder> findByMenuIdInAndStatusOrderBySubmittedAtDesc(Collection<Long> menuIds, MenuOrderStatus status);
 
+    List<MenuOrder> findByMenuIdInAndStatusInOrderBySubmittedAtDesc(
+            Collection<Long> menuIds,
+            Collection<MenuOrderStatus> statuses
+    );
+
     List<MenuOrder> findByCustomerIdAndMenuIdOrderByCreatedAtDesc(Long customerId, Long menuId);
 
     Optional<MenuOrder> findByIdAndCustomerId(Long id, Long customerId);

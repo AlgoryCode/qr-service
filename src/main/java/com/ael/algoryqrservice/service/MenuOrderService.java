@@ -61,6 +61,7 @@ public class MenuOrderService {
     private final MenuProductOptionService menuProductOptionService;
     private final OrderAuditService orderAuditService;
     private final SecurityUtils securityUtils;
+    private final KitchenUberEatsService kitchenUberEatsService;
 
     @Transactional
     public MenuOrderDtos.OrderResponse getOrCreateDraft(String tableSessionToken) {
@@ -254,6 +255,120 @@ public class MenuOrderService {
         MenuOrder saved = menuOrderRepository.save(order);
         orderAuditService.record(saved, OrderAuditAction.CANCELLED, null, null);
         return toOrderResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MenuOrderDtos.OrderResponse> merchantKitchenQueue(Long menuId) {
+        Menu menu = requireOwnedMenu(menuId);
+        List<MenuOrderDtos.OrderResponse> active = menuOrderRepository
+                .findByMenuIdAndStatusInOrderBySubmittedAtDesc(
+                        menuId,
+                        List.of(
+                                MenuOrderStatus.CONFIRMED,
+                                MenuOrderStatus.PREPARING,
+                                MenuOrderStatus.READY
+                        )
+                )
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
+        LocalDateTime start = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Istanbul")).atStartOfDay();
+        LocalDateTime end = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Istanbul")).atTime(java.time.LocalTime.MAX);
+        List<MenuOrderDtos.OrderResponse> servedToday = menuOrderRepository
+                .findByMenuIdAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        menuId,
+                        List.of(MenuOrderStatus.SERVED),
+                        start,
+                        end
+                )
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
+        List<MenuOrderDtos.OrderResponse> combined = new ArrayList<>(active);
+        combined.addAll(servedToday);
+        combined.addAll(kitchenUberEatsService.listActiveForOwner(menu.getUserId()));
+        return combined;
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantMarkPreparing(Long menuId, Long orderId, String source) {
+        if (KitchenUberEatsMapper.isUberEatsSource(source)) {
+            throw new BadRequestException("Uber Eats siparişlerinde hazırlık adımı yok");
+        }
+        return merchantKitchenTransition(menuId, orderId, MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantMarkPreparing(Long menuId, Long orderId) {
+        return merchantMarkPreparing(menuId, orderId, null);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantMarkReady(Long menuId, Long orderId, String source) {
+        if (KitchenUberEatsMapper.isUberEatsSource(source)) {
+            Menu menu = requireOwnedMenu(menuId);
+            return kitchenUberEatsService.markReady(menu.getUserId(), orderId);
+        }
+        return merchantKitchenTransition(menuId, orderId, MenuOrderStatus.PREPARING, MenuOrderStatus.READY);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantMarkReady(Long menuId, Long orderId) {
+        return merchantMarkReady(menuId, orderId, null);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantMarkServed(Long menuId, Long orderId) {
+        return merchantKitchenTransition(menuId, orderId, MenuOrderStatus.READY, MenuOrderStatus.SERVED);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantUpdateKitchenNote(Long menuId, Long orderId, String note) {
+        requireOwnedMenu(menuId);
+        MenuOrder order = requireOrderForMenu(menuId, orderId);
+        order.setKitchenNote(trimToNull(note));
+        order.setUpdatedAt(LocalDateTime.now());
+        return toOrderResponse(menuOrderRepository.save(order));
+    }
+
+    public MenuOrder applyKitchenTransition(
+            MenuOrder order,
+            MenuOrderStatus expected,
+            MenuOrderStatus next,
+            Long actorWaiterId
+    ) {
+        if (order.getStatus() != expected) {
+            throw new BadRequestException("Sipariş durumu bu geçiş için uygun değil: " + order.getStatus());
+        }
+        LocalDateTime now = LocalDateTime.now();
+        order.setStatus(next);
+        if (next == MenuOrderStatus.PREPARING) {
+            order.setPreparedAt(now);
+        } else if (next == MenuOrderStatus.READY) {
+            order.setReadyAt(now);
+        } else if (next == MenuOrderStatus.SERVED) {
+            order.setServedAt(now);
+        }
+        order.setUpdatedAt(now);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(
+                saved,
+                OrderAuditAction.STATUS_CHANGED,
+                actorWaiterId,
+                "{\"from\":\"" + expected + "\",\"to\":\"" + next + "\"}"
+        );
+        return saved;
+    }
+
+    private MenuOrderDtos.OrderResponse merchantKitchenTransition(
+            Long menuId,
+            Long orderId,
+            MenuOrderStatus expected,
+            MenuOrderStatus next
+    ) {
+        requireOwnedMenu(menuId);
+        MenuOrder order = requireOrderForMenu(menuId, orderId);
+        return toOrderResponse(applyKitchenTransition(order, expected, next, null));
     }
 
     public static boolean isCancellable(MenuOrderStatus status) {
@@ -491,6 +606,7 @@ public class MenuOrderService {
                 .cancelledByWaiterId(order.getCancelledByWaiterId())
                 .waiterName(waiterName)
                 .waiterNote(order.getWaiterNote())
+                .kitchenNote(order.getKitchenNote())
                 .billId(order.getBillId())
                 .commissionAmount(order.getCommissionAmount())
                 .analyticsSessionId(order.getAnalyticsSessionId())

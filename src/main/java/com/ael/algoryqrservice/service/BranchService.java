@@ -71,6 +71,7 @@ public class BranchService {
                 .email(trimToNull(request.getEmail()))
                 .grandfathered(false)
                 .active(true)
+                .kitchenEnabled(false)
                 .build());
         return toResponse(branch, List.of());
     }
@@ -93,7 +94,20 @@ public class BranchService {
         if (request.getActive() != null) {
             branch.setActive(request.getActive());
         }
+        if (request.getKitchenEnabled() != null) {
+            branch.setKitchenEnabled(request.getKitchenEnabled());
+        }
         return toResponse(branchRepository.save(branch), menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
+    }
+
+    @Transactional
+    public BranchDtos.Response enableKitchen(Long branchId) {
+        Branch branch = requireOwned(branchId);
+        branch.setKitchenEnabled(true);
+        return toResponse(
+                branchRepository.save(branch),
+                menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR)
+        );
     }
 
     @Transactional
@@ -222,6 +236,7 @@ public class BranchService {
                 .photoUrl(branch.getPhotoUrl())
                 .grandfathered(branch.isGrandfathered())
                 .active(branch.isActive())
+                .kitchenEnabled(branch.isKitchenEnabled())
                 .menus(menus.stream()
                         .map(menu -> BranchDtos.MenuSummary.builder()
                                 .menuId(menu.getMenuId())

@@ -96,7 +96,22 @@ class BranchServiceTest {
 
         assertThat(response.getId()).isEqualTo(15L);
         assertThat(response.getName()).isEqualTo("Kadıköy");
+        assertThat(response.isKitchenEnabled()).isFalse();
         verify(branchQuotaService).assertCanCreateBranch(7L);
+    }
+
+    @Test
+    void enableKitchen_whenOwned_thenTurnsKitchenOn() {
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(false).build();
+        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
+
+        BranchDtos.Response response = branchService.enableKitchen(15L);
+
+        assertThat(branch.isKitchenEnabled()).isTrue();
+        assertThat(response.isKitchenEnabled()).isTrue();
     }
 
     @Test

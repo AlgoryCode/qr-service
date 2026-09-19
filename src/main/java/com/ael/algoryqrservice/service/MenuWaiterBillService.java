@@ -34,7 +34,7 @@ public class MenuWaiterBillService {
 
     @Transactional
     public TableBillDtos.BillResponse addItems(Long billId, TableBillDtos.UpdateBillItemsRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.addItems(
                 bill.getMenuId(),
@@ -46,42 +46,42 @@ public class MenuWaiterBillService {
 
     @Transactional
     public TableBillDtos.BillResponse updateItemQuantity(Long billId, Long itemId, int quantity) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.updateItemQuantity(bill.getMenuId(), billId, itemId, quantity);
     }
 
     @Transactional
     public TableBillDtos.BillResponse removeItem(Long billId, Long itemId) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.removeItem(bill.getMenuId(), billId, itemId);
     }
 
     @Transactional
     public TableBillDtos.BillResponse payItems(Long billId, TableBillDtos.PayBillItemsRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.payItems(bill.getMenuId(), billId, waiter, request);
     }
 
     @Transactional
     public TableBillDtos.BillResponse payShare(Long billId, TableBillDtos.PayBillShareRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.payShare(bill.getMenuId(), billId, waiter, request);
     }
 
     @Transactional(readOnly = true)
     public TableBillDtos.SplitPreviewResponse getSplitPreview(Long billId, int personCount) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.getSplitPreview(bill.getMenuId(), billId, personCount);
     }
 
     @Transactional
     public TableBillDtos.BillResponse closeBill(Long billId, TableBillDtos.CloseBillRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         TableBill bill = requireBillForWaiter(billId, waiter);
         return tableBillService.closeBill(
                 bill.getMenuId(),
@@ -94,7 +94,7 @@ public class MenuWaiterBillService {
     }
 
     private RestaurantTable requireTableForCurrentWaiter(Long tableId) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
         RestaurantTable table = restaurantTableRepository.findById(tableId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
@@ -103,7 +103,7 @@ public class MenuWaiterBillService {
     }
 
     private TableBill requireBillForCurrentWaiter(Long billId) {
-        return requireBillForWaiter(billId, waiterAccessService.requireCurrentWaiter());
+        return requireBillForWaiter(billId, waiterAccessService.requireWaiterStaff());
     }
 
     private TableBill requireBillForWaiter(Long billId, MenuWaiter waiter) {

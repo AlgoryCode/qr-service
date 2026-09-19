@@ -27,7 +27,7 @@ public class WaiterAccessService {
         MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
         if (!waiter.isActive()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Garson hesabı pasif");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Hesap pasif");
         }
         Long tokenBranchId = securityUtils.getCurrentWaiterBranchId();
         if (waiter.getBranchId() == null || !tokenBranchId.equals(waiter.getBranchId())) {
@@ -36,8 +36,24 @@ public class WaiterAccessService {
         return waiter;
     }
 
+    public MenuWaiter requireWaiterStaff() {
+        MenuWaiter staff = requireCurrentWaiter();
+        if (!staff.isWaiterStaff()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu işlem yalnızca garson içindir");
+        }
+        return staff;
+    }
+
+    public MenuWaiter requireKitchenStaff() {
+        MenuWaiter staff = requireCurrentWaiter();
+        if (!staff.isKitchen()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu işlem yalnızca mutfak içindir");
+        }
+        return staff;
+    }
+
     public MenuWaiter requireWaiterForMenu(Long menuId) {
-        MenuWaiter waiter = requireCurrentWaiter();
+        MenuWaiter waiter = requireWaiterStaff();
         requireMenuInWaiterBranch(menuId, waiter);
         return waiter;
     }

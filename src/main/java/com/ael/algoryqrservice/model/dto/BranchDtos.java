@@ -47,6 +47,7 @@ public final class BranchDtos {
         @Size(max = 255)
         private String email;
         private Boolean active;
+        private Boolean kitchenEnabled;
     }
 
     @Data
@@ -74,6 +75,7 @@ public final class BranchDtos {
         private String photoUrl;
         private boolean grandfathered;
         private boolean active;
+        private boolean kitchenEnabled;
         private List<MenuSummary> menus;
     }
 

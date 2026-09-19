@@ -3,10 +3,10 @@ package com.ael.algoryqrservice.store.service;
 import com.ael.algoryqrservice.store.model.Merchant;
 import com.ael.algoryqrservice.store.model.StoreWorkingHour;
 import com.ael.algoryqrservice.store.model.dto.StoreDtos;
+import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,7 +27,7 @@ public class MerchantMapper {
                 .handle(storeUrlBuilder.buildHandle(merchant))
                 .storeUrl(storeUrlBuilder.buildUrl(merchant))
                 .status(merchant.getStatus())
-                .open(storeOpeningHours.isOpenAt(merchant, LocalDateTime.now()))
+                .open(storeOpeningHours.isOpenAt(merchant, AppTime.nowLocal()))
                 .branchId(merchant.getBranchId())
                 .catalogMenuId(merchant.getCatalogMenuId())
                 .business(toBusinessInfo(merchant))

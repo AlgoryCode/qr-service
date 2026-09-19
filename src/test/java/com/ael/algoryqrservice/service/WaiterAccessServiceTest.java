@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -71,5 +72,39 @@ class WaiterAccessServiceTest {
         assertThatThrownBy(() -> waiterAccessService.requireWaiterForMenu(12L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("şubeye erişim");
+    }
+
+    @Test
+    void requireKitchenStaff_whenWaiterRole_thenForbidden() {
+        MenuWaiter waiter = MenuWaiter.builder()
+                .id(7L)
+                .branchId(4L)
+                .active(true)
+                .staffRole(StaffRole.WAITER)
+                .build();
+        when(securityUtils.getCurrentWaiterId()).thenReturn(7L);
+        when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
+        when(menuWaiterRepository.findById(7L)).thenReturn(Optional.of(waiter));
+
+        assertThatThrownBy(() -> waiterAccessService.requireKitchenStaff())
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("mutfak");
+    }
+
+    @Test
+    void requireWaiterStaff_whenKitchenRole_thenForbidden() {
+        MenuWaiter staff = MenuWaiter.builder()
+                .id(8L)
+                .branchId(4L)
+                .active(true)
+                .staffRole(StaffRole.KITCHEN)
+                .build();
+        when(securityUtils.getCurrentWaiterId()).thenReturn(8L);
+        when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
+        when(menuWaiterRepository.findById(8L)).thenReturn(Optional.of(staff));
+
+        assertThatThrownBy(() -> waiterAccessService.requireWaiterStaff())
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("garson");
     }
 }

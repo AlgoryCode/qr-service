@@ -54,4 +54,8 @@ public class Branch extends QrBaseModel {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "kitchen_enabled", nullable = false)
+    @Builder.Default
+    private boolean kitchenEnabled = false;
 }

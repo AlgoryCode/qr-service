@@ -76,7 +76,7 @@ public class CampaignService {
 
     @Transactional(readOnly = true)
     public List<CampaignDtos.ActiveCampaignResponse> listActiveCampaignsForCurrentWaiter() {
-        var waiter = waiterAccessService.requireCurrentWaiter();
+        var waiter = waiterAccessService.requireWaiterStaff();
         List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
         if (menuIds.isEmpty()) {
             return List.of();

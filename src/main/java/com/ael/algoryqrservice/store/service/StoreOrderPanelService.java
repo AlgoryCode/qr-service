@@ -7,11 +7,13 @@ import com.ael.algoryqrservice.store.model.StoreOrderStatus;
 import com.ael.algoryqrservice.store.model.dto.StoreOrderDtos;
 import com.ael.algoryqrservice.store.repository.StoreCourierRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderRepository;
+import com.ael.algoryqrservice.store.repository.StoreOrderSpecifications;
 import com.ael.algoryqrservice.store.repository.StoreOrderStatusHistoryRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,12 +55,18 @@ public class StoreOrderPanelService {
     ) {
         Merchant merchant = merchantService.requireCurrentMerchant();
         Collection<StoreOrderStatus> effectiveStatuses = statuses == null || statuses.isEmpty() ? null : statuses;
-        Page<StoreOrder> result = storeOrderRepository.search(
-                merchant.getId(),
-                effectiveStatuses,
-                from == null ? null : from.atStartOfDay(),
-                to == null ? null : to.plusDays(1).atStartOfDay(),
-                PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE))
+        Page<StoreOrder> result = storeOrderRepository.findAll(
+                StoreOrderSpecifications.search(
+                        merchant.getId(),
+                        effectiveStatuses,
+                        from == null ? null : from.atStartOfDay(),
+                        to == null ? null : to.plusDays(1).atStartOfDay()
+                ),
+                PageRequest.of(
+                        Math.max(page, 0),
+                        Math.clamp(size, 1, MAX_PAGE_SIZE),
+                        Sort.by(Sort.Direction.DESC, "createdAt")
+                )
         );
         Map<Long, StoreCourier> couriers = loadCouriers(merchant.getId());
         return StoreOrderDtos.OrderPage.builder()

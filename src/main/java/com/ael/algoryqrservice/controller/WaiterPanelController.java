@@ -169,6 +169,47 @@ public class WaiterPanelController {
         return ResponseEntity.ok(menuOrderService.merchantCancel(menuId, orderId, request));
     }
 
+    @GetMapping("/menu/{menuId}/kitchen/orders")
+    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listKitchenQueue(@PathVariable Long menuId) {
+        return ResponseEntity.ok(menuOrderService.merchantKitchenQueue(menuId));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/preparing")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markPreparing(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantMarkPreparing(menuId, orderId, source));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/ready")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markReady(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantMarkReady(menuId, orderId, source));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/served")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markServed(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantMarkServed(menuId, orderId));
+    }
+
+    @PatchMapping("/menu/{menuId}/orders/{orderId}/kitchen-note")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> updateKitchenNote(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @Valid @RequestBody MenuWaiterDtos.WaiterNoteRequest request
+    ) {
+        String note = request != null ? request.getNote() : null;
+        return ResponseEntity.ok(menuOrderService.merchantUpdateKitchenNote(menuId, orderId, note));
+    }
+
     @GetMapping("/menu/{menuId}/customers")
     public ResponseEntity<List<MenuWaiterDtos.CustomerListItem>> listCustomers(@PathVariable Long menuId) {
         return ResponseEntity.ok(merchantCustomerService.listCustomers(menuId));
