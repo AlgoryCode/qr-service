@@ -621,6 +621,14 @@ public class MenuService {
         response.setPairings(menuProductPairingService.load(response.getProductId()));
         menuProductOptionService.replace(response.getProductId(), request.getOptionGroups());
         response.setOptionGroups(menuProductOptionService.load(response.getProductId()));
+        if (menu.getChannel() == MenuChannel.QR) {
+            menuCatalogCloneService.mirrorOptionsToStoreCatalog(
+                    menu.getUserId(),
+                    menu.getMenuId(),
+                    response.getProductId(),
+                    response.getName()
+            );
+        }
         usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
         menuProductIndexNotifier.productChanged(saved);
         return response;
@@ -630,7 +638,7 @@ public class MenuService {
     public MenuDtos.MenuProductResponse updateProduct(Long productId, MenuDtos.MenuProductRequest request) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
-        ensureOwnedMenu(product.getMenuId());
+        Menu menu = ensureOwnedMenu(product.getMenuId());
         validateProductRequest(request);
         MenuSubCategory subCategory = menuCategoryService.requireSubCategory(
                 product.getMenuId(),
@@ -682,6 +690,14 @@ public class MenuService {
         if (request.getOptionGroups() != null) {
             menuProductOptionService.replace(product.getProductId(), request.getOptionGroups());
             response.setOptionGroups(menuProductOptionService.load(product.getProductId()));
+            if (menu.getChannel() == MenuChannel.QR) {
+                menuCatalogCloneService.mirrorOptionsToStoreCatalog(
+                        menu.getUserId(),
+                        menu.getMenuId(),
+                        product.getProductId(),
+                        product.getName()
+                );
+            }
         }
         menuProductIndexNotifier.productChanged(saved);
         return response;

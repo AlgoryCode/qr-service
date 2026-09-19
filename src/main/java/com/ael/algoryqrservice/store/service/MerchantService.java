@@ -19,7 +19,6 @@ public class MerchantService {
     private final MerchantRepository merchantRepository;
     private final MerchantMapper merchantMapper;
     private final StoreSlugGenerator storeSlugGenerator;
-    private final StoreTokenGenerator storeTokenGenerator;
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
@@ -50,13 +49,6 @@ public class MerchantService {
         if (request.status() != null) {
             merchant.setStatus(request.status());
         }
-        return merchantMapper.toResponse(merchantRepository.save(merchant));
-    }
-
-    @Transactional
-    public StoreDtos.MerchantResponse rotateToken() {
-        Merchant merchant = requireCurrentMerchant();
-        merchant.setPublicToken(storeTokenGenerator.generateUnique(merchantRepository::existsByPublicToken));
         return merchantMapper.toResponse(merchantRepository.save(merchant));
     }
 }

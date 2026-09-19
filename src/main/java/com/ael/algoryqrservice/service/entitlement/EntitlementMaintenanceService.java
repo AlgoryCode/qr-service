@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.service.FulfillmentMigrationService;
+import com.ael.algoryqrservice.service.PackageFulfillmentSynchronizer;
 import com.ael.algoryqrservice.util.WritableTransactionGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class EntitlementMaintenanceService {
     private final PackageEntitlementWriter entitlementWriter;
     private final FulfillmentGrantService fulfillmentGrantService;
     private final FulfillmentMigrationService fulfillmentMigrationService;
+    private final PackageFulfillmentSynchronizer packageFulfillmentSynchronizer;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final WritableTransactionGuard writableTransactionGuard;
 
@@ -43,6 +45,7 @@ public class EntitlementMaintenanceService {
         repairPackageEntitlements(userId);
         repairAddonEntitlements(userId);
         fulfillmentMigrationService.backfillUser(userId);
+        packageFulfillmentSynchronizer.appendMissingProducts(userId);
         usageSyncRegistry.synchronizeAll(userId);
     }
 
@@ -52,6 +55,7 @@ public class EntitlementMaintenanceService {
             return;
         }
         fulfillmentMigrationService.backfillUser(userId);
+        packageFulfillmentSynchronizer.appendMissingProducts(userId);
     }
 
     private void repairPackageEntitlements(Long userId) {

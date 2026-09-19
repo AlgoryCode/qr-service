@@ -1,5 +1,5 @@
 -- Address book for signed-in customers ordering from a storefront. Guest orders
--- keep their address only as a snapshot on store_orders.
+-- keep their address only as a snapshot on tbl_merchant_store_order.
 -- Safe to run manually on stage/prod while Flyway remains disabled.
 
 CREATE TABLE IF NOT EXISTS customer_addresses (

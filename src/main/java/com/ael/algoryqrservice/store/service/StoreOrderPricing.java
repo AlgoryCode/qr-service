@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.store.service;
 
 import com.ael.algoryqrservice.model.MenuProduct;
+import com.ael.algoryqrservice.model.MenuProductOptionGroup;
 import com.ael.algoryqrservice.model.SelectedMenuOption;
-import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.service.MenuProductOptionService;
 import com.ael.algoryqrservice.store.model.Merchant;
 import com.ael.algoryqrservice.store.model.StoreDeliveryType;
@@ -15,7 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,8 +34,8 @@ public class StoreOrderPricing {
     public PricedOrder price(Merchant merchant, StorePublicDtos.CreateOrderRequest request) {
         List<Long> requestedIds = request.items().stream().map(StorePublicDtos.OrderItemRequest::productId).toList();
         Map<Long, MenuProduct> products = storeCatalogService.loadAvailableProducts(merchant.getCatalogMenuId(), requestedIds);
-        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionGroups =
-                menuProductOptionService.loadByProductIds(products.keySet());
+        Map<Long, List<MenuProductOptionGroup>> optionGroups =
+                menuProductOptionService.loadEntitiesByProductIds(products.keySet());
 
         List<StoreOrderItem> items = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -45,7 +44,16 @@ public class StoreOrderPricing {
             if (product == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün satışta değil");
             }
-            List<SelectedMenuOption> selected = resolveOptions(requested, optionGroups.get(product.getProductId()));
+            List<Long> selectedIds = requested.options() == null
+                    ? List.of()
+                    : requested.options().stream()
+                            .map(StorePublicDtos.SelectedOptionRequest::optionId)
+                            .toList();
+            List<SelectedMenuOption> selected = menuProductOptionService.resolveSelections(
+                    product.getProductId(),
+                    optionGroups.get(product.getProductId()),
+                    selectedIds
+            ).selectedOptions();
             BigDecimal unitPrice = basePrice(product).add(optionsTotal(selected));
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(requested.quantity()));
             items.add(StoreOrderItem.builder()
@@ -87,45 +95,6 @@ public class StoreOrderPricing {
             return BigDecimal.ZERO;
         }
         return merchant.getDeliveryFee() == null ? BigDecimal.ZERO : merchant.getDeliveryFee();
-    }
-
-    private List<SelectedMenuOption> resolveOptions(
-            StorePublicDtos.OrderItemRequest requested,
-            List<MenuDtos.MenuProductOptionGroupResponse> groups
-    ) {
-        if (requested.options() == null || requested.options().isEmpty()) {
-            return List.of();
-        }
-        Map<Long, MenuDtos.MenuProductOptionGroupResponse> groupsById = indexGroups(groups);
-        List<SelectedMenuOption> selected = new ArrayList<>();
-        for (StorePublicDtos.SelectedOptionRequest option : requested.options()) {
-            MenuDtos.MenuProductOptionGroupResponse group = groupsById.get(option.groupId());
-            if (group == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçersiz ürün seçeneği");
-            }
-            MenuDtos.MenuProductOptionResponse match = group.getOptions().stream()
-                    .filter(candidate -> candidate.getOptionId().equals(option.optionId()) && candidate.isAvailable())
-                    .findFirst()
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçersiz ürün seçeneği"));
-            selected.add(SelectedMenuOption.builder()
-                    .groupId(group.getGroupId())
-                    .groupName(group.getName())
-                    .optionId(match.getOptionId())
-                    .optionName(match.getName())
-                    .priceDelta(match.getPriceDelta() == null ? BigDecimal.ZERO : match.getPriceDelta())
-                    .build());
-        }
-        return selected;
-    }
-
-    private Map<Long, MenuDtos.MenuProductOptionGroupResponse> indexGroups(
-            List<MenuDtos.MenuProductOptionGroupResponse> groups
-    ) {
-        Map<Long, MenuDtos.MenuProductOptionGroupResponse> byId = new LinkedHashMap<>();
-        if (groups != null) {
-            groups.forEach(group -> byId.put(group.getGroupId(), group));
-        }
-        return byId;
     }
 
     private BigDecimal optionsTotal(List<SelectedMenuOption> selected) {

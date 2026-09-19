@@ -150,29 +150,42 @@ public class MenuProductOptionService {
             if (targetProductId == null) {
                 continue;
             }
-            MenuProductOptionGroup copy = MenuProductOptionGroup.builder()
-                    .productId(targetProductId)
-                    .name(source.getName())
-                    .kind(source.getKind() == null ? MenuProductOptionGroupKind.CUSTOM : source.getKind())
-                    .unit(source.getUnit() == null ? MenuProductOptionUnit.NONE : source.getUnit())
-                    .minSelect(source.getMinSelect())
-                    .maxSelect(source.getMaxSelect())
-                    .sortOrder(source.getSortOrder())
-                    .options(new ArrayList<>())
-                    .build();
-            for (MenuProductOption sourceOption : source.getOptions()) {
-                copy.addOption(MenuProductOption.builder()
-                        .name(sourceOption.getName())
-                        .priceDelta(sourceOption.getPriceDelta())
-                        .available(sourceOption.isAvailable())
-                        .sortOrder(sourceOption.getSortOrder())
-                        .build());
-            }
-            copies.add(copy);
+            copies.add(copyGroup(source, targetProductId));
         }
         if (!copies.isEmpty()) {
             optionGroupRepository.saveAll(copies);
         }
+    }
+
+    @Transactional
+    public void overwriteOnto(Long sourceProductId, Collection<Long> targetProductIds) {
+        if (sourceProductId == null || targetProductIds == null || targetProductIds.isEmpty()) {
+            return;
+        }
+        LinkedHashSet<Long> targets = new LinkedHashSet<>();
+        for (Long targetId : targetProductIds) {
+            if (targetId != null && targetId > 0 && !targetId.equals(sourceProductId)) {
+                targets.add(targetId);
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        for (Long targetId : targets) {
+            optionGroupRepository.deleteByProductId(targetId);
+        }
+        List<MenuProductOptionGroup> sourceGroups =
+                optionGroupRepository.findByProductIdOrderBySortOrderAscIdAsc(sourceProductId);
+        if (sourceGroups.isEmpty()) {
+            return;
+        }
+        List<MenuProductOptionGroup> copies = new ArrayList<>();
+        for (Long targetId : targets) {
+            for (MenuProductOptionGroup source : sourceGroups) {
+                copies.add(copyGroup(source, targetId));
+            }
+        }
+        optionGroupRepository.saveAll(copies);
     }
 
     public ResolvedSelections resolveSelections(
@@ -281,6 +294,30 @@ public class MenuProductOptionService {
                                 .toList())
                         .build())
                 .toList();
+    }
+
+    private static MenuProductOptionGroup copyGroup(MenuProductOptionGroup source, Long targetProductId) {
+        MenuProductOptionGroup copy = MenuProductOptionGroup.builder()
+                .productId(targetProductId)
+                .name(source.getName())
+                .kind(source.getKind() == null ? MenuProductOptionGroupKind.CUSTOM : source.getKind())
+                .unit(source.getUnit() == null ? MenuProductOptionUnit.NONE : source.getUnit())
+                .minSelect(source.getMinSelect())
+                .maxSelect(source.getMaxSelect())
+                .sortOrder(source.getSortOrder())
+                .options(new ArrayList<>())
+                .build();
+        List<MenuProductOption> sourceOptions =
+                source.getOptions() == null ? List.of() : source.getOptions();
+        for (MenuProductOption sourceOption : sourceOptions) {
+            copy.addOption(MenuProductOption.builder()
+                    .name(sourceOption.getName())
+                    .priceDelta(sourceOption.getPriceDelta())
+                    .available(sourceOption.isAvailable())
+                    .sortOrder(sourceOption.getSortOrder())
+                    .build());
+        }
+        return copy;
     }
 
     private static MenuProductOptionGroupKind resolveKind(String raw) {

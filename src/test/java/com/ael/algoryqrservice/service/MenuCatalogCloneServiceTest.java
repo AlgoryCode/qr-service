@@ -5,6 +5,8 @@ import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.store.model.Merchant;
+import com.ael.algoryqrservice.store.repository.MerchantRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +49,8 @@ class MenuCatalogCloneServiceTest {
     private EntitlementService entitlementService;
     @Mock
     private FeatureUsageSyncRegistry usageSyncRegistry;
+    @Mock
+    private MerchantRepository merchantRepository;
 
     @InjectMocks
     private MenuCatalogCloneService menuCatalogCloneService;
@@ -73,7 +77,11 @@ class MenuCatalogCloneServiceTest {
         when(menuRepository.findById(12L)).thenReturn(Optional.of(source));
         when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
                 .thenReturn(List.of(sourceProduct));
-        when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuProductRepository.saveAndFlush(any(MenuProduct.class))).thenAnswer(invocation -> {
+            MenuProduct product = invocation.getArgument(0);
+            product.setProductId(500L);
+            return product;
+        });
         when(menuCategoryService.cloneTaxonomyToMenu(12L, 99L))
                 .thenReturn(new MenuCategoryService.TaxonomyCloneResult(Map.of(1L, 10L), Map.of(3L, 30L)));
 
@@ -83,7 +91,7 @@ class MenuCatalogCloneServiceTest {
         verify(entitlementService).assertMenuProductCreationAllowed(7L, 1);
 
         ArgumentCaptor<MenuProduct> productCaptor = ArgumentCaptor.forClass(MenuProduct.class);
-        verify(menuProductRepository, times(1)).save(productCaptor.capture());
+        verify(menuProductRepository, times(1)).saveAndFlush(productCaptor.capture());
         MenuProduct saved = productCaptor.getValue();
         assertThat(saved.getMenuId()).isEqualTo(99L);
         assertThat(saved.getName()).isEqualTo("Latte");
@@ -93,6 +101,29 @@ class MenuCatalogCloneServiceTest {
         assertThat(saved.getRatingAvg()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getRatingCount()).isZero();
         verify(menuProductPairingService).copyPairings(any(), eq(Map.of(1L, 10L)), eq(Map.of(3L, 30L)));
+        verify(menuProductOptionService).copyOptions(Map.of(100L, 500L));
+    }
+
+    @Test
+    void mirrorOptionsToStoreCatalog_whenMerchantHasMatchingProduct_thenOverwrite() {
+        Merchant merchant = Merchant.builder().catalogMenuId(99L).build();
+        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.of(merchant));
+        when(menuProductRepository.findByMenuIdAndNameIgnoreCaseAndDeletedFalse(99L, "Latte"))
+                .thenReturn(List.of(MenuProduct.builder().productId(500L).name("Latte").build()));
+
+        menuCatalogCloneService.mirrorOptionsToStoreCatalog(7L, 12L, 100L, "Latte");
+
+        verify(menuProductOptionService).overwriteOnto(100L, List.of(500L));
+    }
+
+    @Test
+    void mirrorOptionsToStoreCatalog_whenSourceIsStoreCatalog_thenSkip() {
+        Merchant merchant = Merchant.builder().catalogMenuId(12L).build();
+        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.of(merchant));
+
+        menuCatalogCloneService.mirrorOptionsToStoreCatalog(7L, 12L, 100L, "Latte");
+
+        verifyNoInteractions(menuProductOptionService);
     }
 
     @Test
