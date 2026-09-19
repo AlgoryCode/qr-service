@@ -169,6 +169,7 @@ public final class MenuOrderDtos {
         private Long cancelledByWaiterId;
         private String waiterName;
         private String waiterNote;
+        private String kitchenNote;
         private Long billId;
         private BigDecimal commissionAmount;
         private UUID analyticsSessionId;

@@ -3,10 +3,12 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.dto.LogoutRequest;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.dto.RefreshTokenRequest;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MenuWaiterAuthService {
 
     private final MenuWaiterRepository menuWaiterRepository;
+    private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
     private final MenuWaiterSessionService menuWaiterSessionService;
     private final JwtService jwtService;
@@ -72,12 +75,16 @@ public class MenuWaiterAuthService {
         Long waiterId = securityUtils.getCurrentWaiterId();
         MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
                 .orElseThrow(() -> new BadCredentialsException("Garson bulunamadı"));
+        boolean kitchenEnabled = waiter.getBranchId() != null
+                && branchRepository.findById(waiter.getBranchId()).map(Branch::isKitchenEnabled).orElse(false);
         return MenuWaiterDtos.WaiterMeResponse.builder()
                 .waiterId(waiter.getId())
                 .branchId(waiter.getBranchId())
                 .ownerUserId(waiter.getOwnerUserId())
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())
+                .staffRole(waiter.resolvedStaffRole())
+                .kitchenEnabled(kitchenEnabled)
                 .active(waiter.isActive())
                 .commissionEnabled(waiter.isCommissionEnabled())
                 .commissionType(waiter.getCommissionType())

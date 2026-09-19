@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.validation.constraints.NotBlank;
@@ -35,6 +36,8 @@ public final class MenuWaiterDtos {
         @NotBlank
         @Size(max = 120)
         private String displayName;
+
+        private StaffRole staffRole;
     }
 
     @Data
@@ -66,6 +69,7 @@ public final class MenuWaiterDtos {
         private Long branchId;
         private String username;
         private String displayName;
+        private StaffRole staffRole;
         private boolean active;
         private boolean commissionEnabled;
         private WaiterCommissionType commissionType;
@@ -116,6 +120,7 @@ public final class MenuWaiterDtos {
         private Long waiterId;
         private Long branchId;
         private String displayName;
+        private StaffRole staffRole;
     }
 
     @Data
@@ -128,6 +133,8 @@ public final class MenuWaiterDtos {
         private Long ownerUserId;
         private String username;
         private String displayName;
+        private StaffRole staffRole;
+        private boolean kitchenEnabled;
         private boolean active;
         private boolean commissionEnabled;
         private WaiterCommissionType commissionType;
@@ -189,6 +196,8 @@ public final class MenuWaiterDtos {
         private String areaName;
         private boolean active;
         private int pendingOrderCount;
+        private int kitchenOrderCount;
+        private int readyOrderCount;
         private Long latestPendingOrderId;
         private MenuOrderStatus latestPendingStatus;
         private BigDecimal latestPendingTotal;

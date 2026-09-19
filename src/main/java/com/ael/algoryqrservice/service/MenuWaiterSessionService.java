@@ -55,7 +55,8 @@ public class MenuWaiterSessionService {
                 sessionId,
                 waiter.getId(),
                 waiter.getBranchId(),
-                waiter.getOwnerUserId()
+                waiter.getOwnerUserId(),
+                waiter.resolvedStaffRole().name()
         );
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
 
@@ -95,7 +96,8 @@ public class MenuWaiterSessionService {
                 session.getId(),
                 waiter.getId(),
                 waiter.getBranchId(),
-                waiter.getOwnerUserId()
+                waiter.getOwnerUserId(),
+                waiter.resolvedStaffRole().name()
         );
         String newRefreshToken = formatRefreshToken(session.getId(), newRawRefreshToken);
 
@@ -148,6 +150,7 @@ public class MenuWaiterSessionService {
                 .waiterId(waiter.getId())
                 .branchId(waiter.getBranchId())
                 .displayName(waiter.getDisplayName())
+                .staffRole(waiter.resolvedStaffRole())
                 .build();
     }
 

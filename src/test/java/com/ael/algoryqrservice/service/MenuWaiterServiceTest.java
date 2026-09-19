@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.User;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,8 +72,65 @@ class MenuWaiterServiceTest {
         assertThat(captor.getValue().getBranchId()).isEqualTo(4L);
         assertThat(captor.getValue().getOwnerUserId()).isEqualTo(9L);
         assertThat(captor.getValue().getUsername()).isEqualTo("ali");
+        assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.WAITER);
         assertThat(response.getBranchId()).isEqualTo(4L);
         assertThat(response.getDisplayName()).isEqualTo("Ali Garson");
+    }
+
+    @Test
+    void createWaiter_whenKitchenRole_thenPersistsKitchen() {
+        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+                .id(4L)
+                .userId(9L)
+                .name("Kadikoy")
+                .kitchenEnabled(true)
+                .build());
+        when(passwordEncoder.encode("secret1")).thenReturn("hashed");
+        when(menuWaiterRepository.existsByUsernameIgnoreCase("mutfak1")).thenReturn(false);
+        when(menuWaiterRepository.save(any(MenuWaiter.class))).thenAnswer(invocation -> {
+            MenuWaiter waiter = invocation.getArgument(0);
+            waiter.setId(12L);
+            return waiter;
+        });
+
+        MenuWaiterDtos.WaiterResponse response = menuWaiterService.createWaiter(
+                4L,
+                MenuWaiterDtos.CreateWaiterRequest.builder()
+                        .username("mutfak1")
+                        .password("secret1")
+                        .displayName("Mutfak")
+                        .staffRole(com.ael.algoryqrservice.model.enums.StaffRole.KITCHEN)
+                        .build()
+        );
+
+        ArgumentCaptor<MenuWaiter> captor = ArgumentCaptor.forClass(MenuWaiter.class);
+        verify(menuWaiterRepository).save(captor.capture());
+        assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.KITCHEN);
+        assertThat(response.getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.KITCHEN);
+    }
+
+    @Test
+    void createWaiter_whenKitchenRoleWithoutKitchen_thenRejects() {
+        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+                .id(4L)
+                .userId(9L)
+                .name("Kadikoy")
+                .kitchenEnabled(false)
+                .build());
+
+        assertThatThrownBy(() -> menuWaiterService.createWaiter(
+                4L,
+                MenuWaiterDtos.CreateWaiterRequest.builder()
+                        .username("mutfak1")
+                        .password("secret1")
+                        .displayName("Mutfak")
+                        .staffRole(com.ael.algoryqrservice.model.enums.StaffRole.KITCHEN)
+                        .build()
+        ))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("şube ayarlarından");
     }
 
     @Test

@@ -47,6 +47,12 @@ public class BranchController {
         return ResponseEntity.ok(branchService.update(branchId, request));
     }
 
+    @PostMapping("/{branchId}/kitchen")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<BranchDtos.Response> enableKitchen(@PathVariable Long branchId) {
+        return ResponseEntity.ok(branchService.enableKitchen(branchId));
+    }
+
     @PostMapping("/{branchId}/photo")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<BranchDtos.Response> uploadPhoto(

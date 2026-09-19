@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,6 +49,12 @@ public class MenuWaiter {
     @Builder.Default
     private boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "staff_role", nullable = false, length = 16)
+    @ColumnDefault("'WAITER'")
+    @Builder.Default
+    private StaffRole staffRole = StaffRole.WAITER;
+
     @Column(name = "commission_enabled", nullable = false)
     @ColumnDefault("false")
     @Builder.Default
@@ -65,6 +72,18 @@ public class MenuWaiter {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public StaffRole resolvedStaffRole() {
+        return staffRole == null ? StaffRole.WAITER : staffRole;
+    }
+
+    public boolean isKitchen() {
+        return resolvedStaffRole() == StaffRole.KITCHEN;
+    }
+
+    public boolean isWaiterStaff() {
+        return resolvedStaffRole() == StaffRole.WAITER;
+    }
 
     @PrePersist
     void onCreate() {

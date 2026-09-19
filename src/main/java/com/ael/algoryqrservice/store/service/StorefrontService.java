@@ -7,12 +7,12 @@ import com.ael.algoryqrservice.store.model.StoreOrderItem;
 import com.ael.algoryqrservice.store.model.StoreOrderStatus;
 import com.ael.algoryqrservice.store.model.dto.StorePublicDtos;
 import com.ael.algoryqrservice.store.repository.MerchantRepository;
+import com.ael.algoryqrservice.util.AppTime;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -72,7 +72,7 @@ public class StorefrontService {
                 .address(merchant.getAddress())
                 .city(merchant.getCity())
                 .district(merchant.getDistrict())
-                .open(storeOpeningHours.isOpenAt(merchant, LocalDateTime.now()))
+                .open(storeOpeningHours.isOpenAt(merchant, AppTime.nowLocal()))
                 .minOrderAmount(merchant.getMinOrderAmount())
                 .deliveryFee(merchant.getDeliveryFee())
                 .freeDeliveryThreshold(merchant.getFreeDeliveryThreshold())

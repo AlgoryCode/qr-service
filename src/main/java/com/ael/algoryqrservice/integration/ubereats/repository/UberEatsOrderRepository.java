@@ -70,4 +70,16 @@ public interface UberEatsOrderRepository
             @Param("to") LocalDateTime to,
             @Param("statuses") Collection<String> statuses
     );
+
+    @Query("""
+            SELECT o
+            FROM UberEatsOrder o
+            WHERE o.connectionId = :connectionId
+              AND LOWER(o.packageStatus) IN :statuses
+            ORDER BY o.packageCreatedAt DESC
+            """)
+    List<UberEatsOrder> findKitchenOrders(
+            @Param("connectionId") Long connectionId,
+            @Param("statuses") Collection<String> statuses
+    );
 }

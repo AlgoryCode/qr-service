@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.MenuWaiter;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
@@ -57,6 +58,10 @@ public class MenuWaiterService {
         }
 
         String displayName = requireDisplayName(request.getDisplayName());
+        StaffRole staffRole = request.getStaffRole() == null ? StaffRole.WAITER : request.getStaffRole();
+        if (staffRole == StaffRole.KITCHEN && !branch.isKitchenEnabled()) {
+            throw new BadRequestException("Önce şube ayarlarından mutfağı ekleyin");
+        }
         LocalDateTime now = LocalDateTime.now();
 
         MenuWaiter waiter = MenuWaiter.builder()
@@ -65,6 +70,7 @@ public class MenuWaiterService {
                 .username(username)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .displayName(displayName)
+                .staffRole(staffRole)
                 .active(true)
                 .createdAt(now)
                 .updatedAt(now)
@@ -147,6 +153,7 @@ public class MenuWaiterService {
                 .branchId(waiter.getBranchId())
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())
+                .staffRole(waiter.resolvedStaffRole())
                 .active(waiter.isActive())
                 .commissionEnabled(waiter.isCommissionEnabled())
                 .commissionType(waiter.getCommissionType())

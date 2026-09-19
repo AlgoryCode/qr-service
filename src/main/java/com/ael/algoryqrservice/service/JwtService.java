@@ -138,9 +138,11 @@ public class JwtService {
             UUID sessionId,
             Long waiterId,
             Long branchId,
-            Long ownerUserId
+            Long ownerUserId,
+            String staffRole
     ) {
         Date now = new Date();
+        String role = staffRole == null || staffRole.isBlank() ? "WAITER" : staffRole;
         return Jwts.builder()
                 .id(sessionId.toString())
                 .subject(username)
@@ -149,6 +151,7 @@ public class JwtService {
                 .claim(ROLES_CLAIM, List.of("ROLE_WAITER"))
                 .claim("branchId", branchId)
                 .claim("ownerUserId", ownerUserId)
+                .claim("staffRole", role)
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))

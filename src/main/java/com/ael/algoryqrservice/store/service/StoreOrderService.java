@@ -13,6 +13,7 @@ import com.ael.algoryqrservice.store.repository.MerchantRepository;
 import com.ael.algoryqrservice.store.repository.StoreCourierRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderStatusHistoryRepository;
+import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -117,7 +118,7 @@ public class StoreOrderService {
     }
 
     private void requireAcceptingOrders(Merchant merchant, StorePublicDtos.CreateOrderRequest request) {
-        if (!storeOpeningHours.isOpenAt(merchant, LocalDateTime.now())) {
+        if (!storeOpeningHours.isOpenAt(merchant, AppTime.nowLocal())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Mağaza şu anda kapalı");
         }
         if (!merchant.getDeliveryTypes().contains(request.deliveryType())) {
