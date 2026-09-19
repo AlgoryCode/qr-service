@@ -16,7 +16,7 @@ public class StoreUrlBuilder {
     private final AppProperties appProperties;
 
     public String buildHandle(Merchant merchant) {
-        return merchant.getStoreNo() + "-" + merchant.getSlug() + "-" + merchant.getPublicToken();
+        return merchant.getStoreNo() + "-" + merchant.getPublicToken();
     }
 
     public String buildUrl(Merchant merchant) {
@@ -24,8 +24,8 @@ public class StoreUrlBuilder {
     }
 
     /**
-     * Store number sits before the first dash and the secret token after the last one, so a
-     * business slug may itself contain dashes without breaking resolution.
+     * Store number is the prefix before the first dash and the public token is the suffix after
+     * the last dash. A leftover business slug in the middle is ignored so older links still resolve.
      */
     public Optional<StoreHandle> parse(String handle) {
         if (handle == null || handle.isBlank()) {
@@ -34,16 +34,18 @@ public class StoreUrlBuilder {
         String trimmed = handle.trim();
         int firstDash = trimmed.indexOf('-');
         int lastDash = trimmed.lastIndexOf('-');
-        if (firstDash <= 0 || lastDash <= firstDash || lastDash == trimmed.length() - 1) {
+        if (firstDash <= 0 || lastDash == trimmed.length() - 1) {
             return Optional.empty();
         }
         Long storeNo = parseStoreNo(trimmed.substring(0, firstDash));
         if (storeNo == null) {
             return Optional.empty();
         }
-        String slug = trimmed.substring(firstDash + 1, lastDash);
         String token = trimmed.substring(lastDash + 1);
-        return Optional.of(new StoreHandle(storeNo, slug, token));
+        if (token.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(new StoreHandle(storeNo, token));
     }
 
     private Long parseStoreNo(String raw) {
