@@ -111,6 +111,38 @@ class MenuWaiterServiceTest {
     }
 
     @Test
+    void createWaiter_whenCourierRole_thenPersistsCourier() {
+        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+                .id(4L)
+                .userId(9L)
+                .name("Kadikoy")
+                .build());
+        when(passwordEncoder.encode("secret1")).thenReturn("hashed");
+        when(menuWaiterRepository.existsByUsernameIgnoreCase("kurye1")).thenReturn(false);
+        when(menuWaiterRepository.save(any(MenuWaiter.class))).thenAnswer(invocation -> {
+            MenuWaiter waiter = invocation.getArgument(0);
+            waiter.setId(13L);
+            return waiter;
+        });
+
+        MenuWaiterDtos.WaiterResponse response = menuWaiterService.createWaiter(
+                4L,
+                MenuWaiterDtos.CreateWaiterRequest.builder()
+                        .username("kurye1")
+                        .password("secret1")
+                        .displayName("Ali Kurye")
+                        .staffRole(com.ael.algoryqrservice.model.enums.StaffRole.COURIER)
+                        .build()
+        );
+
+        ArgumentCaptor<MenuWaiter> captor = ArgumentCaptor.forClass(MenuWaiter.class);
+        verify(menuWaiterRepository).save(captor.capture());
+        assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.COURIER);
+        assertThat(response.getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.COURIER);
+    }
+
+    @Test
     void createWaiter_whenKitchenRoleWithoutKitchen_thenRejects() {
         when(securityUtils.getCurrentUserId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()

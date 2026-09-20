@@ -107,4 +107,38 @@ class WaiterAccessServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("garson");
     }
+
+    @Test
+    void requireWaiterStaff_whenCourierRole_thenForbidden() {
+        MenuWaiter staff = MenuWaiter.builder()
+                .id(9L)
+                .branchId(4L)
+                .active(true)
+                .staffRole(StaffRole.COURIER)
+                .build();
+        when(securityUtils.getCurrentWaiterId()).thenReturn(9L);
+        when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
+        when(menuWaiterRepository.findById(9L)).thenReturn(Optional.of(staff));
+
+        assertThatThrownBy(() -> waiterAccessService.requireWaiterStaff())
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("garson");
+    }
+
+    @Test
+    void requireCourierStaff_whenWaiterRole_thenForbidden() {
+        MenuWaiter waiter = MenuWaiter.builder()
+                .id(7L)
+                .branchId(4L)
+                .active(true)
+                .staffRole(StaffRole.WAITER)
+                .build();
+        when(securityUtils.getCurrentWaiterId()).thenReturn(7L);
+        when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
+        when(menuWaiterRepository.findById(7L)).thenReturn(Optional.of(waiter));
+
+        assertThatThrownBy(() -> waiterAccessService.requireCourierStaff())
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("kurye");
+    }
 }
