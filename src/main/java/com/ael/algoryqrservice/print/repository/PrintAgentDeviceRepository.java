@@ -13,4 +13,6 @@ public interface PrintAgentDeviceRepository extends JpaRepository<PrintAgentDevi
     List<PrintAgentDevice> findByOwnerUserIdAndBranchIdOrderByIdDesc(Long ownerUserId, Long branchId);
 
     Optional<PrintAgentDevice> findByIdAndOwnerUserId(Long id, Long ownerUserId);
+
+    Optional<PrintAgentDevice> findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(Long ownerUserId);
 }

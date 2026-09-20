@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.print.model.PrintJob;
 import com.ael.algoryqrservice.print.model.PrintJobStatus;
 import com.ael.algoryqrservice.print.model.PrintJobType;
 import com.ael.algoryqrservice.print.model.PrintSourceType;
+import com.ael.algoryqrservice.print.repository.PrintAgentDeviceRepository;
 import com.ael.algoryqrservice.print.repository.PrintJobRepository;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,6 +30,7 @@ public class PrintJobServiceImpl implements PrintJobService {
     private static final int MAX_LIMIT = 20;
 
     private final PrintJobRepository printJobRepository;
+    private final PrintAgentDeviceRepository printAgentDeviceRepository;
     private final BranchRepository branchRepository;
 
     @Override
@@ -43,14 +45,9 @@ public class PrintJobServiceImpl implements PrintJobService {
         if (ownerUserId == null || sourceType == null || sourceId == null || sourceId.isBlank() || payload == null) {
             return Optional.empty();
         }
-        if (branchId != null && !isPrintEnabled(branchId)) {
+        Long targetBranchId = resolveTargetBranch(ownerUserId, branchId);
+        if (targetBranchId == null) {
             return Optional.empty();
-        }
-        if (branchId == null) {
-            branchId = resolvePrintBranch(ownerUserId).orElse(null);
-            if (branchId == null) {
-                return Optional.empty();
-            }
         }
 
         String idempotencyKey = sourceType.name() + ":" + sourceId + ":" + PrintJobType.KITCHEN_TICKET.name();
@@ -61,7 +58,7 @@ public class PrintJobServiceImpl implements PrintJobService {
 
         PrintJob job = PrintJob.builder()
                 .ownerUserId(ownerUserId)
-                .branchId(branchId)
+                .branchId(targetBranchId)
                 .sourceType(sourceType)
                 .sourceId(sourceId)
                 .jobType(PrintJobType.KITCHEN_TICKET)
@@ -119,6 +116,19 @@ public class PrintJobServiceImpl implements PrintJobService {
             job.setStatus(PrintJobStatus.FAILED);
         }
         printJobRepository.save(job);
+    }
+
+    private Long resolveTargetBranch(Long ownerUserId, Long preferredBranchId) {
+        Optional<Long> deviceBranch = printAgentDeviceRepository
+                .findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(ownerUserId)
+                .map(PrintAgentDevice::getBranchId);
+        if (deviceBranch.isPresent()) {
+            return deviceBranch.get();
+        }
+        if (preferredBranchId != null && isPrintEnabled(preferredBranchId)) {
+            return preferredBranchId;
+        }
+        return resolvePrintBranch(ownerUserId).orElse(null);
     }
 
     private boolean isPrintEnabled(Long branchId) {
