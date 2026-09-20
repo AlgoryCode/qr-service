@@ -63,4 +63,9 @@ public class PrintAgentController {
         deviceService.ack(jobId, request);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/jobs/{jobId}/reprint")
+    public ResponseEntity<PrintAgentDtos.JobResponse> reprint(@PathVariable Long jobId) {
+        return ResponseEntity.ok(deviceService.reprintForDevice(jobId));
+    }
 }

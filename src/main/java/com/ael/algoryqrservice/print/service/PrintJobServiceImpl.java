@@ -147,6 +147,44 @@ public class PrintJobServiceImpl implements PrintJobService {
         printJobRepository.save(job);
     }
 
+    @Override
+    @Transactional
+    public PrintAgentDtos.JobResponse requeue(PrintJob job) {
+        if (job.getStatus() != PrintJobStatus.FAILED && job.getStatus() != PrintJobStatus.DONE) {
+            throw new BadRequestException("Sadece FAILED veya DONE job tekrar kuyruga alinabilir");
+        }
+        job.setStatus(PrintJobStatus.PENDING);
+        job.setLastError(null);
+        job.setCompletedAt(null);
+        job.setClaimedByDeviceId(null);
+        job.setClaimedAt(null);
+        return toJobResponse(printJobRepository.save(job));
+    }
+
+    @Override
+    @Transactional
+    public PrintAgentDtos.JobResponse claimForReprint(PrintAgentDevice device, Long jobId) {
+        PrintJob job = printJobRepository.findByIdAndBranchId(jobId, device.getBranchId())
+                .orElseThrow(() -> new NotFoundException("Print job bulunamadi"));
+        if (job.getStatus() == PrintJobStatus.FAILED || job.getStatus() == PrintJobStatus.DONE) {
+            requeue(job);
+            job = printJobRepository.findById(jobId).orElse(job);
+        }
+        if (job.getStatus() == PrintJobStatus.CLAIMED
+                && device.getId().equals(job.getClaimedByDeviceId())) {
+            return toJobResponse(job);
+        }
+        if (job.getStatus() != PrintJobStatus.PENDING) {
+            throw new BadRequestException("Job tekrar yazdirma icin uygun degil");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int updated = printJobRepository.claimJob(job.getId(), device.getId(), now);
+        if (updated != 1) {
+            throw new BadRequestException("Job claim edilemedi");
+        }
+        return toJobResponse(printJobRepository.findById(job.getId()).orElse(job));
+    }
+
     private boolean isPrintEnabled(Long branchId) {
         return branchRepository.findById(branchId)
                 .filter(branch -> !branch.isDeleted())
@@ -170,6 +208,7 @@ public class PrintJobServiceImpl implements PrintJobService {
                 .status(job.getStatus())
                 .payload(job.getPayloadJson())
                 .attempts(job.getAttempts())
+                .lastError(job.getLastError())
                 .createdAt(job.getCreatedAt())
                 .build();
     }

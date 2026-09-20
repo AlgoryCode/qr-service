@@ -78,6 +78,12 @@ public class PrintAgentManageController {
         return ResponseEntity.ok(deviceService.listFailedJobs(branchId));
     }
 
+    @PostMapping("/jobs/{jobId}/retry")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<PrintAgentDtos.JobResponse> retryJob(@PathVariable Long jobId) {
+        return ResponseEntity.ok(deviceService.retryJobForOwner(jobId));
+    }
+
     @PutMapping("/branches/{branchId}/print-kitchen")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<BranchDtos.Response> setPrintKitchen(
