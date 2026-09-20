@@ -25,6 +25,7 @@ import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MenuWaiterRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.service.campaign.CampaignEvaluationService;
+import com.ael.algoryqrservice.print.service.PrintOrderEnqueueService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -62,6 +63,7 @@ public class MenuOrderService {
     private final OrderAuditService orderAuditService;
     private final SecurityUtils securityUtils;
     private final KitchenUberEatsService kitchenUberEatsService;
+    private final PrintOrderEnqueueService printOrderEnqueueService;
 
     @Transactional
     public MenuOrderDtos.OrderResponse getOrCreateDraft(String tableSessionToken) {
@@ -151,7 +153,9 @@ public class MenuOrderService {
         menuOrderRepository.save(saved);
         orderAuditService.record(saved, OrderAuditAction.CREATED, waiterId, null);
         campaignEvaluationService.onOrderConfirmed(saved);
-        return toOrderResponse(saved);
+        MenuOrderDtos.OrderResponse response = toOrderResponse(saved);
+        printOrderEnqueueService.enqueueMenuOrder(saved, response);
+        return response;
     }
 
     @Transactional
@@ -182,7 +186,9 @@ public class MenuOrderService {
         tableBillService.addItemsFromOrder(bill, saved, null);
         orderAuditService.record(saved, OrderAuditAction.CREATED, null, "{\"source\":\"QR\"}");
         campaignEvaluationService.onOrderConfirmed(saved);
-        return toOrderResponse(saved);
+        MenuOrderDtos.OrderResponse response = toOrderResponse(saved);
+        printOrderEnqueueService.enqueueMenuOrder(saved, response);
+        return response;
     }
 
     @Transactional

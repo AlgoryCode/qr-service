@@ -13,6 +13,7 @@ import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsOrderRepository;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsOrderSpecifications;
+import com.ael.algoryqrservice.print.service.PrintOrderEnqueueService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -44,6 +45,7 @@ public class UberEatsOrderService {
     private final UberEatsPayloadMapper payloadMapper;
     private final UberEatsProperties properties;
     private final ObjectMapper objectMapper;
+    private final PrintOrderEnqueueService printOrderEnqueueService;
 
     @Transactional(readOnly = true)
     public UberEatsDtos.OrderPageResponse listOrders(
@@ -199,12 +201,12 @@ public class UberEatsOrderService {
         if (!hasText(externalId)) {
             return null;
         }
-        UberEatsOrder order = orderRepository
-                .findByConnectionIdAndExternalOrderId(connection.getId(), externalId)
-                .orElseGet(() -> UberEatsOrder.builder()
-                        .connectionId(connection.getId())
-                        .externalOrderId(externalId)
-                        .build());
+        var existing = orderRepository.findByConnectionIdAndExternalOrderId(connection.getId(), externalId);
+        boolean isNew = existing.isEmpty();
+        UberEatsOrder order = existing.orElseGet(() -> UberEatsOrder.builder()
+                .connectionId(connection.getId())
+                .externalOrderId(externalId)
+                .build());
         order.setPackageStatus(payloadMapper.packageStatus(node));
         order.setTotalAmount(payloadMapper.totalAmount(node));
         order.setCurrency(payloadMapper.currency(node));
@@ -213,9 +215,14 @@ public class UberEatsOrderService {
         order.setDeliveryAddress(payloadMapper.deliveryAddress(node));
         order.setNote(payloadMapper.note(node));
         order.setPackageCreatedAt(payloadMapper.packageCreatedAt(node));
-        order.setItemsJson(writeJson(payloadMapper.toOrderItems(node)));
+        List<UberEatsDtos.OrderItemResponse> items = payloadMapper.toOrderItems(node);
+        order.setItemsJson(writeJson(items));
         order.setRawPayload(node.toString());
-        return orderRepository.save(order);
+        UberEatsOrder saved = orderRepository.save(order);
+        if (isNew) {
+            printOrderEnqueueService.enqueueUberEatsOrder(connection.getUserId(), saved, items);
+        }
+        return saved;
     }
 
     private UberEatsDtos.OrderResponse applyAction(

@@ -48,6 +48,7 @@ public final class BranchDtos {
         private String email;
         private Boolean active;
         private Boolean kitchenEnabled;
+        private Boolean printKitchenEnabled;
     }
 
     @Data
@@ -76,6 +77,7 @@ public final class BranchDtos {
         private boolean grandfathered;
         private boolean active;
         private boolean kitchenEnabled;
+        private boolean printKitchenEnabled;
         private List<MenuSummary> menus;
     }
 

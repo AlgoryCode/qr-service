@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.integration.ubereats.model.UberEatsOrder;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsOrderRepository;
+import com.ael.algoryqrservice.print.service.PrintOrderEnqueueService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,8 @@ class UberEatsOrderServiceTest {
     private UberEatsOrderRepository orderRepository;
     @Mock
     private UberEatsClient UberEatsClient;
+    @Mock
+    private PrintOrderEnqueueService printOrderEnqueueService;
 
     private UberEatsOrderService orderService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -59,7 +62,8 @@ class UberEatsOrderServiceTest {
                 UberEatsClient,
                 new UberEatsPayloadMapper(),
                 properties,
-                objectMapper
+                objectMapper,
+                printOrderEnqueueService
         );
         org.mockito.Mockito.lenient().when(orderRepository.save(any(UberEatsOrder.class))).thenAnswer(invocation -> {
             UberEatsOrder order = invocation.getArgument(0);
