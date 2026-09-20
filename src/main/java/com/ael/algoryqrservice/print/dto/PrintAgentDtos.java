@@ -98,6 +98,9 @@ public final class PrintAgentDtos {
         @NotNull
         private Long userId;
 
+        @NotNull
+        private Long branchId;
+
         @NotBlank
         @Size(max = 200)
         private String apiKey;

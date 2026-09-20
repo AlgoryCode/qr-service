@@ -41,6 +41,9 @@ public class PrintOrderEnqueueService {
         ((ObjectNode) payload).put("channelLabel", channelLabel(order.getOrderSource() == null
                 ? null
                 : order.getOrderSource().name()));
+        if (menu.getBranchId() != null) {
+            ((ObjectNode) payload).put("branchId", menu.getBranchId());
+        }
         printJobService.enqueueKitchenTicket(
                 menu.getUserId(),
                 menu.getBranchId(),
@@ -52,6 +55,7 @@ public class PrintOrderEnqueueService {
 
     public void enqueueUberEatsOrder(
             Long ownerUserId,
+            Long branchId,
             UberEatsOrder order,
             List<UberEatsDtos.OrderItemResponse> items
     ) {
@@ -61,6 +65,9 @@ public class PrintOrderEnqueueService {
         MenuOrderDtos.OrderResponse kitchen = KitchenUberEatsMapper.toKitchenOrder(order, items);
         ObjectNode payload = objectMapper.valueToTree(kitchen);
         payload.put("channelLabel", "Uber Eats");
+        if (branchId != null) {
+            payload.put("branchId", branchId);
+        }
         if (order.getDeliveryAddress() != null) {
             payload.put("deliveryAddress", order.getDeliveryAddress());
         }
@@ -69,7 +76,7 @@ public class PrintOrderEnqueueService {
         }
         printJobService.enqueueKitchenTicket(
                 ownerUserId,
-                null,
+                branchId,
                 PrintSourceType.UBER_EATS,
                 String.valueOf(order.getId()),
                 payload
@@ -90,6 +97,9 @@ public class PrintOrderEnqueueService {
         payload.put("note", order.getNote());
         payload.put("totalAmount", order.getTotalAmount() == null ? 0 : order.getTotalAmount().doubleValue());
         payload.put("currency", order.getCurrency());
+        if (merchant.getBranchId() != null) {
+            payload.put("branchId", merchant.getBranchId());
+        }
         if (order.getAddressText() != null) {
             payload.put("deliveryAddress", order.getAddressText());
         }

@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.print.model.PrintJob;
 import com.ael.algoryqrservice.print.model.PrintJobStatus;
 import com.ael.algoryqrservice.print.model.PrintJobType;
 import com.ael.algoryqrservice.print.model.PrintSourceType;
+import com.ael.algoryqrservice.print.repository.PrintAgentDeviceRepository;
 import com.ael.algoryqrservice.print.repository.PrintJobRepository;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,6 +30,7 @@ public class PrintJobServiceImpl implements PrintJobService {
     private static final int MAX_LIMIT = 20;
 
     private final PrintJobRepository printJobRepository;
+    private final PrintAgentDeviceRepository printAgentDeviceRepository;
     private final BranchRepository branchRepository;
 
     @Override
@@ -43,17 +45,41 @@ public class PrintJobServiceImpl implements PrintJobService {
         if (ownerUserId == null || sourceType == null || sourceId == null || sourceId.isBlank() || payload == null) {
             return Optional.empty();
         }
-        if (branchId != null && !isPrintEnabled(branchId)) {
-            return Optional.empty();
-        }
         if (branchId == null) {
+            List<Long> deviceBranches = printAgentDeviceRepository
+                    .findByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(ownerUserId)
+                    .stream()
+                    .map(PrintAgentDevice::getBranchId)
+                    .distinct()
+                    .toList();
+            if (!deviceBranches.isEmpty()) {
+                Optional<PrintJob> last = Optional.empty();
+                for (Long deviceBranchId : deviceBranches) {
+                    last = persistKitchenTicket(ownerUserId, deviceBranchId, sourceType, sourceId, payload);
+                }
+                return last;
+            }
             branchId = resolvePrintBranch(ownerUserId).orElse(null);
             if (branchId == null) {
                 return Optional.empty();
             }
+        } else if (!isPrintEnabled(branchId)
+                && !printAgentDeviceRepository.existsByBranchIdAndEnabledTrue(branchId)) {
+            return Optional.empty();
         }
 
-        String idempotencyKey = sourceType.name() + ":" + sourceId + ":" + PrintJobType.KITCHEN_TICKET.name();
+        return persistKitchenTicket(ownerUserId, branchId, sourceType, sourceId, payload);
+    }
+
+    private Optional<PrintJob> persistKitchenTicket(
+            Long ownerUserId,
+            Long branchId,
+            PrintSourceType sourceType,
+            String sourceId,
+            JsonNode payload
+    ) {
+        String idempotencyKey = sourceType.name() + ":" + sourceId + ":" + PrintJobType.KITCHEN_TICKET.name()
+                + ":" + branchId;
         Optional<PrintJob> existing = printJobRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             return existing;

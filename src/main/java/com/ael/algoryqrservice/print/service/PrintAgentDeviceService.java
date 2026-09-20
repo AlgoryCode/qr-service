@@ -74,6 +74,7 @@ public class PrintAgentDeviceService {
                 .enabled(true)
                 .lastSeenAt(now)
                 .build());
+        ensurePrintKitchenEnabled(pairing.getBranchId());
         pairing.setUsedAt(now);
         pairingCodeRepository.save(pairing);
         return PrintAgentDtos.PairDeviceResponse.builder()
@@ -116,6 +117,7 @@ public class PrintAgentDeviceService {
                 .enabled(true)
                 .lastSeenAt(LocalDateTime.now())
                 .build());
+        ensurePrintKitchenEnabled(branch.getId());
         return PrintAgentDtos.ApiKeyResponse.builder()
                 .userId(userId)
                 .deviceId(device.getId())
@@ -134,8 +136,12 @@ public class PrintAgentDeviceService {
         if (!device.getOwnerUserId().equals(request.getUserId())) {
             throw new UnauthorizedException("Kullanici ID eslesmiyor");
         }
+        Branch branch = branchRepository.findByIdAndUserIdAndDeletedFalse(request.getBranchId(), request.getUserId())
+                .orElseThrow(() -> new NotFoundException("Sube bulunamadi"));
+        device.setBranchId(branch.getId());
         device.setLastSeenAt(LocalDateTime.now());
         deviceRepository.save(device);
+        ensurePrintKitchenEnabled(branch.getId());
         return PrintAgentDtos.ConnectResponse.builder()
                 .userId(device.getOwnerUserId())
                 .deviceId(device.getId())
@@ -232,6 +238,16 @@ public class PrintAgentDeviceService {
     private Branch requireOwnedBranch(Long branchId, Long userId) {
         return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, userId)
                 .orElseThrow(() -> new NotFoundException("Sube bulunamadi"));
+    }
+
+    private void ensurePrintKitchenEnabled(Long branchId) {
+        branchRepository.findById(branchId).ifPresent(branch -> {
+            if (branch.isDeleted() || branch.isPrintKitchenEnabled()) {
+                return;
+            }
+            branch.setPrintKitchenEnabled(true);
+            branchRepository.save(branch);
+        });
     }
 
     private PrintAgentDtos.JobResponse toJobResponse(com.ael.algoryqrservice.print.model.PrintJob job) {
