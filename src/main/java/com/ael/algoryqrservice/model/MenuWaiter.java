@@ -81,6 +81,10 @@ public class MenuWaiter {
         return resolvedStaffRole() == StaffRole.KITCHEN;
     }
 
+    public boolean isCourier() {
+        return resolvedStaffRole() == StaffRole.COURIER;
+    }
+
     public boolean isWaiterStaff() {
         return resolvedStaffRole() == StaffRole.WAITER;
     }

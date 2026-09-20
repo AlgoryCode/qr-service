@@ -52,6 +52,14 @@ public class WaiterAccessService {
         return staff;
     }
 
+    public MenuWaiter requireCourierStaff() {
+        MenuWaiter staff = requireCurrentWaiter();
+        if (!staff.isCourier()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu işlem yalnızca kurye içindir");
+        }
+        return staff;
+    }
+
     public MenuWaiter requireWaiterForMenu(Long menuId) {
         MenuWaiter waiter = requireWaiterStaff();
         requireMenuInWaiterBranch(menuId, waiter);
