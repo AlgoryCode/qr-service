@@ -13,6 +13,7 @@ import com.ael.algoryqrservice.store.repository.MerchantRepository;
 import com.ael.algoryqrservice.store.repository.StoreCourierRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderStatusHistoryRepository;
+import com.ael.algoryqrservice.print.service.PrintOrderEnqueueService;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,6 +36,7 @@ public class StoreOrderService {
     private final StoreOrderStatusMachine statusMachine;
     private final StoreOpeningHours storeOpeningHours;
     private final StoreTokenGenerator storeTokenGenerator;
+    private final PrintOrderEnqueueService printOrderEnqueueService;
 
     @Transactional
     public StoreOrder placeOrder(Merchant merchant, StorePublicDtos.CreateOrderRequest request, Long customerId) {
@@ -62,6 +64,7 @@ public class StoreOrderService {
 
         StoreOrder saved = storeOrderRepository.save(order);
         recordTransition(saved, null, StoreOrderStatus.PENDING, StoreOrderActorType.CUSTOMER, customerId, null);
+        printOrderEnqueueService.enqueueStoreOrder(merchant, saved);
         return saved;
     }
 

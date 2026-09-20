@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.security;
 
+import com.ael.algoryqrservice.print.security.PrintDeviceAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -36,6 +37,7 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final PrintDeviceAuthenticationFilter printDeviceAuthenticationFilter;
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
     private final AuthRateLimitGatewayFilter authRateLimitGatewayFilter;
@@ -92,8 +94,12 @@ public class SecurityConfig {
                         .requestMatchers("/integrations/odeal/test/**").permitAll()
                         .requestMatchers("/internal/integrations/**").permitAll()
                         .requestMatchers("/internal/menu-import/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/print-agent/jobs/**", "/print-agent/devices/heartbeat")
+                            .hasRole("PRINT_AGENT")
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -105,6 +111,7 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(authRateLimitGatewayFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(emailVerificationGatewayFilter, JwtAuthenticationFilter.class);
