@@ -185,4 +185,15 @@ public final class PrintAgentDtos {
         @NotNull
         private Boolean enabled;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SettingsResponse {
+        private Long userId;
+        private Long branchId;
+        private boolean printKitchenEnabled;
+        private List<DeviceResponse> devices;
+    }
 }

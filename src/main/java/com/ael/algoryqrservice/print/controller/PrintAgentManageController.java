@@ -31,6 +31,12 @@ public class PrintAgentManageController {
     private final PrintAgentDeviceService deviceService;
     private final BranchService branchService;
 
+    @GetMapping("/settings")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<PrintAgentDtos.SettingsResponse> settings(@RequestParam Long branchId) {
+        return ResponseEntity.ok(deviceService.getSettings(branchId));
+    }
+
     @PostMapping("/pairing-codes")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<PrintAgentDtos.PairingCodeResponse> createPairingCode(

@@ -86,6 +86,20 @@ public class PrintAgentDeviceService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public PrintAgentDtos.SettingsResponse getSettings(Long branchId) {
+        Long userId = securityUtils.getCurrentUserId();
+        Branch branch = requireOwnedBranch(branchId, userId);
+        return PrintAgentDtos.SettingsResponse.builder()
+                .userId(userId)
+                .branchId(branch.getId())
+                .printKitchenEnabled(branch.isPrintKitchenEnabled())
+                .devices(deviceRepository.findByOwnerUserIdAndBranchIdOrderByIdDesc(userId, branchId).stream()
+                        .map(this::toDeviceResponse)
+                        .toList())
+                .build();
+    }
+
     @Transactional
     public PrintAgentDtos.ApiKeyResponse createApiKey(PrintAgentDtos.CreateApiKeyRequest request) {
         Long userId = securityUtils.getCurrentUserId();
