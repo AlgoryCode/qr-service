@@ -173,4 +173,22 @@ class PrintJobServiceImplTest {
         assertThat(response.getJobs().getFirst().getId()).isEqualTo(11L);
         verify(printJobRepository).releaseStaleClaims(any(), any());
     }
+
+    @Test
+    void requeue_whenFailed_thenPending() {
+        PrintJob failed = PrintJob.builder()
+                .id(11L)
+                .branchId(4L)
+                .status(PrintJobStatus.FAILED)
+                .lastError("printer offline")
+                .attempts(2)
+                .build();
+        when(printJobRepository.save(any(PrintJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PrintAgentDtos.JobResponse response = printJobService.requeue(failed);
+
+        assertThat(response.getStatus()).isEqualTo(PrintJobStatus.PENDING);
+        assertThat(failed.getLastError()).isNull();
+        assertThat(failed.getClaimedByDeviceId()).isNull();
+    }
 }

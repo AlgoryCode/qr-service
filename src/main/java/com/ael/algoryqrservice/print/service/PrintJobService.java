@@ -20,4 +20,8 @@ public interface PrintJobService {
     PrintAgentDtos.PendingJobsResponse claimPending(PrintAgentDevice device, int limit);
 
     void ack(PrintAgentDevice device, Long jobId, PrintAgentDtos.AckRequest request);
+
+    PrintAgentDtos.JobResponse requeue(PrintJob job);
+
+    PrintAgentDtos.JobResponse claimForReprint(PrintAgentDevice device, Long jobId);
 }

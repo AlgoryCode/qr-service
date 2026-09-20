@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.print.dto.PrintAgentDtos;
 import com.ael.algoryqrservice.print.model.PrintAgentDevice;
+import com.ael.algoryqrservice.print.model.PrintJob;
 import com.ael.algoryqrservice.print.model.PrintJobStatus;
 import com.ael.algoryqrservice.print.model.PrintPairingCode;
 import com.ael.algoryqrservice.print.repository.PrintAgentDeviceRepository;
@@ -205,6 +206,19 @@ public class PrintAgentDeviceService {
         printJobService.ack(requireCurrentDevice(), jobId, request);
     }
 
+    @Transactional
+    public PrintAgentDtos.JobResponse retryJobForOwner(Long jobId) {
+        Long userId = securityUtils.getCurrentUserId();
+        PrintJob job = printJobRepository.findByIdAndOwnerUserId(jobId, userId)
+                .orElseThrow(() -> new NotFoundException("Print job bulunamadi"));
+        return printJobService.requeue(job);
+    }
+
+    @Transactional
+    public PrintAgentDtos.JobResponse reprintForDevice(Long jobId) {
+        return printJobService.claimForReprint(requireCurrentDevice(), jobId);
+    }
+
     @Transactional(readOnly = true)
     public List<PrintAgentDtos.JobResponse> listFailedJobs(Long branchId) {
         Long userId = securityUtils.getCurrentUserId();
@@ -259,6 +273,7 @@ public class PrintAgentDeviceService {
                 .status(job.getStatus())
                 .payload(job.getPayloadJson())
                 .attempts(job.getAttempts())
+                .lastError(job.getLastError())
                 .createdAt(job.getCreatedAt())
                 .build();
     }

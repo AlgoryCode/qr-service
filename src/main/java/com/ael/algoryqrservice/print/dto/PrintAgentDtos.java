@@ -157,6 +157,7 @@ public final class PrintAgentDtos {
         private PrintJobStatus status;
         private JsonNode payload;
         private int attempts;
+        private String lastError;
         private LocalDateTime createdAt;
     }
 
