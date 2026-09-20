@@ -45,12 +45,41 @@ public class PrintJobServiceImpl implements PrintJobService {
         if (ownerUserId == null || sourceType == null || sourceId == null || sourceId.isBlank() || payload == null) {
             return Optional.empty();
         }
-        Long targetBranchId = resolveTargetBranch(ownerUserId, branchId);
-        if (targetBranchId == null) {
+        if (branchId == null) {
+            List<Long> deviceBranches = printAgentDeviceRepository
+                    .findByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(ownerUserId)
+                    .stream()
+                    .map(PrintAgentDevice::getBranchId)
+                    .distinct()
+                    .toList();
+            if (!deviceBranches.isEmpty()) {
+                Optional<PrintJob> last = Optional.empty();
+                for (Long deviceBranchId : deviceBranches) {
+                    last = persistKitchenTicket(ownerUserId, deviceBranchId, sourceType, sourceId, payload);
+                }
+                return last;
+            }
+            branchId = resolvePrintBranch(ownerUserId).orElse(null);
+            if (branchId == null) {
+                return Optional.empty();
+            }
+        } else if (!isPrintEnabled(branchId)
+                && !printAgentDeviceRepository.existsByBranchIdAndEnabledTrue(branchId)) {
             return Optional.empty();
         }
 
-        String idempotencyKey = sourceType.name() + ":" + sourceId + ":" + PrintJobType.KITCHEN_TICKET.name();
+        return persistKitchenTicket(ownerUserId, branchId, sourceType, sourceId, payload);
+    }
+
+    private Optional<PrintJob> persistKitchenTicket(
+            Long ownerUserId,
+            Long branchId,
+            PrintSourceType sourceType,
+            String sourceId,
+            JsonNode payload
+    ) {
+        String idempotencyKey = sourceType.name() + ":" + sourceId + ":" + PrintJobType.KITCHEN_TICKET.name()
+                + ":" + branchId;
         Optional<PrintJob> existing = printJobRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             return existing;
@@ -58,7 +87,7 @@ public class PrintJobServiceImpl implements PrintJobService {
 
         PrintJob job = PrintJob.builder()
                 .ownerUserId(ownerUserId)
-                .branchId(targetBranchId)
+                .branchId(branchId)
                 .sourceType(sourceType)
                 .sourceId(sourceId)
                 .jobType(PrintJobType.KITCHEN_TICKET)
@@ -116,19 +145,6 @@ public class PrintJobServiceImpl implements PrintJobService {
             job.setStatus(PrintJobStatus.FAILED);
         }
         printJobRepository.save(job);
-    }
-
-    private Long resolveTargetBranch(Long ownerUserId, Long preferredBranchId) {
-        Optional<Long> deviceBranch = printAgentDeviceRepository
-                .findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(ownerUserId)
-                .map(PrintAgentDevice::getBranchId);
-        if (deviceBranch.isPresent()) {
-            return deviceBranch.get();
-        }
-        if (preferredBranchId != null && isPrintEnabled(preferredBranchId)) {
-            return preferredBranchId;
-        }
-        return resolvePrintBranch(ownerUserId).orElse(null);
     }
 
     private boolean isPrintEnabled(Long branchId) {

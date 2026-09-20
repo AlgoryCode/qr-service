@@ -220,7 +220,7 @@ public class UberEatsOrderService {
         order.setRawPayload(node.toString());
         UberEatsOrder saved = orderRepository.save(order);
         if (isNew) {
-            printOrderEnqueueService.enqueueUberEatsOrder(connection.getUserId(), saved, items);
+            printOrderEnqueueService.enqueueUberEatsOrder(connection.getUserId(), null, saved, items);
         }
         return saved;
     }

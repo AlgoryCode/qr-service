@@ -56,15 +56,13 @@ class PrintJobServiceImplTest {
 
     @Test
     void enqueueKitchenTicket_whenPrintDisabledAndNoDevice_thenSkip() {
-        when(printAgentDeviceRepository.findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(7L))
-                .thenReturn(Optional.empty());
         when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
                 .id(4L)
                 .userId(7L)
                 .name("Sube")
                 .printKitchenEnabled(false)
                 .build()));
-        when(branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(7L)).thenReturn(List.of());
+        when(printAgentDeviceRepository.existsByBranchIdAndEnabledTrue(4L)).thenReturn(false);
 
         Optional<PrintJob> result = printJobService.enqueueKitchenTicket(
                 7L, 4L, PrintSourceType.MENU_ORDER, "10", payload);
@@ -74,10 +72,15 @@ class PrintJobServiceImplTest {
     }
 
     @Test
-    void enqueueKitchenTicket_whenMenuBranchDiffersFromDevice_thenRouteToDeviceBranch() {
-        when(printAgentDeviceRepository.findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(7L))
-                .thenReturn(Optional.of(PrintAgentDevice.builder().id(1L).branchId(9L).enabled(true).build()));
-        when(printJobRepository.findByIdempotencyKey("MENU_ORDER:10:KITCHEN_TICKET"))
+    void enqueueKitchenTicket_whenPreferredBranchHasDevice_thenKeepPreferredBranch() {
+        when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
+                .id(4L)
+                .userId(7L)
+                .name("Sube")
+                .printKitchenEnabled(false)
+                .build()));
+        when(printAgentDeviceRepository.existsByBranchIdAndEnabledTrue(4L)).thenReturn(true);
+        when(printJobRepository.findByIdempotencyKey("MENU_ORDER:10:KITCHEN_TICKET:4"))
                 .thenReturn(Optional.empty());
         when(printJobRepository.save(any(PrintJob.class))).thenAnswer(invocation -> {
             PrintJob job = invocation.getArgument(0);
@@ -91,20 +94,25 @@ class PrintJobServiceImplTest {
         assertThat(result).isPresent();
         ArgumentCaptor<PrintJob> captor = ArgumentCaptor.forClass(PrintJob.class);
         verify(printJobRepository).save(captor.capture());
-        assertThat(captor.getValue().getBranchId()).isEqualTo(9L);
+        assertThat(captor.getValue().getBranchId()).isEqualTo(4L);
         assertThat(captor.getValue().getStatus()).isEqualTo(PrintJobStatus.PENDING);
     }
 
     @Test
     void enqueueKitchenTicket_whenIdempotent_thenReturnExisting() {
-        when(printAgentDeviceRepository.findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(7L))
-                .thenReturn(Optional.of(PrintAgentDevice.builder().id(1L).branchId(4L).enabled(true).build()));
+        when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
+                .id(4L)
+                .userId(7L)
+                .name("Sube")
+                .printKitchenEnabled(true)
+                .deleted(false)
+                .build()));
         PrintJob existing = PrintJob.builder()
                 .id(99L)
-                .idempotencyKey("MENU_ORDER:10:KITCHEN_TICKET")
+                .idempotencyKey("MENU_ORDER:10:KITCHEN_TICKET:4")
                 .status(PrintJobStatus.PENDING)
                 .build();
-        when(printJobRepository.findByIdempotencyKey("MENU_ORDER:10:KITCHEN_TICKET"))
+        when(printJobRepository.findByIdempotencyKey("MENU_ORDER:10:KITCHEN_TICKET:4"))
                 .thenReturn(Optional.of(existing));
 
         Optional<PrintJob> result = printJobService.enqueueKitchenTicket(
@@ -116,8 +124,6 @@ class PrintJobServiceImplTest {
 
     @Test
     void enqueueKitchenTicket_whenEnabled_thenPersistPending() {
-        when(printAgentDeviceRepository.findFirstByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(7L))
-                .thenReturn(Optional.empty());
         when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
                 .id(4L)
                 .userId(7L)
@@ -125,7 +131,7 @@ class PrintJobServiceImplTest {
                 .printKitchenEnabled(true)
                 .deleted(false)
                 .build()));
-        when(printJobRepository.findByIdempotencyKey("MENU_ORDER:10:KITCHEN_TICKET"))
+        when(printJobRepository.findByIdempotencyKey("MENU_ORDER:10:KITCHEN_TICKET:4"))
                 .thenReturn(Optional.empty());
         when(printJobRepository.save(any(PrintJob.class))).thenAnswer(invocation -> {
             PrintJob job = invocation.getArgument(0);

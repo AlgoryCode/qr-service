@@ -136,9 +136,12 @@ public class PrintAgentDeviceService {
         if (!device.getOwnerUserId().equals(request.getUserId())) {
             throw new UnauthorizedException("Kullanici ID eslesmiyor");
         }
+        Branch branch = branchRepository.findByIdAndUserIdAndDeletedFalse(request.getBranchId(), request.getUserId())
+                .orElseThrow(() -> new NotFoundException("Sube bulunamadi"));
+        device.setBranchId(branch.getId());
         device.setLastSeenAt(LocalDateTime.now());
         deviceRepository.save(device);
-        ensurePrintKitchenEnabled(device.getBranchId());
+        ensurePrintKitchenEnabled(branch.getId());
         return PrintAgentDtos.ConnectResponse.builder()
                 .userId(device.getOwnerUserId())
                 .deviceId(device.getId())
