@@ -23,11 +23,11 @@ public final class KitchenUberEatsMapper {
     }
 
     public static boolean isUberEatsSource(String source) {
-        if (source == null || source.isBlank()) {
-            return false;
-        }
-        String normalized = source.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
-        return "UBER_EATS".equals(normalized) || "UBEREATS".equals(normalized) || "UBER".equals(normalized);
+        return matchesSource(source, "UBER_EATS", "UBEREATS", "UBER");
+    }
+
+    public static boolean isYemekSepetiSource(String source) {
+        return matchesSource(source, "YEMEKSEPETI", "YEMEK_SEPETI", "YS");
     }
 
     public static String normalizeStatus(String packageStatus) {
@@ -39,10 +39,22 @@ public final class KitchenUberEatsMapper {
 
     public static MenuOrderStatus toKitchenStatus(String packageStatus) {
         String status = normalizeStatus(packageStatus);
+        if (status.contains("cancel") || "unsupplied".equals(status)) {
+            return MenuOrderStatus.CANCELLED;
+        }
+        if (status.contains("reject")) {
+            return MenuOrderStatus.REJECTED;
+        }
         if ("picking".equals(status)) {
             return MenuOrderStatus.PREPARING;
         }
-        if ("prepared".equals(status) || "ready".equals(status)) {
+        if ("prepared".equals(status)
+                || "ready".equals(status)
+                || "readyforpickup".equals(status)
+                || "dispatched".equals(status)
+                || "delivered".equals(status)
+                || "pickedup".equals(status)
+                || "completed".equals(status)) {
             return MenuOrderStatus.READY;
         }
         return MenuOrderStatus.CONFIRMED;
@@ -72,38 +84,121 @@ public final class KitchenUberEatsMapper {
                 if (item == null) {
                     continue;
                 }
-                String optionNote = firstText(item.getDetail(), item.getOptions());
-                items.add(MenuOrderDtos.OrderItemResponse.builder()
-                        .productId(parseLong(item.getProductId()))
-                        .productName(item.getProductName())
-                        .unitPrice(item.getUnitPrice())
-                        .quantity(Math.max(item.getQuantity(), 1))
-                        .note(optionNote)
-                        .lineTotal(lineTotal(item.getUnitPrice(), item.getQuantity()))
-                        .selectedOptions(List.of())
-                        .build());
+                items.add(toTicketItem(
+                        item.getProductId(),
+                        item.getProductName(),
+                        item.getQuantity(),
+                        item.getUnitPrice(),
+                        firstText(item.getDetail(), item.getOptions())
+                ));
             }
         }
 
-        LocalDateTime when = order.getPackageCreatedAt() != null ? order.getPackageCreatedAt() : order.getCreatedAt();
-        MenuOrderStatus status = toKitchenStatus(order.getPackageStatus());
+        return toTicket(
+                order.getId(),
+                order.getPackageStatus(),
+                order.getCustomerName(),
+                order.getNote(),
+                order.getTotalAmount(),
+                order.getCurrency(),
+                order.getPackageCreatedAt(),
+                order.getCreatedAt(),
+                order.getUpdatedAt(),
+                items,
+                OrderSource.UBER_EATS,
+                "Uber Eats"
+        );
+    }
+
+    public static MenuOrderDtos.OrderResponse toTicket(
+            Long id,
+            String packageStatus,
+            String customerName,
+            String note,
+            BigDecimal totalAmount,
+            String currency,
+            LocalDateTime packageCreatedAt,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt,
+            List<MenuOrderDtos.OrderItemResponse> items,
+            OrderSource source,
+            String tableName
+    ) {
+        LocalDateTime when = packageCreatedAt != null ? packageCreatedAt : createdAt;
+        MenuOrderStatus status = toKitchenStatus(packageStatus);
         return MenuOrderDtos.OrderResponse.builder()
-                .id(order.getId())
-                .tableName("Uber Eats")
-                .customerName(order.getCustomerName())
+                .id(id)
+                .tableName(tableName)
+                .customerName(customerName)
                 .status(status)
-                .orderSource(OrderSource.UBER_EATS)
-                .totalAmount(order.getTotalAmount())
-                .currency(order.getCurrency())
-                .note(order.getNote())
-                .items(items)
+                .orderSource(source)
+                .totalAmount(totalAmount)
+                .currency(currency)
+                .note(note)
+                .items(items == null ? List.of() : items)
                 .submittedAt(when)
                 .confirmedAt(when)
-                .preparedAt(status == MenuOrderStatus.PREPARING || status == MenuOrderStatus.READY ? order.getUpdatedAt() : null)
-                .readyAt(status == MenuOrderStatus.READY ? order.getUpdatedAt() : null)
-                .createdAt(order.getCreatedAt())
-                .updatedAt(order.getUpdatedAt())
+                .cancelledAt(status == MenuOrderStatus.CANCELLED || status == MenuOrderStatus.REJECTED ? updatedAt : null)
+                .rejectedAt(status == MenuOrderStatus.REJECTED ? updatedAt : null)
+                .preparedAt(status == MenuOrderStatus.PREPARING || status == MenuOrderStatus.READY ? updatedAt : null)
+                .readyAt(status == MenuOrderStatus.READY ? updatedAt : null)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
                 .build();
+    }
+
+    public static MenuOrderDtos.OrderItemResponse toTicketItem(
+            String productId,
+            String productName,
+            int quantity,
+            BigDecimal unitPrice,
+            String note
+    ) {
+        return MenuOrderDtos.OrderItemResponse.builder()
+                .productId(parseLong(productId))
+                .productName(productName)
+                .unitPrice(unitPrice)
+                .quantity(Math.max(quantity, 1))
+                .note(note)
+                .lineTotal(lineTotal(unitPrice, quantity))
+                .selectedOptions(List.of())
+                .build();
+    }
+
+    public static boolean isActiveMarketplaceKitchenOrder(
+            String packageStatus,
+            LocalDateTime updatedAt,
+            LocalDateTime packageCreatedAt,
+            LocalDate today,
+            boolean includeReceived
+    ) {
+        String status = normalizeStatus(packageStatus);
+        if (includeReceived && "received".equals(status)) {
+            return true;
+        }
+        if ("accepted".equals(status) || "picking".equals(status)) {
+            return true;
+        }
+        if ("prepared".equals(status)
+                || "ready".equals(status)
+                || "readyforpickup".equals(status)
+                || "dispatched".equals(status)) {
+            return isOnDay(updatedAt, today) || isOnDay(packageCreatedAt, today);
+        }
+        return false;
+    }
+
+    private static boolean matchesSource(String source, String... aliases) {
+        if (source == null || source.isBlank()) {
+            return false;
+        }
+        String normalized = source.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        for (String alias : aliases) {
+            if (alias.equals(normalized)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isOnDay(LocalDateTime value, LocalDate today) {

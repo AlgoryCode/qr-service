@@ -58,6 +58,7 @@ public class MenuWaiterOrderService {
     private final WaiterAccessService waiterAccessService;
     private final OrderAuditService orderAuditService;
     private final KitchenUberEatsService kitchenUberEatsService;
+    private final KitchenYemekSepetiService kitchenYemekSepetiService;
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listPending() {
@@ -229,6 +230,7 @@ public class MenuWaiterOrderService {
         List<MenuOrderDtos.OrderResponse> combined = new java.util.ArrayList<>(active);
         combined.addAll(servedToday);
         combined.addAll(kitchenUberEatsService.listActiveForOwner(staff.getOwnerUserId()));
+        combined.addAll(kitchenYemekSepetiService.listActiveForOwner(staff.getOwnerUserId()));
         return combined;
     }
 
@@ -318,8 +320,8 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse markPreparing(Long orderId, String source) {
-        if (KitchenUberEatsMapper.isUberEatsSource(source)) {
-            throw new BadRequestException("Uber Eats siparişlerinde hazırlık adımı yok");
+        if (KitchenUberEatsMapper.isUberEatsSource(source) || KitchenUberEatsMapper.isYemekSepetiSource(source)) {
+            throw new BadRequestException("Pazar yeri siparişlerinde hazırlık adımı yok");
         }
         return transitionKitchen(orderId, MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, true);
     }
@@ -334,6 +336,10 @@ public class MenuWaiterOrderService {
         if (KitchenUberEatsMapper.isUberEatsSource(source)) {
             MenuWaiter staff = waiterAccessService.requireKitchenStaff();
             return kitchenUberEatsService.markReady(staff.getOwnerUserId(), orderId);
+        }
+        if (KitchenUberEatsMapper.isYemekSepetiSource(source)) {
+            MenuWaiter staff = waiterAccessService.requireKitchenStaff();
+            return kitchenYemekSepetiService.markReady(staff.getOwnerUserId(), orderId);
         }
         return transitionKitchen(orderId, MenuOrderStatus.PREPARING, MenuOrderStatus.READY, true);
     }

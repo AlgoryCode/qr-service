@@ -194,6 +194,15 @@ ubereats:
     restaurant-menu-upsert: ${UBEREATS_MENU_UPSERT_PATH:/integrator/product/meal/suppliers/{sellerId}/stores/{restaurantId}/products}
     restaurant-menu-upsert-method: ${UBEREATS_MENU_UPSERT_METHOD:POST}
 
+yemeksepeti:
+  base-url: ${YEMEKSEPETI_BASE_URL:https://yemeksepeti.partner.deliveryhero.io}
+  encrypt-key: ${YEMEKSEPETI_CREDENTIALS_ENCRYPT_KEY:}
+  connect-timeout: ${YEMEKSEPETI_CONNECT_TIMEOUT:5s}
+  read-timeout: ${YEMEKSEPETI_READ_TIMEOUT:20s}
+  max-attempts: ${YEMEKSEPETI_MAX_ATTEMPTS:3}
+  poll-enabled: ${YEMEKSEPETI_POLL_ENABLED:true}
+  poll-lookback-hours: ${YEMEKSEPETI_POLL_LOOKBACK_HOURS:168}
+
 ubereats-menu:
   api-base-url: ${UBEREATS_MENU_API_BASE_URL:${UBEREATS_API_BASE_URL:https://api.uber.com}}
   auth-url: ${UBEREATS_MENU_AUTH_URL:${UBEREATS_AUTH_URL:https://login.uber.com/oauth/v2/token}}

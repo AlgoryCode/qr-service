@@ -2,6 +2,8 @@ package com.ael.algoryqrservice.print.service;
 
 import com.ael.algoryqrservice.integration.ubereats.model.UberEatsOrder;
 import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
+import com.ael.algoryqrservice.integration.yemeksepeti.model.YemekSepetiOrder;
+import com.ael.algoryqrservice.integration.yemeksepeti.model.dto.YemekSepetiDtos;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
@@ -83,6 +85,58 @@ public class PrintOrderEnqueueService {
         );
     }
 
+    public void enqueueYemekSepetiOrder(
+            Long ownerUserId,
+            Long branchId,
+            YemekSepetiOrder order,
+            List<YemekSepetiDtos.OrderItemResponse> items
+    ) {
+        if (ownerUserId == null || order == null || order.getId() == null) {
+            return;
+        }
+        List<MenuOrderDtos.OrderItemResponse> ticketItems = items == null ? List.of() : items.stream()
+                .map(item -> KitchenUberEatsMapper.toTicketItem(
+                        item.getProductId(),
+                        item.getProductName(),
+                        item.getQuantity(),
+                        item.getUnitPrice(),
+                        item.getDetail() != null ? item.getDetail() : item.getOptions()
+                ))
+                .toList();
+        MenuOrderDtos.OrderResponse kitchen = KitchenUberEatsMapper.toTicket(
+                order.getId(),
+                order.getPackageStatus(),
+                order.getCustomerName(),
+                order.getNote(),
+                order.getTotalAmount(),
+                order.getCurrency(),
+                order.getPackageCreatedAt(),
+                order.getCreatedAt(),
+                order.getUpdatedAt(),
+                ticketItems,
+                com.ael.algoryqrservice.model.enums.OrderSource.YEMEKSEPETI,
+                "Yemeksepeti"
+        );
+        ObjectNode payload = objectMapper.valueToTree(kitchen);
+        payload.put("channelLabel", "Yemeksepeti");
+        if (branchId != null) {
+            payload.put("branchId", branchId);
+        }
+        if (order.getDeliveryAddress() != null) {
+            payload.put("deliveryAddress", order.getDeliveryAddress());
+        }
+        if (order.getCustomerPhone() != null) {
+            payload.put("customerPhone", order.getCustomerPhone());
+        }
+        printJobService.enqueueKitchenTicket(
+                ownerUserId,
+                branchId,
+                PrintSourceType.YEMEKSEPETI,
+                String.valueOf(order.getId()),
+                payload
+        );
+    }
+
     public void enqueueStoreOrder(Merchant merchant, StoreOrder order) {
         if (merchant == null || order == null || order.getId() == null) {
             return;
@@ -131,6 +185,7 @@ public class PrintOrderEnqueueService {
             case "QR" -> "QR Masa";
             case "WAITER" -> "Garson";
             case "UBER_EATS" -> "Uber Eats";
+            case "YEMEKSEPETI" -> "Yemeksepeti";
             default -> source;
         };
     }

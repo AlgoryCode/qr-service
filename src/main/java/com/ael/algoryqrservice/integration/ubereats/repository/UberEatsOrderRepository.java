@@ -78,6 +78,12 @@ public interface UberEatsOrderRepository
               AND LOWER(o.packageStatus) IN :statuses
             ORDER BY o.packageCreatedAt DESC
             """)
+    List<UberEatsOrder> findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
+            Long connectionId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
     List<UberEatsOrder> findKitchenOrders(
             @Param("connectionId") Long connectionId,
             @Param("statuses") Collection<String> statuses
