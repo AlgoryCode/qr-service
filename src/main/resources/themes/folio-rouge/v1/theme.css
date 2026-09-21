@@ -1,0 +1,88 @@
+@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600&family=Inter:wght@400;700;800&family=Plus+Jakarta+Sans:wght@700&family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+
+  .folio-menu {
+    --lx-bg: #E3E1DD;
+    --lx-fg: #1A1A1A;
+    --lx-card: #F3F3F1;
+    --lx-muted: #6F6E6B;
+    --lx-border: #D0CDC8;
+    --lx-gold: #B21833;
+    --lx-gold-soft: #8E1428;
+    --lx-primary-fg: #F7F7F5;
+    --lx-destructive: #B21833;
+    --lx-destructive-fg: #F7F7F5;
+    --menu-frame-bg: #E3E1DD;
+    --menu-frame-border: #D0CDC8;
+    --lx-gradient-gold: #B21833;
+    background-color: var(--lx-bg);
+    color: var(--lx-fg);
+    font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .folio-menu .font-display {
+    font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+
+  .folio-menu .text-gradient-gold {
+    background-image: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    color: #B21833;
+  }
+
+  .folio-menu .bg-gradient-gold {
+    background-image: none;
+    background-color: #B21833;
+  }
+
+  .folio-menu .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .folio-menu .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .folio-menu .lx-bg { background-color: var(--lx-bg); }
+  .folio-menu .lx-fg { color: var(--lx-fg); }
+  .folio-menu .lx-muted { color: var(--lx-muted); }
+  .folio-menu .lx-gold { color: var(--lx-gold); }
+  .folio-menu .lx-gold-bg { background-color: var(--lx-gold); }
+  .folio-menu .lx-card-bg { background-color: var(--lx-card); }
+  .folio-menu .lx-border { border-color: var(--lx-border); }
+  .folio-menu .lx-destructive { color: var(--lx-destructive); }
+
+  .folio-menu .text-muted-foreground { color: var(--lx-muted); }
+  .folio-menu .text-foreground { color: var(--lx-fg); }
+  .folio-menu .text-destructive { color: var(--lx-destructive); }
+  .folio-menu .bg-background { background-color: var(--lx-card); }
+  .folio-menu .bg-card { background-color: var(--lx-card); }
+  .folio-menu .bg-muted { background-color: #D8D6D2; }
+  .folio-menu .bg-foreground { background-color: var(--lx-gold); color: var(--lx-primary-fg); }
+  .folio-menu .text-background { color: var(--lx-primary-fg); }
+  .folio-menu .border-border { border-color: var(--lx-border); }
+
+  .folio-menu input,
+  .folio-menu textarea,
+  .folio-menu select {
+    color: var(--lx-fg);
+    background-color: #F3F3F1;
+    border-color: var(--lx-border);
+  }
+  .folio-menu input::placeholder,
+  .folio-menu textarea::placeholder {
+    color: var(--lx-muted);
+  }
+
+  .folio-menu .menu-footer {
+    background-color: #D8D6D2;
+  }
+
+  .folio-menu header {
+    background-color: color-mix(in srgb, #F3F3F1 88%, transparent);
+  }

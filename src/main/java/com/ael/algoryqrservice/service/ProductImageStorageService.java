@@ -42,6 +42,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class ProductImageStorageService {
 
+    public static final String IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+    private static final java.util.Set<String> RASTER_CONTENT_TYPES = java.util.Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+    );
+
+    private static final java.util.Set<String> SEED_CONTENT_TYPES = java.util.Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/svg+xml",
+            "text/css",
+            "font/woff2"
+    );
+
     private final RestClient.Builder restClientBuilder;
     private final StorageProperties storageProperties;
     private final AtomicBoolean bucketReady = new AtomicBoolean(false);
@@ -54,6 +71,10 @@ public class ProductImageStorageService {
 
     public ProductImageDtos.UploadResponse uploadLogo(Long menuId, MultipartFile file) {
         return uploadWithPrefix(menuId, file, "menus/" + menuId + "/logo/");
+    }
+
+    public ProductImageDtos.UploadResponse uploadCover(Long menuId, MultipartFile file) {
+        return uploadWithPrefix(menuId, file, "menus/" + menuId + "/cover/");
     }
 
     public ProductImageDtos.UploadResponse uploadCategoryCover(Long menuId, Long categoryId, MultipartFile file) {
@@ -86,6 +107,17 @@ public class ProductImageStorageService {
         }
         if (!resolvedKey.startsWith("menus/" + menuId + "/logo/")) {
             throw new BadRequestException("Bu logo bu menüye ait değil");
+        }
+        delete(resolvedKey);
+    }
+
+    public void deleteCoverForMenu(Long menuId, String objectKey, String imageUrl) {
+        String resolvedKey = resolveObjectKey(objectKey, imageUrl);
+        if (resolvedKey == null || resolvedKey.isBlank()) {
+            throw new BadRequestException("objectKey veya imageUrl zorunludur");
+        }
+        if (!resolvedKey.startsWith("menus/" + menuId + "/cover/")) {
+            throw new BadRequestException("Bu kapak bu menüye ait değil");
         }
         delete(resolvedKey);
     }
@@ -123,9 +155,9 @@ public class ProductImageStorageService {
         String objectKey = keyPrefix + UUID.randomUUID() + "." + extension;
 
         if (storageProperties.isS3Mode()) {
-            uploadViaS3(objectKey, bytes, contentType);
+            uploadViaS3(objectKey, bytes, contentType, null);
         } else {
-            uploadViaFiler(objectKey, bytes, contentType);
+            uploadViaFiler(objectKey, bytes, contentType, null);
         }
 
         return new ProductImageDtos.UploadResponse(buildPublicUrl(objectKey), objectKey);
@@ -174,9 +206,33 @@ public class ProductImageStorageService {
         }
         validateMagicBytes(bytes, normalizedType);
         if (storageProperties.isS3Mode()) {
-            uploadViaS3(objectKey, bytes, normalizedType);
+            uploadViaS3(objectKey, bytes, normalizedType, null);
         } else {
-            uploadViaFiler(objectKey, bytes, normalizedType);
+            uploadViaFiler(objectKey, bytes, normalizedType, null);
+        }
+    }
+
+    public void uploadSeedBytes(String objectKey, byte[] bytes, String contentType) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BadRequestException("objectKey zorunludur");
+        }
+        if (bytes == null || bytes.length == 0) {
+            throw new BadRequestException("Dosya zorunludur");
+        }
+        if (contentType == null || contentType.isBlank()) {
+            throw new BadRequestException("İçerik tipi belirlenemedi");
+        }
+        String normalizedType = contentType.toLowerCase(Locale.ROOT);
+        if (!SEED_CONTENT_TYPES.contains(normalizedType)) {
+            throw new BadRequestException("Desteklenmeyen tema formatı");
+        }
+        if (RASTER_CONTENT_TYPES.contains(normalizedType)) {
+            validateMagicBytes(bytes, normalizedType);
+        }
+        if (storageProperties.isS3Mode()) {
+            uploadViaS3(objectKey, bytes, normalizedType, IMMUTABLE_CACHE_CONTROL);
+        } else {
+            uploadViaFiler(objectKey, bytes, normalizedType, IMMUTABLE_CACHE_CONTROL);
         }
     }
 
@@ -224,18 +280,18 @@ public class ProductImageStorageService {
         }
     }
 
-    private void uploadViaS3(String objectKey, byte[] bytes, String contentType) {
+    private void uploadViaS3(String objectKey, byte[] bytes, String contentType, String cacheControl) {
         S3Client client = s3Client();
         ensureBucketExists(client);
         try {
-            client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(storageProperties.getBucket())
-                            .key(objectKey)
-                            .contentType(contentType)
-                            .build(),
-                    RequestBody.fromBytes(bytes)
-            );
+            var request = PutObjectRequest.builder()
+                    .bucket(storageProperties.getBucket())
+                    .key(objectKey)
+                    .contentType(contentType);
+            if (cacheControl != null && !cacheControl.isBlank()) {
+                request.cacheControl(cacheControl);
+            }
+            client.putObject(request.build(), RequestBody.fromBytes(bytes));
         } catch (S3Exception exception) {
             if (log.isErrorEnabled()) {
                 log.error("S3 upload rejected. endpoint={} bucket={} key={} status={} message={}",
@@ -405,13 +461,16 @@ public class ProductImageStorageService {
         }
     }
 
-    private void uploadViaFiler(String objectKey, byte[] bytes, String contentType) {
+    private void uploadViaFiler(String objectKey, byte[] bytes, String contentType, String cacheControl) {
         String filerPath = filerObjectPath(objectKey);
         try {
-            filerClient().put()
+            var spec = filerClient().put()
                     .uri(filerPath)
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .body(bytes)
+                    .contentType(MediaType.parseMediaType(contentType));
+            if (cacheControl != null && !cacheControl.isBlank()) {
+                spec = spec.header("Cache-Control", cacheControl);
+            }
+            spec.body(bytes)
                     .retrieve()
                     .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(), (request, response) -> {
                         String body = readResponseBody(response.getBody());

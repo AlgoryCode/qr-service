@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" fill="none">
+  <rect width="1200" height="800" fill="#F9F6EE"/>
+  <circle cx="180" cy="140" r="160" fill="#BCE3C5" fill-opacity="0.35"/>
+  <circle cx="1040" cy="120" r="200" fill="#C8B1E0" fill-opacity="0.28"/>
+  <circle cx="980" cy="680" r="180" fill="#BCE3C5" fill-opacity="0.32"/>
+  <circle cx="220" cy="700" r="140" fill="#C8B1E0" fill-opacity="0.22"/>
+  <g fill="#4E7B6C" fill-opacity="0.12">
+    <circle cx="160" cy="320" r="6"/>
+    <circle cx="320" cy="220" r="4"/>
+    <circle cx="480" cy="160" r="5"/>
+    <circle cx="640" cy="240" r="4"/>
+    <circle cx="800" cy="180" r="6"/>
+    <circle cx="940" cy="300" r="4"/>
+    <circle cx="1080" cy="360" r="5"/>
+    <circle cx="260" cy="480" r="4"/>
+    <circle cx="420" cy="560" r="6"/>
+    <circle cx="600" cy="500" r="4"/>
+    <circle cx="760" cy="620" r="5"/>
+    <circle cx="900" cy="520" r="4"/>
+  </g>
+  <path d="M540 430c40-70 180-70 220 0 8 14-6 22-22 18-30-8-62-8-88 0-28 8-62 8-90 0-16-4-28-12-20-18Z" fill="#C8B1E0" fill-opacity="0.45"/>
+  <path d="M560 428c32-48 148-48 180 0" stroke="#4E7B6C" stroke-opacity="0.35" stroke-width="3" stroke-linecap="round"/>
+  <rect x="70" y="40" width="1060" height="720" rx="48" stroke="#BCE3C5" stroke-width="3" fill="none"/>
+</svg>
