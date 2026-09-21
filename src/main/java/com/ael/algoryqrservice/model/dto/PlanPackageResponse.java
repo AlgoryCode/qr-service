@@ -35,5 +35,6 @@ public class PlanPackageResponse {
     private List<Integer> allowedInstallments;
     private List<InstallmentOptionResponse> installmentOptions;
     private List<PlanPackageItemResponse> items;
+    private List<PlanPackageModuleResponse> availableModules;
     private LocalDateTime createdAt;
 }

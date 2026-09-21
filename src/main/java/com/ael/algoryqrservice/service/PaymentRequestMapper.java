@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCardDto;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,9 @@ import java.util.UUID;
 
 @Component
 public class PaymentRequestMapper {
+
+    /** PayTR rejects basket lines below this amount. */
+    private static final BigDecimal MIN_BASKET_LINE_AMOUNT = new BigDecimal("0.01");
 
     public PaymentThreeDsRequest toThreeDsRequest(
             Purchase purchase,
@@ -112,6 +117,30 @@ public class PaymentRequestMapper {
             String conversationId,
             int billingCycleNumber
     ) {
+        return toDebtCheckoutFormRequest(
+                purchase,
+                user,
+                planPackage,
+                clientIp,
+                appProperties,
+                paymentClientProperties,
+                conversationId,
+                billingCycleNumber,
+                List.of()
+        );
+    }
+
+    public PaymentCheckoutFormRequest toDebtCheckoutFormRequest(
+            Purchase purchase,
+            User user,
+            PlanPackage planPackage,
+            String clientIp,
+            AppProperties appProperties,
+            PaymentClientProperties paymentClientProperties,
+            String conversationId,
+            int billingCycleNumber,
+            List<PurchaseItem> moduleLines
+    ) {
         PaymentStyle style = purchase.getPaymentStyle();
         BigDecimal chargeAmount = purchase.getPrice();
         int intervalMonths = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
@@ -129,6 +158,9 @@ public class PaymentRequestMapper {
         sourceMetadata.put("paymentStyle", style.name());
         sourceMetadata.put("validityDays", planPackage.getValidityDays());
         sourceMetadata.put("totalAmount", chargeAmount);
+        if (purchase.getRecurringPrice() != null) {
+            sourceMetadata.put("recurringPrice", purchase.getRecurringPrice());
+        }
         if (purchase.getSubscriptionId() != null) {
             sourceMetadata.put("subscriptionId", purchase.getSubscriptionId());
         }
@@ -141,6 +173,7 @@ public class PaymentRequestMapper {
                 .locale("tr")
                 .price(chargeAmount)
                 .paidPrice(chargeAmount)
+                .recurringPrice(resolveRecurringPrice(purchase, chargeAmount))
                 .currency(planPackage.getCurrency())
                 .paymentStyle(style.name())
                 .subscriptionCycleCount(null)
@@ -151,7 +184,7 @@ public class PaymentRequestMapper {
                 .buyer(toBuyer(user, purchase.getBillingSnapshot(), clientIp))
                 .shippingAddress(toAddress(purchase.getBillingSnapshot()))
                 .billingAddress(toAddress(purchase.getBillingSnapshot()))
-                .basketItems(List.of(toBasketItem(planPackage, chargeAmount)))
+                .basketItems(toBasketItems(planPackage, chargeAmount, moduleLines))
                 .build();
     }
 
@@ -379,6 +412,57 @@ public class PaymentRequestMapper {
             BigDecimal chargeAmount
     ) {
         return toBasketItem(planPackage, chargeAmount, "");
+    }
+
+    /**
+     * The renewal amount only needs to travel to the payment service when it differs from what
+     * is charged now, which happens once a cart carries ONE_TIME module lines.
+     */
+    private BigDecimal resolveRecurringPrice(Purchase purchase, BigDecimal chargeAmount) {
+        BigDecimal recurringPrice = purchase.getRecurringPrice();
+        if (recurringPrice == null
+                || recurringPrice.signum() <= 0
+                || recurringPrice.compareTo(chargeAmount) == 0) {
+            return null;
+        }
+        return recurringPrice;
+    }
+
+    /**
+     * Builds the basket for a cart: one line for the package and one per module. The package
+     * line absorbs any coupon discount so the lines always add up to {@code chargeAmount},
+     * which PayTR hashes alongside the payment amount. Falls back to a single package line
+     * when a discount would leave nothing chargeable for the base.
+     */
+    private List<PaymentThreeDsRequest.BasketItemPayload> toBasketItems(
+            PlanPackage planPackage,
+            BigDecimal chargeAmount,
+            List<PurchaseItem> moduleLines
+    ) {
+        if (moduleLines == null || moduleLines.isEmpty()) {
+            return List.of(toBasketItem(planPackage, chargeAmount));
+        }
+        BigDecimal modulesTotal = moduleLines.stream()
+                .map(PurchaseItem::getLineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal packageAmount = chargeAmount.subtract(modulesTotal);
+        if (packageAmount.compareTo(MIN_BASKET_LINE_AMOUNT) < 0) {
+            return List.of(toBasketItem(planPackage, chargeAmount));
+        }
+
+        List<PaymentThreeDsRequest.BasketItemPayload> items = new ArrayList<>();
+        items.add(toBasketItem(planPackage, packageAmount));
+        for (PurchaseItem line : moduleLines) {
+            items.add(PaymentThreeDsRequest.BasketItemPayload.builder()
+                    .id(line.getProductCode())
+                    .name(line.getProductName() + " x" + line.getQuantity())
+                    .category1("Digital")
+                    .category2("Module")
+                    .itemType("VIRTUAL")
+                    .price(line.getLineTotal())
+                    .build());
+        }
+        return List.copyOf(items);
     }
 
     private PaymentThreeDsRequest.BasketItemPayload toBasketItem(

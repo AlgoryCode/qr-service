@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseFulfillment;
+import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
@@ -17,6 +18,7 @@ import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
+import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.util.Enums;
@@ -40,6 +42,7 @@ public class PurchaseFulfillmentService {
     private final PurchaseRepository purchaseRepository;
     private final PlanPackageRepository planPackageRepository;
     private final ProductRepository productRepository;
+    private final PurchaseItemRepository purchaseItemRepository;
     private final PackageEntitlementWriter entitlementWriter;
     private final PackageActivationService packageActivationService;
     private final MenuPublicAccessService menuPublicAccessService;
@@ -308,6 +311,14 @@ public class PurchaseFulfillmentService {
                     item.getProduct().getCode(),
                     item.getQuantity(),
                     item.isUnlimited()
+            );
+        }
+        for (PurchaseItem moduleLine : purchaseItemRepository.findByPurchaseId(purchase.getId())) {
+            entitlementWriter.grantModuleLine(
+                    purchase,
+                    moduleLine.getProductId(),
+                    moduleLine.getProductCode(),
+                    moduleLine.getQuantity()
             );
         }
     }

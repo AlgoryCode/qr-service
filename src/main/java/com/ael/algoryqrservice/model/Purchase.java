@@ -61,6 +61,18 @@ public class Purchase {
     @Column(name = "discount_amount", precision = 12, scale = 2)
     private BigDecimal discountAmount;
 
+    /** Paket tutarı, modüller hariç. */
+    @Column(name = "base_price", precision = 12, scale = 2)
+    private BigDecimal basePrice;
+
+    /** Sepetteki modül satırlarının KDV dahil toplamı. */
+    @Column(name = "modules_total", precision = 12, scale = 2)
+    private BigDecimal modulesTotal;
+
+    /** Yenilemede tahsil edilecek tutar: paket + tekrarlayan modüller. */
+    @Column(name = "recurring_price", precision = 12, scale = 2)
+    private BigDecimal recurringPrice;
+
     @Column(name = "coupon_id")
     private Long couponId;
 

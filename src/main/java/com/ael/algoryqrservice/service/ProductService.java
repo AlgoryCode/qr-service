@@ -183,6 +183,8 @@ public class ProductService {
                 .vatRate(product.getVatRate())
                 .countable(product.isConsumable())
                 .consumable(product.isConsumable())
+                .addonPurchasable(product.isAddonPurchasable())
+                .billingType(product.getBillingType())
                 .active(product.isActive())
                 .createdAt(product.getCreatedAt())
                 .build();

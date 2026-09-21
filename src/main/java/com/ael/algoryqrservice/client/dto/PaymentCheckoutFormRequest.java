@@ -18,6 +18,9 @@ public class PaymentCheckoutFormRequest {
     private String locale;
     private BigDecimal price;
     private BigDecimal paidPrice;
+
+    /** Yenilemede tahsil edilecek tutar; tek seferlik modüller bu tutara girmez. */
+    private BigDecimal recurringPrice;
     private String currency;
     private String paymentStyle;
     private Integer subscriptionCycleCount;
