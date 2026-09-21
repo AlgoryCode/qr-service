@@ -29,6 +29,11 @@ class KitchenUberEatsMapperTest {
         assertThat(KitchenUberEatsMapper.toKitchenStatus("picking")).isEqualTo(MenuOrderStatus.PREPARING);
         assertThat(KitchenUberEatsMapper.toKitchenStatus("Prepared")).isEqualTo(MenuOrderStatus.READY);
         assertThat(KitchenUberEatsMapper.toKitchenStatus("ready")).isEqualTo(MenuOrderStatus.READY);
+        assertThat(KitchenUberEatsMapper.toKitchenStatus("Cancelled")).isEqualTo(MenuOrderStatus.CANCELLED);
+        assertThat(KitchenUberEatsMapper.toKitchenStatus("READY_FOR_PICKUP")).isEqualTo(MenuOrderStatus.READY);
+        assertThat(KitchenUberEatsMapper.toKitchenStatus("RECEIVED")).isEqualTo(MenuOrderStatus.CONFIRMED);
+        assertThat(KitchenUberEatsMapper.isYemekSepetiSource("YEMEKSEPETI")).isTrue();
+        assertThat(KitchenUberEatsMapper.isYemekSepetiSource("yemek-sepeti")).isTrue();
     }
 
     @Test
@@ -85,5 +90,30 @@ class KitchenUberEatsMapperTest {
         assertThat(ticket.getItems().getFirst().getProductName()).isEqualTo("Burger");
         assertThat(ticket.getItems().getFirst().getNote()).isEqualTo("Acısız");
         assertThat(ticket.getItems().getFirst().getQuantity()).isEqualTo(2);
+        assertThat(ticket.getTotalAmount()).isEqualByComparingTo("120.00");
+    }
+
+    @Test
+    void mapsYemekSepetiTicketWithAmount() {
+        var ticket = KitchenUberEatsMapper.toTicket(
+                12L,
+                "RECEIVED",
+                "Ece",
+                null,
+                new BigDecimal("95.50"),
+                "TRY",
+                LocalDateTime.of(2026, 9, 21, 9, 0),
+                LocalDateTime.of(2026, 9, 21, 9, 0),
+                LocalDateTime.of(2026, 9, 21, 9, 0),
+                List.of(),
+                OrderSource.YEMEKSEPETI,
+                "Yemeksepeti"
+        );
+
+        assertThat(ticket.getOrderSource()).isEqualTo(OrderSource.YEMEKSEPETI);
+        assertThat(ticket.getTableName()).isEqualTo("Yemeksepeti");
+        assertThat(ticket.getStatus()).isEqualTo(MenuOrderStatus.CONFIRMED);
+        assertThat(ticket.getTotalAmount()).isEqualByComparingTo("95.50");
+        assertThat(ticket.getCustomerName()).isEqualTo("Ece");
     }
 }

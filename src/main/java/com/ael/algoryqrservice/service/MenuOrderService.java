@@ -63,6 +63,7 @@ public class MenuOrderService {
     private final OrderAuditService orderAuditService;
     private final SecurityUtils securityUtils;
     private final KitchenUberEatsService kitchenUberEatsService;
+    private final KitchenYemekSepetiService kitchenYemekSepetiService;
     private final PrintOrderEnqueueService printOrderEnqueueService;
 
     @Transactional
@@ -206,9 +207,10 @@ public class MenuOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> merchantList(Long menuId, String status) {
-        requireOwnedMenu(menuId);
+        Menu menu = requireOwnedMenu(menuId);
+        List<MenuOrderDtos.OrderResponse> listed;
         if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status.trim())) {
-            return menuOrderRepository
+            listed = new ArrayList<>(menuOrderRepository
                     .findByMenuIdAndStatusInOrderBySubmittedAtDesc(
                             menuId,
                             List.of(
@@ -222,12 +224,20 @@ public class MenuOrderService {
                     )
                     .stream()
                     .map(this::toOrderResponse)
-                    .toList();
+                    .toList());
+        } else {
+            MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
+            listed = new ArrayList<>(menuOrderRepository.findByMenuIdAndStatusOrderBySubmittedAtDesc(menuId, orderStatus).stream()
+                    .map(this::toOrderResponse)
+                    .toList());
         }
-        MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
-        return menuOrderRepository.findByMenuIdAndStatusOrderBySubmittedAtDesc(menuId, orderStatus).stream()
-                .map(this::toOrderResponse)
-                .toList();
+        listed.addAll(kitchenUberEatsService.listManagedForOwner(menu.getUserId()));
+        listed.addAll(kitchenYemekSepetiService.listManagedForOwner(menu.getUserId()));
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status.trim())) {
+            MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
+            return listed.stream().filter(order -> order.getStatus() == orderStatus).toList();
+        }
+        return listed;
     }
 
     @Transactional(readOnly = true)
@@ -293,13 +303,14 @@ public class MenuOrderService {
         List<MenuOrderDtos.OrderResponse> combined = new ArrayList<>(active);
         combined.addAll(servedToday);
         combined.addAll(kitchenUberEatsService.listActiveForOwner(menu.getUserId()));
+        combined.addAll(kitchenYemekSepetiService.listActiveForOwner(menu.getUserId()));
         return combined;
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse merchantMarkPreparing(Long menuId, Long orderId, String source) {
-        if (KitchenUberEatsMapper.isUberEatsSource(source)) {
-            throw new BadRequestException("Uber Eats siparişlerinde hazırlık adımı yok");
+        if (KitchenUberEatsMapper.isUberEatsSource(source) || KitchenUberEatsMapper.isYemekSepetiSource(source)) {
+            throw new BadRequestException("Pazar yeri siparişlerinde hazırlık adımı yok");
         }
         return merchantKitchenTransition(menuId, orderId, MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING);
     }
@@ -314,6 +325,10 @@ public class MenuOrderService {
         if (KitchenUberEatsMapper.isUberEatsSource(source)) {
             Menu menu = requireOwnedMenu(menuId);
             return kitchenUberEatsService.markReady(menu.getUserId(), orderId);
+        }
+        if (KitchenUberEatsMapper.isYemekSepetiSource(source)) {
+            Menu menu = requireOwnedMenu(menuId);
+            return kitchenYemekSepetiService.markReady(menu.getUserId(), orderId);
         }
         return merchantKitchenTransition(menuId, orderId, MenuOrderStatus.PREPARING, MenuOrderStatus.READY);
     }

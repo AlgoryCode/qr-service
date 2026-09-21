@@ -44,6 +44,28 @@ public class KitchenUberEatsService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long ownerUserId) {
+        UberEatsConnection connection = connectedOrNull(ownerUserId);
+        if (connection == null) {
+            return List.of();
+        }
+        LocalDate today = LocalDate.now(KitchenUberEatsMapper.ZONE);
+        return orderRepository
+                .findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
+                        connection.getId(),
+                        today.minusDays(31).atStartOfDay(),
+                        today.plusDays(1).atStartOfDay().minusNanos(1)
+                )
+                .stream()
+                .filter(order -> {
+                    String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
+                    return !status.isEmpty() && !"created".equals(status) && !"unassigned".equals(status);
+                })
+                .map(this::toKitchenOrder)
+                .toList();
+    }
+
     @Transactional
     public MenuOrderDtos.OrderResponse markReady(Long ownerUserId, Long orderId) {
         UberEatsConnection connection = connectionService.requireConnectedForUser(ownerUserId);
