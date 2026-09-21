@@ -9,6 +9,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 public class PurchaseRequest {
 
@@ -46,6 +49,15 @@ public class PurchaseRequest {
 
     @Valid
     private AddressDto shippingAddress;
+
+    /** Pakete sepetten eklenen opsiyonel modüller; aynı ödemede tahsil edilir. */
+    @Valid
+    @Size(max = 20, message = "En fazla 20 modül eklenebilir")
+    private List<PurchaseModuleLineRequest> modules = new ArrayList<>();
+
+    public List<PurchaseModuleLineRequest> resolvedModules() {
+        return modules == null ? List.of() : modules;
+    }
 
     @AssertTrue(message = "Kart veya kayıtlı ödeme yöntemi zorunludur")
     public boolean isPaymentInstrumentValid() {

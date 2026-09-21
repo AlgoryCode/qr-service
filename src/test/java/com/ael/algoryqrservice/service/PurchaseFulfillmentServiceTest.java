@@ -46,6 +46,8 @@ class PurchaseFulfillmentServiceTest {
     @Mock
     private ProductRepository productRepository;
     @Mock
+    private com.ael.algoryqrservice.repository.PurchaseItemRepository purchaseItemRepository;
+    @Mock
     private PackageEntitlementWriter entitlementWriter;
     @Mock
     private PackageActivationService packageActivationService;

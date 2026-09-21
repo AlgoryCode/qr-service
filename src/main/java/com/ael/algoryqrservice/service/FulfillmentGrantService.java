@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.model.enums.FulfillmentDetailSource;
 import com.ael.algoryqrservice.model.enums.GrantFulfillmentStatus;
@@ -15,6 +16,7 @@ import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.GrantFulfillmentRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
+import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class FulfillmentGrantService {
     private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final PlanPackageRepository planPackageRepository;
     private final ProductRepository productRepository;
+    private final PurchaseItemRepository purchaseItemRepository;
     private final MenuThemeService menuThemeService;
 
     @Transactional
@@ -77,10 +80,40 @@ public class FulfillmentGrantService {
                     .expiresAt(purchase.getExpiresAt())
                     .build());
         }
+        grantModuleFulfillmentDetails(purchase, fulfillment);
         log.info("Package fulfillment granted: userId={}, purchaseId={}, fulfillmentId={}",
                 purchase.getUserId(), purchase.getId(), fulfillment.getId());
         menuThemeService.ensureDefaultThemeAssigned(purchase.getUserId());
         return fulfillment;
+    }
+
+    /**
+     * Records the cart modules paid for alongside the package. They are add-on products by
+     * nature, so they land as extra quota rows next to the package includes.
+     */
+    private void grantModuleFulfillmentDetails(Purchase purchase, GrantFulfillment fulfillment) {
+        for (PurchaseItem moduleLine : purchaseItemRepository.findByPurchaseId(purchase.getId())) {
+            Product product = productRepository.findById(moduleLine.getProductId()).orElse(null);
+            if (product == null) {
+                log.warn("Module product missing for purchaseItemId={} productId={}",
+                        moduleLine.getId(), moduleLine.getProductId());
+                continue;
+            }
+            fulfillmentDetailRepository.save(FulfillmentDetail.builder()
+                    .fulfillmentId(fulfillment.getId())
+                    .userId(purchase.getUserId())
+                    .productId(product.getId())
+                    .productTypeId(ProductType.ADDON_PRODUCT)
+                    .featureCode(resolveFeatureCode(product))
+                    .scopeCode(product.getScopeCode())
+                    .quantity(moduleLine.getQuantity())
+                    .unlimited(false)
+                    .usedQuantity(0)
+                    .source(FulfillmentDetailSource.ADDON_PURCHASE)
+                    .startsAt(purchase.getStartsAt())
+                    .expiresAt(purchase.getExpiresAt())
+                    .build());
+        }
     }
 
     @Transactional

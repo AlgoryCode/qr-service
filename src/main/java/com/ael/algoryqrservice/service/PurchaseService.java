@@ -16,6 +16,7 @@ import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.PaymentEventInbox;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
@@ -39,6 +40,7 @@ import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
+import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.service.entitlement.EntitlementMaintenanceService;
@@ -98,6 +100,32 @@ public class PurchaseService {
     private final PackagePeriodExtender packagePeriodExtender;
     private final CouponRedemptionService couponRedemptionService;
     private final TrialLogRepository trialLogRepository;
+    private final CartPricingService cartPricingService;
+    private final PurchaseItemRepository purchaseItemRepository;
+
+    /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
+    private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
+        if (!pricing.hasModules()) {
+            return List.of();
+        }
+        List<PurchaseItem> items = pricing.lines().stream()
+                .map(line -> PurchaseItem.builder()
+                        .purchaseId(purchase.getId())
+                        .productId(line.product().getId())
+                        .productCode(line.product().getCode())
+                        .productName(line.product().getName())
+                        .quantity(line.quantity())
+                        .unitPrice(line.unitPrice())
+                        .vatRate(line.vatRate())
+                        .lineSubtotal(line.lineSubtotal())
+                        .lineVat(line.lineVat())
+                        .lineTotal(line.lineTotal())
+                        .billingType(line.billingType())
+                        .unlimited(false)
+                        .build())
+                .toList();
+        return purchaseItemRepository.saveAll(items);
+    }
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
@@ -122,12 +150,9 @@ public class PurchaseService {
                         user.getId(), request.getBillingAddressId(), request.getInlineBillingAddress());
         PaymentStyle paymentStyle = request.resolvedPaymentStyle();
         var billingPeriod = request.resolvedBillingPeriod();
-        BigDecimal chargeAmount = billingPeriod == com.ael.algoryqrservice.model.enums.BillingPeriod.YEARLY
-                ? planPackage.effectiveYearlyPrice()
-                : planPackage.effectiveMonthlyPrice();
-        if (chargeAmount == null || chargeAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Paket fiyati gecersiz");
-        }
+        CartPricingService.CartPricing pricing =
+                cartPricingService.price(planPackage, billingPeriod, request.resolvedModules());
+        BigDecimal chargeAmount = pricing.grandTotal();
         BigDecimal listPrice = chargeAmount;
         String couponCode = request.getCouponCode();
         boolean applyCoupon = couponCode != null && !couponCode.isBlank();
@@ -140,6 +165,9 @@ public class PurchaseService {
                 .packageName(planPackage.getName())
                 .price(chargeAmount)
                 .listPrice(listPrice)
+                .basePrice(pricing.basePrice())
+                .modulesTotal(pricing.modulesTotal())
+                .recurringPrice(pricing.recurringPrice())
                 .currency(planPackage.getCurrency())
                 .paymentMode(PaymentMode.CHECKOUT_FORM)
                 .paymentStyle(paymentStyle)
@@ -156,18 +184,22 @@ public class PurchaseService {
                 .status(PurchaseStatus.PENDING)
                 .build());
 
+        List<PurchaseItem> moduleLines = persistModuleLines(purchase, pricing);
+
         if (applyCoupon) {
+            // Kupon yalnızca paket taban fiyatına uygulanır, modül satırlarına indirim geçmez.
             CouponRedemptionService.AppliedCoupon applied = couponRedemptionService.reserve(
-                    couponCode, user.getId(), purchase.getId(), listPrice);
+                    couponCode, user.getId(), purchase.getId(), pricing.basePrice());
+            BigDecimal discountAmount = applied.quote().discountAmount();
             purchase.setCouponId(applied.coupon().getId());
-            purchase.setDiscountAmount(applied.quote().discountAmount());
-            purchase.setPrice(applied.quote().payable());
+            purchase.setDiscountAmount(discountAmount);
+            purchase.setPrice(chargeAmount.subtract(discountAmount));
             purchaseRepository.save(purchase);
             purchaseLogService.log(
                     purchase.getId(),
                     user.getId(),
                     PurchaseLogAction.COUPON_APPLIED,
-                    applied.coupon().getCode() + " kuponu uygulandi. Indirim: " + applied.quote().discountAmount()
+                    applied.coupon().getCode() + " kuponu uygulandi. Indirim: " + discountAmount
             );
         }
 
@@ -189,7 +221,8 @@ public class PurchaseService {
                     appProperties,
                     paymentClientProperties,
                     conversationId,
-                    1
+                    1,
+                    moduleLines
             );
             log.info(
                     "PayTR iframe checkout selected. purchaseId={} provider={}",

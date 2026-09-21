@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model.dto;
 
+import com.ael.algoryqrservice.model.enums.ProductBillingType;
 import com.ael.algoryqrservice.model.enums.ProductType;
 import lombok.Builder;
 import lombok.Data;
@@ -22,6 +23,8 @@ public class ProductResponse {
     private BigDecimal vatRate;
     private boolean countable;
     private boolean consumable;
+    private boolean addonPurchasable;
+    private ProductBillingType billingType;
     private boolean active;
     private LocalDateTime createdAt;
 }

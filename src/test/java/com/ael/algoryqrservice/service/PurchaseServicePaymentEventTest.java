@@ -11,7 +11,11 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.PurchaseItem;
+import com.ael.algoryqrservice.model.dto.PurchaseModuleLineRequest;
+import com.ael.algoryqrservice.model.enums.ProductBillingType;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
@@ -52,6 +56,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
@@ -101,9 +106,24 @@ class PurchaseServicePaymentEventTest {
     private CouponRedemptionService couponRedemptionService;
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Mock
+    private CartPricingService cartPricingService;
+    @Mock
+    private com.ael.algoryqrservice.repository.PurchaseItemRepository purchaseItemRepository;
 
     @InjectMocks
     private PurchaseService purchaseService;
+
+    /** Modulsuz sepet: tahsil edilen tutar paket taban fiyatina esittir. */
+    private void stubCartPricing(BigDecimal basePrice) {
+        when(cartPricingService.price(any(), any(), any())).thenReturn(new CartPricingService.CartPricing(
+                basePrice,
+                BigDecimal.ZERO.setScale(2),
+                basePrice,
+                basePrice,
+                List.of()
+        ));
+    }
 
     private Purchase purchase;
     private PlanPackage planPackage;
@@ -533,6 +553,7 @@ class PurchaseServicePaymentEventTest {
         planPackage.setYearlyPrice(new BigDecimal("1000.00"));
         when(planPackageService.findActivePackage(30L)).thenReturn(planPackage);
         when(billingAddressService.resolveSnapshot(eq(20L), eq(1L), any())).thenReturn(null);
+        stubCartPricing(new BigDecimal("100.00"));
         when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
             Purchase saved = invocation.getArgument(0);
             if (saved.getId() == null) {
@@ -543,7 +564,7 @@ class PurchaseServicePaymentEventTest {
         when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conversation-10");
         when(paymentRequestMapper.toDebtCheckoutFormRequest(
                 any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
-                eq("conversation-10"), eq(1)
+                eq("conversation-10"), eq(1), anyList()
         )).thenReturn(PaymentCheckoutFormRequest.builder().build());
         when(paymentServiceClient.initializeCheckoutForm(eq(20L), any()))
                 .thenThrow(new PaymentServiceException("Checkout basarisiz"));
@@ -557,6 +578,119 @@ class PurchaseServicePaymentEventTest {
         assertThat(lastSaved.getStatus()).isEqualTo(PurchaseStatus.FAILED);
         assertThat(lastSaved.getPaymentConversationId()).isNull();
         verify(couponRedemptionService).release(any(Purchase.class));
+    }
+
+    @Test
+    void purchase_whenModulesInCart_thenChargeGrandTotalAndPersistLines() {
+        User user = User.builder().id(20L).firstName("A").email("a@test.com").build();
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPackageId(30L);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setBillingPeriod(BillingPeriod.MONTHLY);
+        request.setBillingAddressId(1L);
+        request.setModules(List.of(new PurchaseModuleLineRequest("QR_BRANCH", 2)));
+        planPackage.setPurchasable(true);
+        planPackage.setSystemManaged(false);
+        planPackage.setPrice(new BigDecimal("1000.00"));
+        planPackage.setYearlyPrice(new BigDecimal("10000.00"));
+
+        Product branch = Product.builder().id(11L).code("QR_BRANCH").name("Ek sube")
+                .unitPrice(new BigDecimal("500.00")).vatRate(new BigDecimal("20.00"))
+                .addonPurchasable(true).billingType(ProductBillingType.RECURRING).active(true).build();
+        CartPricingService.ModuleLine line = new CartPricingService.ModuleLine(
+                branch,
+                2,
+                new BigDecimal("500.00"),
+                new BigDecimal("20.00"),
+                new BigDecimal("1000.00"),
+                new BigDecimal("200.00"),
+                new BigDecimal("1200.00"),
+                ProductBillingType.RECURRING
+        );
+        when(cartPricingService.price(any(), any(), any())).thenReturn(new CartPricingService.CartPricing(
+                new BigDecimal("1000.00"),
+                new BigDecimal("1200.00"),
+                new BigDecimal("2200.00"),
+                new BigDecimal("2200.00"),
+                List.of(line)
+        ));
+        when(planPackageService.findActivePackage(30L)).thenReturn(planPackage);
+        when(billingAddressService.resolveSnapshot(eq(20L), eq(1L), any())).thenReturn(null);
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
+            Purchase saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(10L);
+            }
+            return saved;
+        });
+        when(purchaseItemRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conversation-10");
+        when(paymentRequestMapper.toDebtCheckoutFormRequest(
+                any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
+                eq("conversation-10"), eq(1), anyList()
+        )).thenReturn(PaymentCheckoutFormRequest.builder().build());
+        PaymentCheckoutFormResponse checkout = new PaymentCheckoutFormResponse();
+        checkout.setConversationId("conversation-10");
+        checkout.setToken("tok");
+        when(paymentServiceClient.initializeCheckoutForm(eq(20L), any())).thenReturn(checkout);
+
+        purchaseService.purchase(user, request, "127.0.0.1");
+
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseRepository, atLeastOnce()).save(purchaseCaptor.capture());
+        Purchase saved = purchaseCaptor.getAllValues().getFirst();
+        assertThat(saved.getPrice()).isEqualByComparingTo("2200.00");
+        assertThat(saved.getBasePrice()).isEqualByComparingTo("1000.00");
+        assertThat(saved.getModulesTotal()).isEqualByComparingTo("1200.00");
+        assertThat(saved.getRecurringPrice()).isEqualByComparingTo("2200.00");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<PurchaseItem>> itemCaptor = ArgumentCaptor.forClass(List.class);
+        verify(purchaseItemRepository).saveAll(itemCaptor.capture());
+        assertThat(itemCaptor.getValue()).singleElement().satisfies(item -> {
+            assertThat(item.getPurchaseId()).isEqualTo(10L);
+            assertThat(item.getProductCode()).isEqualTo("QR_BRANCH");
+            assertThat(item.getQuantity()).isEqualTo(2);
+            assertThat(item.getLineTotal()).isEqualByComparingTo("1200.00");
+            assertThat(item.getBillingType()).isEqualTo(ProductBillingType.RECURRING);
+        });
+    }
+
+    @Test
+    void purchase_whenNoModules_thenSkipsPurchaseItemWrite() {
+        User user = User.builder().id(20L).firstName("A").email("a@test.com").build();
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPackageId(30L);
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setBillingPeriod(BillingPeriod.MONTHLY);
+        request.setBillingAddressId(1L);
+        planPackage.setPurchasable(true);
+        planPackage.setSystemManaged(false);
+        planPackage.setPrice(new BigDecimal("100.00"));
+        planPackage.setYearlyPrice(new BigDecimal("1000.00"));
+        stubCartPricing(new BigDecimal("100.00"));
+        when(planPackageService.findActivePackage(30L)).thenReturn(planPackage);
+        when(billingAddressService.resolveSnapshot(eq(20L), eq(1L), any())).thenReturn(null);
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
+            Purchase saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(10L);
+            }
+            return saved;
+        });
+        when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conversation-10");
+        when(paymentRequestMapper.toDebtCheckoutFormRequest(
+                any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
+                eq("conversation-10"), eq(1), anyList()
+        )).thenReturn(PaymentCheckoutFormRequest.builder().build());
+        PaymentCheckoutFormResponse checkout = new PaymentCheckoutFormResponse();
+        checkout.setConversationId("conversation-10");
+        checkout.setToken("tok");
+        when(paymentServiceClient.initializeCheckoutForm(eq(20L), any())).thenReturn(checkout);
+
+        purchaseService.purchase(user, request, "127.0.0.1");
+
+        verify(purchaseItemRepository, never()).saveAll(any());
     }
 
     @Test
@@ -576,6 +710,7 @@ class PurchaseServicePaymentEventTest {
         CouponQuote quote = new CouponQuote(new BigDecimal("100.00"), new BigDecimal("10.00"), new BigDecimal("90.00"));
         when(planPackageService.findActivePackage(30L)).thenReturn(planPackage);
         when(billingAddressService.resolveSnapshot(eq(20L), eq(1L), any())).thenReturn(null);
+        stubCartPricing(new BigDecimal("100.00"));
         when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> {
             Purchase saved = invocation.getArgument(0);
             if (saved.getId() == null) {
@@ -588,7 +723,7 @@ class PurchaseServicePaymentEventTest {
         when(paymentRequestMapper.newPaymentAttemptId(anyLong())).thenReturn("conversation-10");
         when(paymentRequestMapper.toDebtCheckoutFormRequest(
                 any(), eq(user), eq(planPackage), eq("127.0.0.1"), eq(appProperties), eq(paymentClientProperties),
-                eq("conversation-10"), eq(1)
+                eq("conversation-10"), eq(1), anyList()
         )).thenReturn(PaymentCheckoutFormRequest.builder().build());
         PaymentCheckoutFormResponse checkout = new PaymentCheckoutFormResponse();
         checkout.setConversationId("conversation-10");
