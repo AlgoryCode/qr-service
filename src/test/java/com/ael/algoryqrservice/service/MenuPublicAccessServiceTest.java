@@ -5,8 +5,10 @@ import com.ael.algoryqrservice.access.PackageProductCatalog;
 import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +34,8 @@ class MenuPublicAccessServiceTest {
     private SessionAccessService sessionAccessService;
     @Mock
     private PackageProductCatalog packageProductCatalog;
+    @Mock
+    private FulfillmentDetailRepository fulfillmentDetailRepository;
     @Mock
     private MenuRepository menuRepository;
 
@@ -92,11 +96,34 @@ class MenuPublicAccessServiceTest {
         ));
         when(packageProductCatalog.containsProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.QR_MENU))
                 .thenReturn(false);
+        when(fulfillmentDetailRepository.existsActiveByScopeCode(
+                eq(7L), eq(CatalogScopes.QR_MENU_OWNER), any()
+        )).thenReturn(false);
 
         MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
 
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.reason()).isEqualTo(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
+    }
+
+    @Test
+    void evaluate_whenCatalogMissesQrMenuButFulfillmentHasIt_thenAllow() {
+        when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
+                AccessDecision.ALLOW,
+                CatalogPackages.ULTIMATE_TRIAL_PACKAGE,
+                LocalDateTime.now().plusDays(15),
+                null
+        ));
+        when(packageProductCatalog.containsProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.QR_MENU))
+                .thenReturn(false);
+        when(fulfillmentDetailRepository.existsActiveByScopeCode(
+                eq(7L), eq(CatalogScopes.QR_MENU_OWNER), any()
+        )).thenReturn(true);
+
+        MenuPublicAccessService.AccessDecision decision = service.evaluate(7L);
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(decision.reason()).isNull();
     }
 
     @Test

@@ -4,9 +4,12 @@ import com.ael.algoryqrservice.access.AccessSession;
 import com.ael.algoryqrservice.access.PackageProductCatalog;
 import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
+import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
+import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,7 @@ public class MenuPublicAccessService {
 
     private final SessionAccessService sessionAccessService;
     private final PackageProductCatalog packageProductCatalog;
+    private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final MenuRepository menuRepository;
 
     @Transactional
@@ -38,10 +42,21 @@ public class MenuPublicAccessService {
         if (!session.isAllow()) {
             return AccessDecision.deny(disabledReason(session.decision()));
         }
-        if (!packageProductCatalog.containsProduct(session.packageCode(), CatalogProducts.QR_MENU)) {
-            return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
+        if (hasQrMenu(userId, session.packageCode())) {
+            return AccessDecision.allow();
         }
-        return AccessDecision.allow();
+        return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
+    }
+
+    private boolean hasQrMenu(Long userId, String packageCode) {
+        if (packageProductCatalog.containsProduct(packageCode, CatalogProducts.QR_MENU)) {
+            return true;
+        }
+        return fulfillmentDetailRepository.existsActiveByScopeCode(
+                userId,
+                CatalogScopes.QR_MENU_OWNER,
+                AppTime.nowLocal()
+        );
     }
 
     @Transactional
