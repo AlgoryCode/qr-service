@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600&family=Inter:wght@400;700;800&family=Plus+Jakarta+Sans:wght@700&family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+
+  .elixir-menu {
+    --lx-bg: #10102e;
+    --lx-fg: #e2dfff;
+    --lx-card: #1c1c3b;
+    --lx-muted: #c7c5cc;
+    --lx-border: rgba(255, 255, 255, 0.12);
+    --lx-gold: #c0c1ff;
+    --lx-gold-soft: #3d3f93;
+    --lx-primary-fg: #232479;
+    --lx-destructive: #ffb4ab;
+    --lx-destructive-fg: #690005;
+    --menu-frame-bg: #0a0a28;
+    --menu-frame-border: rgba(255, 255, 255, 0.1);
+    --lx-gradient-gold: #c0c1ff;
+    --lx-chip: rgba(255, 255, 255, 0.06);
+    --lx-card-fg: var(--lx-fg);
+    --lx-card-muted: var(--lx-muted);
+    background-color: var(--lx-bg);
+    background-image:
+      radial-gradient(circle at top right, rgba(230, 230, 250, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at bottom left, rgba(230, 230, 250, 0.1) 0%, transparent 50%);
+    background-attachment: fixed;
+    color: var(--lx-fg);
+    font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .elixir-menu .font-display {
+    font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+
+  .elixir-menu .text-gradient-gold {
+    background-image: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    color: #c0c1ff;
+  }
+
+  .elixir-menu .bg-gradient-gold {
+    background-image: none;
+    background-color: #c0c1ff;
+  }
+
+  .elixir-menu .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .elixir-menu .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .elixir-menu .lx-bg { background-color: var(--lx-bg); }
+  .elixir-menu .lx-fg { color: var(--lx-fg); }
+  .elixir-menu .lx-muted { color: var(--lx-muted); }
+  .elixir-menu .lx-card-fg { color: var(--lx-card-fg); }
+  .elixir-menu .lx-card-muted { color: var(--lx-card-muted); }
+  .elixir-menu .lx-gold { color: var(--lx-gold); }
+  .elixir-menu .lx-gold-bg { background-color: var(--lx-gold); }
+  .elixir-menu .lx-card-bg { background-color: var(--lx-card); }
+  .elixir-menu .lx-border { border-color: var(--lx-border); }
+  .elixir-menu .lx-destructive { color: var(--lx-destructive); }
+
+  .elixir-menu .text-muted-foreground { color: var(--lx-muted); }
+  .elixir-menu .text-foreground { color: var(--lx-fg); }
+  .elixir-menu .text-destructive { color: var(--lx-destructive); }
+  .elixir-menu .bg-background { background-color: #1c1c3b; }
+  .elixir-menu .bg-card { background-color: #1c1c3b; }
+  .elixir-menu .bg-muted { background-color: #272746; }
+  .elixir-menu .bg-foreground { background-color: #c0c1ff; color: #232479; }
+  .elixir-menu .text-background { color: #232479; }
+  .elixir-menu .border-border { border-color: var(--lx-border); }
+
+  .elixir-menu input,
+  .elixir-menu textarea,
+  .elixir-menu select {
+    color: var(--lx-fg);
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: var(--lx-border);
+  }
+  .elixir-menu input::placeholder,
+  .elixir-menu textarea::placeholder {
+    color: color-mix(in srgb, var(--lx-muted) 70%, transparent);
+  }
+
+  .elixir-menu .menu-footer {
+    background-color: #0a0a28;
+  }
+
+  .elixir-menu header {
+    background-color: color-mix(in srgb, #10102e 18%, transparent);
+    backdrop-filter: blur(24px);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .elixir-menu nav[aria-label="Kategoriler"] button {
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #c7c5cc;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.5rem 1.5rem;
+  }
+  .elixir-menu nav[aria-label="Kategoriler"] button[aria-current="true"] {
+    background: #c0c1ff;
+    color: #232479;
+    border-color: transparent;
+    box-shadow: 0 0 15px rgba(230, 230, 250, 0.2);
+  }
+
+  .elixir-menu .elixir-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 2rem;
+    overflow: hidden;
+  }
+
+  .elixir-menu .elixir-sheet {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .elixir-menu .fixed.bottom-5 {
+    background: #c0c1ff;
+    color: #232479;
+    border-color: transparent;
+    box-shadow: 0 0 24px rgba(230, 230, 250, 0.18);
+  }
+
+  .elixir-menu .elixir-sheet button {
+    border-radius: 9999px;
+    box-shadow: 0 0 40px rgba(230, 230, 250, 0.1);
+  }

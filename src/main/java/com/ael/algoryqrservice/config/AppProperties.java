@@ -40,6 +40,7 @@ public class AppProperties {
         private boolean branchBackfill = true;
         private boolean waiterBranchBackfill = true;
         private boolean chefAvatars = false;
+        private boolean menuThemes = false;
         private boolean fulfillmentEntitlementBackfill = true;
         private MenuProductsSeed menuProducts = new MenuProductsSeed();
     }

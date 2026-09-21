@@ -1,0 +1,370 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@200;300;400&display=swap");
+
+  .maison-noir-menu {
+    --mn-bg: oklch(0.14 0.004 60);
+    --mn-fg: oklch(0.99 0.002 90);
+    --mn-surface: oklch(0.17 0.005 60);
+    --mn-muted: oklch(0.9 0.006 90);
+    --mn-subtle: oklch(0.78 0.01 88);
+    --mn-border: oklch(0.32 0.012 80 / 45%);
+    --mn-primary: oklch(0.78 0.09 84);
+    --mn-primary-fg: oklch(0.14 0.004 60);
+    --mn-gold: oklch(0.78 0.09 84);
+    --mn-gold-soft: oklch(0.88 0.06 88);
+    --mn-destructive: oklch(0.58 0.2 27);
+    --mn-font: "Jost", "Helvetica Neue", sans-serif;
+    --mn-display: "Cormorant Garamond", "Didot", Georgia, serif;
+    --mn-text-2xs: 0.625rem;
+    --mn-text-xs: 0.6875rem;
+    --mn-text-sm: 0.8125rem;
+    --mn-text-base: 0.875rem;
+    --mn-text-md: 0.9375rem;
+    --mn-text-lg: 1rem;
+    --mn-text-xl: 1.125rem;
+    --mn-leading-tight: 1.25;
+    --mn-leading-normal: 1.45;
+    --mn-leading-relaxed: 1.55;
+    --mn-tracking-eyebrow: 0.18em;
+    --mn-tracking-label: 0.1em;
+    --mn-tracking-brand: 0.14em;
+    --mn-veil: linear-gradient(
+      to top,
+      oklch(0.14 0.004 60) 6%,
+      oklch(0.14 0.004 60 / 0.75) 42%,
+      oklch(0.14 0.004 60 / 0.15) 100%
+    );
+    --mn-rule: linear-gradient(to right, transparent, var(--mn-gold) 50%, transparent);
+    --mn-shadow: 0 20px 48px -14px oklch(0 0 0 / 0.45);
+
+    --lx-bg: var(--mn-bg);
+    --lx-fg: var(--mn-fg);
+    --lx-card: var(--mn-surface);
+    --lx-card-fg: var(--mn-fg);
+    --lx-card-muted: oklch(0.99 0.002 90 / 0.82);
+    --lx-muted: var(--mn-muted);
+    --lx-border: var(--mn-border);
+    --lx-gold: var(--mn-gold);
+    --lx-gold-soft: var(--mn-gold-soft);
+    --lx-primary-fg: var(--mn-primary-fg);
+    --lx-destructive: var(--mn-destructive);
+    --lx-destructive-fg: var(--mn-fg);
+    --lx-gradient-gold: linear-gradient(135deg, var(--mn-gold), var(--mn-gold-soft));
+    --menu-frame-bg: var(--mn-bg);
+    --menu-frame-border: var(--mn-border);
+
+    background-color: var(--mn-bg);
+    color: var(--mn-fg);
+    font-family: var(--mn-font);
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .maison-noir-menu .font-display {
+    font-family: var(--mn-display);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+  }
+
+  .maison-noir-menu .mn-veil {
+    background-image: var(--mn-veil);
+  }
+
+  .maison-noir-menu .mn-hairline {
+    height: 1px;
+    background-image: var(--mn-rule);
+    opacity: 0.55;
+  }
+
+  .maison-noir-menu .mn-tracked {
+    letter-spacing: var(--mn-tracking-eyebrow);
+    text-transform: uppercase;
+  }
+
+  .maison-noir-menu .mn-type-eyebrow {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-2xs);
+    font-weight: 400;
+    letter-spacing: var(--mn-tracking-eyebrow);
+    text-transform: uppercase;
+    line-height: 1.3;
+  }
+
+  .maison-noir-menu .mn-type-label {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-xs);
+    font-weight: 400;
+    letter-spacing: var(--mn-tracking-label);
+    line-height: 1.35;
+  }
+
+  .maison-noir-menu .mn-type-body {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-sm);
+    font-weight: 300;
+    line-height: var(--mn-leading-relaxed);
+  }
+
+  .maison-noir-menu .mn-type-body-strong {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-base);
+    font-weight: 400;
+    line-height: var(--mn-leading-normal);
+  }
+
+  .maison-noir-menu .mn-type-category {
+    font-family: var(--mn-display);
+    font-size: var(--mn-text-lg);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: var(--mn-leading-tight);
+  }
+
+  .maison-noir-menu .mn-type-product {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-md);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: var(--mn-leading-tight);
+  }
+
+  .maison-noir-menu .mn-type-price {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-sm);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .maison-noir-menu .mn-type-page-title {
+    font-family: var(--mn-display);
+    font-size: clamp(1.375rem, 4.8vw, 1.625rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .maison-noir-menu .mn-type-brand {
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-2xs);
+    font-weight: 400;
+    letter-spacing: var(--mn-tracking-brand);
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+
+  .maison-noir-menu .mn-rise {
+    animation: mn-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes mn-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .maison-noir-menu .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .maison-noir-menu .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .menu-atmosphere {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .menu-atmosphere__image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 28%;
+    opacity: 0.34;
+    filter: saturate(0.82) contrast(1.08) brightness(0.72);
+    transform: scale(1.06);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .menu-atmosphere__image {
+      animation: mn-atmosphere-drift 28s ease-in-out infinite alternate;
+    }
+  }
+
+  @keyframes mn-atmosphere-drift {
+    from { transform: scale(1.06) translate3d(0, 0, 0); }
+    to { transform: scale(1.1) translate3d(0, -1.25%, 0); }
+  }
+
+  .menu-atmosphere__scrim {
+    position: absolute;
+    inset: 0;
+  }
+
+  .menu-atmosphere__scrim--immersive {
+    background:
+      linear-gradient(
+        to bottom,
+        oklch(0.14 0.004 60 / 0.94) 0%,
+        oklch(0.14 0.004 60 / 0.62) 22%,
+        oklch(0.14 0.004 60 / 0.48) 46%,
+        oklch(0.14 0.004 60 / 0.82) 72%,
+        oklch(0.14 0.004 60 / 0.98) 92%
+      ),
+      radial-gradient(
+        ellipse 90% 55% at 50% 8%,
+        oklch(0.78 0.09 84 / 0.11),
+        transparent 68%
+      );
+  }
+
+  .menu-atmosphere__scrim--editorial {
+    background: linear-gradient(
+      to bottom,
+      oklch(0.16 0.012 60 / 0.55) 0%,
+      oklch(0.14 0.004 60 / 0.88) 100%
+    );
+  }
+
+  .menu-atmosphere__vignette {
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 120px oklch(0 0 0 / 0.45);
+  }
+
+  .maison-noir-menu .mn-content-layer {
+    position: relative;
+    z-index: 1;
+  }
+
+  .maison-noir-menu .mn-glass-nav {
+    background: oklch(0.14 0.004 60 / 0.52);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-bottom-color: oklch(0.32 0.012 80 / 28%);
+  }
+
+  .maison-noir-menu .mn-section-panel {
+    border: 1px solid oklch(0.32 0.012 80 / 22%);
+    background: oklch(0.17 0.005 60 / 0.42);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .maison-noir-menu .mn-nav-drawer {
+    background: oklch(0.14 0.004 60 / 0.88);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+  }
+
+  @keyframes mn-ai-ring-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  @keyframes mn-ai-sparkle {
+    0%, 100% { opacity: 0.72; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.12); }
+  }
+
+  .maison-noir-menu .mn-ai-ask-btn {
+    position: relative;
+    display: inline-flex;
+    max-width: min(40vw, 6.25rem);
+    flex-shrink: 0;
+    padding: 1.5px;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: linear-gradient(
+      120deg,
+      #ff6b9d,
+      #ffc371,
+      #ffe259,
+      #43e97b,
+      #38f9d7,
+      #4facfe,
+      #a855f7,
+      #ff6b9d
+    );
+    background-size: 220% 220%;
+    animation: mn-ai-ring-shift 5s ease infinite;
+    box-shadow: 0 0 14px oklch(0.78 0.09 84 / 0.22);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .maison-noir-menu .mn-ai-ask-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 18px oklch(0.78 0.09 84 / 0.32);
+  }
+
+  .maison-noir-menu .mn-ai-ask-btn:active {
+    transform: translateY(0);
+  }
+
+  .maison-noir-menu .mn-ai-ask-btn__inner {
+    display: inline-flex;
+    min-width: 0;
+    width: 100%;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 9999px;
+    background: oklch(0.14 0.004 60 / 0.96);
+    padding: 0.32rem 0.62rem 0.32rem 0.48rem;
+    font-family: var(--mn-font);
+    font-size: var(--mn-text-xs);
+    font-weight: 400;
+    letter-spacing: var(--mn-tracking-label);
+    line-height: 1;
+    color: var(--mn-fg);
+  }
+
+  .maison-noir-menu .mn-ai-ask-btn__spark {
+    color: var(--mn-primary);
+    animation: mn-ai-sparkle 2.4s ease-in-out infinite;
+  }
+
+  .maison-noir-menu .mn-ai-ask-btn:focus-visible {
+    outline: 2px solid oklch(0.88 0.12 84 / 0.75);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .maison-noir-menu .mn-ai-ask-btn {
+      animation: none;
+      background-position: 50% 50%;
+    }
+    .maison-noir-menu .mn-ai-ask-btn__spark {
+      animation: none;
+    }
+  }
+
+  .maison-noir-menu .text-muted-foreground { color: var(--mn-muted); }
+  .maison-noir-menu .text-foreground { color: var(--mn-fg); }
+  .maison-noir-menu .text-destructive { color: var(--mn-destructive); }
+  .maison-noir-menu .bg-background { background-color: var(--mn-bg); }
+  .maison-noir-menu .bg-card { background-color: var(--mn-surface); }
+  .maison-noir-menu .bg-muted { background-color: oklch(0.22 0.006 70); }
+  .maison-noir-menu .bg-foreground { background-color: var(--mn-primary); color: var(--mn-primary-fg); }
+  .maison-noir-menu .text-background { color: var(--mn-primary-fg); }
+  .maison-noir-menu .border-border { border-color: var(--mn-border); }
+  .maison-noir-menu .text-gradient-gold {
+    background-image: var(--lx-gradient-gold);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .maison-noir-menu .bg-gradient-gold {
+    background-image: var(--lx-gradient-gold);
+  }

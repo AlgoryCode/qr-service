@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1500" viewBox="0 0 1200 1500" fill="none">
+  <rect width="1200" height="1500" fill="#E3E1DD"/>
+  <ellipse cx="600" cy="1296" rx="300" ry="22" fill="#1A1A1A" fill-opacity="0.07"/>
+  <rect x="470" y="1188" width="260" height="92" rx="4" fill="#F3F3F1"/>
+  <rect x="470" y="1188" width="260" height="8" fill="#D0CDC8"/>
+  <rect x="318" y="210" width="564" height="990" rx="8" fill="#B21833"/>
+  <rect x="318" y="210" width="564" height="990" rx="8" fill="#ffffff" fill-opacity="0.08"/>
+  <g transform="translate(458 430)" fill="#F7F7F5">
+    <rect width="26" height="26"/><rect x="34" width="26" height="26"/><rect x="68" width="26" height="26"/><rect x="136" width="26" height="26"/><rect x="170" width="26" height="26"/><rect x="204" width="26" height="26"/><rect x="238" width="26" height="26"/>
+    <rect y="34" width="26" height="26"/><rect x="238" y="34" width="26" height="26"/>
+    <rect y="68" width="26" height="26"/><rect x="68" y="68" width="26" height="26"/><rect x="102" y="68" width="26" height="26"/><rect x="170" y="68" width="26" height="26"/><rect x="238" y="68" width="26" height="26"/>
+    <rect y="102" width="26" height="26"/><rect x="34" y="102" width="26" height="26"/><rect x="136" y="102" width="26" height="26"/><rect x="204" y="102" width="26" height="26"/><rect x="238" y="102" width="26" height="26"/>
+    <rect y="136" width="26" height="26"/><rect x="68" y="136" width="26" height="26"/><rect x="170" y="136" width="26" height="26"/><rect x="238" y="136" width="26" height="26"/>
+    <rect y="170" width="26" height="26"/><rect x="34" y="170" width="26" height="26"/><rect x="102" y="170" width="26" height="26"/><rect x="136" y="170" width="26" height="26"/><rect x="238" y="170" width="26" height="26"/>
+    <rect y="204" width="26" height="26"/><rect x="68" y="204" width="26" height="26"/><rect x="204" y="204" width="26" height="26"/><rect x="238" y="204" width="26" height="26"/>
+    <rect y="238" width="26" height="26"/><rect x="34" y="238" width="26" height="26"/><rect x="68" y="238" width="26" height="26"/><rect x="136" y="238" width="26" height="26"/><rect x="170" y="238" width="26" height="26"/><rect x="204" y="238" width="26" height="26"/><rect x="238" y="238" width="26" height="26"/>
+  </g>
+  <text x="600" y="820" text-anchor="middle" fill="#F7F7F5" font-family="Inter, sans-serif" font-size="18" letter-spacing="7">SCAN TO OPEN MENU</text>
+</svg>
