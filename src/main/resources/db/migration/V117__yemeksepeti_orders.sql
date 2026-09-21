@@ -1,4 +1,4 @@
-CREATE TABLE yemeksepeti_connections (
+CREATE TABLE IF NOT EXISTS yemeksepeti_connections (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
     chain_id VARCHAR(128) NOT NULL,
@@ -14,16 +14,16 @@ CREATE TABLE yemeksepeti_connections (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX uk_yemeksepeti_connections_user
+CREATE UNIQUE INDEX IF NOT EXISTS uk_yemeksepeti_connections_user
     ON yemeksepeti_connections (user_id);
 
-CREATE INDEX idx_yemeksepeti_connections_vendor
+CREATE INDEX IF NOT EXISTS idx_yemeksepeti_connections_vendor
     ON yemeksepeti_connections (vendor_id);
 
-CREATE INDEX idx_yemeksepeti_connections_chain
+CREATE INDEX IF NOT EXISTS idx_yemeksepeti_connections_chain
     ON yemeksepeti_connections (chain_id);
 
-CREATE TABLE yemeksepeti_orders (
+CREATE TABLE IF NOT EXISTS yemeksepeti_orders (
     id BIGSERIAL PRIMARY KEY,
     connection_id BIGINT NOT NULL REFERENCES yemeksepeti_connections (id),
     external_order_id VARCHAR(128) NOT NULL,
@@ -41,11 +41,11 @@ CREATE TABLE yemeksepeti_orders (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX uk_yemeksepeti_orders_connection_external
+CREATE UNIQUE INDEX IF NOT EXISTS uk_yemeksepeti_orders_connection_external
     ON yemeksepeti_orders (connection_id, external_order_id);
 
-CREATE INDEX idx_yemeksepeti_orders_connection_status
+CREATE INDEX IF NOT EXISTS idx_yemeksepeti_orders_connection_status
     ON yemeksepeti_orders (connection_id, package_status);
 
-CREATE INDEX idx_yemeksepeti_orders_created
+CREATE INDEX IF NOT EXISTS idx_yemeksepeti_orders_created
     ON yemeksepeti_orders (package_created_at);

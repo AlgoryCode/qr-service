@@ -71,6 +71,12 @@ public interface UberEatsOrderRepository
             @Param("statuses") Collection<String> statuses
     );
 
+    List<UberEatsOrder> findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
+            Long connectionId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
     @Query("""
             SELECT o
             FROM UberEatsOrder o
@@ -78,12 +84,6 @@ public interface UberEatsOrderRepository
               AND LOWER(o.packageStatus) IN :statuses
             ORDER BY o.packageCreatedAt DESC
             """)
-    List<UberEatsOrder> findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
-            Long connectionId,
-            LocalDateTime from,
-            LocalDateTime to
-    );
-
     List<UberEatsOrder> findKitchenOrders(
             @Param("connectionId") Long connectionId,
             @Param("statuses") Collection<String> statuses
