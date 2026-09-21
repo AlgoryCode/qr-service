@@ -124,7 +124,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
             """)
     List<Long> findMenuIdsByUserIdAndChannel(@Param("userId") Long userId, @Param("channel") MenuChannel channel);
 
-    @Modifying(clearAutomatically = false, flushAutomatically = true)
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Menu menu
             set menu.publicAccessEnabled = :enabled,
