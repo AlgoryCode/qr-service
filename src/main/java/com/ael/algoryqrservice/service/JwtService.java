@@ -29,6 +29,7 @@ public class JwtService {
     public static final String PRINCIPAL_DASHBOARD = "DASHBOARD";
     public static final String PRINCIPAL_CUSTOMER = "CUSTOMER";
     public static final String PRINCIPAL_WAITER = "WAITER";
+    public static final String PRINCIPAL_DEMO = "DEMO";
 
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ACCESS_TOKEN_TYPE = "access";
@@ -126,6 +127,30 @@ public class JwtService {
                 .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_CUSTOMER)
                 .claim(ROLES_CLAIM, List.of("ROLE_CUSTOMER"))
                 .claim(PROVIDER_CLAIM, resolveProvider(provider))
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateDemoAccessToken(
+            String email,
+            UUID sessionId,
+            Long userId,
+            UserAccessProfile accessProfile
+    ) {
+        Date now = new Date();
+        return Jwts.builder()
+                .id(sessionId.toString())
+                .subject(email)
+                .claim("userId", userId)
+                .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_DEMO)
+                .claim(ROLES_CLAIM, List.of("ROLE_USER"))
+                .claim(PROVIDER_CLAIM, AuthProvider.BASIC.name())
+                .claim("activePackage", accessProfile.activePackage())
+                .claim("products", accessProfile.products())
+                .claim("scopes", accessProfile.scopes())
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))

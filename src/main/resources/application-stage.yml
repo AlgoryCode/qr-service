@@ -82,3 +82,10 @@ google:
     frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
     handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}
     android-client-id: ${GOOGLE_ANDROID_CLIENT_ID:}
+
+fulfillment:
+  external:
+    enabled: ${FULFILLMENT_EXTERNAL_ENABLED:true}
+    base-url: ${FULFILLMENT_SERVICE_URL:http://qr-fulfillment-service:8080}
+    auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
+    auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}

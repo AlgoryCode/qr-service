@@ -25,7 +25,6 @@ spring:
 app:
   url: http://localhost:3000
   seed:
-    branch-backfill: false
     package-catalog: false
 
 ubereats:

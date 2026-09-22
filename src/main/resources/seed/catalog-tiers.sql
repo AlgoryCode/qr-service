@@ -36,9 +36,9 @@ INSERT INTO tbl_product (code, name, description, active, scope_code, consumable
 SELECT 'WAITER_PANEL', 'Garson Paneli', 'Garson siparis ve adisyon modulu erisimi', TRUE, 'WAITER_PANEL_OWNER', FALSE, 149.00, 20.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'WAITER_PANEL');
 
-INSERT INTO tbl_product (code, name, description, active, scope_code, consumable, unit_price, vat_rate, created_at, updated_at)
-SELECT 'AI_MENU_IMPORT', 'AI Menu Import', 'Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma', TRUE, 'AI_MENU_IMPORT_OWNER', FALSE, 0.00, 20.00, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'AI_MENU_IMPORT');
+INSERT INTO tbl_product (code, name, description, active, scope_code, type_id, feature_code, consumable, unit_price, vat_rate, created_at, updated_at)
+SELECT 'ONLINE_ORDER', 'Online Siparis', 'Gizli adresli paket servis magazasi, siparis paneli ve kurye yonetimi', TRUE, 'ONLINE_ORDER_OWNER', 'PACKAGE_PRODUCT', 'ONLINE_ORDER', FALSE, 179.00, 20.00, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'ONLINE_ORDER');
 
 INSERT INTO tbl_product (
     code, name, description, active, scope_code, type_id, feature_code,
@@ -81,6 +81,10 @@ UPDATE tbl_product SET name = 'Garson Paneli', description = 'Garson siparis ve 
 UPDATE tbl_product SET name = 'AI Menu Import', description = 'Menu fotografından yapay zeka ile urun cikarma ve taslak olusturma',
     scope_code = 'AI_MENU_IMPORT_OWNER', unit_price = 0.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW()
 WHERE code = 'AI_MENU_IMPORT';
+UPDATE tbl_product SET name = 'Online Siparis', description = 'Gizli adresli paket servis magazasi, siparis paneli ve kurye yonetimi',
+    scope_code = 'ONLINE_ORDER_OWNER', type_id = 'PACKAGE_PRODUCT', feature_code = 'ONLINE_ORDER',
+    unit_price = 179.00, vat_rate = 20.00, active = TRUE, consumable = FALSE, updated_at = NOW()
+WHERE code = 'ONLINE_ORDER';
 
 UPDATE tbl_product SET
     name = 'Ek Akilli Rapor',
@@ -183,6 +187,8 @@ INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'WAITER_PANEL' WHERE p.code = 'ULTIMATE_PACKAGE';
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'AI_MENU_IMPORT' WHERE p.code = 'ULTIMATE_PACKAGE';
+INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
+SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'ONLINE_ORDER' WHERE p.code = 'ULTIMATE_PACKAGE';
 
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
 SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'QR_CREATE' WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE';
@@ -208,6 +214,12 @@ AND NOT EXISTS (
     SELECT 1 FROM tbl_plan_package_item i
     WHERE i.package_id = p.id AND i.product_id = pr.id
 );
+INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)
+SELECT p.id, pr.id, 1, TRUE FROM tbl_plan_package p JOIN tbl_product pr ON pr.code = 'ONLINE_ORDER' WHERE p.code = 'ULTIMATE_TRIAL_PACKAGE'
+AND NOT EXISTS (
+    SELECT 1 FROM tbl_plan_package_item i
+    WHERE i.package_id = p.id AND i.product_id = pr.id
+);
 
 INSERT INTO tbl_plan_package_addon (package_id, product_id, active, created_at)
 SELECT p.id, pr.id, TRUE, NOW()
@@ -218,3 +230,5 @@ AND NOT EXISTS (
     SELECT 1 FROM tbl_plan_package_addon a
     WHERE a.package_id = p.id AND a.product_id = pr.id
 );
+
+UPDATE tbl_product SET addon_purchasable = TRUE, updated_at = NOW() WHERE active = TRUE;

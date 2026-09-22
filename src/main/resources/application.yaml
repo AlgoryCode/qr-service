@@ -96,6 +96,10 @@ app:
     rate-limit-enabled: ${AUTH_GATEWAY_RATE_LIMIT_ENABLED:true}
     login-max-failures: ${AUTH_GATEWAY_LOGIN_MAX_FAILURES:10}
     login-failure-window-minutes: ${AUTH_GATEWAY_LOGIN_FAILURE_WINDOW_MINUTES:15}
+  demo:
+    enabled: ${DEMO_ACCOUNT_ENABLED:false}
+    email: ${DEMO_ACCOUNT_EMAIL:}
+    password: ${DEMO_ACCOUNT_PASSWORD:}
   storage:
     filer-url: ${STORAGE_FILER_URL:http://localhost:8888}
     s3-endpoint: ${STORAGE_S3_ENDPOINT:}
@@ -117,9 +121,6 @@ app:
   seed:
     taxonomy: ${APP_SEED_TAXONOMY_ENABLED:false}
     package-catalog: ${APP_SEED_PACKAGE_CATALOG_ENABLED:false}
-    public-access-backfill: ${APP_SEED_PUBLIC_ACCESS_BACKFILL_ENABLED:false}
-    branch-backfill: ${APP_SEED_BRANCH_BACKFILL_ENABLED:true}
-    fulfillment-entitlement-backfill: ${APP_SEED_FULFILLMENT_ENTITLEMENT_BACKFILL_ENABLED:true}
     chef-avatars: ${APP_SEED_CHEF_AVATARS_ENABLED:false}
     menu-themes: ${APP_SEED_MENU_THEMES_ENABLED:false}
     menu-products:
@@ -236,3 +237,10 @@ google:
     frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
     handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}
     android-client-id: ${GOOGLE_ANDROID_CLIENT_ID:}
+
+fulfillment:
+  external:
+    enabled: ${FULFILLMENT_EXTERNAL_ENABLED:false}
+    base-url: ${FULFILLMENT_SERVICE_URL:http://localhost:8086}
+    auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
+    auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}

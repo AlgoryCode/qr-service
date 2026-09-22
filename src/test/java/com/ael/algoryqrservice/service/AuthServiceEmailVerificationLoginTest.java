@@ -55,6 +55,8 @@ class AuthServiceEmailVerificationLoginTest {
     UserAccessProfileService userAccessProfileService;
     @Mock
     EmailVerificationService emailVerificationService;
+    @Mock
+    com.ael.algoryqrservice.demo.DemoAuthService demoAuthService;
 
     LoginAttemptGuard loginAttemptGuard;
 
@@ -63,6 +65,7 @@ class AuthServiceEmailVerificationLoginTest {
     @BeforeEach
     void setUp() {
         loginAttemptGuard = new LoginAttemptGuard(LOGIN_MAX_FAILURES, 15);
+        when(demoAuthService.loginIfDemo(any(), any())).thenReturn(Optional.empty());
         authService = new AuthService(
                 userRepository,
                 dashboardUserRepository,
@@ -74,7 +77,8 @@ class AuthServiceEmailVerificationLoginTest {
                 packageActivationService,
                 userAccessProfileService,
                 emailVerificationService,
-                loginAttemptGuard
+                loginAttemptGuard,
+                demoAuthService
         );
     }
 

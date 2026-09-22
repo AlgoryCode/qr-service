@@ -42,6 +42,10 @@ class PackageCatalogServiceTest {
                         && CatalogScopes.QR_MENU_OWNER.equals(product.getScopeCode())
         ));
         verify(productRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.argThat(product ->
+                CatalogProducts.ONLINE_ORDER.equals(product.getCode())
+                        && CatalogScopes.ONLINE_ORDER_OWNER.equals(product.getScopeCode())
+        ));
+        verify(productRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.argThat(product ->
                 CatalogProducts.QR_BRANCH.equals(product.getCode())
         ));
     }

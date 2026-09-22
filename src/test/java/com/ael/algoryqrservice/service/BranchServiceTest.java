@@ -11,7 +11,6 @@ import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -112,38 +111,6 @@ class BranchServiceTest {
 
         assertThat(branch.isKitchenEnabled()).isTrue();
         assertThat(response.isKitchenEnabled()).isTrue();
-    }
-
-    @Test
-    void backfillMissingBranches_whenMenuHasNoBranch_thenCreatesGrandfatheredBranch() {
-        Menu menu = Menu.builder()
-                .menuId(4L)
-                .userId(7L)
-                .businessName("Cafe Ada")
-                .logoUrl("https://cdn/logo.png")
-                .logoKey("menus/4/logo/a.png")
-                .phone("0216")
-                .address("Ada")
-                .active(true)
-                .build();
-        when(menuRepository.findAll()).thenReturn(List.of(menu));
-        when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> {
-            Branch branch = invocation.getArgument(0);
-            branch.setId(22L);
-            return branch;
-        });
-
-        int created = branchService.backfillMissingBranches();
-
-        assertThat(created).isEqualTo(1);
-        ArgumentCaptor<Menu> menuCaptor = ArgumentCaptor.forClass(Menu.class);
-        verify(menuRepository).save(menuCaptor.capture());
-        assertThat(menuCaptor.getValue().getBranchId()).isEqualTo(22L);
-        ArgumentCaptor<Branch> branchCaptor = ArgumentCaptor.forClass(Branch.class);
-        verify(branchRepository).save(branchCaptor.capture());
-        assertThat(branchCaptor.getValue().getName()).isEqualTo("Cafe Ada");
-        assertThat(branchCaptor.getValue().isGrandfathered()).isTrue();
-        assertThat(branchCaptor.getValue().getPhotoUrl()).isEqualTo("https://cdn/logo.png");
     }
 
     @Test

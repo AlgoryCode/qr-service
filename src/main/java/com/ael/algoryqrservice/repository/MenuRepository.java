@@ -108,14 +108,6 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     List<Menu> findByBranchIdAndChannelAndDeletedFalse(Long branchId, MenuChannel channel);
 
     @Query("""
-            select distinct menu.userId
-            from Menu menu
-            where menu.deleted = false
-              and menu.channel = :channel
-            """)
-    List<Long> findDistinctUserIdsByChannel(@Param("channel") MenuChannel channel);
-
-    @Query("""
             select menu.menuId
             from Menu menu
             where menu.userId = :userId

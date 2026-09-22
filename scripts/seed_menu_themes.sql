@@ -48,5 +48,6 @@ VALUES
     ('modern-bistro', 'Modern Bistro', 'Modern bistro teması', '{"swatch":"#15803D"}'::jsonb, 110, TRUE),
     ('clever-dish-scribe', 'Clever Dish Scribe', 'Akıllı şef yazı teması', '{"swatch":"#0369A1"}'::jsonb, 120, TRUE),
     ('maison-noir', 'Maison Noir', 'Siyah maison lüks tema', '{"swatch":"#0A0A0A"}'::jsonb, 130, TRUE),
-    ('kahve-sokagi', 'Kahve Sokağı', 'Kahve / kafe teması', '{"swatch":"#78350F"}'::jsonb, 140, TRUE)
+    ('kahve-sokagi', 'Kahve Sokağı', 'Kahve / kafe teması', '{"swatch":"#78350F"}'::jsonb, 140, TRUE),
+    ('lilas-doux', 'Lilas Doux', 'Beyaz, yumuşak eflatun menü teması', '{"swatch":"#E0117A"}'::jsonb, 150, TRUE)
 ON CONFLICT (code) DO NOTHING;

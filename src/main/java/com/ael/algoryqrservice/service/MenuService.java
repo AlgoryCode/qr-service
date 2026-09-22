@@ -759,6 +759,9 @@ public class MenuService {
         if (request.getLogoUrl() != null) {
             applyLogoUrl(menu, request.getLogoUrl());
         }
+        if (request.getCoverUrl() != null) {
+            applyCoverUrl(menu, request.getCoverUrl());
+        }
         if (request.getPhone() != null) menu.setPhone(trimToNull(request.getPhone()));
         if (request.getEmail() != null) menu.setEmail(trimToNull(request.getEmail()));
         if (request.getAddress() != null) menu.setAddress(trimToNull(request.getAddress()));
@@ -798,6 +801,33 @@ public class MenuService {
         menu.setLogoKey(uploaded.objectKey());
         menuRepository.save(menu);
         if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(uploaded.objectKey())) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+        return toMenuProfile(menu, buildPublicUrl(menu), null);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProfileResponse uploadCover(Long menuId, MultipartFile file) {
+        Menu menu = ensureOwnedMenu(menuId);
+        ProductImageDtos.UploadResponse uploaded = productImageStorageService.uploadCover(menuId, file);
+        String previousKey = menu.getCoverKey();
+        menu.setCoverUrl(uploaded.imageUrl());
+        menu.setCoverKey(uploaded.objectKey());
+        menuRepository.save(menu);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(uploaded.objectKey())) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+        return toMenuProfile(menu, buildPublicUrl(menu), null);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProfileResponse clearCover(Long menuId) {
+        Menu menu = ensureOwnedMenu(menuId);
+        String previousKey = menu.getCoverKey();
+        menu.setCoverUrl(null);
+        menu.setCoverKey(null);
+        menuRepository.save(menu);
+        if (previousKey != null && !previousKey.isBlank()) {
             productImageStorageService.deleteQuietly(previousKey);
         }
         return toMenuProfile(menu, buildPublicUrl(menu), null);
@@ -1108,6 +1138,7 @@ public class MenuService {
                 .chefAvatarKey(menu.getChefAvatarKey())
                 .chefAvatarUrl(chefAvatarService.resolveImageUrl(menu.getChefAvatarKey()))
                 .logoUrl(menu.getLogoUrl())
+                .coverUrl(menu.getCoverUrl())
                 .phone(branch != null && branch.getPhone() != null ? branch.getPhone() : menu.getPhone())
                 .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
                 .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
@@ -1338,6 +1369,7 @@ public class MenuService {
                 .chefAvatarKey(menu.getChefAvatarKey())
                 .chefAvatarUrl(chefAvatarService.resolveImageUrl(menu.getChefAvatarKey()))
                 .logoUrl(menu.getLogoUrl())
+                .coverUrl(menu.getCoverUrl())
                 .phone(branch != null && branch.getPhone() != null ? branch.getPhone() : menu.getPhone())
                 .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
                 .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
@@ -1369,6 +1401,30 @@ public class MenuService {
         String previousKey = menu.getLogoKey();
         menu.setLogoUrl(normalized);
         menu.setLogoKey(objectKey);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(objectKey)) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+    }
+
+    private void applyCoverUrl(Menu menu, String coverUrl) {
+        String normalized = trimToNull(coverUrl);
+        if (normalized == null) {
+            String previousKey = menu.getCoverKey();
+            menu.setCoverUrl(null);
+            menu.setCoverKey(null);
+            if (previousKey != null && !previousKey.isBlank()) {
+                productImageStorageService.deleteQuietly(previousKey);
+            }
+            return;
+        }
+        productImageStorageService.validateImageUrl(normalized);
+        String objectKey = productImageStorageService.extractObjectKey(normalized);
+        if (objectKey == null || !objectKey.startsWith("menus/" + menu.getMenuId() + "/cover/")) {
+            throw new BadRequestException("Geçersiz kapak URL");
+        }
+        String previousKey = menu.getCoverKey();
+        menu.setCoverUrl(normalized);
+        menu.setCoverKey(objectKey);
         if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(objectKey)) {
             productImageStorageService.deleteQuietly(previousKey);
         }

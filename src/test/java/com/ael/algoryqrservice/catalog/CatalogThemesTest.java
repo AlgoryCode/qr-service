@@ -23,7 +23,8 @@ class CatalogThemesTest {
             "modern-bistro",
             "clever-dish-scribe",
             "maison-noir",
-            "kahve-sokagi"
+            "kahve-sokagi",
+            "lilas-doux"
     })
     void isCustomTheme_whenPresetTheme_thenFalse(String themeId) {
         assertThat(CatalogThemes.isCustomTheme(themeId)).isFalse();

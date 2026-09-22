@@ -236,11 +236,11 @@ public class PaymentRequestMapper {
                 .build();
     }
 
-    public PaymentCheckoutFormRequest toAddonCheckoutFormRequest(
+    public PaymentCheckoutFormRequest toAddonCartCheckoutFormRequest(
             Purchase purchase,
             User user,
-            String productCode,
-            String productName,
+            List<PaymentThreeDsRequest.BasketItemPayload> basketItems,
+            String primaryProductCode,
             String clientIp,
             AppProperties appProperties,
             PaymentClientProperties paymentClientProperties,
@@ -251,12 +251,15 @@ public class PaymentRequestMapper {
         if (purchase.getBillingSnapshot() == null) {
             throw new BadRequestException("Fatura bilgisi bulunamadı; önce fatura adresi tanımlayın");
         }
+        if (basketItems == null || basketItems.isEmpty()) {
+            throw new BadRequestException("Sepet kalemi bulunamadı");
+        }
         BigDecimal chargeAmount = purchase.getPrice();
         Map<String, Object> sourceMetadata = new HashMap<>();
         sourceMetadata.put("userId", user.getId());
         sourceMetadata.put("packageId", purchase.getPackageId());
         sourceMetadata.put("packageCode", purchase.getPackageCode());
-        sourceMetadata.put("productCode", productCode);
+        sourceMetadata.put("productCode", primaryProductCode);
         sourceMetadata.put("purchaseConversationId", conversationId);
         sourceMetadata.put("purchaseId", purchase.getId());
         sourceMetadata.put("installmentNumber", 1);
@@ -285,15 +288,41 @@ public class PaymentRequestMapper {
                 .buyer(toBuyer(user, purchase.getBillingSnapshot(), clientIp))
                 .shippingAddress(toAddress(purchase.getBillingSnapshot()))
                 .billingAddress(toAddress(purchase.getBillingSnapshot()))
-                .basketItems(List.of(PaymentThreeDsRequest.BasketItemPayload.builder()
+                .basketItems(List.copyOf(basketItems))
+                .build();
+    }
+
+    public PaymentCheckoutFormRequest toAddonCheckoutFormRequest(
+            Purchase purchase,
+            User user,
+            String productCode,
+            String productName,
+            String clientIp,
+            AppProperties appProperties,
+            PaymentClientProperties paymentClientProperties,
+            String conversationId,
+            LocalDateTime periodStart,
+            LocalDateTime periodEnd
+    ) {
+        return toAddonCartCheckoutFormRequest(
+                purchase,
+                user,
+                List.of(PaymentThreeDsRequest.BasketItemPayload.builder()
                         .id(productCode)
                         .name(productName)
                         .category1("Digital")
                         .category2("Product")
                         .itemType("VIRTUAL")
-                        .price(chargeAmount)
-                        .build()))
-                .build();
+                        .price(purchase.getPrice())
+                        .build()),
+                productCode,
+                clientIp,
+                appProperties,
+                paymentClientProperties,
+                conversationId,
+                periodStart,
+                periodEnd
+        );
     }
 
     public PaymentCardVerificationRequest toCardVerificationRequest(

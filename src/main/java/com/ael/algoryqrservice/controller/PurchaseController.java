@@ -48,6 +48,17 @@ public class PurchaseController {
         );
     }
 
+    @PostMapping("/addons/cart")
+    public ResponseEntity<PurchaseInitiateResponse> purchaseAddonCart(
+            @Valid @RequestBody AddonCartPurchaseRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        String clientIp = resolveClientIp(httpServletRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                addonPurchaseService.purchaseCart(securityUtils.getCurrentUser(), request, clientIp)
+        );
+    }
+
     @GetMapping("/my")
     public ResponseEntity<List<PurchaseResponse>> getMyPurchases() {
         Long userId = securityUtils.getCurrentUser().getId();

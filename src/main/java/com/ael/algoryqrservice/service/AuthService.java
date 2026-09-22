@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.demo.DemoAccess;
+import com.ael.algoryqrservice.demo.DemoAuthService;
 import com.ael.algoryqrservice.exception.AuthErrorCodes;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
@@ -45,6 +47,7 @@ public class AuthService {
     private final UserAccessProfileService userAccessProfileService;
     private final EmailVerificationService emailVerificationService;
     private final LoginAttemptGuard loginAttemptGuard;
+    private final DemoAuthService demoAuthService;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request, ClientInfo clientInfo) {
@@ -90,8 +93,12 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional
     public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
+        return demoAuthService.loginIfDemo(request, clientInfo)
+                .orElseGet(() -> loginPersisted(request, clientInfo));
+    }
+
+    private AuthResponse loginPersisted(LoginRequest request, ClientInfo clientInfo) {
         User user = authenticate(request);
         requireEmailVerified(user);
         packageActivationService.ensureSubscriptionState(user.getId());
@@ -150,11 +157,14 @@ public class AuthService {
     }
 
     public AuthResponse refresh(RefreshTokenRequest request) {
-        return sessionService.refresh(request.getRefreshToken());
+        return demoAuthService.refreshIfDemo(request.getRefreshToken())
+                .orElseGet(() -> sessionService.refresh(request.getRefreshToken()));
     }
 
-    @Transactional
     public void logout(LogoutRequest request, String accessToken) {
+        if (demoAuthService.logoutIfDemo(accessToken, request)) {
+            return;
+        }
         if (accessToken != null && !accessToken.isBlank()) {
             var revoked = jwtService.extractSessionIdIfSignatureValid(accessToken)
                     .map(sessionId -> {
@@ -176,6 +186,12 @@ public class AuthService {
     }
 
     public SessionPageResponse getMySessions(String accessToken, int page, int size) {
+        if (demoAuthService.isCurrentDemo()) {
+            UUID currentSessionId = accessToken == null || accessToken.isBlank()
+                    ? null
+                    : jwtService.extractSessionIdIfSignatureValid(accessToken).orElse(null);
+            return demoAuthService.listCurrentSessions(currentSessionId);
+        }
         User user = getCurrentUser();
         UUID currentSessionId = accessToken == null || accessToken.isBlank()
                 ? null
@@ -185,12 +201,19 @@ public class AuthService {
 
     @Transactional
     public UserAccessProfile getAccessProfile() {
+        if (demoAuthService.isCurrentDemo()) {
+            return DemoAccess.profile();
+        }
         User user = getCurrentUser();
         return userAccessProfileService.resolve(user.getId());
     }
 
     @Transactional
     public void revokeSession(UUID sessionId) {
+        if (demoAuthService.isCurrentDemo()) {
+            demoAuthService.revokeSession(sessionId);
+            return;
+        }
         User user = getCurrentUser();
         sessionService.revokeSession(sessionId, user.getId());
     }

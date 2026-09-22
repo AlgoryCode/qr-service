@@ -181,6 +181,19 @@ class ProductAccessGatewayFilterTest {
     }
 
     @Test
+    void doFilter_whenDemoPrincipal_thenContinueWithoutPurchaseLookup() throws Exception {
+        authenticatePrincipal(7L, JwtService.PRINCIPAL_DEMO);
+        FilterChain chain = mock(FilterChain.class);
+        MockHttpServletRequest servletRequest = request("/features/QR_MENU/qrs");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(servletRequest, response, chain);
+
+        verify(chain).doFilter(servletRequest, response);
+        verify(sessionAccessService, never()).resolve(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void doFilter_whenBlankProductCode_thenForbidden() throws Exception {
         authenticateOwner(7L);
         FilterChain chain = mock(FilterChain.class);

@@ -31,7 +31,8 @@ public class OnboardingPackageCatalog {
             "Akilli asistan",
             "Akilli ozet",
             "Ozel tasarim menu",
-            "AI ile menu fotografından urun ekleme"
+            "AI ile menu fotografından urun ekleme",
+            "Online siparis magazasi"
     );
     private static final List<ItemSpec> DEFAULT_ITEMS = List.of(
             new ItemSpec(CatalogProducts.QR_CREATE, 1, true),
@@ -43,7 +44,8 @@ public class OnboardingPackageCatalog {
             new ItemSpec(CatalogProducts.SMART_SUMMARY, 1, true),
             new ItemSpec(CatalogProducts.CUSTOM_DESIGN, 1, true),
             new ItemSpec(CatalogProducts.WAITER_PANEL, 1, true),
-            new ItemSpec(CatalogProducts.AI_MENU_IMPORT, 1, true)
+            new ItemSpec(CatalogProducts.AI_MENU_IMPORT, 1, true),
+            new ItemSpec(CatalogProducts.ONLINE_ORDER, 1, true)
     );
 
     private final PlanPackageRepository planPackageRepository;

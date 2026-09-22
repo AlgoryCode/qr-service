@@ -18,6 +18,9 @@
 | `PAYMENT_EVENTS_EXCHANGE` | `payment.events` | Topic exchange name |
 | `PAYMENT_EVENTS_QUEUE` | `qr-service.payment.events` | Payment event consumer queue |
 | `PAYMENT_EVENTS_ROUTING_KEY` | `qr-service.payment.events` | Binding routing key |
+| `FULFILLMENT_EXTERNAL_ENABLED` | `true` (stage) / `false` (prod) | Stage'te qr-fulfillment-service client açılır |
+| `FULFILLMENT_SERVICE_URL` | `http://qr-fulfillment-service:8080` | Stage fulfillment HTTP base URL |
+| `FULFILLMENT_SERVICE_AUTH_TOKEN` | (shared service token) | X-Service-Token değeri |
 | `SMART_REPORT_QUEUE` | `smart_report.generate` | Outbound queue for AI report generation |
 | `SMART_REPORT_EVENTS_EXCHANGE` | `smart_report.events` | Topic exchange for AI status events |
 | `SMART_REPORT_EVENTS_QUEUE` | `qr-service.smart_report.events` | Inbound smart report status queue |
@@ -112,6 +115,7 @@ See [`docs/product-image-upload.md`](docs/product-image-upload.md) for API and f
 - iyzico calls payment-service via public URL only
 - payment-service publishes to `payment.events` with routing key `{serviceName}.payment.events`
 - qr-service binds `qr-service.payment.events` and branches on `eventType`
+- **Stage only:** `qr-fulfillment-service` also binds its own queue to routing key `qr-service.payment.events` (fan-out mirror). Prod'da bu servis yok.
 - Wire contract (JSON body + required headers): [`docs/payment-events-contract.md`](docs/payment-events-contract.md)
 - Failed payment events → `qr-service.payment.events.dlq`; after consumer fix, republish DLQ or reconcile purchase (e.g. purchase `46`)
 - qr-service publishes smart report jobs to `smart_report.generate`; AI consumes
