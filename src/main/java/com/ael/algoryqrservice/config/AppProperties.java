@@ -52,7 +52,7 @@ public class AppProperties {
     @Setter
     public static class FulfillmentSettings {
         private FulfillmentGateMode gateMode = FulfillmentGateMode.FULFILLMENT_ONLY;
-        private boolean repairJobEnabled = true;
+        private boolean repairJobEnabled = false;
         private int repairJobBatchSize = 100;
     }
 }
