@@ -38,7 +38,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
 
 management:
   endpoints:
