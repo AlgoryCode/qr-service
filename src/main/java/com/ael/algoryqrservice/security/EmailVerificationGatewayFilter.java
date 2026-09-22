@@ -64,7 +64,7 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
     }
 
     static boolean isAllowed(String requestUri) {
-        if (requestUri == null || requestUri.isBlank()) {
+        if (requestUri == null || requestUri.isBlank() || "/".equals(requestUri)) {
             return true;
         }
         return ALLOWED_PREFIXES.stream().anyMatch(requestUri::startsWith);

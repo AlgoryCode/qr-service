@@ -85,7 +85,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/menu/allergens").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu/chef-avatars").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/healthcheck").permitAll()
+                        .requestMatchers("/", "/healthcheck").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/packages/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/products/**").permitAll()
