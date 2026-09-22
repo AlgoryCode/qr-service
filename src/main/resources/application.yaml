@@ -56,7 +56,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: ${DDL_AUTO:validate}
-    show-sql: true
+    show-sql: ${JPA_SHOW_SQL:false}
 
 management:
   endpoints:
