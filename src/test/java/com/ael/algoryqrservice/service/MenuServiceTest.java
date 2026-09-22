@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.model.dto.ProductImageDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.model.enums.MenuChannel;
@@ -37,6 +38,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -708,5 +710,61 @@ class MenuServiceTest {
                 .build()))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("allergen");
+    }
+
+    @Test
+    void uploadCover_whenOwnedMenu_thenStoreCoverAndReturnProfile() {
+        Menu menu = Menu.builder()
+                .menuId(10L)
+                .qrId(2L)
+                .publicId("pub-test")
+                .userId(7L)
+                .themeId("lilas-doux")
+                .businessName("IYB")
+                .active(true)
+                .build();
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+        when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(appProperties.getUrl()).thenReturn("https://example.com");
+        when(productImageStorageService.uploadCover(eq(10L), any()))
+                .thenReturn(new ProductImageDtos.UploadResponse(
+                        "https://cdn/menus/10/cover/a.png",
+                        "menus/10/cover/a.png"));
+        when(chefAvatarService.resolveDisplayName(any())).thenReturn("Sef");
+        when(chefAvatarService.resolveImageUrl(any())).thenReturn("https://cdn/chef.png");
+
+        MenuDtos.MenuProfileResponse response = menuService.uploadCover(
+                10L,
+                org.mockito.Mockito.mock(MultipartFile.class)
+        );
+
+        assertThat(response.getCoverUrl()).isEqualTo("https://cdn/menus/10/cover/a.png");
+        assertThat(menu.getCoverKey()).isEqualTo("menus/10/cover/a.png");
+    }
+
+    @Test
+    void clearCover_whenCoverExists_thenRemoveAndDeleteObject() {
+        Menu menu = Menu.builder()
+                .menuId(10L)
+                .qrId(2L)
+                .publicId("pub-test")
+                .userId(7L)
+                .themeId("lilas-doux")
+                .businessName("IYB")
+                .coverUrl("https://cdn/menus/10/cover/a.png")
+                .coverKey("menus/10/cover/a.png")
+                .active(true)
+                .build();
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+        when(menuRepository.save(any(Menu.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(appProperties.getUrl()).thenReturn("https://example.com");
+        when(chefAvatarService.resolveDisplayName(any())).thenReturn("Sef");
+        when(chefAvatarService.resolveImageUrl(any())).thenReturn("https://cdn/chef.png");
+
+        MenuDtos.MenuProfileResponse response = menuService.clearCover(10L);
+
+        assertThat(response.getCoverUrl()).isNull();
+        assertThat(menu.getCoverKey()).isNull();
+        verify(productImageStorageService).deleteQuietly("menus/10/cover/a.png");
     }
 }

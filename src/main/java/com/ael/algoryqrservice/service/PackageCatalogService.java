@@ -38,11 +38,13 @@ public class PackageCatalogService {
         ensureProduct(CatalogProducts.QR_MENU,        "QR Menu",            CatalogScopes.QR_MENU_OWNER,        true,  ProductType.PACKAGE_PRODUCT, CatalogProducts.QR_MENU,        true,  true);
         ensureProduct(CatalogProducts.QR_BRANCH,      "Ek Sube",            CatalogScopes.QR_BRANCH_OWNER,      true,  ProductType.PACKAGE_PRODUCT, CatalogProducts.QR_BRANCH,      true,  false);
         ensureProduct(CatalogProducts.MENU_PRODUCT,   "Menu Urun Hakki",    CatalogScopes.MENU_PRODUCT_OWNER,   true,  ProductType.PACKAGE_PRODUCT, CatalogProducts.MENU_PRODUCT,   true,  true);
-        ensureProduct(CatalogProducts.SMART_ASSISTANT,"Akilli Asistan",     CatalogScopes.SMART_ASSISTANT_OWNER,false, ProductType.PACKAGE_PRODUCT, CatalogProducts.SMART_ASSISTANT,false, false);
-        ensureProduct(CatalogProducts.SMART_SUMMARY,  "Akilli Ozet",        CatalogScopes.SMART_SUMMARY_OWNER,  false, ProductType.PACKAGE_PRODUCT, CatalogProducts.SMART_SUMMARY,  false, false);
-        ensureProduct(CatalogProducts.SMART_REPORTING,"Akilli Raporlama",   CatalogScopes.SMART_REPORTING_OWNER,false, ProductType.PACKAGE_PRODUCT, CatalogProducts.SMART_REPORTING,false, false);
-        ensureProduct(CatalogProducts.CUSTOM_DESIGN,  "Ozel Tasarim Menu",  CatalogScopes.CUSTOM_DESIGN_OWNER,  false, ProductType.PACKAGE_PRODUCT, CatalogProducts.CUSTOM_DESIGN,  false, false);
-        ensureProduct(CatalogProducts.WAITER_PANEL,   "Garson Paneli",      CatalogScopes.WAITER_PANEL_OWNER,   false, ProductType.PACKAGE_PRODUCT, CatalogProducts.WAITER_PANEL,   false, false);
+        ensureProduct(CatalogProducts.SMART_ASSISTANT,"Akilli Asistan",     CatalogScopes.SMART_ASSISTANT_OWNER,false, ProductType.PACKAGE_PRODUCT, CatalogProducts.SMART_ASSISTANT,true, false);
+        ensureProduct(CatalogProducts.SMART_SUMMARY,  "Akilli Ozet",        CatalogScopes.SMART_SUMMARY_OWNER,  false, ProductType.PACKAGE_PRODUCT, CatalogProducts.SMART_SUMMARY,  true, false);
+        ensureProduct(CatalogProducts.SMART_REPORTING,"Akilli Raporlama",   CatalogScopes.SMART_REPORTING_OWNER,false, ProductType.PACKAGE_PRODUCT, CatalogProducts.SMART_REPORTING,true, false);
+        ensureProduct(CatalogProducts.CUSTOM_DESIGN,  "Ozel Tasarim Menu",  CatalogScopes.CUSTOM_DESIGN_OWNER,  false, ProductType.PACKAGE_PRODUCT, CatalogProducts.CUSTOM_DESIGN,  true, false);
+        ensureProduct(CatalogProducts.WAITER_PANEL,   "Garson Paneli",      CatalogScopes.WAITER_PANEL_OWNER,   false, ProductType.PACKAGE_PRODUCT, CatalogProducts.WAITER_PANEL,   true, false);
+        ensureProduct(CatalogProducts.AI_MENU_IMPORT, "AI Menu Import",     CatalogScopes.AI_MENU_IMPORT_OWNER, false, ProductType.PACKAGE_PRODUCT, CatalogProducts.AI_MENU_IMPORT, true, false);
+        ensureProduct(CatalogProducts.ONLINE_ORDER,   "Online Siparis",     CatalogScopes.ONLINE_ORDER_OWNER,   false, ProductType.PACKAGE_PRODUCT, CatalogProducts.ONLINE_ORDER,   true, false);
         ensureProduct(CatalogProducts.QR_MENU_ADDON,  "Ek Dijital Menu",    CatalogScopes.QR_MENU_OWNER,        true,  ProductType.ADDON_PRODUCT,   CatalogProducts.QR_MENU,        true,  false);
         ensureProduct(CatalogProducts.QR_BRANCH_ADDON,"Ek Sube Hakki",      CatalogScopes.QR_BRANCH_OWNER,      true,  ProductType.ADDON_PRODUCT,   CatalogProducts.QR_BRANCH,      true,  false);
         ensureProduct(CatalogProducts.SMART_REPORTING_ADDON, "Ek Akilli Rapor", CatalogScopes.SMART_REPORTING_OWNER, true, ProductType.ADDON_PRODUCT, CatalogProducts.SMART_REPORTING, true, false);
@@ -73,8 +75,11 @@ public class PackageCatalogService {
                 "Haftalik akilli raporlama",
                 "Akilli asistan",
                 "Akilli ozet",
-                "Ozel tasarim menu"
+                "Ozel tasarim menu",
+                "Online siparis magazasi"
         ));
+        ensurePackageProduct(CatalogPackages.ULTIMATE_PACKAGE, CatalogProducts.ONLINE_ORDER, true);
+        ensurePackageProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.ONLINE_ORDER, true);
         syncPackageAddons(CatalogPackages.ULTIMATE_TRIAL_PACKAGE);
     }
 
@@ -183,6 +188,31 @@ public class PackageCatalogService {
         product.setAddonPurchasable(addonPurchasable);
         product.setRequiresCountSync(requiresCountSync);
         return productRepository.save(product);
+    }
+
+    private void ensurePackageProduct(String packageCode, String productCode, boolean unlimited) {
+        PlanPackage planPackage = planPackageRepository.findByCode(packageCode)
+                .flatMap(existing -> planPackageRepository.findByIdWithItems(existing.getId()))
+                .orElse(null);
+        if (planPackage == null) {
+            return;
+        }
+        Product product = productRepository.findByCode(productCode).orElse(null);
+        if (product == null) {
+            return;
+        }
+        boolean alreadyPresent = planPackage.getItems().stream()
+                .anyMatch(item -> item.getProduct() != null && item.getProduct().getId().equals(product.getId()));
+        if (alreadyPresent) {
+            return;
+        }
+        planPackage.getItems().add(PlanPackageItem.builder()
+                .planPackage(planPackage)
+                .product(product)
+                .quantity(1)
+                .unlimited(unlimited)
+                .build());
+        planPackageRepository.save(planPackage);
     }
 
     public void ensurePackageAddon(PlanPackage planPackage, String addonProductCode) {

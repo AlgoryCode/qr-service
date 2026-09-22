@@ -26,7 +26,8 @@ public final class CatalogThemes {
             "modern-bistro",
             "clever-dish-scribe",
             "maison-noir",
-            "kahve-sokagi"
+            "kahve-sokagi",
+            "lilas-doux"
     );
 
     /** Yapay zeka ile üretilen özel temalar bu önek ile gelir. */

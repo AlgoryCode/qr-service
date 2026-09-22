@@ -63,6 +63,12 @@ public class Menu extends QrBaseModel {
     @Column(name = "logo_key", length = 255)
     private String logoKey;
 
+    @Column(name = "cover_url", length = 1024)
+    private String coverUrl;
+
+    @Column(name = "cover_key", length = 255)
+    private String coverKey;
+
     private String phone;
     private String email;
     private String address;

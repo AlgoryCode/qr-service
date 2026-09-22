@@ -388,6 +388,7 @@ public final class MenuDtos {
         private String chefAvatarKey;
         private String chefAvatarUrl;
         private String logoUrl;
+        private String coverUrl;
         private String phone;
         private String email;
         private String address;
@@ -413,6 +414,7 @@ public final class MenuDtos {
         private String chefAvatarKey;
         private String chefAvatarUrl;
         private String logoUrl;
+        private String coverUrl;
         private String phone;
         private String email;
         private String address;
@@ -510,6 +512,8 @@ public final class MenuDtos {
         private String chefAvatarKey;
         @Size(max = 1024)
         private String logoUrl;
+        @Size(max = 1024)
+        private String coverUrl;
         private String phone;
         private String email;
         private String address;

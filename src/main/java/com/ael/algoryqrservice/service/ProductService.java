@@ -46,6 +46,7 @@ public class ProductService {
                 .unitPrice(request.resolvedUnitPrice())
                 .vatRate(request.resolvedVatRate())
                 .consumable(request.resolvedCountable())
+                .addonPurchasable(true)
                 .active(request.resolvedActive())
                 .build();
 

@@ -15,6 +15,7 @@ import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.repository.ProductRepository;
+import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +48,8 @@ class AddonPurchaseServiceTest {
     private ProductRepository productRepository;
     @Mock
     private PurchaseRepository purchaseRepository;
+    @Mock
+    private PurchaseItemRepository purchaseItemRepository;
     @Mock
     private PurchaseLogService purchaseLogService;
     @Mock
@@ -94,6 +97,18 @@ class AddonPurchaseServiceTest {
                 .active(true)
                 .addonPurchasable(false)
                 .build();
+        Purchase host = Purchase.builder()
+                .id(3L)
+                .userId(9L)
+                .packageId(22L)
+                .packageCode("PRO_PACKAGE")
+                .purchaseType(PurchaseType.PAID)
+                .status(PurchaseStatus.ACTIVE)
+                .billingPeriod(BillingPeriod.MONTHLY)
+                .startsAt(LocalDateTime.of(2026, 8, 1, 0, 0))
+                .expiresAt(LocalDateTime.of(2027, 8, 24, 0, 0))
+                .build();
+        when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
         when(productRepository.findByCode(CatalogProducts.SMART_ASSISTANT)).thenReturn(Optional.of(product));
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
@@ -106,17 +121,6 @@ class AddonPurchaseServiceTest {
         AddonPurchaseRequest request = new AddonPurchaseRequest();
         request.setProductCode(CatalogProducts.QR_MENU);
         request.setBillingAddressId(1L);
-        Product product = Product.builder()
-                .id(2L)
-                .code(CatalogProducts.QR_MENU)
-                .name("QR Menu")
-                .unitPrice(new BigDecimal("29.00"))
-                .vatRate(new BigDecimal("20.00"))
-                .consumable(true)
-                .addonPurchasable(true)
-                .active(true)
-                .build();
-        when(productRepository.findByCode(CatalogProducts.QR_MENU)).thenReturn(Optional.of(product));
         when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
@@ -129,16 +133,6 @@ class AddonPurchaseServiceTest {
         AddonPurchaseRequest request = new AddonPurchaseRequest();
         request.setProductCode(CatalogProducts.QR_MENU);
         request.setBillingAddressId(1L);
-        Product product = Product.builder()
-                .id(2L)
-                .code(CatalogProducts.QR_MENU)
-                .name("QR Menu")
-                .unitPrice(new BigDecimal("29.00"))
-                .vatRate(new BigDecimal("20.00"))
-                .consumable(true)
-                .addonPurchasable(true)
-                .active(true)
-                .build();
         Purchase addon = Purchase.builder()
                 .id(5L)
                 .userId(9L)
@@ -149,7 +143,6 @@ class AddonPurchaseServiceTest {
                 .startsAt(LocalDateTime.of(2026, 8, 1, 0, 0))
                 .expiresAt(LocalDateTime.of(2027, 8, 24, 0, 0))
                 .build();
-        when(productRepository.findByCode(CatalogProducts.QR_MENU)).thenReturn(Optional.of(product));
         when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(addon));
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
@@ -222,11 +215,11 @@ class AddonPurchaseServiceTest {
             return purchase;
         });
         when(appProperties.getServiceName()).thenReturn("qr-service");
-        when(paymentRequestMapper.toAddonCheckoutFormRequest(
+        when(paymentRequestMapper.toAddonCartCheckoutFormRequest(
                 any(Purchase.class),
                 any(User.class),
+                any(),
                 eq(CatalogProducts.QR_MENU),
-                eq("QR Menu"),
                 eq("127.0.0.1"),
                 eq(appProperties),
                 eq(paymentClientProperties),
@@ -246,6 +239,7 @@ class AddonPurchaseServiceTest {
         assertThat(saved.getPurchaseType()).isEqualTo(PurchaseType.ADD_ON);
         assertThat(response.getPurchaseId()).isEqualTo(340L);
         assertThat(response.getPaymentPageUrl()).isEqualTo("https://paytr.com/pay");
+        verify(purchaseItemRepository, atLeastOnce()).save(any());
     }
 
     private User user() {

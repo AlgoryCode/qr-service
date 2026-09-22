@@ -58,6 +58,10 @@ public class ProductAccessGatewayFilter extends OncePerRequestFilter {
         }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (isDemo(authentication)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)
@@ -80,6 +84,12 @@ public class ProductAccessGatewayFilter extends OncePerRequestFilter {
             return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    private static boolean isDemo(Authentication authentication) {
+        return authentication != null
+                && authentication.getDetails() instanceof JwtAccessPrincipal principal
+                && principal.isDemo();
     }
 
     static String productCodeFrom(String requestUri) {

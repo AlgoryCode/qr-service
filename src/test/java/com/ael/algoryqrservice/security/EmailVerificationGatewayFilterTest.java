@@ -103,6 +103,19 @@ class EmailVerificationGatewayFilterTest {
         verify(gate, never()).isVerificationPending(any());
     }
 
+    @Test
+    void doFilter_whenDemoPrincipal_thenContinueWithoutGateLookup() throws Exception {
+        authenticatePrincipal(7L, JwtService.PRINCIPAL_DEMO);
+        FilterChain chain = mock(FilterChain.class);
+        MockHttpServletRequest servletRequest = request("/menus");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(servletRequest, response, chain);
+
+        verify(chain).doFilter(servletRequest, response);
+        verify(gate, never()).isVerificationPending(any());
+    }
+
     private static MockHttpServletRequest request(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
         request.setRequestURI(uri);

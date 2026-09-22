@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.security;
 
+import com.ael.algoryqrservice.demo.DemoRequestFilter;
 import com.ael.algoryqrservice.print.security.PrintDeviceAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -41,6 +42,7 @@ public class SecurityConfig {
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
     private final AuthRateLimitGatewayFilter authRateLimitGatewayFilter;
+    private final DemoRequestFilter demoRequestFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -67,6 +69,7 @@ public class SecurityConfig {
                                 "/auth/email-verification/resend",
                                 "/auth/email-verification/verify"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/demo-account").permitAll()
                         .requestMatchers("/customer/auth/**").permitAll()
                         .requestMatchers("/waiter/auth/login", "/waiter/auth/refresh", "/waiter/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.POST, "/admin/auth/sessions").permitAll()
@@ -114,10 +117,20 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(authRateLimitGatewayFilter, JwtAuthenticationFilter.class)
-                .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
-                .addFilterAfter(emailVerificationGatewayFilter, JwtAuthenticationFilter.class);
+                .addFilterAfter(demoRequestFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(productAccessGatewayFilter, DemoRequestFilter.class)
+                .addFilterAfter(emailVerificationGatewayFilter, ProductAccessGatewayFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<DemoRequestFilter> demoRequestFilterRegistration(
+            DemoRequestFilter filter
+    ) {
+        FilterRegistrationBean<DemoRequestFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
