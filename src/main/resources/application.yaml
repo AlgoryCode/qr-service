@@ -112,6 +112,7 @@ app:
     category-max-depth: ${MENU_CATEGORY_MAX_DEPTH:10}
   fulfillment:
     gate-mode: ${APP_FULFILLMENT_GATE_MODE:FULFILLMENT_ONLY}
+    repair-job-enabled: ${APP_FULFILLMENT_REPAIR_JOB_ENABLED:false}
   chef-avatars:
     items:
       - key: default
