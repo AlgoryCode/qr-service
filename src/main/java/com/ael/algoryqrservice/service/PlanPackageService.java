@@ -3,15 +3,18 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.catalog.CatalogCodeFactory;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.PlanPackageAddon;
 import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemRequest;
 import com.ael.algoryqrservice.model.dto.PlanPackageItemResponse;
+import com.ael.algoryqrservice.model.dto.PlanPackageModuleResponse;
 import com.ael.algoryqrservice.model.dto.PlanPackageRequest;
 import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
 import com.ael.algoryqrservice.model.dto.PublishPackageRequest;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.repository.PlanPackageAddonRepository;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ import java.util.stream.Collectors;
 public class PlanPackageService {
 
     private final PlanPackageRepository planPackageRepository;
+    private final PlanPackageAddonRepository planPackageAddonRepository;
     private final PurchaseRepository purchaseRepository;
     private final ProductService productService;
     private final CatalogCodeFactory catalogCodeFactory;
@@ -78,14 +82,12 @@ public class PlanPackageService {
 
     @Transactional(readOnly = true)
     public List<PlanPackageResponse> getAll() {
-        return planPackageRepository.findAll().stream().map(this::toResponse).toList();
+        return toResponses(planPackageRepository.findAll());
     }
 
     @Transactional(readOnly = true)
     public List<PlanPackageResponse> getActivePackages() {
-        return planPackageRepository.findByActiveTrueOrderByPriceAsc().stream()
-                .map(this::toResponse)
-                .toList();
+        return toResponses(planPackageRepository.findByActiveTrueOrderByPriceAsc());
     }
 
     @Transactional(readOnly = true)
@@ -368,7 +370,48 @@ public class PlanPackageService {
         return normalized;
     }
 
+    /** Batches the add-on lookup so listing packages stays a single extra query. */
+    private List<PlanPackageResponse> toResponses(List<PlanPackage> packages) {
+        if (packages.isEmpty()) {
+            return List.of();
+        }
+        List<Long> packageIds = packages.stream().map(PlanPackage::getId).toList();
+        Map<Long, List<PlanPackageModuleResponse>> modulesByPackageId =
+                planPackageAddonRepository.findActiveByPackageIdIn(packageIds).stream()
+                        .collect(Collectors.groupingBy(
+                                addon -> addon.getPlanPackage().getId(),
+                                Collectors.mapping(this::toModuleResponse, Collectors.toList())
+                        ));
+        return packages.stream()
+                .map(pkg -> toResponse(pkg, modulesByPackageId.getOrDefault(pkg.getId(), List.of())))
+                .toList();
+    }
+
     private PlanPackageResponse toResponse(PlanPackage planPackage) {
+        List<PlanPackageModuleResponse> modules = planPackage.getId() == null
+                ? List.of()
+                : planPackageAddonRepository.findActiveByPackageId(planPackage.getId()).stream()
+                        .map(this::toModuleResponse)
+                        .toList();
+        return toResponse(planPackage, modules);
+    }
+
+    private PlanPackageModuleResponse toModuleResponse(PlanPackageAddon addon) {
+        Product product = addon.getProduct();
+        return PlanPackageModuleResponse.builder()
+                .productId(product.getId())
+                .productCode(product.getCode())
+                .productName(product.getName())
+                .description(product.getDescription())
+                .featureCode(product.getFeatureCode())
+                .unitPrice(product.getUnitPrice())
+                .vatRate(product.getVatRate())
+                .billingType(product.getBillingType())
+                .consumable(product.isConsumable())
+                .build();
+    }
+
+    private PlanPackageResponse toResponse(PlanPackage planPackage, List<PlanPackageModuleResponse> availableModules) {
         PackagePricingService.PriceBreakdown breakdown = packagePricingService.calculate(planPackage.getItems());
         Map<Long, PackagePricingService.LinePrice> lineByProductId = breakdown.lines().stream()
                 .collect(Collectors.toMap(PackagePricingService.LinePrice::productId, Function.identity(), (a, b) -> a));
@@ -403,6 +446,7 @@ public class PlanPackageService {
                 .items(planPackage.getItems().stream()
                         .map(item -> toItemResponse(item, lineByProductId.get(item.getProduct().getId())))
                         .toList())
+                .availableModules(availableModules)
                 .createdAt(planPackage.getCreatedAt())
                 .build();
     }

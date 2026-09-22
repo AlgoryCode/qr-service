@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1500" viewBox="0 0 1200 1500" fill="none">
+  <rect width="1200" height="1500" fill="#FFF4EA"/>
+  <line x1="80" y1="0" x2="80" y2="1500" stroke="#F3DCC6"/>
+  <line x1="1120" y1="0" x2="1120" y2="1500" stroke="#F3DCC6"/>
+  <rect x="80" y="0" width="6" height="1500" fill="#FF4F0F"/>
+  <rect x="360" y="260" width="480" height="780" fill="#FF4F0F"/>
+  <g transform="translate(468 380)" fill="#FFF4EA">
+    <rect width="24" height="24"/><rect x="32" width="24" height="24"/><rect x="64" width="24" height="24"/><rect x="128" width="24" height="24"/><rect x="160" width="24" height="24"/><rect x="192" width="24" height="24"/><rect x="224" width="24" height="24"/>
+    <rect y="32" width="24" height="24"/><rect x="224" y="32" width="24" height="24"/>
+    <rect y="64" width="24" height="24"/><rect x="64" y="64" width="24" height="24"/><rect x="96" y="64" width="24" height="24"/><rect x="160" y="64" width="24" height="24"/><rect x="224" y="64" width="24" height="24"/>
+    <rect y="96" width="24" height="24"/><rect x="32" y="96" width="24" height="24"/><rect x="128" y="96" width="24" height="24"/><rect x="192" y="96" width="24" height="24"/><rect x="224" y="96" width="24" height="24"/>
+    <rect y="128" width="24" height="24"/><rect x="64" y="128" width="24" height="24"/><rect x="160" y="128" width="24" height="24"/><rect x="224" y="128" width="24" height="24"/>
+    <rect y="160" width="24" height="24"/><rect x="32" y="160" width="24" height="24"/><rect x="96" y="160" width="24" height="24"/><rect x="128" y="160" width="24" height="24"/><rect x="224" y="160" width="24" height="24"/>
+    <rect y="192" width="24" height="24"/><rect x="64" y="192" width="24" height="24"/><rect x="192" y="192" width="24" height="24"/><rect x="224" y="192" width="24" height="24"/>
+    <rect y="224" width="24" height="24"/><rect x="32" y="224" width="24" height="24"/><rect x="64" y="224" width="24" height="24"/><rect x="128" y="224" width="24" height="24"/><rect x="160" y="224" width="24" height="24"/><rect x="192" y="224" width="24" height="24"/><rect x="224" y="224" width="24" height="24"/>
+  </g>
+  <text x="600" y="740" text-anchor="middle" fill="#FFF4EA" font-family="Inter, sans-serif" font-size="18" letter-spacing="7">BIGARADE</text>
+  <text x="600" y="780" text-anchor="middle" fill="#FFF4EA" font-family="Inter, sans-serif" font-size="12" letter-spacing="5">SCAN TO ORDER</text>
+</svg>

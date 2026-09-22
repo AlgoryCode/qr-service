@@ -1,0 +1,167 @@
+@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600&family=Inter:wght@400;700;800&family=Plus+Jakarta+Sans:wght@700&family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+  @import url("https://fonts.googleapis.com/css2?family=Epilogue:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+  .kahve-sokagi-menu {
+    --lx-bg: #fbf9f5;
+    --lx-fg: #1b1c1a;
+    --lx-card: #ffffff;
+    --lx-card-fg: #1b1c1a;
+    --lx-card-muted: #50443e;
+    --lx-muted: #50443e;
+    --lx-border: rgba(212, 195, 187, 0.55);
+    --lx-gold: #a23f00;
+    --lx-gold-soft: #fc7127;
+    --lx-primary-fg: #ffffff;
+    --lx-destructive: #ba1a1a;
+    --lx-destructive-fg: #ffffff;
+    --menu-frame-bg: #fbf9f5;
+    --menu-frame-border: rgba(212, 195, 187, 0.55);
+    --lx-gradient-gold: linear-gradient(135deg, #a23f00, #fc7127);
+    --lx-chip: #efeeea;
+    --ks-primary: #311908;
+    --ks-primary-deep: #251307;
+    --ks-secondary: #a23f00;
+    --ks-secondary-container: #fc7127;
+    --ks-amber: #fcd34d;
+    --ks-surface: #fbf9f5;
+    --ks-surface-low: #f5f3ef;
+    --ks-surface-high: #eae8e4;
+    --ks-card-radius: 1rem;
+    --ks-shadow: 0 8px 24px rgba(49, 25, 8, 0.08);
+    --ks-hero-shadow: 0 12px 32px rgba(49, 25, 8, 0.28);
+    background-color: var(--lx-bg);
+    color: var(--lx-fg);
+    font-family: "Plus Jakarta Sans", Manrope, ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .kahve-sokagi-menu .font-display {
+    font-family: Epilogue, Manrope, ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+  }
+
+  .kahve-sokagi-menu .text-gradient-gold {
+    color: var(--lx-gold);
+    background-image: none;
+  }
+
+  .kahve-sokagi-menu .bg-gradient-gold { background-image: var(--lx-gradient-gold); }
+  .kahve-sokagi-menu .lx-bg { background-color: var(--lx-bg); }
+  .kahve-sokagi-menu .lx-fg { color: var(--lx-fg); }
+  .kahve-sokagi-menu .lx-muted { color: var(--lx-muted); }
+  .kahve-sokagi-menu .lx-card-fg { color: var(--lx-card-fg); }
+  .kahve-sokagi-menu .lx-card-muted { color: var(--lx-card-muted); }
+  .kahve-sokagi-menu .lx-gold { color: var(--lx-gold); }
+  .kahve-sokagi-menu .lx-gold-bg { background-color: var(--lx-gold); }
+  .kahve-sokagi-menu .lx-card-bg { background-color: var(--lx-card); }
+  .kahve-sokagi-menu .lx-border { border-color: var(--lx-border); }
+  .kahve-sokagi-menu .lx-destructive { color: var(--lx-destructive); }
+  .kahve-sokagi-menu .text-muted-foreground { color: var(--lx-muted); }
+  .kahve-sokagi-menu .text-foreground { color: var(--lx-fg); }
+  .kahve-sokagi-menu .text-destructive { color: var(--lx-destructive); }
+  .kahve-sokagi-menu .bg-background, .kahve-sokagi-menu .bg-card { background-color: var(--lx-card); }
+  .kahve-sokagi-menu .bg-muted { background-color: var(--ks-surface-low); }
+  .kahve-sokagi-menu .bg-foreground { background-color: var(--ks-primary); color: var(--lx-primary-fg); }
+  .kahve-sokagi-menu .text-background { color: var(--lx-primary-fg); }
+  .kahve-sokagi-menu .border-border { border-color: var(--lx-border); }
+  .kahve-sokagi-menu .menu-footer { background-color: var(--ks-surface-low); }
+
+  .kahve-sokagi-menu .ks-soft-card {
+    border-radius: var(--ks-card-radius);
+    background-color: var(--lx-card);
+    border: 1px solid var(--lx-border);
+    box-shadow: var(--ks-shadow);
+  }
+
+  .kahve-sokagi-menu .ks-scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .kahve-sokagi-menu .ks-scrollbar-none::-webkit-scrollbar { display: none; }
+
+  .kahve-sokagi-menu input, .kahve-sokagi-menu textarea, .kahve-sokagi-menu select {
+    color: var(--lx-fg);
+    background-color: var(--lx-card);
+    border-color: var(--lx-border);
+  }
+  .kahve-sokagi-menu input::placeholder, .kahve-sokagi-menu textarea::placeholder { color: var(--lx-muted); }
+
+  @keyframes ks-ai-shimmer {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+  @keyframes ks-ai-dot {
+    0%, 100% { opacity: 0.45; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.35); }
+  }
+  @keyframes ks-ai-spark {
+    0%, 100% { opacity: 0.75; transform: rotate(0deg) scale(1); }
+    50% { opacity: 1; transform: rotate(8deg) scale(1.08); }
+  }
+
+  .kahve-sokagi-menu .ks-ai-ask-btn {
+    position: relative;
+    display: inline-flex;
+    max-width: 100%;
+    border: 0;
+    padding: 1.5px;
+    border-radius: 9999px;
+    background-image: linear-gradient(110deg, #fc7127, #fcd34d, #a23f00, #fc7127);
+    background-size: 220% 100%;
+    animation: ks-ai-shimmer 3.2s linear infinite;
+    box-shadow: 0 4px 14px rgba(162, 63, 0, 0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(162, 63, 0, 0.24);
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn:active {
+    transform: scale(0.97);
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn:disabled {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn__shell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 9999px;
+    background: #311908;
+    padding: 0.4rem 0.65rem 0.4rem 0.5rem;
+    color: #fff;
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn__dot {
+    width: 0.35rem;
+    height: 0.35rem;
+    border-radius: 9999px;
+    background: #4ade80;
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+    animation: ks-ai-dot 1.8s ease-in-out infinite;
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn__spark {
+    width: 0.8rem;
+    height: 0.8rem;
+    color: #fcd34d;
+    flex-shrink: 0;
+    animation: ks-ai-spark 2.4s ease-in-out infinite;
+  }
+  .kahve-sokagi-menu .ks-ai-ask-btn__label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    white-space: nowrap;
+    color: #fff;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kahve-sokagi-menu .ks-ai-ask-btn,
+    .kahve-sokagi-menu .ks-ai-ask-btn__dot,
+    .kahve-sokagi-menu .ks-ai-ask-btn__spark {
+      animation: none;
+    }
+  }

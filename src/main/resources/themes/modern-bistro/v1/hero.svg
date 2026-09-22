@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1500" viewBox="0 0 1200 1500" fill="none">
+  <rect width="1200" height="1500" fill="#FAFAFA"/>
+  <rect x="420" y="180" width="360" height="720" rx="36" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+  <rect x="452" y="240" width="296" height="28" rx="14" fill="#111111"/>
+  <rect x="452" y="292" width="72" height="28" rx="14" fill="#111111"/>
+  <rect x="532" y="292" width="88" height="28" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="628" y="292" width="96" height="28" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="452" y="352" width="140" height="18" rx="4" fill="#111111" opacity="0.85"/>
+  <rect x="452" y="392" width="140" height="120" rx="16" fill="#F3F4F6"/>
+  <rect x="608" y="392" width="140" height="120" rx="16" fill="#F3F4F6"/>
+  <rect x="452" y="536" width="88" height="14" rx="4" fill="#111111" opacity="0.7"/>
+  <rect x="452" y="568" width="92" height="92" rx="14" fill="#F3F4F6"/>
+  <rect x="556" y="568" width="92" height="92" rx="14" fill="#F3F4F6"/>
+  <rect x="660" y="568" width="92" height="92" rx="14" fill="#F3F4F6"/>
+  <rect x="452" y="820" width="296" height="52" rx="26" fill="#111111"/>
+  <circle cx="600" cy="846" r="10" fill="#16A34A"/>
+  <text x="600" y="980" text-anchor="middle" fill="#111111" font-family="Inter, sans-serif" font-size="20" font-weight="700" letter-spacing="4">MODERN BISTRO</text>
+  <text x="600" y="1018" text-anchor="middle" fill="#6B7280" font-family="Inter, sans-serif" font-size="12" letter-spacing="3">QR MENU</text>
+</svg>

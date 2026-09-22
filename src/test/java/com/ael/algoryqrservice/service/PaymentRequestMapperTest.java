@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
 import com.ael.algoryqrservice.model.Purchase;
+import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PaymentCardDto;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
@@ -29,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -203,6 +205,169 @@ class PaymentRequestMapperTest {
         assertThat(result.getConversationId()).isEqualTo("conversation");
         assertThat(result.getBuyer().getIdentityNumber()).isEqualTo("12345678901");
         assertThat(result.getSourceMetadata().get("userId")).isEqualTo(7L);
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenModulesPresent_thenBasketLinesSumToPaidPrice() {
+        PlanPackage plan = cartPackage();
+        Purchase purchase = cartPurchase(new BigDecimal("2200.00"));
+
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                purchase,
+                cartUser(),
+                plan,
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1,
+                List.of(moduleLine("QR_BRANCH", "Ek sube", 2, "1200.00"))
+        );
+
+        assertThat(result.getBasketItems()).hasSize(2);
+        assertThat(result.getBasketItems().get(0).getPrice()).isEqualByComparingTo("1000.00");
+        assertThat(result.getBasketItems().get(1).getId()).isEqualTo("QR_BRANCH");
+        assertThat(result.getBasketItems().get(1).getName()).isEqualTo("Ek sube x2");
+        assertThat(result.getBasketItems().get(1).getPrice()).isEqualByComparingTo("1200.00");
+        assertThat(basketTotal(result)).isEqualByComparingTo(result.getPaidPrice());
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenCouponDiscountsBase_thenBasketStillSumsToPaidPrice() {
+        // Kupon yalnizca paket satirina yansir, modul satirlari tam fiyatta kalir.
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                cartPurchase(new BigDecimal("1900.00")),
+                cartUser(),
+                cartPackage(),
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1,
+                List.of(moduleLine("QR_BRANCH", "Ek sube", 2, "1200.00"))
+        );
+
+        assertThat(result.getBasketItems().get(0).getPrice()).isEqualByComparingTo("700.00");
+        assertThat(basketTotal(result)).isEqualByComparingTo("1900.00");
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenDiscountLeavesNothingForBase_thenFallBackToSingleLine() {
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                cartPurchase(new BigDecimal("1200.00")),
+                cartUser(),
+                cartPackage(),
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1,
+                List.of(moduleLine("QR_BRANCH", "Ek sube", 2, "1200.00"))
+        );
+
+        assertThat(result.getBasketItems()).hasSize(1);
+        assertThat(basketTotal(result)).isEqualByComparingTo("1200.00");
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenNoModules_thenSinglePackageLine() {
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                cartPurchase(new BigDecimal("1000.00")),
+                cartUser(),
+                cartPackage(),
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1
+        );
+
+        assertThat(result.getBasketItems()).hasSize(1);
+        assertThat(result.getBasketItems().getFirst().getPrice()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenRecurringPriceDiffers_thenSentToPaymentService() {
+        // Tek seferlik modul icerdiginde yenileme tutari ilk odemeden kucuktur.
+        Purchase purchase = cartPurchase(new BigDecimal("2200.00"));
+        purchase.setRecurringPrice(new BigDecimal("1000.00"));
+
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                purchase,
+                cartUser(),
+                cartPackage(),
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1,
+                List.of(moduleLine("QR_BRANCH", "Ek sube", 2, "1200.00"))
+        );
+
+        assertThat(result.getRecurringPrice()).isEqualByComparingTo("1000.00");
+        assertThat(result.getSourceMetadata().get("recurringPrice")).isEqualTo(new BigDecimal("1000.00"));
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenRecurringPriceMatchesCharge_thenOmittedSoPaidPriceIsUsed() {
+        Purchase purchase = cartPurchase(new BigDecimal("2200.00"));
+        purchase.setRecurringPrice(new BigDecimal("2200.00"));
+
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                purchase,
+                cartUser(),
+                cartPackage(),
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1,
+                List.of(moduleLine("QR_BRANCH", "Ek sube", 2, "1200.00"))
+        );
+
+        assertThat(result.getRecurringPrice()).isNull();
+    }
+
+    private static BigDecimal basketTotal(PaymentCheckoutFormRequest request) {
+        return request.getBasketItems().stream()
+                .map(PaymentThreeDsRequest.BasketItemPayload::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static PurchaseItem moduleLine(String code, String name, int quantity, String lineTotal) {
+        return PurchaseItem.builder()
+                .productId(11L)
+                .productCode(code)
+                .productName(name)
+                .quantity(quantity)
+                .unitPrice(new BigDecimal("500.00"))
+                .vatRate(new BigDecimal("20.00"))
+                .lineSubtotal(new BigDecimal("1000.00"))
+                .lineVat(new BigDecimal("200.00"))
+                .lineTotal(new BigDecimal(lineTotal))
+                .build();
+    }
+
+    private static PlanPackage cartPackage() {
+        return PlanPackage.builder().id(2L).code(CatalogPackages.PRO_PACKAGE).name("PRO")
+                .price(new BigDecimal("1000.00")).currency("TRY").validityDays(30).build();
+    }
+
+    private static Purchase cartPurchase(BigDecimal chargeAmount) {
+        BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
+                .name("Ada").surname("Lovelace").country("TR").city("İstanbul")
+                .address("Adres").postcode("34000").tckn("12345678901").phone("5551112233").build();
+        return Purchase.builder().id(10L).paymentConversationId("conversation")
+                .paymentStyle(PaymentStyle.SUBSCRIPTION)
+                .billingPeriod(BillingPeriod.MONTHLY)
+                .billingIntervalMonths(1)
+                .price(chargeAmount)
+                .billingSnapshot(snapshot).build();
+    }
+
+    private static User cartUser() {
+        return User.builder().id(7L).firstName("Ada").lastName("Lovelace")
+                .email("ada@example.com").phone("5551112233").build();
     }
 
     @Test

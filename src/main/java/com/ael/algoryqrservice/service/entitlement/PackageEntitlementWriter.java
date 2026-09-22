@@ -62,6 +62,35 @@ public class PackageEntitlementWriter {
         );
     }
 
+    /**
+     * Grants a cart module line. When the package already entitles the same product the
+     * module tops that quota up instead of being dropped as a duplicate.
+     */
+    @Transactional
+    public void grantModuleLine(Purchase purchase, Long productId, String productCode, int quantity) {
+        UserEntitlement existing = entitlementRepository
+                .findByPurchaseIdAndProductId(purchase.getId(), productId)
+                .orElse(null);
+        if (existing == null) {
+            grant(purchase, productId, productCode, quantity, false);
+            return;
+        }
+        if (existing.isUnlimited()) {
+            return;
+        }
+        int total = (existing.getTotalQuantity() == null ? 0 : existing.getTotalQuantity()) + quantity;
+        applyQuantityKeepingUsage(existing, total, false);
+        applyPeriod(existing, purchase);
+        entitlementRepository.save(existing);
+
+        purchaseLogService.log(
+                purchase.getId(),
+                purchase.getUserId(),
+                PurchaseLogAction.ENTITLEMENT_GRANTED,
+                quantity + " adet " + productCode + " modulu pakete eklendi (toplam " + total + ")"
+        );
+    }
+
     @Transactional
     public void synchronizePeriod(Purchase purchase) {
         List<UserEntitlement> entitlements = entitlementsOf(purchase);

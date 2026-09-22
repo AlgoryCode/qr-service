@@ -118,6 +118,7 @@ app:
     taxonomy: ${APP_SEED_TAXONOMY_ENABLED:false}
     package-catalog: ${APP_SEED_PACKAGE_CATALOG_ENABLED:false}
     chef-avatars: ${APP_SEED_CHEF_AVATARS_ENABLED:false}
+    menu-themes: ${APP_SEED_MENU_THEMES_ENABLED:false}
     menu-products:
       enabled: ${APP_SEED_MENU_PRODUCTS_ENABLED:false}
       only-if-empty: ${APP_SEED_MENU_PRODUCTS_ONLY_IF_EMPTY:true}

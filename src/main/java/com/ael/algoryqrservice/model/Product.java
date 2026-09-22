@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.model;
 
+import com.ael.algoryqrservice.model.enums.ProductBillingType;
 import com.ael.algoryqrservice.model.enums.ProductType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -68,6 +69,12 @@ public class Product {
     @ColumnDefault("false")
     @Builder.Default
     private boolean requiresCountSync = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_type", nullable = false, length = 16)
+    @ColumnDefault("'RECURRING'")
+    @Builder.Default
+    private ProductBillingType billingType = ProductBillingType.RECURRING;
 
     @Column(nullable = false)
     private boolean active;
