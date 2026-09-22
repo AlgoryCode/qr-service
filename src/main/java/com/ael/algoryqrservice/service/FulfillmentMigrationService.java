@@ -18,10 +18,8 @@ import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserEntitlementRepository;
-import com.ael.algoryqrservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,7 +42,6 @@ public class FulfillmentMigrationService {
     private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final PlanPackageRepository planPackageRepository;
     private final ProductRepository productRepository;
-    private final UserRepository userRepository;
 
     @Transactional
     public MigrationResult backfillUser(Long userId) {
@@ -82,42 +79,6 @@ public class FulfillmentMigrationService {
         }
         log.info("Backfill complete for userId={}: {} fulfillments, {} details", userId, fulfillmentCount, detailCount);
         return new MigrationResult(userId, fulfillmentCount, detailCount);
-    }
-
-    @Transactional
-    public int backfillAllActiveUsers() {
-        List<Long> userIds = purchaseRepository.findDistinctUserIdsByActiveStatus();
-        int migrated = 0;
-        for (Long userId : userIds) {
-            if (userId == null) {
-                continue;
-            }
-            try {
-                MigrationResult result = backfillUser(userId);
-                if (result.fulfillmentCount() > 0 || result.detailCount() > 0) {
-                    migrated++;
-                }
-            } catch (Exception e) {
-                log.error("Backfill failed for userId={}: {}", userId, e.getMessage(), e);
-            }
-        }
-        return migrated;
-    }
-
-    public List<MigrationResult> backfillBatch(int offset, int batchSize) {
-        List<Long> userIds = userRepository.findAll(PageRequest.of(offset / batchSize, batchSize))
-                .stream()
-                .map(com.ael.algoryqrservice.model.User::getId)
-                .toList();
-        List<MigrationResult> results = new ArrayList<>();
-        for (Long userId : userIds) {
-            try {
-                results.add(backfillUser(userId));
-            } catch (Exception e) {
-                log.error("Backfill failed for userId={}: {}", userId, e.getMessage(), e);
-            }
-        }
-        return results;
     }
 
     @Transactional(readOnly = true)

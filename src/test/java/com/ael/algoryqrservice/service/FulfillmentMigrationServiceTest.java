@@ -18,7 +18,6 @@ import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.UserEntitlementRepository;
-import com.ael.algoryqrservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,7 +26,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,8 +51,6 @@ class FulfillmentMigrationServiceTest {
     private PlanPackageRepository planPackageRepository;
     @Mock
     private ProductRepository productRepository;
-    @Mock
-    private UserRepository userRepository;
 
     private FulfillmentMigrationService service;
 
@@ -66,8 +62,7 @@ class FulfillmentMigrationServiceTest {
                 grantFulfillmentRepository,
                 fulfillmentDetailRepository,
                 planPackageRepository,
-                productRepository,
-                userRepository
+                productRepository
         );
     }
 
@@ -146,16 +141,6 @@ class FulfillmentMigrationServiceTest {
         assertThat(result.fulfillmentCount()).isZero();
         assertThat(result.detailCount()).isZero();
         verifyNoInteractions(purchaseRepository);
-    }
-
-    @Test
-    void backfillAllActiveUsers_whenUserIdNull_thenSkip() {
-        when(purchaseRepository.findDistinctUserIdsByActiveStatus()).thenReturn(Collections.singletonList(null));
-
-        int migrated = service.backfillAllActiveUsers();
-
-        assertThat(migrated).isZero();
-        verify(purchaseRepository, never()).findByUserIdAndStatus(any(), any());
     }
 
     private static Purchase usablePurchase() {

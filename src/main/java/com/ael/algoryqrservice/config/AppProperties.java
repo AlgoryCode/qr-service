@@ -36,11 +36,7 @@ public class AppProperties {
     public static class SeedSettings {
         private boolean taxonomy = false;
         private boolean packageCatalog = false;
-        private boolean publicAccessBackfill = false;
-        private boolean branchBackfill = true;
-        private boolean waiterBranchBackfill = true;
         private boolean chefAvatars = false;
-        private boolean fulfillmentEntitlementBackfill = true;
         private MenuProductsSeed menuProducts = new MenuProductsSeed();
     }
 

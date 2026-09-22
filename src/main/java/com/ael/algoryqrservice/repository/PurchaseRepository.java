@@ -86,14 +86,6 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     );
 
     @Query("""
-            select distinct p.userId
-            from Purchase p
-            where p.status = com.ael.algoryqrservice.model.enums.PurchaseStatus.ACTIVE
-              and p.userId is not null
-            """)
-    List<Long> findDistinctUserIdsByActiveStatus();
-
-    @Query("""
             select p from Purchase p
             where p.status = com.ael.algoryqrservice.model.enums.PurchaseStatus.ACTIVE
               and p.userId is not null

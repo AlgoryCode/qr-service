@@ -5,7 +5,6 @@ import com.ael.algoryqrservice.access.PackageProductCatalog;
 import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -84,11 +83,6 @@ public class MenuPublicAccessService {
         for (Long userId : userIds) {
             syncForUser(userId);
         }
-    }
-
-    @Transactional
-    public void syncAllMenuOwners() {
-        syncForUsers(menuRepository.findDistinctUserIdsByChannel(MenuChannel.QR));
     }
 
     private static MenuPublicAccessDisabledReason disabledReason(

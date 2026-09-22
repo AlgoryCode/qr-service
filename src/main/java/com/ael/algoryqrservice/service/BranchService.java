@@ -199,36 +199,6 @@ public class BranchService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçerli bir şube seçin"));
     }
 
-    @Transactional
-    public int backfillMissingBranches() {
-        List<Menu> menus = menuRepository.findAll().stream()
-                .filter(menu -> !menu.isDeleted())
-                .filter(menu -> menu.getBranchId() == null)
-                .toList();
-        int created = 0;
-        for (Menu menu : menus) {
-            String name = menu.getBusinessName();
-            if (name == null || name.isBlank()) {
-                name = "Şube";
-            }
-            Branch branch = branchRepository.save(Branch.builder()
-                    .userId(menu.getUserId())
-                    .name(name.trim())
-                    .address(trimToNull(menu.getAddress()))
-                    .phone(trimToNull(menu.getPhone()))
-                    .email(trimToNull(menu.getEmail()))
-                    .photoUrl(trimToNull(menu.getLogoUrl()))
-                    .photoKey(trimToNull(menu.getLogoKey()))
-                    .grandfathered(true)
-                    .active(menu.isActive())
-                    .build());
-            menu.setBranchId(branch.getId());
-            menuRepository.save(menu);
-            created++;
-        }
-        return created;
-    }
-
     private BranchDtos.Response toResponse(Branch branch, List<Menu> menus) {
         return BranchDtos.Response.builder()
                 .id(branch.getId())
