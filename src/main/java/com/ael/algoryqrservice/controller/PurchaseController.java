@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.service.AddonPurchaseService;
 import com.ael.algoryqrservice.service.EntitlementService;
+import com.ael.algoryqrservice.service.ExternalPackageViewService;
 import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.service.PurchaseService;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -24,6 +25,7 @@ public class PurchaseController {
     private final AddonPurchaseService addonPurchaseService;
     private final PurchaseLogService purchaseLogService;
     private final EntitlementService entitlementService;
+    private final ExternalPackageViewService externalPackageView;
     private final SecurityUtils securityUtils;
 
     @PostMapping
@@ -61,14 +63,16 @@ public class PurchaseController {
 
     @GetMapping("/my")
     public ResponseEntity<List<PurchaseResponse>> getMyPurchases() {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.getUserPurchases(userId));
+        Long userId = securityUtils.getCurrentUserId();
+        return ResponseEntity.ok(externalPackageView.purchases(userId)
+                .orElseGet(() -> purchaseService.getUserPurchases(userId)));
     }
 
     @GetMapping("/my/subscription-overview")
     public ResponseEntity<SubscriptionOverviewResponse> getMySubscriptionOverview() {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.getMySubscriptionOverview(userId));
+        Long userId = securityUtils.getCurrentUserId();
+        return ResponseEntity.ok(externalPackageView.overview(userId)
+                .orElseGet(() -> purchaseService.getMySubscriptionOverview(userId)));
     }
 
     @GetMapping("/my/logs")
@@ -140,7 +144,7 @@ public class PurchaseController {
 
     @GetMapping("/my/entitlements")
     public ResponseEntity<List<UserEntitlementResponse>> getMyEntitlements() {
-        Long userId = securityUtils.getCurrentUser().getId();
+        Long userId = securityUtils.getCurrentUserId();
         return ResponseEntity.ok(entitlementService.getUserEntitlements(userId));
     }
 

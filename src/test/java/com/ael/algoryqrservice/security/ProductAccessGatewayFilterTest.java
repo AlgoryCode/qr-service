@@ -38,7 +38,7 @@ class ProductAccessGatewayFilterTest {
         sessionAccessService = mock(SessionAccessService.class);
         catalog = mock(PackageProductCatalog.class);
         objectMapper = new ObjectMapper();
-        filter = new ProductAccessGatewayFilter(sessionAccessService, catalog, objectMapper);
+        filter = new ProductAccessGatewayFilter(sessionAccessService, catalog, null, objectMapper);
     }
 
     @AfterEach

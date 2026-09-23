@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -30,7 +31,16 @@ public class JwtService {
     public static final String PRINCIPAL_CUSTOMER = "CUSTOMER";
     public static final String PRINCIPAL_WAITER = "WAITER";
     public static final String PRINCIPAL_DEMO = "DEMO";
+    public static final String SUBJECT_TYPE_CLAIM = "subjectType";
+    public static final String SUBJECT_MERCHANT = "MERCHANT";
+    public static final String SUBJECT_STAFF = "STAFF";
+    public static final String SUBJECT_ADMIN = "ADMIN";
 
+    private static final Set<String> AUTH_SERVICE_SUBJECTS = Set.of(
+            SUBJECT_MERCHANT,
+            SUBJECT_STAFF,
+            SUBJECT_ADMIN
+    );
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String ROLES_CLAIM = "roles";
@@ -161,9 +171,9 @@ public class JwtService {
     public String generateWaiterAccessToken(
             String username,
             UUID sessionId,
-            Long waiterId,
+            Long staffId,
             Long branchId,
-            Long ownerUserId,
+            Long merchantId,
             String staffRole
     ) {
         Date now = new Date();
@@ -171,11 +181,11 @@ public class JwtService {
         return Jwts.builder()
                 .id(sessionId.toString())
                 .subject(username)
-                .claim("userId", waiterId)
+                .claim("userId", staffId)
                 .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_WAITER)
                 .claim(ROLES_CLAIM, List.of("ROLE_WAITER"))
                 .claim("branchId", branchId)
-                .claim("ownerUserId", ownerUserId)
+                .claim("merchantId", merchantId)
                 .claim("staffRole", role)
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
@@ -221,6 +231,25 @@ public class JwtService {
         return type == null || type.isBlank() ? PRINCIPAL_APP : type;
     }
 
+    public String extractSubjectType(Claims claims) {
+        return claims.get(SUBJECT_TYPE_CLAIM, String.class);
+    }
+
+    public boolean isAuthServiceSubject(Claims claims) {
+        String subjectType = extractSubjectType(claims);
+        return subjectType != null && AUTH_SERVICE_SUBJECTS.contains(subjectType);
+    }
+
+    public Long extractPackageOwnerId(Claims claims) {
+        if (SUBJECT_STAFF.equals(extractSubjectType(claims))) {
+            Long merchantId = extractMerchantId(claims);
+            if (merchantId != null) {
+                return merchantId;
+            }
+        }
+        return extractUserId(claims);
+    }
+
     public boolean isDashboardPrincipal(Claims claims) {
         return PRINCIPAL_DASHBOARD.equals(extractPrincipalType(claims));
     }
@@ -237,7 +266,11 @@ public class JwtService {
         return extractLongClaim(claims, "branchId");
     }
 
-    public Long extractOwnerUserId(Claims claims) {
+    public Long extractMerchantId(Claims claims) {
+        Long merchantId = extractLongClaim(claims, "merchantId");
+        if (merchantId != null) {
+            return merchantId;
+        }
         return extractLongClaim(claims, "ownerUserId");
     }
 
