@@ -40,7 +40,7 @@ public final class TableBillDtos {
         private BigDecimal lineTotal;
         private String note;
         private Long sourceOrderId;
-        private Long addedByWaiterId;
+        private Long addedByStaffId;
         private LocalDateTime createdAt;
     }
 
@@ -90,8 +90,8 @@ public final class TableBillDtos {
         private Long tableId;
         private String tableName;
         private TableBillStatus status;
-        private Long openedByWaiterId;
-        private Long closedByWaiterId;
+        private Long openedByStaffId;
+        private Long closedByStaffId;
         private LocalDateTime openedAt;
         private LocalDateTime closedAt;
         private TableBillPaymentMethod paymentMethod;

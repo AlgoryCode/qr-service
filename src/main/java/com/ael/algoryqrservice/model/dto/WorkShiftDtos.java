@@ -29,7 +29,7 @@ public final class WorkShiftDtos {
         @Min(0)
         private BigDecimal openingFloat;
 
-        private Set<Long> waiterIds;
+        private Set<Long> staffIds;
 
         @Size(max = 1000)
         private String note;
@@ -56,15 +56,15 @@ public final class WorkShiftDtos {
         private Long id;
         private Long branchId;
         private Long menuId;
-        private Long openedByWaiterId;
-        private Long closedByWaiterId;
+        private Long openedByStaffId;
+        private Long closedByStaffId;
         private LocalDateTime openedAt;
         private LocalDateTime closedAt;
         private BigDecimal openingFloat;
         private BigDecimal closingCash;
         private String note;
         private String status;
-        private Set<Long> waiterIds;
+        private Set<Long> staffIds;
         private BigDecimal revenue;
         private long orderCount;
     }

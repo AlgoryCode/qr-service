@@ -9,7 +9,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.MenuAnalyticsSession;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductVisit;
 import com.ael.algoryqrservice.model.MenuSubCategory;
@@ -22,7 +22,7 @@ import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -76,7 +76,7 @@ public class AnalyticsService {
     private final MenuProductRepository menuProductRepository;
     private final MenuSubCategoryRepository menuSubCategoryRepository;
     private final MenuFeedbackService menuFeedbackService;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final BillPaymentRepository billPaymentRepository;
     private final MenuFixedExpenseService menuFixedExpenseService;
     private final BranchService branchService;
@@ -365,9 +365,9 @@ public class AnalyticsService {
                 )
                 .stream()
                 .collect(Collectors.toMap(MenuSubCategory::getId, MenuSubCategory::getName, (a, b) -> a));
-        List<MenuWaiter> waiters = loadWaiters(scope);
-        Map<Long, MenuWaiter> waitersById = waiters.stream()
-                .collect(Collectors.toMap(MenuWaiter::getId, w -> w, (a, b) -> a));
+        List<MerchantStaff> waiters = loadWaiters(scope);
+        Map<Long, MerchantStaff> waitersById = waiters.stream()
+                .collect(Collectors.toMap(MerchantStaff::getId, w -> w, (a, b) -> a));
         Map<Long, String> waiterNames = labeledWaiterNames(scope, waiters);
 
         BigDecimal cashRevenue = BigDecimal.ZERO;
@@ -452,9 +452,9 @@ public class AnalyticsService {
                 ));
             }
 
-            if (payment.getWaiterId() != null) {
+            if (payment.getStaffId() != null) {
                 PersonnelPaymentAgg stats = personnelStats.computeIfAbsent(
-                        payment.getWaiterId(),
+                        payment.getStaffId(),
                         ignored -> new PersonnelPaymentAgg()
                 );
                 stats.add(payment);
@@ -524,7 +524,7 @@ public class AnalyticsService {
 
         List<AnalyticsDtos.RevenuePersonnelRow> personnelRows = new ArrayList<>();
         for (Map.Entry<Long, PersonnelPaymentAgg> entry : personnelStats.entrySet()) {
-            MenuWaiter waiter = waitersById.get(entry.getKey());
+            MerchantStaff waiter = waitersById.get(entry.getKey());
             PersonnelPaymentAgg stats = entry.getValue();
             personnelRows.add(new AnalyticsDtos.RevenuePersonnelRow(
                     entry.getKey(),
@@ -733,7 +733,7 @@ public class AnalyticsService {
     }
 
     @Transactional(readOnly = true)
-    public AnalyticsDtos.MenuWaiterPerformanceReportResponse getMenuWaiterPerformanceReport(
+    public AnalyticsDtos.MerchantStaffPerformanceReportResponse getMerchantStaffPerformanceReport(
             Long menuId,
             Long ownerId,
             LocalDate from,
@@ -743,7 +743,7 @@ public class AnalyticsService {
     }
 
     @Transactional(readOnly = true)
-    public AnalyticsDtos.MenuWaiterPerformanceReportResponse getBranchWaiterPerformanceReport(
+    public AnalyticsDtos.MerchantStaffPerformanceReportResponse getBranchWaiterPerformanceReport(
             Long branchId,
             Long menuId,
             Long ownerId,
@@ -753,12 +753,12 @@ public class AnalyticsService {
         return buildWaiterPerformanceReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
     }
 
-    private AnalyticsDtos.MenuWaiterPerformanceReportResponse buildWaiterPerformanceReport(
+    private AnalyticsDtos.MerchantStaffPerformanceReportResponse buildWaiterPerformanceReport(
             ReportScope scope,
             LocalDate from,
             LocalDate to
     ) {
-        List<MenuWaiter> waiters = loadWaiters(scope);
+        List<MerchantStaff> waiters = loadWaiters(scope);
         return waiterPerformanceReportService.build(
                 scope.menuId(),
                 scope.menuName(),
@@ -958,9 +958,9 @@ public class AnalyticsService {
         return menu;
     }
 
-    private List<MenuWaiter> loadWaiters(ReportScope scope) {
+    private List<MerchantStaff> loadWaiters(ReportScope scope) {
         if (scope.branchId() != null) {
-            return menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(scope.branchId());
+            return merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(scope.branchId());
         }
         return List.of();
     }
@@ -1113,13 +1113,13 @@ public class AnalyticsService {
         return names;
     }
 
-    private Map<Long, String> labeledWaiterNames(ReportScope scope, List<MenuWaiter> waiters) {
+    private Map<Long, String> labeledWaiterNames(ReportScope scope, List<MerchantStaff> waiters) {
         Map<String, Long> nameCounts = new HashMap<>();
-        for (MenuWaiter waiter : waiters) {
+        for (MerchantStaff waiter : waiters) {
             nameCounts.merge(normalizeLabel(waiter.getDisplayName()), 1L, Long::sum);
         }
         Map<Long, String> names = new LinkedHashMap<>();
-        for (MenuWaiter waiter : waiters) {
+        for (MerchantStaff waiter : waiters) {
             String name = waiter.getDisplayName() == null || waiter.getDisplayName().isBlank()
                     ? "Personel #" + waiter.getId()
                     : waiter.getDisplayName();

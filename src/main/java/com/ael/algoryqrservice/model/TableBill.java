@@ -44,11 +44,11 @@ public class TableBill {
     @Builder.Default
     private TableBillStatus status = TableBillStatus.OPEN;
 
-    @Column(name = "opened_by_waiter_id")
-    private Long openedByWaiterId;
+    @Column(name = "opened_by_staff_id")
+    private Long openedByStaffId;
 
-    @Column(name = "closed_by_waiter_id")
-    private Long closedByWaiterId;
+    @Column(name = "closed_by_staff_id")
+    private Long closedByStaffId;
 
     @Column(name = "opened_at", nullable = false)
     private LocalDateTime openedAt;

@@ -7,7 +7,7 @@ import com.ael.algoryqrservice.model.MenuCategory;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.RestaurantArea;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableBill;
@@ -59,10 +59,11 @@ public class MenuWaiterOrderService {
     private final OrderAuditService orderAuditService;
     private final KitchenUberEatsService kitchenUberEatsService;
     private final KitchenYemekSepetiService kitchenYemekSepetiService;
+    private final StockConsumptionService stockConsumptionService;
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listPending() {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
         if (menuIds.isEmpty()) {
             return List.of();
@@ -76,7 +77,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuWaiterDtos.TableOrderSummary> listTables() {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         List<Menu> menus = waiterAccessService.menusForWaiter(waiter);
         if (menus.isEmpty()) {
             return List.of();
@@ -159,7 +160,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listTodayHistory() {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
         if (menuIds.isEmpty()) {
             return List.of();
@@ -185,7 +186,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listReady() {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         List<Long> menuIds = waiterAccessService.menuIdsForWaiter(waiter);
         if (menuIds.isEmpty()) {
             return List.of();
@@ -199,7 +200,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listKitchenQueue() {
-        MenuWaiter staff = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff staff = waiterAccessService.requireCurrentWaiter();
         List<Long> menuIds = waiterAccessService.menuIdsForWaiter(staff);
         if (menuIds.isEmpty()) {
             return List.of();
@@ -229,23 +230,23 @@ public class MenuWaiterOrderService {
                 .toList();
         List<MenuOrderDtos.OrderResponse> combined = new java.util.ArrayList<>(active);
         combined.addAll(servedToday);
-        combined.addAll(kitchenUberEatsService.listActiveForOwner(staff.getOwnerUserId()));
-        combined.addAll(kitchenYemekSepetiService.listActiveForOwner(staff.getOwnerUserId()));
+        combined.addAll(kitchenUberEatsService.listActiveForOwner(staff.getMerchantId()));
+        combined.addAll(kitchenYemekSepetiService.listActiveForOwner(staff.getMerchantId()));
         return combined;
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse confirm(Long orderId) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
             throw new BadRequestException("Sadece gönderilmiş siparişler onaylanabilir");
         }
         order.setStatus(MenuOrderStatus.CONFIRMED);
         order.setConfirmedAt(LocalDateTime.now());
-        order.setWaiterId(waiter.getId());
-        if (order.getCreatedByWaiterId() == null) {
-            order.setCreatedByWaiterId(waiter.getId());
+        order.setStaffId(waiter.getId());
+        if (order.getCreatedByStaffId() == null) {
+            order.setCreatedByStaffId(waiter.getId());
         }
         if (order.getOrderSource() == null) {
             order.setOrderSource(OrderSource.QR);
@@ -259,13 +260,14 @@ public class MenuWaiterOrderService {
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
         menuOrderRepository.save(saved);
         orderAuditService.record(saved, OrderAuditAction.CONFIRMED, waiter.getId(), null);
+        stockConsumptionService.consumeMenuOrder(saved);
         campaignEvaluationService.onOrderConfirmed(saved);
         return menuOrderService.toOrderResponse(saved);
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse reject(Long orderId, MenuOrderDtos.CancelOrderRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (order.getStatus() != MenuOrderStatus.SUBMITTED) {
             throw new BadRequestException("Sadece gönderilmiş siparişler reddedilebilir");
@@ -273,13 +275,14 @@ public class MenuWaiterOrderService {
         LocalDateTime now = LocalDateTime.now();
         order.setStatus(MenuOrderStatus.REJECTED);
         order.setRejectedAt(now);
-        order.setCancelledByWaiterId(waiter.getId());
+        order.setCancelledByStaffId(waiter.getId());
         if (request != null) {
             order.setCancelReason(request.getReason() != null ? request.getReason() : CancelReason.OTHER);
             order.setCancelReasonNote(trimToNull(request.getReasonNote()));
         }
         order.setUpdatedAt(now);
         MenuOrder saved = menuOrderRepository.save(order);
+        stockConsumptionService.reverseMenuOrder(saved);
         orderAuditService.record(saved, OrderAuditAction.REJECTED, waiter.getId(), null);
         return menuOrderService.toOrderResponse(saved);
     }
@@ -291,7 +294,7 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse cancel(Long orderId, MenuOrderDtos.CancelOrderRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         MenuOrder order = requireOrderForWaiter(orderId, waiter);
         if (!MenuOrderService.isCancellable(order.getStatus())) {
             throw new BadRequestException("Bu sipariş iptal edilemez");
@@ -300,7 +303,7 @@ public class MenuWaiterOrderService {
         order.setStatus(MenuOrderStatus.CANCELLED);
         order.setCancelledAt(now);
         order.setRejectedAt(now);
-        order.setCancelledByWaiterId(waiter.getId());
+        order.setCancelledByStaffId(waiter.getId());
         if (request != null) {
             order.setCancelReason(request.getReason() != null ? request.getReason() : CancelReason.OTHER);
             order.setCancelReasonNote(trimToNull(request.getReasonNote()));
@@ -309,6 +312,7 @@ public class MenuWaiterOrderService {
         }
         order.setUpdatedAt(now);
         MenuOrder saved = menuOrderRepository.save(order);
+        stockConsumptionService.reverseMenuOrder(saved);
         orderAuditService.record(saved, OrderAuditAction.CANCELLED, waiter.getId(), null);
         return menuOrderService.toOrderResponse(saved);
     }
@@ -334,12 +338,12 @@ public class MenuWaiterOrderService {
     @Transactional
     public MenuOrderDtos.OrderResponse markReady(Long orderId, String source) {
         if (KitchenUberEatsMapper.isUberEatsSource(source)) {
-            MenuWaiter staff = waiterAccessService.requireKitchenStaff();
-            return kitchenUberEatsService.markReady(staff.getOwnerUserId(), orderId);
+            MerchantStaff staff = waiterAccessService.requireKitchenStaff();
+            return kitchenUberEatsService.markReady(staff.getMerchantId(), orderId);
         }
         if (KitchenUberEatsMapper.isYemekSepetiSource(source)) {
-            MenuWaiter staff = waiterAccessService.requireKitchenStaff();
-            return kitchenYemekSepetiService.markReady(staff.getOwnerUserId(), orderId);
+            MerchantStaff staff = waiterAccessService.requireKitchenStaff();
+            return kitchenYemekSepetiService.markReady(staff.getMerchantId(), orderId);
         }
         return transitionKitchen(orderId, MenuOrderStatus.PREPARING, MenuOrderStatus.READY, true);
     }
@@ -360,7 +364,7 @@ public class MenuWaiterOrderService {
             MenuOrderStatus next,
             boolean kitchen
     ) {
-        MenuWaiter staff = kitchen
+        MerchantStaff staff = kitchen
                 ? waiterAccessService.requireKitchenStaff()
                 : waiterAccessService.requireWaiterStaff();
         MenuOrder order = requireOrderForWaiter(orderId, staff);
@@ -371,13 +375,13 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public MenuOrderDtos.OrderResponse getOrder(Long orderId) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff waiter = waiterAccessService.requireCurrentWaiter();
         return menuOrderService.toOrderResponse(requireOrderForWaiter(orderId, waiter));
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse updateWaiterNote(Long orderId, String note) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         MenuOrder order = requireOrderForWaiter(orderId, waiter);
         order.setWaiterNote(trimToNull(note));
         order.setUpdatedAt(LocalDateTime.now());
@@ -386,7 +390,7 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse updateKitchenNote(Long orderId, String note) {
-        MenuWaiter staff = waiterAccessService.requireKitchenStaff();
+        MerchantStaff staff = waiterAccessService.requireKitchenStaff();
         MenuOrder order = requireOrderForWaiter(orderId, staff);
         order.setKitchenNote(trimToNull(note));
         order.setUpdatedAt(LocalDateTime.now());
@@ -395,7 +399,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public MenuWaiterDtos.CatalogResponse listCatalog(Long tableId) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         RestaurantTable table = requireTableForWaiter(tableId, waiter);
         Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(table.getMenuId());
         Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(table.getMenuId());
@@ -421,7 +425,7 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse createOrder(MenuOrderDtos.WaiterCreateOrderRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         if (request == null || request.getTableId() == null) {
             throw new BadRequestException("Masa zorunludur");
         }
@@ -431,7 +435,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> getTableTodayOrders(Long tableId) {
-        MenuWaiter waiter = waiterAccessService.requireWaiterStaff();
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         RestaurantTable table = requireTableForWaiter(tableId, waiter);
 
         LocalDateTime[] dayRange = todayRange();
@@ -442,7 +446,7 @@ public class MenuWaiterOrderService {
                 .toList();
     }
 
-    private RestaurantTable requireTableForWaiter(Long tableId, MenuWaiter waiter) {
+    private RestaurantTable requireTableForWaiter(Long tableId, MerchantStaff waiter) {
         RestaurantTable table = restaurantTableRepository.findById(tableId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
@@ -450,7 +454,7 @@ public class MenuWaiterOrderService {
         return table;
     }
 
-    private MenuOrder requireOrderForWaiter(Long orderId, MenuWaiter waiter) {
+    private MenuOrder requireOrderForWaiter(Long orderId, MerchantStaff waiter) {
         MenuOrder order = menuOrderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Sipariş bulunamadı"));
         waiterAccessService.requireMenuInWaiterBranch(order.getMenuId(), waiter);

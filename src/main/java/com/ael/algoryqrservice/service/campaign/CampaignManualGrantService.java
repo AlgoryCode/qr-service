@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.model.CampaignProgress;
 import com.ael.algoryqrservice.model.CampaignReward;
 import com.ael.algoryqrservice.model.Customer;
 import com.ael.algoryqrservice.model.CustomerMembership;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.dto.CampaignDtos;
 import com.ael.algoryqrservice.model.enums.CampaignManualGrantAction;
 import com.ael.algoryqrservice.model.enums.CampaignProgressStatus;
@@ -61,7 +61,7 @@ public class CampaignManualGrantService {
 
     @Transactional
     public CampaignDtos.ManualGrantResponse grant(Long menuId, CampaignDtos.ManualGrantRequest request) {
-        MenuWaiter waiter = requireWaiterForMenu(menuId);
+        MerchantStaff waiter = requireWaiterForMenu(menuId);
         Campaign campaign = campaignService.requireActiveCampaign(menuId, request.getCampaignId());
         String normalized = normalizeEmail(request.getEmail());
         Customer customer = customerRepository.findByEmail(normalized)
@@ -109,7 +109,7 @@ public class CampaignManualGrantService {
         campaignManualGrantRepository.save(CampaignManualGrant.builder()
                 .campaignId(campaign.getId())
                 .menuId(menuId)
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .customerId(customer.getId())
                 .customerEmail(normalized)
                 .action(request.getAction())
@@ -127,7 +127,7 @@ public class CampaignManualGrantService {
                 .build();
     }
 
-    private MenuWaiter requireWaiterForMenu(Long menuId) {
+    private MerchantStaff requireWaiterForMenu(Long menuId) {
         return waiterAccessService.requireWaiterForMenu(menuId);
     }
 

@@ -3,12 +3,12 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Branch;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class MenuWaiterService {
 
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final UserRepository userRepository;
     private final BranchService branchService;
     private final PasswordEncoder passwordEncoder;
@@ -34,7 +34,7 @@ public class MenuWaiterService {
     public MenuWaiterDtos.UsersPageResponse listWaiters(Long branchId) {
         Branch branch = requireOwnedBranch(branchId);
         MenuWaiterDtos.OwnerSummary owner = getOwnerSummary(branch);
-        List<MenuWaiterDtos.WaiterResponse> waiters = menuWaiterRepository
+        List<MenuWaiterDtos.WaiterResponse> waiters = merchantStaffRepository
                 .findByBranchIdOrderByDisplayNameAsc(branch.getId())
                 .stream()
                 .map(this::toWaiterResponse)
@@ -53,7 +53,7 @@ public class MenuWaiterService {
         }
 
         String username = normalizeUsername(request.getUsername());
-        if (menuWaiterRepository.existsByUsernameIgnoreCase(username)) {
+        if (merchantStaffRepository.existsByUsernameIgnoreCase(username)) {
             throw new BadRequestException("Bu kullanıcı adı zaten kullanılıyor");
         }
 
@@ -64,8 +64,8 @@ public class MenuWaiterService {
         }
         LocalDateTime now = LocalDateTime.now();
 
-        MenuWaiter waiter = MenuWaiter.builder()
-                .ownerUserId(branch.getUserId())
+        MerchantStaff waiter = MerchantStaff.builder()
+                .merchantId(branch.getUserId())
                 .branchId(branch.getId())
                 .username(username)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
@@ -76,17 +76,17 @@ public class MenuWaiterService {
                 .updatedAt(now)
                 .build();
 
-        return toWaiterResponse(menuWaiterRepository.save(waiter));
+        return toWaiterResponse(merchantStaffRepository.save(waiter));
     }
 
     @Transactional
     public MenuWaiterDtos.WaiterResponse updateWaiter(
             Long branchId,
-            Long waiterId,
+            Long staffId,
             MenuWaiterDtos.UpdateWaiterRequest request
     ) {
         requireOwnedBranch(branchId);
-        MenuWaiter waiter = requireWaiter(branchId, waiterId);
+        MerchantStaff waiter = requireWaiter(branchId, staffId);
 
         if (request != null) {
             if (request.getDisplayName() != null) {
@@ -115,16 +115,16 @@ public class MenuWaiterService {
         }
 
         waiter.setUpdatedAt(LocalDateTime.now());
-        return toWaiterResponse(menuWaiterRepository.save(waiter));
+        return toWaiterResponse(merchantStaffRepository.save(waiter));
     }
 
     @Transactional
-    public void deleteWaiter(Long branchId, Long waiterId) {
+    public void deleteWaiter(Long branchId, Long staffId) {
         requireOwnedBranch(branchId);
-        MenuWaiter waiter = requireWaiter(branchId, waiterId);
+        MerchantStaff waiter = requireWaiter(branchId, staffId);
         waiter.setActive(false);
         waiter.setUpdatedAt(LocalDateTime.now());
-        menuWaiterRepository.save(waiter);
+        merchantStaffRepository.save(waiter);
     }
 
     private MenuWaiterDtos.OwnerSummary getOwnerSummary(Branch branch) {
@@ -142,12 +142,12 @@ public class MenuWaiterService {
         return branchService.requireOwnedForUser(branchId, securityUtils.getCurrentUserId());
     }
 
-    private MenuWaiter requireWaiter(Long branchId, Long waiterId) {
-        return menuWaiterRepository.findByIdAndBranchId(waiterId, branchId)
+    private MerchantStaff requireWaiter(Long branchId, Long staffId) {
+        return merchantStaffRepository.findByIdAndBranchId(staffId, branchId)
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
     }
 
-    private MenuWaiterDtos.WaiterResponse toWaiterResponse(MenuWaiter waiter) {
+    private MenuWaiterDtos.WaiterResponse toWaiterResponse(MerchantStaff waiter) {
         return MenuWaiterDtos.WaiterResponse.builder()
                 .id(waiter.getId())
                 .branchId(waiter.getBranchId())

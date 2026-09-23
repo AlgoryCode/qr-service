@@ -5,7 +5,7 @@ import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.WorkShift;
 import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.model.dto.WorkShiftDtos;
@@ -37,7 +37,7 @@ public class WorkShiftService {
 
     @Transactional
     public WorkShiftDtos.ShiftResponse openShift(WorkShiftDtos.OpenShiftRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff waiter = waiterAccessService.requireCurrentWaiter();
         workShiftRepository.findFirstByBranchIdAndStatusOrderByOpenedAtDesc(waiter.getBranchId(), WorkShiftStatus.OPEN)
                 .ifPresent(open -> {
                     throw new BadRequestException("Zaten açık bir vardiya var");
@@ -49,27 +49,27 @@ public class WorkShiftService {
                 throw new BadRequestException("Menü bu şubeye ait değil");
             }
         }
-        Set<Long> waiterIds = request.getWaiterIds() == null
+        Set<Long> staffIds = request.getStaffIds() == null
                 ? new HashSet<>(Set.of(waiter.getId()))
-                : new HashSet<>(request.getWaiterIds());
-        waiterIds.add(waiter.getId());
+                : new HashSet<>(request.getStaffIds());
+        staffIds.add(waiter.getId());
 
         WorkShift shift = WorkShift.builder()
                 .branchId(waiter.getBranchId())
                 .menuId(request.getMenuId())
-                .openedByWaiterId(waiter.getId())
+                .openedByStaffId(waiter.getId())
                 .openedAt(LocalDateTime.now())
                 .openingFloat(request.getOpeningFloat() == null ? BigDecimal.ZERO : request.getOpeningFloat())
                 .note(request.getNote())
                 .status(WorkShiftStatus.OPEN)
-                .waiterIds(waiterIds)
+                .staffIds(staffIds)
                 .build();
         return toResponse(workShiftRepository.save(shift));
     }
 
     @Transactional
     public WorkShiftDtos.ShiftResponse closeShift(Long shiftId, WorkShiftDtos.CloseShiftRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff waiter = waiterAccessService.requireCurrentWaiter();
         WorkShift shift = workShiftRepository.findByIdAndBranchId(shiftId, waiter.getBranchId())
                 .orElseThrow(() -> new NotFoundException("Vardiya bulunamadı"));
         if (shift.getStatus() != WorkShiftStatus.OPEN) {
@@ -77,7 +77,7 @@ public class WorkShiftService {
         }
         shift.setStatus(WorkShiftStatus.CLOSED);
         shift.setClosedAt(LocalDateTime.now());
-        shift.setClosedByWaiterId(waiter.getId());
+        shift.setClosedByStaffId(waiter.getId());
         shift.setClosingCash(request.getClosingCash());
         if (request.getNote() != null) {
             shift.setNote(request.getNote());
@@ -87,7 +87,7 @@ public class WorkShiftService {
 
     @Transactional(readOnly = true)
     public WorkShiftDtos.ShiftResponse currentOpen() {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff waiter = waiterAccessService.requireCurrentWaiter();
         return workShiftRepository
                 .findFirstByBranchIdAndStatusOrderByOpenedAtDesc(waiter.getBranchId(), WorkShiftStatus.OPEN)
                 .map(this::toResponse)
@@ -123,15 +123,15 @@ public class WorkShiftService {
                 .id(shift.getId())
                 .branchId(shift.getBranchId())
                 .menuId(shift.getMenuId())
-                .openedByWaiterId(shift.getOpenedByWaiterId())
-                .closedByWaiterId(shift.getClosedByWaiterId())
+                .openedByStaffId(shift.getOpenedByStaffId())
+                .closedByStaffId(shift.getClosedByStaffId())
                 .openedAt(shift.getOpenedAt())
                 .closedAt(shift.getClosedAt())
                 .openingFloat(shift.getOpeningFloat())
                 .closingCash(shift.getClosingCash())
                 .note(shift.getNote())
                 .status(shift.getStatus().name())
-                .waiterIds(shift.getWaiterIds())
+                .staffIds(shift.getStaffIds())
                 .revenue(revenue)
                 .orderCount(orderCount)
                 .build();

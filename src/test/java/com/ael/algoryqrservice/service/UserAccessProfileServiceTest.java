@@ -5,6 +5,8 @@ import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.catalog.CatalogPackages;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.model.FulfillmentDetail;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.model.enums.AccessDecision;
@@ -17,9 +19,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,12 +49,17 @@ class UserAccessProfileServiceTest {
     private PackageActivationService packageActivationService;
     @Mock
     private SessionAccessService sessionAccessService;
+    @Mock
+    private ObjectProvider<FulfillmentServiceClient> fulfillmentServiceClient;
+    @Mock
+    private FulfillmentServiceClient client;
 
     @InjectMocks
     private UserAccessProfileService service;
 
     @Test
     void resolve_whenAllowWithOnboardingPackage_thenReturnSortedProductsAndScopes() {
+        when(fulfillmentServiceClient.getIfAvailable()).thenReturn(null);
         when(sessionAccessService.resolve(USER_ID)).thenReturn(AccessSession.of(
                 AccessDecision.ALLOW,
                 CatalogPackages.ULTIMATE_TRIAL_PACKAGE,
@@ -72,7 +83,37 @@ class UserAccessProfileServiceTest {
     }
 
     @Test
+    void resolve_whenExternalFulfillmentHasActivePackage_thenPreferExternal() {
+        when(fulfillmentServiceClient.getIfAvailable()).thenReturn(client);
+        when(client.findActivePackage(USER_ID)).thenReturn(Optional.of(new ExternalActivePackageResponse(
+                9L,
+                USER_ID,
+                4L,
+                8L,
+                3L,
+                CatalogPackages.PRO_PACKAGE,
+                "Pro",
+                LocalDate.now(),
+                LocalDate.now().plusDays(30),
+                "ACTIVE",
+                Instant.now(),
+                Instant.now(),
+                List.of(CatalogProducts.QR_CREATE),
+                List.of(CatalogScopes.QR_CREATE_OWNER)
+        )));
+
+        UserAccessProfile profile = service.resolve(USER_ID);
+
+        assertThat(profile.activePackage()).isEqualTo(CatalogPackages.PRO_PACKAGE);
+        assertThat(profile.products()).containsExactly(CatalogProducts.QR_CREATE);
+        assertThat(profile.scopes()).containsExactly(CatalogScopes.QR_CREATE_OWNER);
+        verify(sessionAccessService, never()).resolve(any());
+        verify(fulfillmentDetailRepository, never()).findAllActiveByUserId(any(), any());
+    }
+
+    @Test
     void resolve_whenNotAllow_thenReturnEmptyProfileWithoutLoadingDetails() {
+        when(fulfillmentServiceClient.getIfAvailable()).thenReturn(null);
         when(sessionAccessService.resolve(USER_ID)).thenReturn(AccessSession.of(
                 AccessDecision.START_PACKAGE,
                 null,

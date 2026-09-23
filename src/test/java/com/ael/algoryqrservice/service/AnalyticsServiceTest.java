@@ -21,7 +21,7 @@ import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -69,7 +69,7 @@ class AnalyticsServiceTest {
     @Mock
     private MenuFeedbackService menuFeedbackService;
     @Mock
-    private MenuWaiterRepository menuWaiterRepository;
+    private MerchantStaffRepository merchantStaffRepository;
     @Mock
     private BillPaymentRepository billPaymentRepository;
     @Mock
@@ -98,7 +98,7 @@ class AnalyticsServiceTest {
                 menuProductRepository,
                 menuSubCategoryRepository,
                 menuFeedbackService,
-                menuWaiterRepository,
+                merchantStaffRepository,
                 billPaymentRepository,
                 menuFixedExpenseService,
                 branchService,
@@ -306,7 +306,7 @@ class AnalyticsServiceTest {
                         .name("Icecek")
                         .sortOrder(1)
                         .build()));
-        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
         when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
 
@@ -360,7 +360,7 @@ class AnalyticsServiceTest {
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(menuId)))
                 .thenReturn(List.of());
         when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
-        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
         when(billPaymentRepository.findByMenuIdInAndPaidAtBetween(eq(List.of(menuId)), any(), any()))
                 .thenReturn(List.of());
@@ -416,16 +416,16 @@ class AnalyticsServiceTest {
     }
 
     @Test
-    void getMenuWaiterPerformanceReport_whenScopeResolved_thenDelegatesToReportService() {
+    void getMerchantStaffPerformanceReport_whenScopeResolved_thenDelegatesToReportService() {
         Long menuId = 5L;
         Long ownerId = 9L;
         LocalDate day = LocalDate.of(2026, 8, 13);
         Menu menu = publicMenu(menuId, ownerId);
         menu.setBranchId(2L);
         when(menuRepository.findById(menuId)).thenReturn(Optional.of(menu));
-        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse expected =
-                new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse expected =
+                new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                         menuId,
                         "Test",
                         2L,
@@ -442,8 +442,8 @@ class AnalyticsServiceTest {
         when(waiterPerformanceReportService.build(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(expected);
 
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse report =
-                service.getMenuWaiterPerformanceReport(menuId, ownerId, day, day);
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse report =
+                service.getMerchantStaffPerformanceReport(menuId, ownerId, day, day);
 
         assertThat(report).isSameAs(expected);
         verify(waiterPerformanceReportService).build(any(), any(), any(), any(), any(), any(), any(), any(), any());
@@ -578,7 +578,7 @@ class AnalyticsServiceTest {
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
                 .thenReturn(List.of());
         when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
-        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L, 6L))).thenReturn(BigDecimal.ZERO);
         when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
         TableBill bill = TableBill.builder().id(20L).menuId(5L).currency("TRY").build();

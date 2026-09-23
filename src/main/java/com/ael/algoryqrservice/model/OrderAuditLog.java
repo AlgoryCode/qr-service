@@ -33,8 +33,8 @@ public class OrderAuditLog {
     @Column(name = "bill_id")
     private Long billId;
 
-    @Column(name = "waiter_id")
-    private Long waiterId;
+    @Column(name = "staff_id")
+    private Long staffId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)

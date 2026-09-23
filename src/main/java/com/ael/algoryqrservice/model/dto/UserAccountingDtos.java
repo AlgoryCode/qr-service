@@ -54,7 +54,7 @@ public final class UserAccountingDtos {
             AccountingSourceType sourceType,
             Long sourceBillId,
             Long sourceOrderId,
-            Long createdByWaiterId,
+            Long createdByStaffId,
             LocalDateTime createdAt
     ) {
     }

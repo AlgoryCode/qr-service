@@ -3,11 +3,11 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
-import com.ael.algoryqrservice.model.MenuWaiter;
-import com.ael.algoryqrservice.model.MenuWaiterSession;
+import com.ael.algoryqrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.model.MerchantStaffSession;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterSessionRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffSessionRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,21 +21,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MenuWaiterSessionService {
 
-    private final MenuWaiterSessionRepository sessionRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffSessionRepository sessionRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final JwtPropertiesHelper jwtPropertiesHelper;
 
     @Transactional
-    public SessionTokens createSession(MenuWaiter waiter, ClientInfo clientInfo) {
+    public SessionTokens createSession(MerchantStaff waiter, ClientInfo clientInfo) {
         UUID sessionId = UUID.randomUUID();
         String rawRefreshToken = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
 
-        MenuWaiterSession session = MenuWaiterSession.builder()
+        MerchantStaffSession session = MerchantStaffSession.builder()
                 .id(sessionId)
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .refreshTokenHash(passwordEncoder.encode(rawRefreshToken))
                 .loggedInAt(now)
                 .accessExpiresAt(now.plus(jwtPropertiesHelper.getAccessDuration()))
@@ -55,7 +55,7 @@ public class MenuWaiterSessionService {
                 sessionId,
                 waiter.getId(),
                 waiter.getBranchId(),
-                waiter.getOwnerUserId(),
+                waiter.getMerchantId(),
                 waiter.resolvedStaffRole().name()
         );
         String refreshToken = formatRefreshToken(sessionId, rawRefreshToken);
@@ -67,7 +67,7 @@ public class MenuWaiterSessionService {
     public MenuWaiterDtos.WaiterAuthResponse refresh(String refreshToken) {
         RefreshTokenParts parts = parseRefreshToken(refreshToken);
 
-        MenuWaiterSession session = sessionRepository.findById(parts.sessionId())
+        MerchantStaffSession session = sessionRepository.findById(parts.sessionId())
                 .orElseThrow(() -> new UnauthorizedException("Geçersiz refresh token"));
 
         validateSessionActive(session);
@@ -76,7 +76,7 @@ public class MenuWaiterSessionService {
             throw new UnauthorizedException("Geçersiz refresh token");
         }
 
-        MenuWaiter waiter = menuWaiterRepository.findById(session.getWaiterId())
+        MerchantStaff waiter = merchantStaffRepository.findById(session.getStaffId())
                 .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
 
         if (!waiter.isActive()) {
@@ -96,7 +96,7 @@ public class MenuWaiterSessionService {
                 session.getId(),
                 waiter.getId(),
                 waiter.getBranchId(),
-                waiter.getOwnerUserId(),
+                waiter.getMerchantId(),
                 waiter.resolvedStaffRole().name()
         );
         String newRefreshToken = formatRefreshToken(session.getId(), newRawRefreshToken);
@@ -105,8 +105,8 @@ public class MenuWaiterSessionService {
     }
 
     @Transactional
-    public void revokeSession(UUID sessionId, Long waiterId) {
-        MenuWaiterSession session = sessionRepository.findByIdAndWaiterId(sessionId, waiterId)
+    public void revokeSession(UUID sessionId, Long staffId) {
+        MerchantStaffSession session = sessionRepository.findByIdAndStaffId(sessionId, staffId)
                 .orElseThrow(() -> new NotFoundException("Oturum bulunamadı"));
         revoke(session);
     }
@@ -115,7 +115,7 @@ public class MenuWaiterSessionService {
     public void revokeByRefreshToken(String refreshToken) {
         RefreshTokenParts parts = parseRefreshToken(refreshToken);
 
-        MenuWaiterSession session = sessionRepository.findById(parts.sessionId())
+        MerchantStaffSession session = sessionRepository.findById(parts.sessionId())
                 .orElseThrow(() -> new UnauthorizedException("Geçersiz refresh token"));
 
         if (!passwordEncoder.matches(parts.rawToken(), session.getRefreshTokenHash())) {
@@ -127,7 +127,7 @@ public class MenuWaiterSessionService {
 
     @Transactional
     public void revokeByAccessSessionId(UUID sessionId) {
-        MenuWaiterSession session = sessionRepository.findById(sessionId)
+        MerchantStaffSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BadRequestException("Oturum bulunamadı"));
         revoke(session);
     }
@@ -135,26 +135,26 @@ public class MenuWaiterSessionService {
     @Transactional(readOnly = true)
     public boolean isSessionActive(UUID sessionId) {
         return sessionRepository.findById(sessionId)
-                .map(MenuWaiterSession::isActive)
+                .map(MerchantStaffSession::isActive)
                 .orElse(false);
     }
 
     public MenuWaiterDtos.WaiterAuthResponse buildAuthResponse(
             String accessToken,
             String refreshToken,
-            MenuWaiter waiter
+            MerchantStaff waiter
     ) {
         return MenuWaiterDtos.WaiterAuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .branchId(waiter.getBranchId())
                 .displayName(waiter.getDisplayName())
                 .staffRole(waiter.resolvedStaffRole())
                 .build();
     }
 
-    private void validateSessionActive(MenuWaiterSession session) {
+    private void validateSessionActive(MerchantStaffSession session) {
         if (session.isRevoked()) {
             throw new UnauthorizedException("Oturum iptal edilmiş");
         }
@@ -163,7 +163,7 @@ public class MenuWaiterSessionService {
         }
     }
 
-    private void revoke(MenuWaiterSession session) {
+    private void revoke(MerchantStaffSession session) {
         if (!session.isRevoked()) {
             session.setRevoked(true);
             session.setRevokedAt(LocalDateTime.now());
@@ -195,10 +195,10 @@ public class MenuWaiterSessionService {
     }
 
     public record SessionTokens(
-            MenuWaiterSession session,
+            MerchantStaffSession session,
             String accessToken,
             String refreshToken,
-            MenuWaiter waiter
+            MerchantStaff waiter
     ) {
     }
 

@@ -4,7 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
@@ -17,7 +17,7 @@ import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
@@ -65,7 +65,7 @@ class TableBillServiceTest {
     @Mock
     private RestaurantTableRepository restaurantTableRepository;
     @Mock
-    private MenuWaiterRepository menuWaiterRepository;
+    private MerchantStaffRepository merchantStaffRepository;
     @Mock
     private WaiterCommissionService waiterCommissionService;
     @Mock
@@ -127,7 +127,7 @@ class TableBillServiceTest {
         assertThat(updated.getItems()).hasSize(1);
         assertThat(updated.getTotalAmount()).isEqualByComparingTo("50.00");
         assertThat(updated.getItems().get(0).getSourceOrderId()).isEqualTo(20L);
-        assertThat(updated.getItems().get(0).getAddedByWaiterId()).isEqualTo(7L);
+        assertThat(updated.getItems().get(0).getAddedByStaffId()).isEqualTo(7L);
     }
 
     @Test
@@ -152,7 +152,7 @@ class TableBillServiceTest {
                 .build();
         item.setBill(bill);
 
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(3L)
                 .commissionEnabled(true)
@@ -188,7 +188,7 @@ class TableBillServiceTest {
 
     @Test
     void closeBill_whenPaymentMethodMissing_thenThrows() {
-        MenuWaiter waiter = MenuWaiter.builder().id(7L).branchId(3L).build();
+        MerchantStaff waiter = MerchantStaff.builder().id(7L).branchId(3L).build();
 
         assertThatThrownBy(() -> tableBillService.closeBill(1L, 10L, waiter, null, false, null))
                 .isInstanceOf(BadRequestException.class)
@@ -254,7 +254,7 @@ class TableBillServiceTest {
     @Test
     void payShare_whenDuplicateShare_thenThrows() {
         TableBill bill = openBillWithTotal(new BigDecimal("500.00"));
-        MenuWaiter waiter = MenuWaiter.builder().id(7L).branchId(3L).build();
+        MerchantStaff waiter = MerchantStaff.builder().id(7L).branchId(3L).build();
 
         when(tableBillRepository.findByIdAndMenuIdAndStatus(10L, 1L, TableBillStatus.OPEN))
                 .thenReturn(Optional.of(bill));
@@ -275,7 +275,7 @@ class TableBillServiceTest {
     @Test
     void payShare_whenAllSharesPaid_thenClosesBill() {
         TableBill bill = openBillWithTotal(new BigDecimal("500.00"));
-        MenuWaiter waiter = MenuWaiter.builder().id(7L).branchId(3L).build();
+        MerchantStaff waiter = MerchantStaff.builder().id(7L).branchId(3L).build();
         TableSession session = TableSession.builder()
                 .id(UUID.randomUUID())
                 .tableId(5L)

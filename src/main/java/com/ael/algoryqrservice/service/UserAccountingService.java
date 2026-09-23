@@ -150,7 +150,7 @@ public class UserAccountingService {
                 .sourceType(AccountingSourceType.BILL_SALE)
                 .sourceBillId(bill.getId())
                 .sourceOrderId(sourceOrderId)
-                .createdByWaiterId(bill.getClosedByWaiterId())
+                .createdByStaffId(bill.getClosedByStaffId())
                 .orderAmount(amount)
                 .createdAt(now)
                 .updatedAt(now)
@@ -333,7 +333,7 @@ public class UserAccountingService {
                 entry.getSourceType(),
                 entry.getSourceBillId(),
                 entry.getSourceOrderId(),
-                entry.getCreatedByWaiterId(),
+                entry.getCreatedByStaffId(),
                 entry.getCreatedAt()
         );
     }

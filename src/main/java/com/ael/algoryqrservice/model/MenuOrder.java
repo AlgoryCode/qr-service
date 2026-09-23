@@ -67,14 +67,14 @@ public class MenuOrder {
     @Column(columnDefinition = "text")
     private String note;
 
-    @Column(name = "waiter_id")
-    private Long waiterId;
+    @Column(name = "staff_id")
+    private Long staffId;
 
-    @Column(name = "created_by_waiter_id")
-    private Long createdByWaiterId;
+    @Column(name = "created_by_staff_id")
+    private Long createdByStaffId;
 
-    @Column(name = "cancelled_by_waiter_id")
-    private Long cancelledByWaiterId;
+    @Column(name = "cancelled_by_staff_id")
+    private Long cancelledByStaffId;
 
     @Column(name = "waiter_note", columnDefinition = "text")
     private String waiterNote;

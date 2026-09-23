@@ -34,11 +34,11 @@ public class WorkShift {
     @Column(name = "menu_id")
     private Long menuId;
 
-    @Column(name = "opened_by_waiter_id", nullable = false)
-    private Long openedByWaiterId;
+    @Column(name = "opened_by_staff_id", nullable = false)
+    private Long openedByStaffId;
 
-    @Column(name = "closed_by_waiter_id")
-    private Long closedByWaiterId;
+    @Column(name = "closed_by_staff_id")
+    private Long closedByStaffId;
 
     @Column(name = "opened_at", nullable = false)
     private LocalDateTime openedAt;
@@ -63,10 +63,10 @@ public class WorkShift {
     private WorkShiftStatus status = WorkShiftStatus.OPEN;
 
     @ElementCollection
-    @CollectionTable(name = "tbl_work_shift_waiter", joinColumns = @JoinColumn(name = "shift_id"))
-    @Column(name = "waiter_id")
+    @CollectionTable(name = "tbl_work_shift_staff", joinColumns = @JoinColumn(name = "shift_id"))
+    @Column(name = "staff_id")
     @Builder.Default
-    private Set<Long> waiterIds = new HashSet<>();
+    private Set<Long> staffIds = new HashSet<>();
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

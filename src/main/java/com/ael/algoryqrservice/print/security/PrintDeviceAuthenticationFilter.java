@@ -54,7 +54,7 @@ public class PrintDeviceAuthenticationFilter extends OncePerRequestFilter {
                 null,
                 List.of(new SimpleGrantedAuthority(ROLE))
         );
-        auth.setDetails(new PrintDevicePrincipal(device.getId(), device.getOwnerUserId(), device.getBranchId()));
+        auth.setDetails(new PrintDevicePrincipal(device.getId(), device.getMerchantId(), device.getBranchId()));
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

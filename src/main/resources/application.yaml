@@ -245,3 +245,9 @@ fulfillment:
     base-url: ${FULFILLMENT_SERVICE_URL:http://localhost:8086}
     auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
     auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}
+
+auth:
+  service:
+    enabled: ${AUTH_SERVICE_INTERNAL_AUTH_ENABLED:true}
+    token: ${AUTH_SERVICE_INTERNAL_TOKEN:}
+    header-name: ${AUTH_SERVICE_INTERNAL_HEADER:X-Service-Token}

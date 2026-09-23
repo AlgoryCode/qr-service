@@ -15,7 +15,7 @@ public class OrderAuditService {
     private final OrderAuditLogRepository orderAuditLogRepository;
 
     @Transactional
-    public void record(MenuOrder order, OrderAuditAction action, Long waiterId, String detailJson) {
+    public void record(MenuOrder order, OrderAuditAction action, Long staffId, String detailJson) {
         if (order == null || order.getId() == null) {
             return;
         }
@@ -23,7 +23,7 @@ public class OrderAuditService {
                 .menuId(order.getMenuId())
                 .orderId(order.getId())
                 .billId(order.getBillId())
-                .waiterId(waiterId)
+                .staffId(staffId)
                 .action(action)
                 .detailJson(detailJson)
                 .build());

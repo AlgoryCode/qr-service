@@ -30,8 +30,8 @@ public class KitchenUberEatsService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listActiveForOwner(Long ownerUserId) {
-        UberEatsConnection connection = connectedOrNull(ownerUserId);
+    public List<MenuOrderDtos.OrderResponse> listActiveForOwner(Long merchantId) {
+        UberEatsConnection connection = connectedOrNull(merchantId);
         if (connection == null) {
             return List.of();
         }
@@ -45,8 +45,8 @@ public class KitchenUberEatsService {
     }
 
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long ownerUserId) {
-        UberEatsConnection connection = connectedOrNull(ownerUserId);
+    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long merchantId) {
+        UberEatsConnection connection = connectedOrNull(merchantId);
         if (connection == null) {
             return List.of();
         }
@@ -67,8 +67,8 @@ public class KitchenUberEatsService {
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse markReady(Long ownerUserId, Long orderId) {
-        UberEatsConnection connection = connectionService.requireConnectedForUser(ownerUserId);
+    public MenuOrderDtos.OrderResponse markReady(Long merchantId, Long orderId) {
+        UberEatsConnection connection = connectionService.requireConnectedForUser(merchantId);
         UberEatsOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
                 .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
         String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
@@ -83,11 +83,11 @@ public class KitchenUberEatsService {
         return toKitchenOrder(orderRepository.save(order));
     }
 
-    private UberEatsConnection connectedOrNull(Long ownerUserId) {
-        if (ownerUserId == null) {
+    private UberEatsConnection connectedOrNull(Long merchantId) {
+        if (merchantId == null) {
             return null;
         }
-        UberEatsConnection connection = connectionService.findByUserId(ownerUserId);
+        UberEatsConnection connection = connectionService.findByUserId(merchantId);
         if (connection == null
                 || connection.getStatus() != UberEatsConnectionStatus.CONNECTED
                 || connection.getRestaurantId() == null

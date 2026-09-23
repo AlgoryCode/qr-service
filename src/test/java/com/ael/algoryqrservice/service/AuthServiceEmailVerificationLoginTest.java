@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.model.dto.LoginRequest;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.repository.DashboardUserRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.security.LoginAttemptGuard;
 import com.ael.algoryqrservice.util.ClientInfo;
@@ -39,8 +39,7 @@ class AuthServiceEmailVerificationLoginTest {
     UserRepository userRepository;
     @Mock
     DashboardUserRepository dashboardUserRepository;
-    @Mock
-    MenuWaiterRepository menuWaiterRepository;
+    @Mock MerchantStaffRepository merchantStaffRepository;
     @Mock
     PasswordEncoder passwordEncoder;
     @Mock
@@ -69,7 +68,7 @@ class AuthServiceEmailVerificationLoginTest {
         authService = new AuthService(
                 userRepository,
                 dashboardUserRepository,
-                menuWaiterRepository,
+                merchantStaffRepository,
                 passwordEncoder,
                 authenticationManager,
                 sessionService,
@@ -92,7 +91,7 @@ class AuthServiceEmailVerificationLoginTest {
                 .emailVerified(false)
                 .build();
         when(dashboardUserRepository.existsByEmailIgnoreCase("user@example.com")).thenReturn(false);
-        when(menuWaiterRepository.existsByUsernameIgnoreCase("user@example.com")).thenReturn(false);
+        when(merchantStaffRepository.existsByUsernameIgnoreCase("user@example.com")).thenReturn(false);
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenReturn(null);
 
@@ -121,7 +120,7 @@ class AuthServiceEmailVerificationLoginTest {
                 .emailVerified(true)
                 .build();
         when(dashboardUserRepository.existsByEmailIgnoreCase("user@example.com")).thenReturn(false);
-        when(menuWaiterRepository.existsByUsernameIgnoreCase("user@example.com")).thenReturn(false);
+        when(merchantStaffRepository.existsByUsernameIgnoreCase("user@example.com")).thenReturn(false);
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("bad"));
 

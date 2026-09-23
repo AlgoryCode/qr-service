@@ -56,21 +56,21 @@ public class WaiterPanelController {
         return ResponseEntity.status(201).body(menuWaiterService.createWaiter(branchId, request));
     }
 
-    @PatchMapping("/branch/{branchId}/waiters/{waiterId}")
+    @PatchMapping("/branch/{branchId}/waiters/{staffId}")
     public ResponseEntity<MenuWaiterDtos.WaiterResponse> updateWaiter(
             @PathVariable Long branchId,
-            @PathVariable Long waiterId,
+            @PathVariable Long staffId,
             @RequestBody MenuWaiterDtos.UpdateWaiterRequest request
     ) {
-        return ResponseEntity.ok(menuWaiterService.updateWaiter(branchId, waiterId, request));
+        return ResponseEntity.ok(menuWaiterService.updateWaiter(branchId, staffId, request));
     }
 
-    @DeleteMapping("/branch/{branchId}/waiters/{waiterId}")
+    @DeleteMapping("/branch/{branchId}/waiters/{staffId}")
     public ResponseEntity<Void> deleteWaiter(
             @PathVariable Long branchId,
-            @PathVariable Long waiterId
+            @PathVariable Long staffId
     ) {
-        menuWaiterService.deleteWaiter(branchId, waiterId);
+        menuWaiterService.deleteWaiter(branchId, staffId);
         return ResponseEntity.noContent().build();
     }
 

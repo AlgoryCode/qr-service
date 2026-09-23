@@ -58,8 +58,8 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
             LocalDateTime end
     );
 
-    List<MenuOrder> findByWaiterIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
-            Long waiterId,
+    List<MenuOrder> findByStaffIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+            Long staffId,
             LocalDateTime start,
             LocalDateTime end
     );
@@ -107,12 +107,12 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
     );
 
     @Query("""
-            SELECT o.cancelledByWaiterId, COUNT(o) FROM MenuOrder o
+            SELECT o.cancelledByStaffId, COUNT(o) FROM MenuOrder o
             WHERE o.menuId IN :menuIds
               AND o.status IN :statuses
               AND COALESCE(o.cancelledAt, o.rejectedAt) >= :fromDt
               AND COALESCE(o.cancelledAt, o.rejectedAt) <= :toDt
-            GROUP BY o.cancelledByWaiterId
+            GROUP BY o.cancelledByStaffId
             """)
     List<Object[]> countCancellationsByWaiter(
             @Param("menuIds") Collection<Long> menuIds,

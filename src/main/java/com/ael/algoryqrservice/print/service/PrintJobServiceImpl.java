@@ -36,18 +36,18 @@ public class PrintJobServiceImpl implements PrintJobService {
     @Override
     @Transactional
     public Optional<PrintJob> enqueueKitchenTicket(
-            Long ownerUserId,
+            Long merchantId,
             Long branchId,
             PrintSourceType sourceType,
             String sourceId,
             JsonNode payload
     ) {
-        if (ownerUserId == null || sourceType == null || sourceId == null || sourceId.isBlank() || payload == null) {
+        if (merchantId == null || sourceType == null || sourceId == null || sourceId.isBlank() || payload == null) {
             return Optional.empty();
         }
         if (branchId == null) {
             List<Long> deviceBranches = printAgentDeviceRepository
-                    .findByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(ownerUserId)
+                    .findByMerchantIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(merchantId)
                     .stream()
                     .map(PrintAgentDevice::getBranchId)
                     .distinct()
@@ -55,11 +55,11 @@ public class PrintJobServiceImpl implements PrintJobService {
             if (!deviceBranches.isEmpty()) {
                 Optional<PrintJob> last = Optional.empty();
                 for (Long deviceBranchId : deviceBranches) {
-                    last = persistKitchenTicket(ownerUserId, deviceBranchId, sourceType, sourceId, payload);
+                    last = persistKitchenTicket(merchantId, deviceBranchId, sourceType, sourceId, payload);
                 }
                 return last;
             }
-            branchId = resolvePrintBranch(ownerUserId).orElse(null);
+            branchId = resolvePrintBranch(merchantId).orElse(null);
             if (branchId == null) {
                 return Optional.empty();
             }
@@ -68,11 +68,11 @@ public class PrintJobServiceImpl implements PrintJobService {
             return Optional.empty();
         }
 
-        return persistKitchenTicket(ownerUserId, branchId, sourceType, sourceId, payload);
+        return persistKitchenTicket(merchantId, branchId, sourceType, sourceId, payload);
     }
 
     private Optional<PrintJob> persistKitchenTicket(
-            Long ownerUserId,
+            Long merchantId,
             Long branchId,
             PrintSourceType sourceType,
             String sourceId,
@@ -86,7 +86,7 @@ public class PrintJobServiceImpl implements PrintJobService {
         }
 
         PrintJob job = PrintJob.builder()
-                .ownerUserId(ownerUserId)
+                .merchantId(merchantId)
                 .branchId(branchId)
                 .sourceType(sourceType)
                 .sourceId(sourceId)
@@ -192,8 +192,8 @@ public class PrintJobServiceImpl implements PrintJobService {
                 .orElse(false);
     }
 
-    private Optional<Long> resolvePrintBranch(Long ownerUserId) {
-        return branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(ownerUserId).stream()
+    private Optional<Long> resolvePrintBranch(Long merchantId) {
+        return branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(merchantId).stream()
                 .filter(branch -> branch.isPrintKitchenEnabled())
                 .map(branch -> branch.getId())
                 .findFirst();

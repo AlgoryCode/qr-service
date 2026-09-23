@@ -29,8 +29,8 @@ public class CampaignManualGrant {
     @Column(name = "menu_id", nullable = false)
     private Long menuId;
 
-    @Column(name = "waiter_id", nullable = false)
-    private Long waiterId;
+    @Column(name = "staff_id", nullable = false)
+    private Long staffId;
 
     @Column(name = "customer_id", nullable = false)
     private Long customerId;

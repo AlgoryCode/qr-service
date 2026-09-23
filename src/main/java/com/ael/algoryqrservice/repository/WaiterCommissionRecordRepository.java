@@ -16,14 +16,14 @@ import java.util.List;
 @Repository
 public interface WaiterCommissionRecordRepository extends JpaRepository<WaiterCommissionRecord, Long> {
 
-    List<WaiterCommissionRecord> findByWaiterIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-            Long waiterId,
+    List<WaiterCommissionRecord> findByStaffIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+            Long staffId,
             LocalDateTime start,
             LocalDateTime end
     );
 
-    Page<WaiterCommissionRecord> findByWaiterIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-            Long waiterId,
+    Page<WaiterCommissionRecord> findByStaffIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+            Long staffId,
             LocalDateTime start,
             LocalDateTime end,
             Pageable pageable
@@ -32,24 +32,24 @@ public interface WaiterCommissionRecordRepository extends JpaRepository<WaiterCo
     @Query("""
             SELECT COALESCE(SUM(r.amount), 0)
             FROM WaiterCommissionRecord r
-            WHERE r.waiterId = :waiterId
+            WHERE r.staffId = :staffId
               AND r.createdAt >= :start
               AND r.createdAt <= :end
             """)
-    BigDecimal sumAmountByWaiterAndCreatedAtBetween(
-            @Param("waiterId") Long waiterId,
+    BigDecimal sumAmountByStaffAndCreatedAtBetween(
+            @Param("staffId") Long staffId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
 
     @Query("""
             SELECT r FROM WaiterCommissionRecord r
-            WHERE r.waiterId IN :waiterIds
+            WHERE r.staffId IN :staffIds
               AND r.createdAt >= :start
               AND r.createdAt <= :end
             """)
-    List<WaiterCommissionRecord> findByWaiterIdInAndCreatedAtBetween(
-            @Param("waiterIds") Collection<Long> waiterIds,
+    List<WaiterCommissionRecord> findByStaffIdInAndCreatedAtBetween(
+            @Param("staffIds") Collection<Long> staffIds,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );

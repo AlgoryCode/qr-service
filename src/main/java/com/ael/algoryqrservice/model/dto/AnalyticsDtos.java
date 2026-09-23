@@ -316,7 +316,7 @@ public class AnalyticsDtos {
     }
 
     public record RevenuePersonnelRow(
-            Long waiterId,
+            Long staffId,
             String displayName,
             BigDecimal revenue,
             BigDecimal cashRevenue,
@@ -348,7 +348,7 @@ public class AnalyticsDtos {
     }
 
     public record WaiterPerformanceRow(
-            Long waiterId,
+            Long staffId,
             String displayName,
             long orderCount,
             long itemCount,
@@ -365,7 +365,7 @@ public class AnalyticsDtos {
     ) {
     }
 
-    public record MenuWaiterPerformanceReportResponse(
+    public record MerchantStaffPerformanceReportResponse(
             Long menuId,
             String menuName,
             Long branchId,
@@ -497,7 +497,7 @@ public class AnalyticsDtos {
     }
 
     public record StaffRankingRow(
-            Long waiterId,
+            Long staffId,
             String displayName,
             BigDecimal revenue,
             long orderCount,
@@ -597,7 +597,7 @@ public class AnalyticsDtos {
     }
 
     public record CancellationByWaiter(
-            Long waiterId,
+            Long staffId,
             String displayName,
             long cancelCount
     ) {
@@ -626,7 +626,7 @@ public class AnalyticsDtos {
             Long billId,
             Long orderId,
             Long tableId,
-            Long waiterId,
+            Long staffId,
             Long productId,
             LocalDateTime paidAt,
             BigDecimal amount

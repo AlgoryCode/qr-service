@@ -50,12 +50,12 @@ public interface PrintJobRepository extends JpaRepository<PrintJob, Long> {
 
     Optional<PrintJob> findByIdAndClaimedByDeviceId(Long id, Long claimedByDeviceId);
 
-    Optional<PrintJob> findByIdAndOwnerUserId(Long id, Long ownerUserId);
+    Optional<PrintJob> findByIdAndMerchantId(Long id, Long merchantId);
 
     Optional<PrintJob> findByIdAndBranchId(Long id, Long branchId);
 
-    List<PrintJob> findByOwnerUserIdAndBranchIdAndStatusOrderByCreatedAtDesc(
-            Long ownerUserId,
+    List<PrintJob> findByMerchantIdAndBranchIdAndStatusOrderByCreatedAtDesc(
+            Long merchantId,
             Long branchId,
             PrintJobStatus status
     );

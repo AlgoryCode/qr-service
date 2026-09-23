@@ -164,9 +164,9 @@ public final class MenuOrderDtos {
         private BigDecimal totalAmount;
         private String currency;
         private String note;
-        private Long waiterId;
-        private Long createdByWaiterId;
-        private Long cancelledByWaiterId;
+        private Long staffId;
+        private Long createdByStaffId;
+        private Long cancelledByStaffId;
         private String waiterName;
         private String waiterNote;
         private String kitchenNote;

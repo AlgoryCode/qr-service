@@ -205,7 +205,7 @@ class UnifiedAnalyticsServiceTest {
         when(analyticsService.getBranchRevenueReport(eq(1L), eq(null), eq(9L), eq(from.minusDays(1)), eq(from.minusDays(1))))
                 .thenReturn(previous);
         when(analyticsService.getBranchWaiterPerformanceReport(eq(1L), eq(null), eq(9L), eq(from), eq(to)))
-                .thenReturn(new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+                .thenReturn(new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                         5L, "Lokanta", 1L, "Merkez", from, to,
                         new AnalyticsDtos.WaiterPerformanceKpis(
                                 1L, 1L, 1L, new BigDecimal("240.00"), 4L,
@@ -242,8 +242,8 @@ class UnifiedAnalyticsServiceTest {
         );
     }
 
-    private AnalyticsDtos.MenuWaiterPerformanceReportResponse emptyWaiter(LocalDate from, LocalDate to) {
-        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+    private AnalyticsDtos.MerchantStaffPerformanceReportResponse emptyWaiter(LocalDate from, LocalDate to) {
+        return new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                 5L, "Lokanta", 1L, "Merkez", from, to,
                 new AnalyticsDtos.WaiterPerformanceKpis(
                         0L, 0L, 0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO, BigDecimal.ZERO, 0L, "TRY"),

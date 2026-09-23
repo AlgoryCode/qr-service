@@ -3,7 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.WaiterCommissionRecord;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionRecordType;
@@ -43,7 +43,7 @@ class WaiterCommissionServiceTest {
 
     @Test
     void recordPercentOrderCommission_whenEnabled_thenCalculatesAndPersists() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(3L)
                 .commissionEnabled(true)
@@ -76,7 +76,7 @@ class WaiterCommissionServiceTest {
 
     @Test
     void recordFixedTableCloseCommission_whenEnabled_thenPersistsFixedAmount() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(3L)
                 .commissionEnabled(true)
@@ -106,7 +106,7 @@ class WaiterCommissionServiceTest {
 
     @Test
     void recordFixedItemAddCommission_whenEligibleProduct_thenPersistsPerQuantity() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(3L)
                 .commissionEnabled(true)
@@ -145,7 +145,7 @@ class WaiterCommissionServiceTest {
 
     @Test
     void recordFixedItemAddCommission_whenSuCategory_thenSkipsCommission() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(3L)
                 .commissionEnabled(true)
@@ -178,7 +178,7 @@ class WaiterCommissionServiceTest {
 
     @Test
     void recordPercentOrderCommission_whenDisabled_thenReturnsZero() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .commissionEnabled(false)
                 .build();

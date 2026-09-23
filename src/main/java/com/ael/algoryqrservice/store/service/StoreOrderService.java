@@ -14,6 +14,7 @@ import com.ael.algoryqrservice.store.repository.StoreCourierRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderRepository;
 import com.ael.algoryqrservice.store.repository.StoreOrderStatusHistoryRepository;
 import com.ael.algoryqrservice.print.service.PrintOrderEnqueueService;
+import com.ael.algoryqrservice.service.StockConsumptionService;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,7 @@ public class StoreOrderService {
     private final StoreOpeningHours storeOpeningHours;
     private final StoreTokenGenerator storeTokenGenerator;
     private final PrintOrderEnqueueService printOrderEnqueueService;
+    private final StockConsumptionService stockConsumptionService;
 
     @Transactional
     public StoreOrder placeOrder(Merchant merchant, StorePublicDtos.CreateOrderRequest request, Long customerId) {
@@ -83,6 +85,7 @@ public class StoreOrderService {
         stampTransition(order, target, reason);
         StoreOrder saved = storeOrderRepository.save(order);
         recordTransition(saved, previous, target, StoreOrderActorType.MERCHANT, actorUserId, reason);
+        applyStock(saved, target);
         return saved;
     }
 
@@ -118,6 +121,16 @@ public class StoreOrderService {
     @Transactional(readOnly = true)
     public Optional<StoreCourier> findCourier(Long courierId) {
         return courierId == null ? Optional.empty() : storeCourierRepository.findById(courierId);
+    }
+
+    private void applyStock(StoreOrder order, StoreOrderStatus target) {
+        if (target == StoreOrderStatus.CONFIRMED) {
+            stockConsumptionService.consumeStoreOrder(order);
+            return;
+        }
+        if (target == StoreOrderStatus.CANCELLED || target == StoreOrderStatus.REJECTED) {
+            stockConsumptionService.reverseStoreOrder(order);
+        }
     }
 
     private void requireAcceptingOrders(Merchant merchant, StorePublicDtos.CreateOrderRequest request) {

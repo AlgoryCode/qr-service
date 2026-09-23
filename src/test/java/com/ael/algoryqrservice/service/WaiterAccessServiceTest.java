@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.Menu;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 class WaiterAccessServiceTest {
 
     @Mock
-    private MenuWaiterRepository menuWaiterRepository;
+    private MerchantStaffRepository merchantStaffRepository;
     @Mock
     private MenuRepository menuRepository;
     @Mock
@@ -34,35 +34,35 @@ class WaiterAccessServiceTest {
 
     @Test
     void requireWaiterForMenu_whenMenuOnSameBranch_thenReturnsWaiter() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(4L)
                 .active(true)
                 .build();
         when(securityUtils.getCurrentWaiterId()).thenReturn(7L);
         when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
-        when(menuWaiterRepository.findById(7L)).thenReturn(Optional.of(waiter));
+        when(merchantStaffRepository.findById(7L)).thenReturn(Optional.of(waiter));
         when(menuRepository.findById(12L)).thenReturn(Optional.of(Menu.builder()
                 .menuId(12L)
                 .branchId(4L)
                 .deleted(false)
                 .build()));
 
-        MenuWaiter result = waiterAccessService.requireWaiterForMenu(12L);
+        MerchantStaff result = waiterAccessService.requireWaiterForMenu(12L);
 
         assertThat(result.getId()).isEqualTo(7L);
     }
 
     @Test
     void requireWaiterForMenu_whenMenuOnOtherBranch_thenForbidden() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(4L)
                 .active(true)
                 .build();
         when(securityUtils.getCurrentWaiterId()).thenReturn(7L);
         when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
-        when(menuWaiterRepository.findById(7L)).thenReturn(Optional.of(waiter));
+        when(merchantStaffRepository.findById(7L)).thenReturn(Optional.of(waiter));
         when(menuRepository.findById(12L)).thenReturn(Optional.of(Menu.builder()
                 .menuId(12L)
                 .branchId(99L)
@@ -76,7 +76,7 @@ class WaiterAccessServiceTest {
 
     @Test
     void requireKitchenStaff_whenWaiterRole_thenForbidden() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(4L)
                 .active(true)
@@ -84,7 +84,7 @@ class WaiterAccessServiceTest {
                 .build();
         when(securityUtils.getCurrentWaiterId()).thenReturn(7L);
         when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
-        when(menuWaiterRepository.findById(7L)).thenReturn(Optional.of(waiter));
+        when(merchantStaffRepository.findById(7L)).thenReturn(Optional.of(waiter));
 
         assertThatThrownBy(() -> waiterAccessService.requireKitchenStaff())
                 .isInstanceOf(ResponseStatusException.class)
@@ -93,7 +93,7 @@ class WaiterAccessServiceTest {
 
     @Test
     void requireWaiterStaff_whenKitchenRole_thenForbidden() {
-        MenuWaiter staff = MenuWaiter.builder()
+        MerchantStaff staff = MerchantStaff.builder()
                 .id(8L)
                 .branchId(4L)
                 .active(true)
@@ -101,7 +101,7 @@ class WaiterAccessServiceTest {
                 .build();
         when(securityUtils.getCurrentWaiterId()).thenReturn(8L);
         when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
-        when(menuWaiterRepository.findById(8L)).thenReturn(Optional.of(staff));
+        when(merchantStaffRepository.findById(8L)).thenReturn(Optional.of(staff));
 
         assertThatThrownBy(() -> waiterAccessService.requireWaiterStaff())
                 .isInstanceOf(ResponseStatusException.class)
@@ -110,7 +110,7 @@ class WaiterAccessServiceTest {
 
     @Test
     void requireWaiterStaff_whenCourierRole_thenForbidden() {
-        MenuWaiter staff = MenuWaiter.builder()
+        MerchantStaff staff = MerchantStaff.builder()
                 .id(9L)
                 .branchId(4L)
                 .active(true)
@@ -118,7 +118,7 @@ class WaiterAccessServiceTest {
                 .build();
         when(securityUtils.getCurrentWaiterId()).thenReturn(9L);
         when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
-        when(menuWaiterRepository.findById(9L)).thenReturn(Optional.of(staff));
+        when(merchantStaffRepository.findById(9L)).thenReturn(Optional.of(staff));
 
         assertThatThrownBy(() -> waiterAccessService.requireWaiterStaff())
                 .isInstanceOf(ResponseStatusException.class)
@@ -127,7 +127,7 @@ class WaiterAccessServiceTest {
 
     @Test
     void requireCourierStaff_whenWaiterRole_thenForbidden() {
-        MenuWaiter waiter = MenuWaiter.builder()
+        MerchantStaff waiter = MerchantStaff.builder()
                 .id(7L)
                 .branchId(4L)
                 .active(true)
@@ -135,7 +135,7 @@ class WaiterAccessServiceTest {
                 .build();
         when(securityUtils.getCurrentWaiterId()).thenReturn(7L);
         when(securityUtils.getCurrentWaiterBranchId()).thenReturn(4L);
-        when(menuWaiterRepository.findById(7L)).thenReturn(Optional.of(waiter));
+        when(merchantStaffRepository.findById(7L)).thenReturn(Optional.of(waiter));
 
         assertThatThrownBy(() -> waiterAccessService.requireCourierStaff())
                 .isInstanceOf(ResponseStatusException.class)

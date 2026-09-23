@@ -79,8 +79,8 @@ public class UserAccountingEntry {
     @Column(name = "source_order_id")
     private Long sourceOrderId;
 
-    @Column(name = "created_by_waiter_id")
-    private Long createdByWaiterId;
+    @Column(name = "created_by_staff_id")
+    private Long createdByStaffId;
 
     @Column(name = "order_amount", precision = 12, scale = 2)
     private BigDecimal orderAmount;

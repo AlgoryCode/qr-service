@@ -14,7 +14,7 @@ public class SmartReportModelInputBuilder {
     public SmartReportModelDtos.SmartReportModelInput build(
             AnalyticsDtos.MenuAnalyticsReportResponse visits,
             AnalyticsDtos.MenuRevenueReportResponse revenue,
-            AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter,
+            AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter,
             String locale,
             Map<String, Object> optionsMap
     ) {
@@ -149,7 +149,7 @@ public class SmartReportModelInputBuilder {
     }
 
     private static SmartReportModelDtos.WaiterBlock mapWaiter(
-            AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter
+            AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter
     ) {
         if (waiter == null || waiter.kpis() == null) {
             return null;
@@ -186,7 +186,7 @@ public class SmartReportModelInputBuilder {
                 SmartReportModelDtos.WAITER_TOP_PRODUCTS_LIMIT
         );
         return new SmartReportModelDtos.WaiterRow(
-                row.waiterId(),
+                row.staffId(),
                 row.displayName(),
                 row.orderCount(),
                 row.itemCount(),

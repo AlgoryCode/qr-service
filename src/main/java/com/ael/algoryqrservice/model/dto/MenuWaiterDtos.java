@@ -117,7 +117,7 @@ public final class MenuWaiterDtos {
     public static class WaiterAuthResponse {
         private String accessToken;
         private String refreshToken;
-        private Long waiterId;
+        private Long staffId;
         private Long branchId;
         private String displayName;
         private StaffRole staffRole;
@@ -128,9 +128,9 @@ public final class MenuWaiterDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class WaiterMeResponse {
-        private Long waiterId;
+        private Long staffId;
         private Long branchId;
-        private Long ownerUserId;
+        private Long merchantId;
         private String username;
         private String displayName;
         private StaffRole staffRole;

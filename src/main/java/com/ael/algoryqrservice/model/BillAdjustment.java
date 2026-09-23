@@ -35,8 +35,8 @@ public class BillAdjustment {
     @Column(name = "order_id")
     private Long orderId;
 
-    @Column(name = "waiter_id")
-    private Long waiterId;
+    @Column(name = "staff_id")
+    private Long staffId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "adjustment_type", nullable = false, length = 16)

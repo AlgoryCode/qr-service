@@ -11,7 +11,7 @@ import com.ael.algoryqrservice.repository.BillAdjustmentRepository;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
@@ -47,7 +47,7 @@ class UnifiedAnalyticsAggregatesTest {
     @Mock
     private BillPaymentRepository billPaymentRepository;
     @Mock
-    private MenuWaiterRepository menuWaiterRepository;
+    private MerchantStaffRepository merchantStaffRepository;
     @Mock
     private MenuAnalyticsSessionRepository sessionRepository;
     @Mock
@@ -65,7 +65,7 @@ class UnifiedAnalyticsAggregatesTest {
                 tableBillItemRepository,
                 restaurantTableRepository,
                 billPaymentRepository,
-                menuWaiterRepository,
+                merchantStaffRepository,
                 sessionRepository,
                 billAdjustmentRepository,
                 workShiftRepository
