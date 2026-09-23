@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.BillPayment;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.WaiterCommissionRecord;
@@ -54,8 +54,8 @@ class WaiterPerformanceReportServiceTest {
     void build_whenPaymentsExist_thenGroupsSalesByWaiter() {
         Long menuId = 5L;
         LocalDate day = LocalDate.of(2026, 8, 13);
-        MenuWaiter ali = waiter(101L, "Ali", true);
-        MenuWaiter ayse = waiter(102L, "Ayse", true);
+        MerchantStaff ali = waiter(101L, "Ali", true);
+        MerchantStaff ayse = waiter(102L, "Ayse", true);
 
         TableBill aliBill = bill(10L, menuId, 101L);
         TableBill ayseBill = bill(11L, menuId, 102L);
@@ -75,13 +75,13 @@ class WaiterPerformanceReportServiceTest {
         when(tableBillRepository.findByMenuIdInAndStatusAndClosedAtBetween(
                 eq(List.of(menuId)), eq(TableBillStatus.CLOSED), any(), any()
         )).thenReturn(List.of(aliBill, ayseBill, unassignedBill));
-        when(commissionRecordRepository.findByWaiterIdInAndCreatedAtBetween(eq(List.of(101L, 102L)), any(), any()))
+        when(commissionRecordRepository.findByStaffIdInAndCreatedAtBetween(eq(List.of(101L, 102L)), any(), any()))
                 .thenReturn(List.of(
                         commission(101L, menuId, "15.00"),
                         commission(102L, menuId, "9.00")
                 ));
 
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse report = service.build(
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse report = service.build(
                 menuId,
                 "Test",
                 2L,
@@ -116,7 +116,7 @@ class WaiterPerformanceReportServiceTest {
     void build_whenOnlyDirectBillPayments_thenStillShowsSales() {
         Long menuId = 5L;
         LocalDate day = LocalDate.of(2026, 8, 13);
-        MenuWaiter ali = waiter(101L, "Ali", true);
+        MerchantStaff ali = waiter(101L, "Ali", true);
         TableBill bill = bill(10L, menuId, 101L);
         TableBillItem item = item(bill, 11L, "Cay");
 
@@ -127,10 +127,10 @@ class WaiterPerformanceReportServiceTest {
         when(tableBillRepository.findByMenuIdInAndStatusAndClosedAtBetween(
                 eq(List.of(menuId)), eq(TableBillStatus.CLOSED), any(), any()
         )).thenReturn(List.of(bill));
-        when(commissionRecordRepository.findByWaiterIdInAndCreatedAtBetween(eq(List.of(101L)), any(), any()))
+        when(commissionRecordRepository.findByStaffIdInAndCreatedAtBetween(eq(List.of(101L)), any(), any()))
                 .thenReturn(List.of());
 
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse report = service.build(
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse report = service.build(
                 menuId,
                 "Test",
                 2L,
@@ -147,10 +147,10 @@ class WaiterPerformanceReportServiceTest {
         assertThat(report.waiters().getFirst().revenue()).isEqualByComparingTo("75.00");
     }
 
-    private static MenuWaiter waiter(Long id, String name, boolean active) {
-        return MenuWaiter.builder()
+    private static MerchantStaff waiter(Long id, String name, boolean active) {
+        return MerchantStaff.builder()
                 .id(id)
-                .ownerUserId(9L)
+                .merchantId(9L)
                 .branchId(2L)
                 .username(name.toLowerCase())
                 .passwordHash("hash")
@@ -161,13 +161,13 @@ class WaiterPerformanceReportServiceTest {
                 .build();
     }
 
-    private static TableBill bill(Long id, Long menuId, Long closedByWaiterId) {
+    private static TableBill bill(Long id, Long menuId, Long closedByStaffId) {
         return TableBill.builder()
                 .id(id)
                 .menuId(menuId)
                 .tableId(1L)
                 .status(TableBillStatus.CLOSED)
-                .closedByWaiterId(closedByWaiterId)
+                .closedByStaffId(closedByStaffId)
                 .closedAt(LocalDateTime.of(2026, 8, 13, 18, 0))
                 .currency("TRY")
                 .totalAmount(BigDecimal.ZERO)
@@ -189,7 +189,7 @@ class WaiterPerformanceReportServiceTest {
     private static BillPayment payment(
             TableBill bill,
             TableBillItem item,
-            Long waiterId,
+            Long staffId,
             String amount,
             int quantityPaid,
             boolean tip,
@@ -198,7 +198,7 @@ class WaiterPerformanceReportServiceTest {
         return BillPayment.builder()
                 .bill(bill)
                 .billItem(item)
-                .waiterId(waiterId)
+                .staffId(staffId)
                 .paymentMethod(TableBillPaymentMethod.CASH)
                 .amount(new BigDecimal(amount))
                 .quantityPaid(quantityPaid)
@@ -208,9 +208,9 @@ class WaiterPerformanceReportServiceTest {
                 .build();
     }
 
-    private static WaiterCommissionRecord commission(Long waiterId, Long menuId, String amount) {
+    private static WaiterCommissionRecord commission(Long staffId, Long menuId, String amount) {
         return WaiterCommissionRecord.builder()
-                .waiterId(waiterId)
+                .staffId(staffId)
                 .menuId(menuId)
                 .branchId(2L)
                 .recordType(WaiterCommissionRecordType.PERCENT_ORDER)

@@ -31,7 +31,7 @@ public class PrintAgentSchemaInitializer implements BeanPostProcessor {
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS tbl_print_agent_device (
                         id              BIGSERIAL PRIMARY KEY,
-                        owner_user_id   BIGINT       NOT NULL,
+                        merchant_id   BIGINT       NOT NULL,
                         branch_id       BIGINT       NOT NULL,
                         device_name     VARCHAR(128) NOT NULL,
                         device_token_hash VARCHAR(128) NOT NULL,
@@ -47,7 +47,7 @@ public class PrintAgentSchemaInitializer implements BeanPostProcessor {
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS tbl_print_pairing_code (
                         id              BIGSERIAL PRIMARY KEY,
-                        owner_user_id   BIGINT       NOT NULL,
+                        merchant_id   BIGINT       NOT NULL,
                         branch_id       BIGINT       NOT NULL,
                         code_hash       VARCHAR(128) NOT NULL,
                         expires_at      TIMESTAMP    NOT NULL,
@@ -59,7 +59,7 @@ public class PrintAgentSchemaInitializer implements BeanPostProcessor {
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS tbl_print_job (
                         id                      BIGSERIAL PRIMARY KEY,
-                        owner_user_id           BIGINT       NOT NULL,
+                        merchant_id           BIGINT       NOT NULL,
                         branch_id               BIGINT,
                         device_id               BIGINT,
                         source_type             VARCHAR(32)  NOT NULL,

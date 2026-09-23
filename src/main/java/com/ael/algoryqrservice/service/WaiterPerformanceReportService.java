@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.BillPayment;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.WaiterCommissionRecord;
@@ -39,13 +39,13 @@ public class WaiterPerformanceReportService {
     private final TableBillRepository tableBillRepository;
     private final WaiterCommissionRecordRepository commissionRecordRepository;
 
-    public AnalyticsDtos.MenuWaiterPerformanceReportResponse build(
+    public AnalyticsDtos.MerchantStaffPerformanceReportResponse build(
             Long menuId,
             String menuName,
             Long branchId,
             String branchName,
             Collection<Long> menuIds,
-            List<MenuWaiter> waiters,
+            List<MerchantStaff> waiters,
             Map<Long, String> waiterNames,
             LocalDate from,
             LocalDate to
@@ -78,15 +78,15 @@ public class WaiterPerformanceReportService {
     }
 
     private List<WaiterCommissionRecord> loadCommissions(
-            List<MenuWaiter> waiters,
+            List<MerchantStaff> waiters,
             LocalDateTime fromDt,
             LocalDateTime toDt
     ) {
-        List<Long> waiterIds = waiters.stream().map(MenuWaiter::getId).toList();
-        if (waiterIds.isEmpty()) {
+        List<Long> staffIds = waiters.stream().map(MerchantStaff::getId).toList();
+        if (staffIds.isEmpty()) {
             return List.of();
         }
-        return commissionRecordRepository.findByWaiterIdInAndCreatedAtBetween(waiterIds, fromDt, toDt);
+        return commissionRecordRepository.findByStaffIdInAndCreatedAtBetween(staffIds, fromDt, toDt);
     }
 
     private void applyPayments(ReportContext context, List<BillPayment> payments) {
@@ -101,7 +101,7 @@ public class WaiterPerformanceReportService {
         LocalDate day = payment.getPaidAt() != null ? payment.getPaidAt().toLocalDate() : context.from;
         int hour = payment.getPaidAt() != null ? payment.getPaidAt().getHour() : 0;
         Long billId = payment.getBill() != null ? payment.getBill().getId() : null;
-        WaiterStats stats = context.statsFor(payment.getWaiterId());
+        WaiterStats stats = context.statsFor(payment.getStaffId());
 
         if (payment.isTip()) {
             context.totalTip = context.totalTip.add(amount);
@@ -148,7 +148,7 @@ public class WaiterPerformanceReportService {
     private void applyClosedBills(ReportContext context, List<TableBill> closedBills) {
         for (TableBill bill : closedBills) {
             context.billsClosedCount++;
-            Long closerId = bill.getClosedByWaiterId();
+            Long closerId = bill.getClosedByStaffId();
             if (closerId == null) {
                 continue;
             }
@@ -160,7 +160,7 @@ public class WaiterPerformanceReportService {
         for (WaiterCommissionRecord record : records) {
             BigDecimal amount = record.getAmount() != null ? record.getAmount() : BigDecimal.ZERO;
             context.totalCommission = context.totalCommission.add(amount);
-            context.statsFor(record.getWaiterId()).addCommission(amount);
+            context.statsFor(record.getStaffId()).addCommission(amount);
         }
     }
 
@@ -174,7 +174,7 @@ public class WaiterPerformanceReportService {
         }
     }
 
-    private AnalyticsDtos.MenuWaiterPerformanceReportResponse assemble(
+    private AnalyticsDtos.MerchantStaffPerformanceReportResponse assemble(
             Long menuId,
             String menuName,
             Long branchId,
@@ -186,7 +186,7 @@ public class WaiterPerformanceReportService {
         long totalOrders = assignedOrderCount + unassignedOrderCount;
         List<AnalyticsDtos.WaiterPerformanceRow> rows = buildRows(context, totalOrders);
 
-        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+        return new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                 menuId,
                 menuName,
                 branchId,
@@ -194,7 +194,7 @@ public class WaiterPerformanceReportService {
                 context.from,
                 context.to,
                 new AnalyticsDtos.WaiterPerformanceKpis(
-                        context.waiters.stream().filter(MenuWaiter::isActive).count(),
+                        context.waiters.stream().filter(MerchantStaff::isActive).count(),
                         assignedOrderCount,
                         unassignedOrderCount,
                         context.totalRevenue,
@@ -219,9 +219,9 @@ public class WaiterPerformanceReportService {
 
     private List<AnalyticsDtos.WaiterPerformanceRow> buildRows(ReportContext context, long totalOrders) {
         List<AnalyticsDtos.WaiterPerformanceRow> rows = new ArrayList<>();
-        Set<Long> knownIds = context.waiters.stream().map(MenuWaiter::getId).collect(Collectors.toSet());
+        Set<Long> knownIds = context.waiters.stream().map(MerchantStaff::getId).collect(Collectors.toSet());
 
-        for (MenuWaiter waiter : context.waiters) {
+        for (MerchantStaff waiter : context.waiters) {
             WaiterStats stats = context.statsByWaiterId.getOrDefault(waiter.getId(), new WaiterStats());
             rows.add(toRow(
                     waiter.getId(),
@@ -276,7 +276,7 @@ public class WaiterPerformanceReportService {
     }
 
     private AnalyticsDtos.WaiterPerformanceRow toRow(
-            Long waiterId,
+            Long staffId,
             String displayName,
             boolean active,
             WaiterStats stats,
@@ -289,7 +289,7 @@ public class WaiterPerformanceReportService {
                 ? BigDecimal.ZERO
                 : stats.revenue.divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
         return new AnalyticsDtos.WaiterPerformanceRow(
-                waiterId,
+                staffId,
                 displayName,
                 orderCount,
                 stats.itemCount,
@@ -349,7 +349,7 @@ public class WaiterPerformanceReportService {
                 .toList();
     }
 
-    public AnalyticsDtos.MenuWaiterPerformanceReportResponse emptyReport(
+    public AnalyticsDtos.MerchantStaffPerformanceReportResponse emptyReport(
             Long menuId,
             String menuName,
             Long branchId,
@@ -365,7 +365,7 @@ public class WaiterPerformanceReportService {
         for (int hour = 0; hour < 24; hour++) {
             hourly.add(new AnalyticsDtos.HourlyRevenuePoint(hour, BigDecimal.ZERO, 0L));
         }
-        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+        return new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                 menuId,
                 menuName,
                 branchId,
@@ -382,7 +382,7 @@ public class WaiterPerformanceReportService {
     }
 
     private static final class ReportContext {
-        private final List<MenuWaiter> waiters;
+        private final List<MerchantStaff> waiters;
         private final Map<Long, String> waiterNames;
         private final LocalDate from;
         private final LocalDate to;
@@ -400,21 +400,21 @@ public class WaiterPerformanceReportService {
         private long billsClosedCount;
         private String currency = "TRY";
 
-        private ReportContext(List<MenuWaiter> waiters, Map<Long, String> waiterNames, LocalDate from, LocalDate to) {
+        private ReportContext(List<MerchantStaff> waiters, Map<Long, String> waiterNames, LocalDate from, LocalDate to) {
             this.waiters = waiters;
             this.waiterNames = waiterNames;
             this.from = from;
             this.to = to;
-            for (MenuWaiter waiter : waiters) {
+            for (MerchantStaff waiter : waiters) {
                 statsByWaiterId.put(waiter.getId(), new WaiterStats());
             }
         }
 
-        private WaiterStats statsFor(Long waiterId) {
-            if (waiterId == null) {
+        private WaiterStats statsFor(Long staffId) {
+            if (staffId == null) {
                 return unassigned;
             }
-            return statsByWaiterId.computeIfAbsent(waiterId, ignored -> new WaiterStats());
+            return statsByWaiterId.computeIfAbsent(staffId, ignored -> new WaiterStats());
         }
     }
 

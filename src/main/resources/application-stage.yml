@@ -86,6 +86,6 @@ google:
 fulfillment:
   external:
     enabled: ${FULFILLMENT_EXTERNAL_ENABLED:true}
-    base-url: ${FULFILLMENT_SERVICE_URL:http://qr-fulfillment-service:8080}
+    base-url: ${FULFILLMENT_SERVICE_URL:https://stage.fulfillment.algorycode.com}
     auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
     auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}

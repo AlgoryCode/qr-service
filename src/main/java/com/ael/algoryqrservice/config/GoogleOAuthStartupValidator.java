@@ -4,11 +4,13 @@ import com.ael.algoryqrservice.security.GoogleOAuthPaths;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
 
 @Component
+@ConditionalOnProperty(name = "google.oauth.issuer-enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class GoogleOAuthStartupValidator implements ApplicationRunner {
 

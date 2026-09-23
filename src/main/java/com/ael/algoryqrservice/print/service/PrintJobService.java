@@ -10,7 +10,7 @@ import java.util.Optional;
 public interface PrintJobService {
 
     Optional<PrintJob> enqueueKitchenTicket(
-            Long ownerUserId,
+            Long merchantId,
             Long branchId,
             com.ael.algoryqrservice.print.model.PrintSourceType sourceType,
             String sourceId,

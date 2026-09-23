@@ -11,7 +11,7 @@ import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.model.dto.*;
 import com.ael.algoryqrservice.repository.DashboardUserRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.security.LoginAttemptGuard;
 import com.ael.algoryqrservice.util.ClientInfo;
@@ -38,7 +38,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final DashboardUserRepository dashboardUserRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final SessionService sessionService;
@@ -120,7 +120,7 @@ public class AuthService {
         if (dashboardUserRepository.existsByEmailIgnoreCase(email)) {
             throw new BadRequestException("Bu hesap dashboard girisi icindir. /admin/auth/sessions kullanin");
         }
-        if (menuWaiterRepository.existsByUsernameIgnoreCase(email)) {
+        if (merchantStaffRepository.existsByUsernameIgnoreCase(email)) {
             throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");
         }
         User user = userRepository.findByEmail(email)

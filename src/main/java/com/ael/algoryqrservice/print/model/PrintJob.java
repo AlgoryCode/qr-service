@@ -37,8 +37,8 @@ public class PrintJob {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "owner_user_id", nullable = false)
-    private Long ownerUserId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "branch_id")
     private Long branchId;

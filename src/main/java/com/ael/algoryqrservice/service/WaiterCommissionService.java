@@ -5,7 +5,7 @@ import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.WaiterCommissionRecord;
 import com.ael.algoryqrservice.model.dto.TableBillDtos;
@@ -44,7 +44,7 @@ public class WaiterCommissionService {
     private final MenuProductRepository menuProductRepository;
 
     @Transactional
-    public void recordOrderCommissions(MenuWaiter waiter, MenuOrder order, Long billId) {
+    public void recordOrderCommissions(MerchantStaff waiter, MenuOrder order, Long billId) {
         if (waiter == null || order == null || !waiter.isCommissionEnabled()) {
             return;
         }
@@ -64,7 +64,7 @@ public class WaiterCommissionService {
     }
 
     @Transactional
-    public BigDecimal recordPercentOrderCommission(MenuWaiter waiter, MenuOrder order, Long billId) {
+    public BigDecimal recordPercentOrderCommission(MerchantStaff waiter, MenuOrder order, Long billId) {
         if (waiter == null || order == null || !waiter.isCommissionEnabled()) {
             return BigDecimal.ZERO;
         }
@@ -85,7 +85,7 @@ public class WaiterCommissionService {
         order.setCommissionAmount(amount);
 
         WaiterCommissionRecord record = WaiterCommissionRecord.builder()
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .menuId(order.getMenuId())
                 .branchId(waiter.getBranchId())
                 .billId(billId)
@@ -103,7 +103,7 @@ public class WaiterCommissionService {
 
     @Transactional
     public BigDecimal recordFixedItemAddCommission(
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             Long menuId,
             Long billId,
             Long orderId,
@@ -144,7 +144,7 @@ public class WaiterCommissionService {
 
             BigDecimal amount = value.multiply(BigDecimal.valueOf(quantity));
             WaiterCommissionRecord record = WaiterCommissionRecord.builder()
-                    .waiterId(waiter.getId())
+                    .staffId(waiter.getId())
                     .menuId(menuId)
                     .branchId(waiter.getBranchId())
                     .billId(billId)
@@ -164,7 +164,7 @@ public class WaiterCommissionService {
     }
 
     @Transactional
-    public BigDecimal recordFixedTableCloseCommission(MenuWaiter waiter, TableBill bill) {
+    public BigDecimal recordFixedTableCloseCommission(MerchantStaff waiter, TableBill bill) {
         if (waiter == null || bill == null || !waiter.isCommissionEnabled()) {
             return BigDecimal.ZERO;
         }
@@ -178,7 +178,7 @@ public class WaiterCommissionService {
         }
 
         WaiterCommissionRecord record = WaiterCommissionRecord.builder()
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .menuId(bill.getMenuId())
                 .branchId(waiter.getBranchId())
                 .billId(bill.getId())
@@ -217,10 +217,10 @@ public class WaiterCommissionService {
     }
 
     @Transactional(readOnly = true)
-    public TableBillDtos.TodayCommissionSummary getTodaySummary(Long waiterId) {
+    public TableBillDtos.TodayCommissionSummary getTodaySummary(Long staffId) {
         LocalDateTime[] range = todayRange();
         List<WaiterCommissionRecord> records = commissionRecordRepository
-                .findByWaiterIdAndCreatedAtBetweenOrderByCreatedAtDesc(waiterId, range[0], range[1]);
+                .findByStaffIdAndCreatedAtBetweenOrderByCreatedAtDesc(staffId, range[0], range[1]);
 
         BigDecimal percentTotal = BigDecimal.ZERO;
         BigDecimal fixedTableCloseTotal = BigDecimal.ZERO;
@@ -258,7 +258,7 @@ public class WaiterCommissionService {
 
     @Transactional(readOnly = true)
     public TableBillDtos.CommissionHistoryResponse getHistory(
-            Long waiterId,
+            Long staffId,
             LocalDate from,
             LocalDate to,
             int page,
@@ -276,8 +276,8 @@ public class WaiterCommissionService {
         int safeSize = Math.min(Math.max(size, 1), 100);
 
         Page<WaiterCommissionRecord> result = commissionRecordRepository
-                .findByWaiterIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-                        waiterId,
+                .findByStaffIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                        staffId,
                         start,
                         end,
                         PageRequest.of(safePage, safeSize)

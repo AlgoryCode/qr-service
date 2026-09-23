@@ -35,8 +35,8 @@ public class BillPayment {
     @JoinColumn(name = "bill_item_id")
     private TableBillItem billItem;
 
-    @Column(name = "waiter_id")
-    private Long waiterId;
+    @Column(name = "staff_id")
+    private Long staffId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false, length = 10)

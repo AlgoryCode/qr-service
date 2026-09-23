@@ -124,9 +124,9 @@ public class SmartReportService {
                 ? analyticsService.getBranchRevenueReport(branchId, null, ownerId, from, to)
                 : analyticsService.getMenuRevenueReport(menuId, ownerId, from, to);
 
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter = branchOnly
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter = branchOnly
                 ? analyticsService.getBranchWaiterPerformanceReport(branchId, null, ownerId, from, to)
-                : analyticsService.getMenuWaiterPerformanceReport(menuId, ownerId, from, to);
+                : analyticsService.getMerchantStaffPerformanceReport(menuId, ownerId, from, to);
 
         UUID processId = UUID.randomUUID();
         String resolvedLocale = locale == null || locale.isBlank() ? "tr" : locale.trim();
@@ -144,7 +144,7 @@ public class SmartReportService {
         AnalyticsDtos.MenuRevenueReportResponse aiRevenue = branchOnly
                 ? stripMenuIdentity(revenue, resolvedBranchId, branchName)
                 : revenue;
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse aiWaiter = branchOnly
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse aiWaiter = branchOnly
                 ? stripMenuIdentity(waiter, resolvedBranchId, branchName)
                 : waiter;
 
@@ -287,12 +287,12 @@ public class SmartReportService {
         );
     }
 
-    private static AnalyticsDtos.MenuWaiterPerformanceReportResponse stripMenuIdentity(
-            AnalyticsDtos.MenuWaiterPerformanceReportResponse report,
+    private static AnalyticsDtos.MerchantStaffPerformanceReportResponse stripMenuIdentity(
+            AnalyticsDtos.MerchantStaffPerformanceReportResponse report,
             Long branchId,
             String branchName
     ) {
-        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+        return new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                 null,
                 null,
                 branchId,

@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuProductOptionGroup;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.SelectedMenuOption;
 import com.ael.algoryqrservice.model.TableBill;
@@ -22,7 +22,7 @@ import com.ael.algoryqrservice.repository.CustomerRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.service.campaign.CampaignEvaluationService;
 import com.ael.algoryqrservice.print.service.PrintOrderEnqueueService;
@@ -53,7 +53,7 @@ public class MenuOrderService {
     private final MenuProductRepository menuProductRepository;
     private final MenuRepository menuRepository;
     private final RestaurantTableRepository restaurantTableRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final CustomerRepository customerRepository;
     private final TableSessionService tableSessionService;
     private final TableBillService tableBillService;
@@ -65,6 +65,7 @@ public class MenuOrderService {
     private final KitchenUberEatsService kitchenUberEatsService;
     private final KitchenYemekSepetiService kitchenYemekSepetiService;
     private final PrintOrderEnqueueService printOrderEnqueueService;
+    private final StockConsumptionService stockConsumptionService;
 
     @Transactional
     public MenuOrderDtos.OrderResponse getOrCreateDraft(String tableSessionToken) {
@@ -102,7 +103,7 @@ public class MenuOrderService {
     @Transactional
     public MenuOrderDtos.OrderResponse placeWaiterOrder(
             Long menuId,
-            Long waiterId,
+            Long staffId,
             MenuOrderDtos.WaiterCreateOrderRequest request
     ) {
         if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
@@ -116,10 +117,10 @@ public class MenuOrderService {
             throw new BadRequestException("Masa aktif değil");
         }
 
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
+        MerchantStaff waiter = merchantStaffRepository.findById(staffId)
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
 
-        TableBill bill = tableBillService.getOrOpenBill(menuId, table.getId(), waiterId);
+        TableBill bill = tableBillService.getOrOpenBill(menuId, table.getId(), staffId);
         if (request.getCoverCount() != null && request.getCoverCount() > 0) {
             bill.setCoverCount(request.getCoverCount());
             tableBillService.saveBill(bill);
@@ -134,8 +135,8 @@ public class MenuOrderService {
                 .billId(bill.getId())
                 .status(MenuOrderStatus.CONFIRMED)
                 .orderSource(OrderSource.WAITER)
-                .waiterId(waiterId)
-                .createdByWaiterId(waiterId)
+                .staffId(staffId)
+                .createdByStaffId(staffId)
                 .note(trimToNull(request.getNote()))
                 .waiterNote(trimToNull(request.getWaiterNote()))
                 .totalAmount(BigDecimal.ZERO)
@@ -149,10 +150,11 @@ public class MenuOrderService {
 
         applyCartItems(order, menuId, request.getItems());
         MenuOrder saved = menuOrderRepository.save(order);
-        tableBillService.addItemsFromOrder(bill, saved, waiterId);
+        stockConsumptionService.consumeMenuOrder(saved);
+        tableBillService.addItemsFromOrder(bill, saved, staffId);
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
         menuOrderRepository.save(saved);
-        orderAuditService.record(saved, OrderAuditAction.CREATED, waiterId, null);
+        orderAuditService.record(saved, OrderAuditAction.CREATED, staffId, null);
         campaignEvaluationService.onOrderConfirmed(saved);
         MenuOrderDtos.OrderResponse response = toOrderResponse(saved);
         printOrderEnqueueService.enqueueMenuOrder(saved, response);
@@ -184,6 +186,7 @@ public class MenuOrderService {
         TableBill bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), null);
         order.setBillId(bill.getId());
         MenuOrder saved = menuOrderRepository.save(order);
+        stockConsumptionService.consumeMenuOrder(saved);
         tableBillService.addItemsFromOrder(bill, saved, null);
         orderAuditService.record(saved, OrderAuditAction.CREATED, null, "{\"source\":\"QR\"}");
         campaignEvaluationService.onOrderConfirmed(saved);
@@ -269,6 +272,7 @@ public class MenuOrderService {
         }
         order.setUpdatedAt(now);
         MenuOrder saved = menuOrderRepository.save(order);
+        stockConsumptionService.reverseMenuOrder(saved);
         orderAuditService.record(saved, OrderAuditAction.CANCELLED, null, null);
         return toOrderResponse(saved);
     }
@@ -576,9 +580,9 @@ public class MenuOrderService {
                 .orElse(null);
 
         String waiterName = null;
-        if (order.getWaiterId() != null) {
-            waiterName = menuWaiterRepository.findById(order.getWaiterId())
-                    .map(MenuWaiter::getDisplayName)
+        if (order.getStaffId() != null) {
+            waiterName = merchantStaffRepository.findById(order.getStaffId())
+                    .map(MerchantStaff::getDisplayName)
                     .orElse(null);
         }
 
@@ -622,9 +626,9 @@ public class MenuOrderService {
                 .totalAmount(order.getTotalAmount())
                 .currency(order.getCurrency())
                 .note(order.getNote())
-                .waiterId(order.getWaiterId())
-                .createdByWaiterId(order.getCreatedByWaiterId())
-                .cancelledByWaiterId(order.getCancelledByWaiterId())
+                .staffId(order.getStaffId())
+                .createdByStaffId(order.getCreatedByStaffId())
+                .cancelledByStaffId(order.getCancelledByStaffId())
                 .waiterName(waiterName)
                 .waiterNote(order.getWaiterNote())
                 .kitchenNote(order.getKitchenNote())

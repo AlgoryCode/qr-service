@@ -26,8 +26,8 @@ public class WaiterCommissionController {
     @GetMapping("/today")
     public ResponseEntity<TableBillDtos.TodayCommissionSummary> getToday() {
         waiterAccessService.requireWaiterStaff();
-        Long waiterId = securityUtils.getCurrentWaiterId();
-        return ResponseEntity.ok(menuWaiterCommissionQueryService.getTodaySummary(waiterId));
+        Long staffId = securityUtils.getCurrentWaiterId();
+        return ResponseEntity.ok(menuWaiterCommissionQueryService.getTodaySummary(staffId));
     }
 
     @GetMapping("/history")
@@ -38,7 +38,7 @@ public class WaiterCommissionController {
             @RequestParam(defaultValue = "20") int size
     ) {
         waiterAccessService.requireWaiterStaff();
-        Long waiterId = securityUtils.getCurrentWaiterId();
-        return ResponseEntity.ok(menuWaiterCommissionQueryService.getHistory(waiterId, from, to, page, size));
+        Long staffId = securityUtils.getCurrentWaiterId();
+        return ResponseEntity.ok(menuWaiterCommissionQueryService.getHistory(staffId, from, to, page, size));
     }
 }

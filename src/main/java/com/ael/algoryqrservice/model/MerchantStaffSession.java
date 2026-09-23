@@ -7,22 +7,22 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "tbl_menu_waiter_session", indexes = {
-        @Index(name = "idx_menu_waiter_session_waiter", columnList = "waiter_id")
+@Table(name = "tbl_merchant_staff_session", indexes = {
+        @Index(name = "idx_menu_waiter_session_waiter", columnList = "staff_id")
 })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MenuWaiterSession {
+public class MerchantStaffSession {
 
     @Id
     @Column(columnDefinition = "uuid")
     private UUID id;
 
-    @Column(name = "waiter_id", nullable = false)
-    private Long waiterId;
+    @Column(name = "staff_id", nullable = false)
+    private Long staffId;
 
     @Column(name = "refresh_token_hash", nullable = false)
     private String refreshTokenHash;

@@ -54,8 +54,8 @@ public class TableBillItem {
     @Column(name = "source_order_id")
     private Long sourceOrderId;
 
-    @Column(name = "added_by_waiter_id")
-    private Long addedByWaiterId;
+    @Column(name = "added_by_staff_id")
+    private Long addedByStaffId;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

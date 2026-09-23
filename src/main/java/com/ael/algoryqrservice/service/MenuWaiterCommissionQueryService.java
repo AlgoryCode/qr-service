@@ -21,8 +21,8 @@ public class MenuWaiterCommissionQueryService {
     private final RestaurantTableRepository restaurantTableRepository;
 
     @Transactional(readOnly = true)
-    public TableBillDtos.TodayCommissionSummary getTodaySummary(Long waiterId) {
-        TableBillDtos.TodayCommissionSummary summary = waiterCommissionService.getTodaySummary(waiterId);
+    public TableBillDtos.TodayCommissionSummary getTodaySummary(Long staffId) {
+        TableBillDtos.TodayCommissionSummary summary = waiterCommissionService.getTodaySummary(staffId);
         return summary.toBuilder()
                 .records(enrichRecords(summary.getRecords()))
                 .build();
@@ -30,14 +30,14 @@ public class MenuWaiterCommissionQueryService {
 
     @Transactional(readOnly = true)
     public TableBillDtos.CommissionHistoryResponse getHistory(
-            Long waiterId,
+            Long staffId,
             LocalDate from,
             LocalDate to,
             int page,
             int size
     ) {
         TableBillDtos.CommissionHistoryResponse history =
-                waiterCommissionService.getHistory(waiterId, from, to, page, size);
+                waiterCommissionService.getHistory(staffId, from, to, page, size);
         return TableBillDtos.CommissionHistoryResponse.builder()
                 .records(enrichRecords(history.getRecords()))
                 .page(history.getPage())

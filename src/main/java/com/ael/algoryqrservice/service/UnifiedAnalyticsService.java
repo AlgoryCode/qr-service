@@ -47,7 +47,7 @@ public class UnifiedAnalyticsService {
                 branchId, menuId, ownerId, from, to);
         AnalyticsDtos.MenuRevenueReportResponse previousRevenue = analyticsService.getBranchRevenueReport(
                 branchId, menuId, ownerId, period.previousFrom(), period.previousTo());
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter = analyticsService.getBranchWaiterPerformanceReport(
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter = analyticsService.getBranchWaiterPerformanceReport(
                 branchId, menuId, ownerId, from, to);
         AnalyticsDtos.MenuAnalyticsReportResponse visits = analyticsService.getBranchReport(
                 branchId, menuId, ownerId, from, to);
@@ -109,7 +109,7 @@ public class UnifiedAnalyticsService {
                 branchId, menuId, ownerId, from, to);
         AnalyticsDtos.MenuRevenueReportResponse previousRevenue = analyticsService.getBranchRevenueReport(
                 branchId, menuId, ownerId, period.previousFrom(), period.previousTo());
-        AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter = analyticsService.getBranchWaiterPerformanceReport(
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter = analyticsService.getBranchWaiterPerformanceReport(
                 branchId, menuId, ownerId, from, to);
         AnalyticsDtos.MenuAnalyticsReportResponse visits = analyticsService.getBranchReport(
                 branchId, menuId, ownerId, from, to);
@@ -257,7 +257,7 @@ public class UnifiedAnalyticsService {
         return BigDecimal.ZERO;
     }
 
-    private Double unassignedRevenueShare(AnalyticsDtos.MenuWaiterPerformanceReportResponse waiter) {
+    private Double unassignedRevenueShare(AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter) {
         if (waiter.kpis() == null) {
             return null;
         }
@@ -283,7 +283,7 @@ public class UnifiedAnalyticsService {
         int rank = 1;
         for (AnalyticsDtos.WaiterPerformanceRow row : sorted) {
             ranking.add(new AnalyticsDtos.StaffRankingRow(
-                    row.waiterId(),
+                    row.staffId(),
                     row.displayName(),
                     row.revenue() == null ? BigDecimal.ZERO : row.revenue(),
                     row.orderCount(),

@@ -50,7 +50,7 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        Long userId = ownerUserId();
+        Long userId = currentUserId();
         if (userId == null || !emailVerificationGate.isVerificationPending(userId)) {
             filterChain.doFilter(request, response);
             return;
@@ -70,7 +70,7 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
         return ALLOWED_PREFIXES.stream().anyMatch(requestUri::startsWith);
     }
 
-    private static Long ownerUserId() {
+    private static Long currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;

@@ -10,11 +10,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_menu_waiter", uniqueConstraints = {
+@Table(name = "tbl_merchant_staff", uniqueConstraints = {
         @UniqueConstraint(name = "uk_menu_waiter_username", columnNames = "username")
 }, indexes = {
         @Index(name = "idx_menu_waiter_branch", columnList = "branch_id"),
-        @Index(name = "idx_menu_waiter_owner", columnList = "owner_user_id")
+        @Index(name = "idx_menu_waiter_owner", columnList = "merchant_id")
 })
 @Getter
 @Setter
@@ -22,15 +22,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class MenuWaiter {
+public class MerchantStaff {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "owner_user_id", nullable = false)
-    private Long ownerUserId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "branch_id")
     private Long branchId;

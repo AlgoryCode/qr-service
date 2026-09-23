@@ -42,8 +42,8 @@ public class KitchenYemekSepetiService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listActiveForOwner(Long ownerUserId) {
-        YemekSepetiConnection connection = connectedOrNull(ownerUserId);
+    public List<MenuOrderDtos.OrderResponse> listActiveForOwner(Long merchantId) {
+        YemekSepetiConnection connection = connectedOrNull(merchantId);
         if (connection == null) {
             return List.of();
         }
@@ -63,8 +63,8 @@ public class KitchenYemekSepetiService {
     }
 
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long ownerUserId) {
-        YemekSepetiConnection connection = connectedOrNull(ownerUserId);
+    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long merchantId) {
+        YemekSepetiConnection connection = connectedOrNull(merchantId);
         if (connection == null) {
             return List.of();
         }
@@ -81,8 +81,8 @@ public class KitchenYemekSepetiService {
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse markReady(Long ownerUserId, Long orderId) {
-        YemekSepetiConnection connection = connectionService.requireConnectedForUser(ownerUserId);
+    public MenuOrderDtos.OrderResponse markReady(Long merchantId, Long orderId) {
+        YemekSepetiConnection connection = connectionService.requireConnectedForUser(merchantId);
         YemekSepetiOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti siparişi bulunamadı"));
         String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
@@ -97,11 +97,11 @@ public class KitchenYemekSepetiService {
         return toKitchenOrder(orderRepository.save(order));
     }
 
-    private YemekSepetiConnection connectedOrNull(Long ownerUserId) {
-        if (ownerUserId == null) {
+    private YemekSepetiConnection connectedOrNull(Long merchantId) {
+        if (merchantId == null) {
             return null;
         }
-        YemekSepetiConnection connection = connectionService.findByUserId(ownerUserId);
+        YemekSepetiConnection connection = connectionService.findByUserId(merchantId);
         if (connection == null
                 || connection.getStatus() != YemekSepetiConnectionStatus.CONNECTED
                 || connection.getVendorId() == null

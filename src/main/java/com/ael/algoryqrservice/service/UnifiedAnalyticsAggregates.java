@@ -2,7 +2,7 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.model.BillPayment;
 import com.ael.algoryqrservice.model.MenuOrder;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
@@ -15,7 +15,7 @@ import com.ael.algoryqrservice.repository.BillAdjustmentRepository;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
@@ -63,7 +63,7 @@ public class UnifiedAnalyticsAggregates {
     private final TableBillItemRepository tableBillItemRepository;
     private final RestaurantTableRepository restaurantTableRepository;
     private final BillPaymentRepository billPaymentRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final MenuAnalyticsSessionRepository sessionRepository;
     private final BillAdjustmentRepository billAdjustmentRepository;
     private final WorkShiftRepository workShiftRepository;
@@ -220,7 +220,7 @@ public class UnifiedAnalyticsAggregates {
             TableAcc row = acc.computeIfAbsent(order.getTableId(), id -> new TableAcc());
             row.orderCount++;
             boolean qr = order.getOrderSource() == OrderSource.QR
-                    || (order.getOrderSource() == null && order.getCreatedByWaiterId() == null && order.getWaiterId() == null);
+                    || (order.getOrderSource() == null && order.getCreatedByStaffId() == null && order.getStaffId() == null);
             if (qr) {
                 row.qrOrderCount++;
                 qrOrders++;
@@ -435,19 +435,19 @@ public class UnifiedAnalyticsAggregates {
                 new AnalyticsDtos.StatusCount(MenuOrderStatus.REJECTED.name(), rejected)
         );
 
-        Map<Long, String> waiterNames = menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(branchId).stream()
-                .collect(Collectors.toMap(MenuWaiter::getId, MenuWaiter::getDisplayName, (a, b) -> a));
+        Map<Long, String> waiterNames = merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(branchId).stream()
+                .collect(Collectors.toMap(MerchantStaff::getId, MerchantStaff::getDisplayName, (a, b) -> a));
 
         List<AnalyticsDtos.CancellationByWaiter> byWaiter = menuOrderRepository
                 .countCancellationsByWaiter(menuIds, CANCEL_STATUSES, fromDt, toDt)
                 .stream()
                 .map(row -> {
-                    Long waiterId = row[0] == null ? null : ((Number) row[0]).longValue();
+                    Long staffId = row[0] == null ? null : ((Number) row[0]).longValue();
                     long count = ((Number) row[1]).longValue();
-                    String name = waiterId == null
+                    String name = staffId == null
                             ? "Atanmamis"
-                            : waiterNames.getOrDefault(waiterId, "Personel #" + waiterId);
-                    return new AnalyticsDtos.CancellationByWaiter(waiterId, name, count);
+                            : waiterNames.getOrDefault(staffId, "Personel #" + staffId);
+                    return new AnalyticsDtos.CancellationByWaiter(staffId, name, count);
                 })
                 .sorted(Comparator.comparingLong(AnalyticsDtos.CancellationByWaiter::cancelCount).reversed())
                 .toList();
@@ -670,7 +670,7 @@ public class UnifiedAnalyticsAggregates {
                             shift.getClosingCash(),
                             revenue,
                             orderCount,
-                            shift.getWaiterIds() == null ? 0L : shift.getWaiterIds().size()
+                            shift.getStaffIds() == null ? 0L : shift.getStaffIds().size()
                     );
                 })
                 .toList();
@@ -728,7 +728,7 @@ public class UnifiedAnalyticsAggregates {
                 bill == null ? null : bill.getId(),
                 orderId,
                 bill == null ? null : bill.getTableId(),
-                payment.getWaiterId(),
+                payment.getStaffId(),
                 productId,
                 payment.getPaidAt(),
                 payment.getAmount()

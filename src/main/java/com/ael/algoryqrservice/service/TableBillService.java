@@ -7,7 +7,7 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.model.MenuProduct;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.TableBillItem;
@@ -19,7 +19,7 @@ import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.repository.TableBillRepository;
@@ -55,18 +55,18 @@ public class TableBillService {
     private final MenuProductRepository menuProductRepository;
     private final MenuRepository menuRepository;
     private final RestaurantTableRepository restaurantTableRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final WaiterCommissionService waiterCommissionService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public TableBill getOrOpenBill(Long menuId, Long tableId, Long waiterId) {
+    public TableBill getOrOpenBill(Long menuId, Long tableId, Long staffId) {
         return tableBillRepository.findByMenuIdAndTableIdAndStatus(menuId, tableId, TableBillStatus.OPEN)
-                .orElseGet(() -> openBill(menuId, tableId, waiterId));
+                .orElseGet(() -> openBill(menuId, tableId, staffId));
     }
 
     @Transactional
-    public TableBill openBill(Long menuId, Long tableId, Long waiterId) {
+    public TableBill openBill(Long menuId, Long tableId, Long staffId) {
         RestaurantTable table = restaurantTableRepository.findByIdAndMenuId(tableId, menuId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
@@ -87,7 +87,7 @@ public class TableBillService {
                 .tableId(tableId)
                 .tableSessionId(session.getId())
                 .status(TableBillStatus.OPEN)
-                .openedByWaiterId(waiterId)
+                .openedByStaffId(staffId)
                 .openedAt(now)
                 .totalAmount(BigDecimal.ZERO)
                 .currency("TRY")
@@ -105,7 +105,7 @@ public class TableBillService {
     }
 
     @Transactional
-    public TableBill addItemsFromOrder(TableBill bill, MenuOrder order, Long waiterId) {
+    public TableBill addItemsFromOrder(TableBill bill, MenuOrder order, Long staffId) {
         if (bill.getStatus() != TableBillStatus.OPEN) {
             throw new BadRequestException("Kapalı adisyona kalem eklenemez");
         }
@@ -123,7 +123,7 @@ public class TableBillService {
                     .lineTotal(orderItem.getLineTotal())
                     .note(orderItem.getNote())
                     .sourceOrderId(order.getId())
-                    .addedByWaiterId(waiterId)
+                    .addedByStaffId(staffId)
                     .createdAt(now)
                     .updatedAt(now)
                     .build();
@@ -140,20 +140,20 @@ public class TableBillService {
             Long menuId,
             Long billId,
             List<MenuOrderDtos.CartItemRequest> items,
-            Long waiterId
+            Long staffId
     ) {
         TableBill bill = requireOpenBill(menuId, billId);
         List<WaiterCommissionService.CommissionLineItem> addedItems = appendCartItems(
                 bill,
                 menuId,
                 items,
-                waiterId,
+                staffId,
                 null
         );
         recalculateTotal(bill);
         bill.setUpdatedAt(LocalDateTime.now());
         TableBill saved = tableBillRepository.save(bill);
-        recordDirectAddCommissions(waiterId, saved, addedItems);
+        recordDirectAddCommissions(staffId, saved, addedItems);
         return toBillResponse(saved, null);
     }
 
@@ -197,7 +197,7 @@ public class TableBillService {
     public TableBillDtos.BillResponse payItems(
             Long menuId,
             Long billId,
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             TableBillDtos.PayBillItemsRequest request
     ) {
         if (request == null || request.getPaymentMethod() == null) {
@@ -231,7 +231,7 @@ public class TableBillService {
             BillPayment payment = BillPayment.builder()
                     .bill(bill)
                     .billItem(item)
-                    .waiterId(waiter.getId())
+                    .staffId(waiter.getId())
                     .paymentMethod(request.getPaymentMethod())
                     .amount(amount)
                     .quantityPaid(line.getQuantityToPay())
@@ -260,7 +260,7 @@ public class TableBillService {
     public TableBillDtos.BillResponse payShare(
             Long menuId,
             Long billId,
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             TableBillDtos.PayBillShareRequest request
     ) {
         if (request == null || request.getPaymentMethod() == null) {
@@ -306,7 +306,7 @@ public class TableBillService {
 
         BillPayment payment = BillPayment.builder()
                 .bill(bill)
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .paymentMethod(request.getPaymentMethod())
                 .amount(shareAmount)
                 .quantityPaid(0)
@@ -381,7 +381,7 @@ public class TableBillService {
     public TableBillDtos.BillResponse closeBill(
             Long menuId,
             Long billId,
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             TableBillPaymentMethod paymentMethod,
             Boolean tipReceived,
             BigDecimal tipAmount
@@ -416,7 +416,7 @@ public class TableBillService {
 
     private void payAllRemainingItems(
             TableBill bill,
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             TableBillPaymentMethod paymentMethod,
             LocalDateTime now
     ) {
@@ -438,7 +438,7 @@ public class TableBillService {
             BillPayment payment = BillPayment.builder()
                     .bill(bill)
                     .billItem(item)
-                    .waiterId(waiter.getId())
+                    .staffId(waiter.getId())
                     .paymentMethod(paymentMethod)
                     .amount(amount)
                     .quantityPaid(unpaid)
@@ -452,14 +452,14 @@ public class TableBillService {
 
     private void recordTipPayment(
             TableBill bill,
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             TableBillPaymentMethod paymentMethod,
             BigDecimal tipAmount,
             LocalDateTime now
     ) {
         BillPayment tipPayment = BillPayment.builder()
                 .bill(bill)
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .paymentMethod(paymentMethod)
                 .amount(tipAmount)
                 .quantityPaid(0)
@@ -472,13 +472,13 @@ public class TableBillService {
 
     private TableBill finalizeBillClose(
             TableBill bill,
-            MenuWaiter waiter,
+            MerchantStaff waiter,
             TableBillPaymentMethod paymentMethod,
             BigDecimal tipAmount,
             LocalDateTime now
     ) {
         bill.setStatus(TableBillStatus.CLOSED);
-        bill.setClosedByWaiterId(waiter.getId());
+        bill.setClosedByStaffId(waiter.getId());
         bill.setClosedAt(now);
         bill.setPaymentMethod(paymentMethod);
         bill.setTipAmount(tipAmount);
@@ -575,7 +575,7 @@ public class TableBillService {
                             .lineTotal(item.getLineTotal())
                             .note(item.getNote())
                             .sourceOrderId(item.getSourceOrderId())
-                            .addedByWaiterId(item.getAddedByWaiterId())
+                            .addedByStaffId(item.getAddedByStaffId())
                             .createdAt(item.getCreatedAt())
                             .build();
                 })
@@ -610,8 +610,8 @@ public class TableBillService {
                 .tableId(bill.getTableId())
                 .tableName(tableName)
                 .status(bill.getStatus())
-                .openedByWaiterId(bill.getOpenedByWaiterId())
-                .closedByWaiterId(bill.getClosedByWaiterId())
+                .openedByStaffId(bill.getOpenedByStaffId())
+                .closedByStaffId(bill.getClosedByStaffId())
                 .openedAt(bill.getOpenedAt())
                 .closedAt(bill.getClosedAt())
                 .paymentMethod(bill.getPaymentMethod())
@@ -727,7 +727,7 @@ public class TableBillService {
             TableBill bill,
             Long menuId,
             List<MenuOrderDtos.CartItemRequest> items,
-            Long waiterId,
+            Long staffId,
             Long sourceOrderId
     ) {
         if (items == null || items.isEmpty()) {
@@ -763,7 +763,7 @@ public class TableBillService {
                     .lineTotal(lineTotal)
                     .note(trimToNull(itemRequest.getNote()))
                     .sourceOrderId(sourceOrderId)
-                    .addedByWaiterId(waiterId)
+                    .addedByStaffId(staffId)
                     .createdAt(now)
                     .updatedAt(now)
                     .build();
@@ -775,14 +775,14 @@ public class TableBillService {
     }
 
     private void recordDirectAddCommissions(
-            Long waiterId,
+            Long staffId,
             TableBill bill,
             List<WaiterCommissionService.CommissionLineItem> addedItems
     ) {
         if (addedItems == null || addedItems.isEmpty()) {
             return;
         }
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId).orElse(null);
+        MerchantStaff waiter = merchantStaffRepository.findById(staffId).orElse(null);
         if (waiter == null) {
             return;
         }

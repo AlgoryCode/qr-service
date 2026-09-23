@@ -4,12 +4,12 @@ import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.Branch;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.dto.LogoutRequest;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.dto.RefreshTokenRequest;
 import com.ael.algoryqrservice.repository.BranchRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.util.ClientInfo;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class MenuWaiterAuthService {
 
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
     private final MenuWaiterSessionService menuWaiterSessionService;
@@ -35,7 +35,7 @@ public class MenuWaiterAuthService {
             MenuWaiterDtos.WaiterLoginRequest request,
             ClientInfo clientInfo
     ) {
-        MenuWaiter waiter = authenticate(request);
+        MerchantStaff waiter = authenticate(request);
         MenuWaiterSessionService.SessionTokens tokens = menuWaiterSessionService.createSession(waiter, clientInfo);
         return menuWaiterSessionService.buildAuthResponse(
                 tokens.accessToken(),
@@ -72,15 +72,15 @@ public class MenuWaiterAuthService {
 
     @Transactional(readOnly = true)
     public MenuWaiterDtos.WaiterMeResponse me() {
-        Long waiterId = securityUtils.getCurrentWaiterId();
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
+        Long staffId = securityUtils.getCurrentWaiterId();
+        MerchantStaff waiter = merchantStaffRepository.findById(staffId)
                 .orElseThrow(() -> new BadCredentialsException("Garson bulunamadı"));
         boolean kitchenEnabled = waiter.getBranchId() != null
                 && branchRepository.findById(waiter.getBranchId()).map(Branch::isKitchenEnabled).orElse(false);
         return MenuWaiterDtos.WaiterMeResponse.builder()
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .branchId(waiter.getBranchId())
-                .ownerUserId(waiter.getOwnerUserId())
+                .merchantId(waiter.getMerchantId())
                 .username(waiter.getUsername())
                 .displayName(waiter.getDisplayName())
                 .staffRole(waiter.resolvedStaffRole())
@@ -92,9 +92,9 @@ public class MenuWaiterAuthService {
                 .build();
     }
 
-    private MenuWaiter authenticate(MenuWaiterDtos.WaiterLoginRequest request) {
+    private MerchantStaff authenticate(MenuWaiterDtos.WaiterLoginRequest request) {
         String username = request.getUsername().trim();
-        MenuWaiter waiter = menuWaiterRepository.findByUsernameIgnoreCase(username)
+        MerchantStaff waiter = merchantStaffRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
         if (!waiter.isActive()) {
             throw new BadCredentialsException("Geçersiz kimlik bilgileri");
@@ -103,7 +103,7 @@ public class MenuWaiterAuthService {
                 || !passwordEncoder.matches(request.getPassword(), waiter.getPasswordHash())) {
             throw new BadCredentialsException("Geçersiz kimlik bilgileri");
         }
-        if (!entitlementService.hasScope(waiter.getOwnerUserId(), CatalogScopes.WAITER_PANEL_OWNER)) {
+        if (!entitlementService.hasScope(waiter.getMerchantId(), CatalogScopes.WAITER_PANEL_OWNER)) {
             throw new ForbiddenException("Garson paneli için uygun paket gerekli");
         }
         return waiter;

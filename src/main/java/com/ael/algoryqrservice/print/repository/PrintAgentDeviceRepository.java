@@ -10,11 +10,11 @@ public interface PrintAgentDeviceRepository extends JpaRepository<PrintAgentDevi
 
     Optional<PrintAgentDevice> findByDeviceTokenHashAndEnabledTrue(String deviceTokenHash);
 
-    List<PrintAgentDevice> findByOwnerUserIdAndBranchIdOrderByIdDesc(Long ownerUserId, Long branchId);
+    List<PrintAgentDevice> findByMerchantIdAndBranchIdOrderByIdDesc(Long merchantId, Long branchId);
 
-    Optional<PrintAgentDevice> findByIdAndOwnerUserId(Long id, Long ownerUserId);
+    Optional<PrintAgentDevice> findByIdAndMerchantId(Long id, Long merchantId);
 
-    List<PrintAgentDevice> findByOwnerUserIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(Long ownerUserId);
+    List<PrintAgentDevice> findByMerchantIdAndEnabledTrueOrderByLastSeenAtDescIdDesc(Long merchantId);
 
     boolean existsByBranchIdAndEnabledTrue(Long branchId);
 }

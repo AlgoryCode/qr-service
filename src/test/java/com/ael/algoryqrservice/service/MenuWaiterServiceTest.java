@@ -2,10 +2,10 @@ package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Branch;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 class MenuWaiterServiceTest {
 
     @Mock
-    private MenuWaiterRepository menuWaiterRepository;
+    private MerchantStaffRepository merchantStaffRepository;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -51,9 +51,9 @@ class MenuWaiterServiceTest {
                 .name("Kadikoy")
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
-        when(menuWaiterRepository.existsByUsernameIgnoreCase("ali")).thenReturn(false);
-        when(menuWaiterRepository.save(any(MenuWaiter.class))).thenAnswer(invocation -> {
-            MenuWaiter waiter = invocation.getArgument(0);
+        when(merchantStaffRepository.existsByUsernameIgnoreCase("ali")).thenReturn(false);
+        when(merchantStaffRepository.save(any(MerchantStaff.class))).thenAnswer(invocation -> {
+            MerchantStaff waiter = invocation.getArgument(0);
             waiter.setId(11L);
             return waiter;
         });
@@ -67,10 +67,10 @@ class MenuWaiterServiceTest {
                         .build()
         );
 
-        ArgumentCaptor<MenuWaiter> captor = ArgumentCaptor.forClass(MenuWaiter.class);
-        verify(menuWaiterRepository).save(captor.capture());
+        ArgumentCaptor<MerchantStaff> captor = ArgumentCaptor.forClass(MerchantStaff.class);
+        verify(merchantStaffRepository).save(captor.capture());
         assertThat(captor.getValue().getBranchId()).isEqualTo(4L);
-        assertThat(captor.getValue().getOwnerUserId()).isEqualTo(9L);
+        assertThat(captor.getValue().getMerchantId()).isEqualTo(9L);
         assertThat(captor.getValue().getUsername()).isEqualTo("ali");
         assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.WAITER);
         assertThat(response.getBranchId()).isEqualTo(4L);
@@ -87,9 +87,9 @@ class MenuWaiterServiceTest {
                 .kitchenEnabled(true)
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
-        when(menuWaiterRepository.existsByUsernameIgnoreCase("mutfak1")).thenReturn(false);
-        when(menuWaiterRepository.save(any(MenuWaiter.class))).thenAnswer(invocation -> {
-            MenuWaiter waiter = invocation.getArgument(0);
+        when(merchantStaffRepository.existsByUsernameIgnoreCase("mutfak1")).thenReturn(false);
+        when(merchantStaffRepository.save(any(MerchantStaff.class))).thenAnswer(invocation -> {
+            MerchantStaff waiter = invocation.getArgument(0);
             waiter.setId(12L);
             return waiter;
         });
@@ -104,8 +104,8 @@ class MenuWaiterServiceTest {
                         .build()
         );
 
-        ArgumentCaptor<MenuWaiter> captor = ArgumentCaptor.forClass(MenuWaiter.class);
-        verify(menuWaiterRepository).save(captor.capture());
+        ArgumentCaptor<MerchantStaff> captor = ArgumentCaptor.forClass(MerchantStaff.class);
+        verify(merchantStaffRepository).save(captor.capture());
         assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.KITCHEN);
         assertThat(response.getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.KITCHEN);
     }
@@ -119,9 +119,9 @@ class MenuWaiterServiceTest {
                 .name("Kadikoy")
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
-        when(menuWaiterRepository.existsByUsernameIgnoreCase("kurye1")).thenReturn(false);
-        when(menuWaiterRepository.save(any(MenuWaiter.class))).thenAnswer(invocation -> {
-            MenuWaiter waiter = invocation.getArgument(0);
+        when(merchantStaffRepository.existsByUsernameIgnoreCase("kurye1")).thenReturn(false);
+        when(merchantStaffRepository.save(any(MerchantStaff.class))).thenAnswer(invocation -> {
+            MerchantStaff waiter = invocation.getArgument(0);
             waiter.setId(13L);
             return waiter;
         });
@@ -136,8 +136,8 @@ class MenuWaiterServiceTest {
                         .build()
         );
 
-        ArgumentCaptor<MenuWaiter> captor = ArgumentCaptor.forClass(MenuWaiter.class);
-        verify(menuWaiterRepository).save(captor.capture());
+        ArgumentCaptor<MerchantStaff> captor = ArgumentCaptor.forClass(MerchantStaff.class);
+        verify(merchantStaffRepository).save(captor.capture());
         assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.COURIER);
         assertThat(response.getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.COURIER);
     }
@@ -179,8 +179,8 @@ class MenuWaiterServiceTest {
                 .lastName("Cafe")
                 .email("ada@example.com")
                 .build()));
-        when(menuWaiterRepository.findByBranchIdOrderByDisplayNameAsc(4L)).thenReturn(List.of(
-                MenuWaiter.builder()
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(4L)).thenReturn(List.of(
+                MerchantStaff.builder()
                         .id(11L)
                         .branchId(4L)
                         .username("ali")

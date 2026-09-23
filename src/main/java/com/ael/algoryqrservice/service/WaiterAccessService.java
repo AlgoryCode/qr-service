@@ -3,9 +3,9 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.enums.MenuChannel;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,13 +18,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WaiterAccessService {
 
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
     private final MenuRepository menuRepository;
     private final SecurityUtils securityUtils;
 
-    public MenuWaiter requireCurrentWaiter() {
-        Long waiterId = securityUtils.getCurrentWaiterId();
-        MenuWaiter waiter = menuWaiterRepository.findById(waiterId)
+    public MerchantStaff requireCurrentWaiter() {
+        Long staffId = securityUtils.getCurrentWaiterId();
+        MerchantStaff waiter = merchantStaffRepository.findById(staffId)
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
         if (!waiter.isActive()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Hesap pasif");
@@ -36,37 +36,37 @@ public class WaiterAccessService {
         return waiter;
     }
 
-    public MenuWaiter requireWaiterStaff() {
-        MenuWaiter staff = requireCurrentWaiter();
+    public MerchantStaff requireWaiterStaff() {
+        MerchantStaff staff = requireCurrentWaiter();
         if (!staff.isWaiterStaff()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu işlem yalnızca garson içindir");
         }
         return staff;
     }
 
-    public MenuWaiter requireKitchenStaff() {
-        MenuWaiter staff = requireCurrentWaiter();
+    public MerchantStaff requireKitchenStaff() {
+        MerchantStaff staff = requireCurrentWaiter();
         if (!staff.isKitchen()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu işlem yalnızca mutfak içindir");
         }
         return staff;
     }
 
-    public MenuWaiter requireCourierStaff() {
-        MenuWaiter staff = requireCurrentWaiter();
+    public MerchantStaff requireCourierStaff() {
+        MerchantStaff staff = requireCurrentWaiter();
         if (!staff.isCourier()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu işlem yalnızca kurye içindir");
         }
         return staff;
     }
 
-    public MenuWaiter requireWaiterForMenu(Long menuId) {
-        MenuWaiter waiter = requireWaiterStaff();
+    public MerchantStaff requireWaiterForMenu(Long menuId) {
+        MerchantStaff waiter = requireWaiterStaff();
         requireMenuInWaiterBranch(menuId, waiter);
         return waiter;
     }
 
-    public Menu requireMenuInWaiterBranch(Long menuId, MenuWaiter waiter) {
+    public Menu requireMenuInWaiterBranch(Long menuId, MerchantStaff waiter) {
         if (menuId == null) {
             throw new NotFoundException("Menü bulunamadı");
         }
@@ -79,14 +79,14 @@ public class WaiterAccessService {
         return menu;
     }
 
-    public List<Menu> menusForWaiter(MenuWaiter waiter) {
+    public List<Menu> menusForWaiter(MerchantStaff waiter) {
         if (waiter.getBranchId() == null) {
             return List.of();
         }
         return menuRepository.findByBranchIdAndChannelAndDeletedFalse(waiter.getBranchId(), MenuChannel.QR);
     }
 
-    public List<Long> menuIdsForWaiter(MenuWaiter waiter) {
+    public List<Long> menuIdsForWaiter(MerchantStaff waiter) {
         return menusForWaiter(waiter).stream().map(Menu::getMenuId).toList();
     }
 }

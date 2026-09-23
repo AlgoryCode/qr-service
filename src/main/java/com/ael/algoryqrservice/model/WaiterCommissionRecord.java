@@ -9,8 +9,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_waiter_commission_record", indexes = {
-        @Index(name = "idx_waiter_commission_waiter_created", columnList = "waiter_id, created_at"),
+@Table(name = "tbl_merchant_staff_commission", indexes = {
+        @Index(name = "idx_waiter_commission_waiter_created", columnList = "staff_id, created_at"),
         @Index(name = "idx_waiter_commission_menu_created", columnList = "menu_id, created_at"),
         @Index(name = "idx_waiter_commission_branch_created", columnList = "branch_id, created_at")
 })
@@ -27,8 +27,8 @@ public class WaiterCommissionRecord {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "waiter_id", nullable = false)
-    private Long waiterId;
+    @Column(name = "staff_id", nullable = false)
+    private Long staffId;
 
     @Column(name = "menu_id", nullable = false)
     private Long menuId;

@@ -56,12 +56,12 @@ public class PrintOrderEnqueueService {
     }
 
     public void enqueueUberEatsOrder(
-            Long ownerUserId,
+            Long merchantId,
             Long branchId,
             UberEatsOrder order,
             List<UberEatsDtos.OrderItemResponse> items
     ) {
-        if (ownerUserId == null || order == null || order.getId() == null) {
+        if (merchantId == null || order == null || order.getId() == null) {
             return;
         }
         MenuOrderDtos.OrderResponse kitchen = KitchenUberEatsMapper.toKitchenOrder(order, items);
@@ -77,7 +77,7 @@ public class PrintOrderEnqueueService {
             payload.put("customerPhone", order.getCustomerPhone());
         }
         printJobService.enqueueKitchenTicket(
-                ownerUserId,
+                merchantId,
                 branchId,
                 PrintSourceType.UBER_EATS,
                 String.valueOf(order.getId()),
@@ -86,12 +86,12 @@ public class PrintOrderEnqueueService {
     }
 
     public void enqueueYemekSepetiOrder(
-            Long ownerUserId,
+            Long merchantId,
             Long branchId,
             YemekSepetiOrder order,
             List<YemekSepetiDtos.OrderItemResponse> items
     ) {
-        if (ownerUserId == null || order == null || order.getId() == null) {
+        if (merchantId == null || order == null || order.getId() == null) {
             return;
         }
         List<MenuOrderDtos.OrderItemResponse> ticketItems = items == null ? List.of() : items.stream()
@@ -129,7 +129,7 @@ public class PrintOrderEnqueueService {
             payload.put("customerPhone", order.getCustomerPhone());
         }
         printJobService.enqueueKitchenTicket(
-                ownerUserId,
+                merchantId,
                 branchId,
                 PrintSourceType.YEMEKSEPETI,
                 String.valueOf(order.getId()),

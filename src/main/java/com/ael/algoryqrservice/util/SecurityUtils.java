@@ -2,10 +2,10 @@ package com.ael.algoryqrservice.util;
 
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.Customer;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.repository.CustomerRepository;
-import com.ael.algoryqrservice.repository.MenuWaiterRepository;
+import com.ael.algoryqrservice.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.security.JwtAccessPrincipal;
 import com.ael.algoryqrservice.service.JwtService;
@@ -23,7 +23,7 @@ public class SecurityUtils {
 
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
-    private final MenuWaiterRepository menuWaiterRepository;
+    private final MerchantStaffRepository merchantStaffRepository;
 
     public User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -117,8 +117,8 @@ public class SecurityUtils {
                 return principal.branchId();
             }
             if (principal.userId() != null) {
-                return menuWaiterRepository.findById(principal.userId())
-                        .map(MenuWaiter::getBranchId)
+                return merchantStaffRepository.findById(principal.userId())
+                        .map(MerchantStaff::getBranchId)
                         .filter(id -> id != null)
                         .orElseThrow(() -> new UnauthorizedException("Garson şube bilgisi bulunamadı"));
             }

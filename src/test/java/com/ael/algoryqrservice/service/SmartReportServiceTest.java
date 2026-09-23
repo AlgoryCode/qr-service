@@ -116,7 +116,7 @@ class SmartReportServiceTest {
         LocalDate to = LocalDate.of(2026, 7, 2);
         when(analyticsService.getMenuReport(5L, 9L, from, to)).thenReturn(visitReport(5L, "Ogle", 2L, "Kadikoy"));
         when(analyticsService.getMenuRevenueReport(5L, 9L, from, to)).thenReturn(emptyRevenue(5L, "Ogle", 2L, "Kadikoy"));
-        when(analyticsService.getMenuWaiterPerformanceReport(5L, 9L, from, to)).thenReturn(emptyWaiter(5L, "Ogle", 2L, "Kadikoy"));
+        when(analyticsService.getMerchantStaffPerformanceReport(5L, 9L, from, to)).thenReturn(emptyWaiter(5L, "Ogle", 2L, "Kadikoy"));
 
         service.enqueue(5L, 9L, from, to, "tr", null);
 
@@ -312,13 +312,13 @@ class SmartReportServiceTest {
         );
     }
 
-    private AnalyticsDtos.MenuWaiterPerformanceReportResponse emptyWaiter(
+    private AnalyticsDtos.MerchantStaffPerformanceReportResponse emptyWaiter(
             Long menuId,
             String menuName,
             Long branchId,
             String branchName
     ) {
-        return new AnalyticsDtos.MenuWaiterPerformanceReportResponse(
+        return new AnalyticsDtos.MerchantStaffPerformanceReportResponse(
                 menuId,
                 menuName,
                 branchId,

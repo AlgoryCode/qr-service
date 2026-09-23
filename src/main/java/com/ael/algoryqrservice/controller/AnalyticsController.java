@@ -113,7 +113,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/branch/{branchId}/waiter-performance")
-    public ResponseEntity<AnalyticsDtos.MenuWaiterPerformanceReportResponse> getBranchWaiterPerformanceReport(
+    public ResponseEntity<AnalyticsDtos.MerchantStaffPerformanceReportResponse> getBranchWaiterPerformanceReport(
             @PathVariable Long branchId,
             @RequestParam(required = false) Long menuId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -153,7 +153,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/menu/{menuId}/waiter-performance")
-    public ResponseEntity<AnalyticsDtos.MenuWaiterPerformanceReportResponse> getMenuWaiterPerformanceReport(
+    public ResponseEntity<AnalyticsDtos.MerchantStaffPerformanceReportResponse> getMerchantStaffPerformanceReport(
             @PathVariable Long menuId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
@@ -163,7 +163,7 @@ public class AnalyticsController {
         Long ownerId = securityUtils.getCurrentUser().getId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(
-                analyticsService.getMenuWaiterPerformanceReport(menuId, ownerId, effectiveFrom, effectiveTo)
+                analyticsService.getMerchantStaffPerformanceReport(menuId, ownerId, effectiveFrom, effectiveTo)
         );
     }
 

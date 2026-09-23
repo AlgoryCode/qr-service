@@ -167,7 +167,7 @@ public final class SmartReportModelDtos {
     }
 
     public record WaiterRow(
-            Long waiterId,
+            Long staffId,
             String displayName,
             long orderCount,
             long itemCount,

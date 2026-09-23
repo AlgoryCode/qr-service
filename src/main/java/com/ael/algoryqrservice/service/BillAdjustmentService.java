@@ -4,7 +4,7 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillAdjustment;
 import com.ael.algoryqrservice.model.MenuOrder;
-import com.ael.algoryqrservice.model.MenuWaiter;
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.model.TableBill;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.enums.OrderAuditAction;
@@ -29,7 +29,7 @@ public class BillAdjustmentService {
 
     @Transactional
     public BillAdjustment create(MenuOrderDtos.BillAdjustmentRequest request) {
-        MenuWaiter waiter = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff waiter = waiterAccessService.requireCurrentWaiter();
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("Tutar geçersiz");
         }
@@ -41,7 +41,7 @@ public class BillAdjustmentService {
                 .menuId(bill.getMenuId())
                 .billId(bill.getId())
                 .orderId(request.getOrderId())
-                .waiterId(waiter.getId())
+                .staffId(waiter.getId())
                 .adjustmentType(request.getAdjustmentType())
                 .amount(request.getAmount())
                 .reason(request.getReason())

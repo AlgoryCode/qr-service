@@ -19,7 +19,7 @@
 | `PAYMENT_EVENTS_QUEUE` | `qr-service.payment.events` | Payment event consumer queue |
 | `PAYMENT_EVENTS_ROUTING_KEY` | `qr-service.payment.events` | Binding routing key |
 | `FULFILLMENT_EXTERNAL_ENABLED` | `true` (stage) / `false` (prod) | Stage'te qr-fulfillment-service client açılır |
-| `FULFILLMENT_SERVICE_URL` | `http://qr-fulfillment-service:8080` | Stage fulfillment HTTP base URL |
+| `FULFILLMENT_SERVICE_URL` | `https://stage.fulfillment.algorycode.com` | Stage fulfillment HTTP base URL |
 | `FULFILLMENT_SERVICE_AUTH_TOKEN` | (shared service token) | X-Service-Token değeri |
 | `SMART_REPORT_QUEUE` | `smart_report.generate` | Outbound queue for AI report generation |
 | `SMART_REPORT_EVENTS_EXCHANGE` | `smart_report.events` | Topic exchange for AI status events |
