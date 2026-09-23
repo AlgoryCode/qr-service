@@ -115,9 +115,10 @@ public class QrService {
             QrListScope scope
     ) {
         Long currentUserId = securityUtils.getCurrentUser().getId();
-        if (!currentUserId.equals(userId)) {
+        if (!currentUserId.equals(userId) && !securityUtils.matchesTokenUser(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Başka kullanıcının QR kayıtlarına erişilemez");
         }
+        userId = currentUserId;
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
         List<Qr> qrs = qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId);

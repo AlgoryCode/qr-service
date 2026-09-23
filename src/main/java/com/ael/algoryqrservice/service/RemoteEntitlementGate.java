@@ -35,7 +35,8 @@ public class RemoteEntitlementGate {
 
     public boolean hasScope(FulfillmentServiceClient client, Long userId, String scopeCode) {
         return client.listEntitlements(userId).stream()
-                .anyMatch(entitlement -> scopeCode.equals(entitlement.scopeCode()) && open(entitlement));
+                .filter(this::open)
+                .anyMatch(entitlement -> grants(entitlement, scopeCode));
     }
 
     public void requireScope(FulfillmentServiceClient client, Long userId, String scopeCode) {
@@ -79,6 +80,20 @@ public class RemoteEntitlementGate {
                 .mapToInt(this::remainingOf)
                 .max()
                 .orElse(0);
+    }
+
+    private boolean grants(ExternalEntitlementResponse entitlement, String scopeCode) {
+        if (scopeCode.equals(entitlement.scopeCode())) {
+            return true;
+        }
+        return productFor(entitlement)
+                .map(product -> scopeCode.equals(product.getScopeCode()))
+                .orElse(false);
+    }
+
+    private Optional<Product> productFor(ExternalEntitlementResponse entitlement) {
+        String code = isBlank(entitlement.productCode()) ? entitlement.featureCode() : entitlement.productCode();
+        return findProduct(code);
     }
 
     private boolean matches(ExternalEntitlementResponse entitlement, String productCode) {

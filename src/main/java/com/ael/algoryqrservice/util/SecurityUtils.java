@@ -37,9 +37,24 @@ public class SecurityUtils {
                 && principal.userId() != null
                 && !principal.isCustomer()
                 && !principal.isWaiter()) {
-            return principal.userId();
+            return accountUserId(authentication.getName(), principal.userId());
         }
         return getCurrentUser().getId();
+    }
+
+    public boolean matchesTokenUser(Long userId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (userId == null || authentication == null || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)) {
+            return false;
+        }
+        return userId.equals(principal.userId());
+    }
+
+    private Long accountUserId(String login, Long tokenUserId) {
+        if (login == null || login.isBlank()) {
+            return tokenUserId;
+        }
+        return userRepository.findByEmail(login).map(User::getId).orElse(tokenUserId);
     }
 
     public Customer getCurrentCustomer() {
