@@ -8,9 +8,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
 
-/**
- * Flyway is disabled in this service; add kitchen_enabled before Hibernate validate.
- */
 @Component
 @Slf4j
 public class BranchKitchenSchemaInitializer implements BeanPostProcessor {
@@ -34,7 +31,7 @@ public class BranchKitchenSchemaInitializer implements BeanPostProcessor {
                         SET kitchen_enabled = TRUE
                         WHERE EXISTS (
                             SELECT 1
-                            FROM tbl_menu_waiter w
+                            FROM tbl_merchant_staff w
                             WHERE w.branch_id = b.id
                               AND w.staff_role = 'KITCHEN'
                         )

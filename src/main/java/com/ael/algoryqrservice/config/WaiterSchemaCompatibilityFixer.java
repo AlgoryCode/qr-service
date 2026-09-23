@@ -9,9 +9,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
-/**
- * Flyway is disabled; add waiter/kitchen columns before Hibernate validate.
- */
 @Component
 @Slf4j
 public class WaiterSchemaCompatibilityFixer implements BeanPostProcessor {
@@ -26,9 +23,9 @@ public class WaiterSchemaCompatibilityFixer implements BeanPostProcessor {
 
     private void ensureSchema(DataSource dataSource) {
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
-            dropNotNullIfPresent(statement, "tbl_menu_waiter", "menu_id");
+            dropNotNullIfPresent(statement, "tbl_merchant_staff", "menu_id");
             statement.execute(
-                    "ALTER TABLE tbl_menu_waiter ADD COLUMN IF NOT EXISTS staff_role VARCHAR(16) NOT NULL DEFAULT 'WAITER'"
+                    "ALTER TABLE tbl_merchant_staff ADD COLUMN IF NOT EXISTS staff_role VARCHAR(16) NOT NULL DEFAULT 'WAITER'"
             );
             statement.execute(
                     "ALTER TABLE tbl_branch ADD COLUMN IF NOT EXISTS kitchen_enabled BOOLEAN NOT NULL DEFAULT FALSE"
