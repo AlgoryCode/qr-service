@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.service.AddonPurchaseService;
 import com.ael.algoryqrservice.service.EntitlementService;
+import com.ael.algoryqrservice.service.ExternalPackageViewService;
 import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.service.PurchaseService;
 import com.ael.algoryqrservice.util.SecurityUtils;
@@ -39,6 +40,7 @@ class PurchaseControllerCouponTest {
                 mock(AddonPurchaseService.class),
                 mock(PurchaseLogService.class),
                 mock(EntitlementService.class),
+                mock(ExternalPackageViewService.class),
                 securityUtils
         );
         MockHttpServletRequest http = new MockHttpServletRequest();

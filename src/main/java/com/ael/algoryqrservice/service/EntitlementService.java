@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.dto.ConsumedEntitlement;
@@ -13,6 +14,7 @@ import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.service.entitlement.UserEntitlementQueryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,14 +51,26 @@ public class EntitlementService {
     private final EntitlementMaintenanceService maintenanceService;
     private final FeatureUsageSyncRegistry usageSyncRegistry;
     private final UserEntitlementQueryService entitlementQueryService;
+    private final ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
+    private final ExternalPackageViewService externalPackageView;
+    private final RemoteEntitlementGate remoteEntitlementGate;
 
     @Transactional(readOnly = true)
     public boolean hasScope(Long userId, String scopeCode) {
+        FulfillmentServiceClient client = remoteClient();
+        if (client != null) {
+            return remoteEntitlementGate.hasScope(client, userId, scopeCode);
+        }
         return fulfillmentGateService.hasScope(userId, scopeCode);
     }
 
     @Transactional
     public void requireScope(Long userId, String scopeCode) {
+        FulfillmentServiceClient client = remoteClient();
+        if (client != null) {
+            remoteEntitlementGate.requireScope(client, userId, scopeCode);
+            return;
+        }
         refreshUserState(userId);
         if (!fulfillmentGateService.hasScope(userId, scopeCode)) {
             throw new ForbiddenException(scopeCode + MISSING_SCOPE_MESSAGE_SUFFIX);
@@ -65,8 +79,7 @@ public class EntitlementService {
 
     @Transactional
     public List<UserEntitlementResponse> getUserEntitlements(Long userId) {
-        refreshUserState(userId);
-        return entitlementQueryService.forUser(userId);
+        return externalPackageView.entitlements(userId).orElseGet(() -> localEntitlements(userId));
     }
 
     /**
@@ -77,6 +90,10 @@ public class EntitlementService {
      */
     @Transactional
     public ConsumedEntitlement consume(Long userId, String productCode, int amount) {
+        FulfillmentServiceClient client = remoteClient();
+        if (client != null) {
+            return remoteEntitlementGate.consume(client, userId, productCode, amount);
+        }
         purchaseExpiryService.expireDueForUser(userId);
         maintenanceService.backfillFulfillment(userId);
 
@@ -104,6 +121,11 @@ public class EntitlementService {
         if (userId == null || amount <= 0) {
             return;
         }
+        FulfillmentServiceClient client = remoteClient();
+        if (client != null) {
+            remoteEntitlementGate.release(client, userId, productCode, amount);
+            return;
+        }
         purchaseExpiryService.expireDueForUser(userId);
         maintenanceService.backfillFulfillment(userId);
 
@@ -124,11 +146,28 @@ public class EntitlementService {
         if (additionalProducts < 1) {
             return;
         }
+        FulfillmentServiceClient client = remoteClient();
+        if (client != null) {
+            remoteEntitlementGate.assertMenuQuota(client, userId, additionalProducts);
+            return;
+        }
         maintenanceService.repairUser(userId);
         int remaining = fulfillmentGateService.remainingQuantity(userId, CatalogProducts.MENU_PRODUCT, false);
         if (remaining < additionalProducts) {
             throw new ForbiddenException(MENU_PRODUCT_LIMIT_MESSAGE);
         }
+    }
+
+    private List<UserEntitlementResponse> localEntitlements(Long userId) {
+        refreshUserState(userId);
+        return entitlementQueryService.forUser(userId);
+    }
+
+    private FulfillmentServiceClient remoteClient() {
+        if (fulfillmentClients == null) {
+            return null;
+        }
+        return fulfillmentClients.getIfAvailable();
     }
 
     private void refreshUserState(Long userId) {

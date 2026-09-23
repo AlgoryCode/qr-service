@@ -58,6 +58,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isSessionActive(Claims claims) {
+        if (jwtService.isAuthServiceSubject(claims)) {
+            return true;
+        }
         UUID sessionId = jwtService.extractSessionId(claims);
         if (jwtService.isDashboardPrincipal(claims)) {
             return dashboardSessionService.isSessionActive(sessionId);
@@ -81,6 +84,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String principalType = jwtService.extractPrincipalType(claims);
+        Long userId = jwtService.isAuthServiceSubject(claims)
+                ? jwtService.extractPackageOwnerId(claims)
+                : jwtService.extractUserId(claims);
         List<String> roles = jwtService.extractRoles(claims);
         List<String> scopes;
         List<String> products;
@@ -108,7 +114,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .toList()
         );
         authToken.setDetails(new JwtAccessPrincipal(
-                jwtService.extractUserId(claims),
+                userId,
                 scopes,
                 products,
                 activePackage,

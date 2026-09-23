@@ -78,6 +78,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", ex.getMessage()));
     }
 
+    @ExceptionHandler(FulfillmentUnavailableException.class)
+    public ResponseEntity<Map<String, String>> handleFulfillmentUnavailable(FulfillmentUnavailableException ex) {
+        log.warn("Fulfillment service unavailable: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("message", ex.getMessage()));
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
         Map<String, String> body = new HashMap<>();
