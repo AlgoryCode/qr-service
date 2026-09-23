@@ -82,6 +82,22 @@ class QrServiceTest {
     private QrService qrService;
 
     @Test
+    void getUserQrs_whenTokenUserDiffersFromAccount_thenListsAccountQrs() {
+        Long accountUserId = 7L;
+        Long tokenUserId = 99L;
+        Qr linkQr = qr(3L, accountUserId, "link", Map.of("url", "https://example.com"));
+
+        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(accountUserId).build());
+        when(securityUtils.matchesTokenUser(tokenUserId)).thenReturn(true);
+        when(qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(accountUserId)).thenReturn(List.of(linkQr));
+        when(purchaseSelectionPolicy.activePurchaseId(accountUserId)).thenReturn(10L);
+
+        QrListPageResponse response = qrService.getUserQrs(tokenUserId, false, 0, 5, QrListScope.ALL);
+
+        assertThat(response.getContent()).extracting(QrListResponse::getQrId).containsExactly(linkQr.getQrId());
+    }
+
+    @Test
     void getUserQrs_whenMenuQrExists_thenExcludedFromList() {
         Long userId = 7L;
         Qr activeMenuQr = qr(1L, userId, "menu", Map.of("themeId", "classic", "businessName", "Aktif"));
