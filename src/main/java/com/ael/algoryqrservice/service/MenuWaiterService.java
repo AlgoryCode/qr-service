@@ -62,6 +62,9 @@ public class MenuWaiterService {
         if (staffRole == StaffRole.KITCHEN && !branch.isKitchenEnabled()) {
             throw new BadRequestException("Önce şube ayarlarından mutfağı ekleyin");
         }
+        if (staffRole == StaffRole.COURIER && !branch.isCourierEnabled()) {
+            throw new BadRequestException("Önce şube bilgilerinden kuryeyi açın");
+        }
         LocalDateTime now = LocalDateTime.now();
 
         MerchantStaff waiter = MerchantStaff.builder()

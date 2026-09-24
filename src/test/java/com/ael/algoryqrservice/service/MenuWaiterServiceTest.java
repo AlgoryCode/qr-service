@@ -117,6 +117,7 @@ class MenuWaiterServiceTest {
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")
+                .courierEnabled(true)
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
         when(merchantStaffRepository.existsByUsernameIgnoreCase("kurye1")).thenReturn(false);
@@ -163,6 +164,29 @@ class MenuWaiterServiceTest {
         ))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("şube ayarlarından");
+    }
+
+    @Test
+    void createWaiter_whenCourierRoleWithoutCourier_thenRejects() {
+        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+                .id(4L)
+                .userId(9L)
+                .name("Kadikoy")
+                .courierEnabled(false)
+                .build());
+
+        assertThatThrownBy(() -> menuWaiterService.createWaiter(
+                4L,
+                MenuWaiterDtos.CreateWaiterRequest.builder()
+                        .username("kurye1")
+                        .password("secret1")
+                        .displayName("Ali Kurye")
+                        .staffRole(com.ael.algoryqrservice.model.enums.StaffRole.COURIER)
+                        .build()
+        ))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("kuryeyi açın");
     }
 
     @Test
