@@ -72,6 +72,7 @@ public class BranchService {
                 .grandfathered(false)
                 .active(true)
                 .kitchenEnabled(false)
+                .courierEnabled(false)
                 .printKitchenEnabled(false)
                 .build());
         return toResponse(branch, List.of());
@@ -97,6 +98,9 @@ public class BranchService {
         }
         if (request.getKitchenEnabled() != null) {
             branch.setKitchenEnabled(request.getKitchenEnabled());
+        }
+        if (request.getCourierEnabled() != null) {
+            branch.setCourierEnabled(request.getCourierEnabled());
         }
         if (request.getPrintKitchenEnabled() != null) {
             branch.setPrintKitchenEnabled(request.getPrintKitchenEnabled());
@@ -211,6 +215,7 @@ public class BranchService {
                 .grandfathered(branch.isGrandfathered())
                 .active(branch.isActive())
                 .kitchenEnabled(branch.isKitchenEnabled())
+                .courierEnabled(branch.isCourierEnabled())
                 .printKitchenEnabled(branch.isPrintKitchenEnabled())
                 .menus(menus.stream()
                         .map(menu -> BranchDtos.MenuSummary.builder()

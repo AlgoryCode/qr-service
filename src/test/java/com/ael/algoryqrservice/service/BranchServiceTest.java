@@ -114,6 +114,22 @@ class BranchServiceTest {
     }
 
     @Test
+    void update_whenCourierEnabled_thenPersistsCourier() {
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").courierEnabled(false).build();
+        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
+
+        BranchDtos.Response response = branchService.update(15L, BranchDtos.UpdateRequest.builder()
+                .courierEnabled(true)
+                .build());
+
+        assertThat(branch.isCourierEnabled()).isTrue();
+        assertThat(response.isCourierEnabled()).isTrue();
+    }
+
+    @Test
     void applyPhotoToAllBranches_whenSourceHasPhoto_thenCopies() {
         when(securityUtils.getCurrentUserId()).thenReturn(7L);
         Branch source = Branch.builder()
