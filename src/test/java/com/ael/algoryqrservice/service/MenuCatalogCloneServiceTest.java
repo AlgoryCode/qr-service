@@ -192,4 +192,40 @@ class MenuCatalogCloneServiceTest {
 
         assertThat(menuCatalogCloneService.countCloneableProducts(12L, 7L)).isEqualTo(1);
     }
+
+    @Test
+    void cloneFromTemplate_whenOwnedByTemplateUser_thenCopiesImageUrl() {
+        Menu target = Menu.builder().menuId(99L).userId(7L).build();
+        Menu source = Menu.builder().menuId(12L).userId(1L).active(true).deleted(false).build();
+        MenuProduct sourceProduct = MenuProduct.builder()
+                .productId(100L)
+                .menuId(12L)
+                .name("Latte")
+                .price(new BigDecimal("150"))
+                .currency("TRY")
+                .subCategoryId(3L)
+                .imageUrl("https://cdn.example/latte.jpg")
+                .available(true)
+                .build();
+        when(menuRepository.findById(12L)).thenReturn(Optional.of(source));
+        when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
+                .thenReturn(List.of(sourceProduct));
+        when(menuCategoryService.cloneTaxonomyToMenu(12L, 99L))
+                .thenReturn(new MenuCategoryService.TaxonomyCloneResult(Map.of(1L, 10L), Map.of(3L, 30L)));
+        when(menuProductRepository.saveAndFlush(any(MenuProduct.class))).thenAnswer(invocation -> {
+            MenuProduct product = invocation.getArgument(0);
+            product.setProductId(500L);
+            return product;
+        });
+
+        int copied = menuCatalogCloneService.cloneFromTemplate(target, 12L, 1L);
+
+        assertThat(copied).isEqualTo(1);
+        ArgumentCaptor<MenuProduct> captor = ArgumentCaptor.forClass(MenuProduct.class);
+        verify(menuProductRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getName()).isEqualTo("Latte");
+        assertThat(captor.getValue().getImageUrl()).isEqualTo("https://cdn.example/latte.jpg");
+        assertThat(captor.getValue().getMenuId()).isEqualTo(99L);
+        verify(menuRepository, times(1)).findById(12L);
+    }
 }

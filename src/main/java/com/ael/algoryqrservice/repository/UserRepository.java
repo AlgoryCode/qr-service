@@ -19,7 +19,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByProviderAndProviderSubject(AuthProvider provider, String providerSubject);
 
-    boolean existsByEmail(String email);
+    boolean existsByEmailAndDeletedAtIsNull(String email);
 
     boolean existsByPhone(String phone);
 

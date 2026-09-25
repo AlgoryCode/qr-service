@@ -18,6 +18,7 @@ import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
+import com.ael.algoryqrservice.stage.StageTrialFixtureService;
 import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,8 @@ class OnboardingPackageServiceTest {
     SessionAccessService sessionAccessService;
     @Mock
     FulfillmentGrantService fulfillmentGrantService;
+    @Mock
+    StageTrialFixtureService stageTrialFixtureService;
 
     private OnboardingPackageService service;
 
@@ -68,7 +71,8 @@ class OnboardingPackageServiceTest {
                 trialLogRepository,
                 sessionAccessService,
                 new SessionAccessPolicy(),
-                fulfillmentGrantService
+                fulfillmentGrantService,
+                stageTrialFixtureService
         );
     }
 
@@ -86,6 +90,7 @@ class OnboardingPackageServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("daha once");
         verify(trialLogRepository, never()).saveAndFlush(any());
+        verify(stageTrialFixtureService, never()).assign(any());
     }
 
     @Test
@@ -138,6 +143,7 @@ class OnboardingPackageServiceTest {
         assertThat(captor.getValue().getPackageCode()).isEqualTo(CatalogPackages.ULTIMATE_TRIAL_PACKAGE);
         assertThat(captor.getValue().getStatus()).isEqualTo(TrialLogStatus.ACTIVE);
         verify(fulfillmentGrantService).grantOnboardingFulfillment(captor.getValue(), plan);
+        verify(stageTrialFixtureService).assign(7L);
     }
 
     @Test

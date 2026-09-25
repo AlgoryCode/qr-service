@@ -17,6 +17,7 @@ import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
+import com.ael.algoryqrservice.stage.StageTrialFixtureService;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -36,6 +37,7 @@ public class OnboardingPackageService {
     private final SessionAccessService sessionAccessService;
     private final SessionAccessPolicy sessionAccessPolicy;
     private final FulfillmentGrantService fulfillmentGrantService;
+    private final StageTrialFixtureService stageTrialFixtureService;
 
     @Transactional
     public AccessSessionResponse start(
@@ -89,6 +91,7 @@ public class OnboardingPackageService {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         fulfillmentGrantService.grantOnboardingFulfillment(trialLog, planPackage);
+        stageTrialFixtureService.assign(userId);
         return AccessSessionMapper.toResponse(sessionAccessService.resolve(userId));
     }
 

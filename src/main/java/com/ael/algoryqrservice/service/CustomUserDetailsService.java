@@ -21,6 +21,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
+                .filter(candidate -> candidate.getDeletedAt() == null)
                 .orElseThrow(() -> new UsernameNotFoundException("Kullanıcı bulunamadı: " + email));
         if (user.getProvider() != AuthProvider.BASIC || user.getPassword() == null) {
             throw new UsernameNotFoundException("Kullanıcı bu giriş yöntemini kullanamaz");

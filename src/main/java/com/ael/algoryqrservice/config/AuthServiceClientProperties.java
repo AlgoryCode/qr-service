@@ -10,6 +10,7 @@ public class AuthServiceClientProperties {
     private boolean enabled = true;
     private String token = "";
     private String headerName = "X-Service-Token";
+    private String publicBaseUrl = "";
 
     public boolean isEnabled() {
         return enabled;
@@ -33,5 +34,13 @@ public class AuthServiceClientProperties {
 
     public void setHeaderName(String headerName) {
         this.headerName = headerName;
+    }
+
+    public String getPublicBaseUrl() {
+        return publicBaseUrl;
+    }
+
+    public void setPublicBaseUrl(String publicBaseUrl) {
+        this.publicBaseUrl = publicBaseUrl;
     }
 }

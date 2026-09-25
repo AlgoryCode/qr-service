@@ -16,8 +16,28 @@ CREATE TABLE IF NOT EXISTS tbl_print_agent_device (
     CONSTRAINT uk_print_agent_device_token UNIQUE (device_token_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_print_agent_device_owner_branch
-    ON tbl_print_agent_device (owner_user_id, branch_id);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'tbl_print_agent_device'
+          AND column_name = 'owner_user_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_print_agent_device_owner_branch
+            ON tbl_print_agent_device (owner_user_id, branch_id);
+    ELSIF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'tbl_print_agent_device'
+          AND column_name = 'merchant_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_print_agent_device_owner_branch
+            ON tbl_print_agent_device (merchant_id, branch_id);
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS tbl_print_pairing_code (
     id              BIGSERIAL PRIMARY KEY,
@@ -30,8 +50,28 @@ CREATE TABLE IF NOT EXISTS tbl_print_pairing_code (
     CONSTRAINT uk_print_pairing_code_hash UNIQUE (code_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_print_pairing_code_owner
-    ON tbl_print_pairing_code (owner_user_id, branch_id);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'tbl_print_pairing_code'
+          AND column_name = 'owner_user_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_print_pairing_code_owner
+            ON tbl_print_pairing_code (owner_user_id, branch_id);
+    ELSIF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'tbl_print_pairing_code'
+          AND column_name = 'merchant_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_print_pairing_code_owner
+            ON tbl_print_pairing_code (merchant_id, branch_id);
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS tbl_print_job (
     id                      BIGSERIAL PRIMARY KEY,
@@ -57,5 +97,25 @@ CREATE TABLE IF NOT EXISTS tbl_print_job (
 CREATE INDEX IF NOT EXISTS idx_print_job_pending_branch
     ON tbl_print_job (branch_id, status, created_at);
 
-CREATE INDEX IF NOT EXISTS idx_print_job_owner_status
-    ON tbl_print_job (owner_user_id, status, created_at DESC);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'tbl_print_job'
+          AND column_name = 'owner_user_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_print_job_owner_status
+            ON tbl_print_job (owner_user_id, status, created_at DESC);
+    ELSIF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'tbl_print_job'
+          AND column_name = 'merchant_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_print_job_owner_status
+            ON tbl_print_job (merchant_id, status, created_at DESC);
+    END IF;
+END $$;
