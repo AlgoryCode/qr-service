@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_user", uniqueConstraints = {
-        @UniqueConstraint(columnNames = "email"),
         @UniqueConstraint(columnNames = "phone"),
         @UniqueConstraint(columnNames = "provider_subject")
 })
@@ -35,8 +34,11 @@ public class User {
     @Column
     private String lastName;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String email;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(unique = true)
     private String phone;

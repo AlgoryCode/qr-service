@@ -55,7 +55,7 @@ public class AuthService {
             throw new BadRequestException("Şifreler eşleşmiyor");
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmailAndDeletedAtIsNull(request.getEmail())) {
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
 
@@ -124,6 +124,7 @@ public class AuthService {
             throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");
         }
         User user = userRepository.findByEmail(email)
+                .filter(candidate -> candidate.getDeletedAt() == null)
                 .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
         if (user.getRole() == UserRole.WAITER) {
             throw new BadCredentialsException("Bu hesap garson (WAITER) hesabıdır. Panel girişi yapılamaz.");

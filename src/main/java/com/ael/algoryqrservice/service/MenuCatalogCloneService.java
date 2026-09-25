@@ -37,8 +37,16 @@ public class MenuCatalogCloneService {
 
     @Transactional
     public int cloneInto(Menu targetMenu, Long sourceMenuId, Long userId) {
-        Menu sourceMenu = requireCloneableSource(sourceMenuId, userId);
+        return copyCatalog(requireCloneableSource(sourceMenuId, userId), targetMenu, userId);
+    }
 
+    @Transactional
+    public int cloneFromTemplate(Menu targetMenu, Long sourceMenuId, Long templateUserId) {
+        Menu sourceMenu = requireTemplateSource(sourceMenuId, templateUserId);
+        return copyCatalog(sourceMenu, targetMenu, targetMenu.getUserId());
+    }
+
+    private int copyCatalog(Menu sourceMenu, Menu targetMenu, Long userId) {
         List<MenuProduct> sourceProducts = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(sourceMenu.getMenuId());
         if (sourceProducts.isEmpty()) {
@@ -117,6 +125,19 @@ public class MenuCatalogCloneService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Kaynak menü bulunamadı"));
         if (!userId.equals(sourceMenu.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
+        }
+        if (!sourceMenu.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yalnızca aktif menülerden kopyalama yapılabilir");
+        }
+        return sourceMenu;
+    }
+
+    private Menu requireTemplateSource(Long sourceMenuId, Long templateUserId) {
+        Menu sourceMenu = menuRepository.findById(sourceMenuId)
+                .filter(menu -> !menu.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şablon menü bulunamadı"));
+        if (templateUserId == null || !templateUserId.equals(sourceMenu.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Şablon menü bu kullanıcıya ait değil");
         }
         if (!sourceMenu.isActive()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yalnızca aktif menülerden kopyalama yapılabilir");
