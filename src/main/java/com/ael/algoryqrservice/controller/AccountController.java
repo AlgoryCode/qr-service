@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.SessionPageResponse;
 import com.ael.algoryqrservice.model.dto.SubscriptionOverviewResponse;
 import com.ael.algoryqrservice.service.AccountFacadeService;
+import com.ael.algoryqrservice.util.HttpRequestAuth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +71,7 @@ public class AccountController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return accountFacade.listSessions(readBearerToken(request), page, size);
+        return accountFacade.listSessions(HttpRequestAuth.readBearerToken(request), page, size);
     }
 
     @DeleteMapping("/sessions/{sessionId}")
@@ -86,7 +87,7 @@ public class AccountController {
             @RequestParam(defaultValue = "" + AccountOverviewDtos.DEFAULT_SESSION_PAGE_SIZE) int sessionSize
     ) {
         AccountOverviewDtos.OverviewResponse body = accountFacade.getOverview(
-                readBearerToken(request),
+                HttpRequestAuth.readBearerToken(request),
                 sessionPage,
                 sessionSize
         );
@@ -101,13 +102,5 @@ public class AccountController {
             return ResponseEntity.status(status).body(body);
         }
         return ResponseEntity.ok(body);
-    }
-
-    private static String readBearerToken(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            return null;
-        }
-        return header.substring("Bearer ".length()).trim();
     }
 }
