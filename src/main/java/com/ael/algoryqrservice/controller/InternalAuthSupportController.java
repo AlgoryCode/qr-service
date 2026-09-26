@@ -1,15 +1,19 @@
 package com.ael.algoryqrservice.controller;
 
+import com.ael.algoryqrservice.access.OnboardingPackageService;
 import com.ael.algoryqrservice.config.AuthServiceClientProperties;
+import com.ael.algoryqrservice.model.dto.InternalDemoOnboardingRequest;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.service.PackageActivationService;
 import com.ael.algoryqrservice.service.UserAccessProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +29,7 @@ public class InternalAuthSupportController {
 
     private final UserAccessProfileService userAccessProfileService;
     private final PackageActivationService packageActivationService;
+    private final OnboardingPackageService onboardingPackageService;
     private final AuthServiceClientProperties authServiceClientProperties;
 
     @GetMapping("/users/{userId}/access-profile")
@@ -35,6 +40,18 @@ public class InternalAuthSupportController {
     ) {
         requireServiceToken(resolveToken(request, serviceTokenFallback));
         return ResponseEntity.ok(userAccessProfileService.resolve(userId));
+    }
+
+    @PostMapping("/users/{userId}/demo-onboarding")
+    public ResponseEntity<Void> demoOnboarding(
+            @PathVariable Long userId,
+            @Valid @RequestBody InternalDemoOnboardingRequest request,
+            @RequestHeader(value = "X-Service-Token", required = false) String serviceTokenFallback,
+            jakarta.servlet.http.HttpServletRequest httpRequest
+    ) {
+        requireServiceToken(resolveToken(httpRequest, serviceTokenFallback));
+        onboardingPackageService.startDemoForAuthLinkedUser(userId, request.email(), request.displayName());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/users/{userId}/ensure-subscription")

@@ -17,6 +17,7 @@ import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +57,8 @@ class OnboardingPackageServiceTest {
     SessionAccessService sessionAccessService;
     @Mock
     FulfillmentGrantService fulfillmentGrantService;
+    @Mock
+    AuthLinkedUserProvisioner authLinkedUserProvisioner;
 
     private OnboardingPackageService service;
 
@@ -68,7 +71,8 @@ class OnboardingPackageServiceTest {
                 trialLogRepository,
                 sessionAccessService,
                 new SessionAccessPolicy(),
-                fulfillmentGrantService
+                fulfillmentGrantService,
+                authLinkedUserProvisioner
         );
     }
 

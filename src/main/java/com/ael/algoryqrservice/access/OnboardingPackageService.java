@@ -16,6 +16,7 @@ import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,18 @@ public class OnboardingPackageService {
     private final SessionAccessService sessionAccessService;
     private final SessionAccessPolicy sessionAccessPolicy;
     private final FulfillmentGrantService fulfillmentGrantService;
+    private final AuthLinkedUserProvisioner authLinkedUserProvisioner;
+
+    @Transactional
+    public AccessSessionResponse startDemoForAuthLinkedUser(
+            Long userId,
+            String email,
+            String displayName
+    ) {
+        User user = authLinkedUserProvisioner.ensureUser(userId, email, displayName);
+        authLinkedUserProvisioner.refreshDemoProfile(user, displayName);
+        return start(userId, null, BusinessType.OTHER, UsagePurpose.EXPLORE_ALL, true);
+    }
 
     @Transactional
     public AccessSessionResponse start(
@@ -43,6 +56,17 @@ public class OnboardingPackageService {
             Long packageId,
             BusinessType businessType,
             UsagePurpose usagePurpose
+    ) {
+        return start(userId, packageId, businessType, usagePurpose, false);
+    }
+
+    @Transactional
+    public AccessSessionResponse start(
+            Long userId,
+            Long packageId,
+            BusinessType businessType,
+            UsagePurpose usagePurpose,
+            boolean skipEmailVerification
     ) {
         if (businessType == null) {
             throw new BadRequestException("Isletme tipi zorunludur");
@@ -52,7 +76,7 @@ public class OnboardingPackageService {
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadRequestException("Kullanici bulunamadi"));
-        if (user.getProvider() == AuthProvider.BASIC && !user.isEmailVerified()) {
+        if (!skipEmailVerification && user.getProvider() == AuthProvider.BASIC && !user.isEmailVerified()) {
             throw new BadRequestException("Deneme baslatmak icin e-posta adresinizi dogrulamaniz gerekiyor");
         }
 
