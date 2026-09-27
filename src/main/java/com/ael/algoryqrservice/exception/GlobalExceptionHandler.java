@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -119,9 +121,11 @@ public class GlobalExceptionHandler {
                 ? String.valueOf(ex.getMostSpecificCause().getMessage())
                 : "";
         String lower = detail.toLowerCase();
-        if (lower.contains("uk_menu_waiter_username") || lower.contains("tbl_menu_waiter_username")) {
+        if (lower.contains("uk_menu_waiter_username")
+                || lower.contains("tbl_menu_waiter_username")
+                || lower.contains("uk_merchant_staff_merchant_username")) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "Bu kullanıcı adı zaten kullanılıyor"));
+                    .body(Map.of("message", "Bu kullanıcı adı bu işletmede zaten kullanılıyor"));
         }
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "Veri kaydı tamamlanamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin."));
@@ -135,6 +139,11 @@ public class GlobalExceptionHandler {
         }
         String message = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
         return ResponseEntity.status(status).body(Map.of("message", message));
+    }
+
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<Map<String, String>> handleMissingRoute(Exception ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Not found"));
     }
 
     @ExceptionHandler(Exception.class)

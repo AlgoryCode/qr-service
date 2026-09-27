@@ -51,7 +51,7 @@ class MenuWaiterServiceTest {
                 .name("Kadikoy")
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
-        when(merchantStaffRepository.existsByUsernameIgnoreCase("ali")).thenReturn(false);
+        when(merchantStaffRepository.existsByMerchantIdAndUsernameIgnoreCase(9L, "ali")).thenReturn(false);
         when(merchantStaffRepository.save(any(MerchantStaff.class))).thenAnswer(invocation -> {
             MerchantStaff waiter = invocation.getArgument(0);
             waiter.setId(11L);
@@ -87,7 +87,7 @@ class MenuWaiterServiceTest {
                 .kitchenEnabled(true)
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
-        when(merchantStaffRepository.existsByUsernameIgnoreCase("mutfak1")).thenReturn(false);
+        when(merchantStaffRepository.existsByMerchantIdAndUsernameIgnoreCase(9L, "mutfak1")).thenReturn(false);
         when(merchantStaffRepository.save(any(MerchantStaff.class))).thenAnswer(invocation -> {
             MerchantStaff waiter = invocation.getArgument(0);
             waiter.setId(12L);
@@ -120,7 +120,7 @@ class MenuWaiterServiceTest {
                 .courierEnabled(true)
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
-        when(merchantStaffRepository.existsByUsernameIgnoreCase("kurye1")).thenReturn(false);
+        when(merchantStaffRepository.existsByMerchantIdAndUsernameIgnoreCase(9L, "kurye1")).thenReturn(false);
         when(merchantStaffRepository.save(any(MerchantStaff.class))).thenAnswer(invocation -> {
             MerchantStaff waiter = invocation.getArgument(0);
             waiter.setId(13L);

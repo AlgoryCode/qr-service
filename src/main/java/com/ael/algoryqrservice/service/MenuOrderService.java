@@ -305,7 +305,7 @@ public class MenuOrderService {
                 .map(this::toOrderResponse)
                 .toList();
         List<MenuOrderDtos.OrderResponse> combined = new ArrayList<>(active);
-        combined.addAll(servedToday);
+        combined.addAll(tableBillService.hideClosedTableTickets(servedToday));
         combined.addAll(kitchenUberEatsService.listActiveForOwner(menu.getUserId()));
         combined.addAll(kitchenYemekSepetiService.listActiveForOwner(menu.getUserId()));
         return combined;

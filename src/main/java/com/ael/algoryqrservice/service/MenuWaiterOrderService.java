@@ -229,7 +229,7 @@ public class MenuWaiterOrderService {
                 .map(menuOrderService::toOrderResponse)
                 .toList();
         List<MenuOrderDtos.OrderResponse> combined = new java.util.ArrayList<>(active);
-        combined.addAll(servedToday);
+        combined.addAll(tableBillService.hideClosedTableTickets(servedToday));
         combined.addAll(kitchenUberEatsService.listActiveForOwner(staff.getMerchantId()));
         combined.addAll(kitchenYemekSepetiService.listActiveForOwner(staff.getMerchantId()));
         return combined;

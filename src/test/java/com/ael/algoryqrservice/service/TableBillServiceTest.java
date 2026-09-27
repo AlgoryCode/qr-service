@@ -15,6 +15,7 @@ import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MerchantStaffRepository;
@@ -68,6 +69,10 @@ class TableBillServiceTest {
     private MerchantStaffRepository merchantStaffRepository;
     @Mock
     private WaiterCommissionService waiterCommissionService;
+    @Mock
+    private MenuOrderRepository menuOrderRepository;
+    @Mock
+    private OrderAuditService orderAuditService;
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
@@ -176,6 +181,12 @@ class TableBillServiceTest {
         when(tableSessionRepository.findByTableIdAndRevokedFalse(5L)).thenReturn(List.of(session));
         when(billPaymentRepository.findByBillIdOrderByPaidAtAsc(10L)).thenReturn(List.of());
         when(billPaymentRepository.save(any(BillPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MenuOrder sameTable = MenuOrder.builder().id(30L).menuId(1L).tableId(5L).status(MenuOrderStatus.READY).build();
+        MenuOrder otherTable = MenuOrder.builder().id(31L).menuId(1L).tableId(9L).status(MenuOrderStatus.READY).build();
+        when(menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
+                eq(1L), eq(5L), eq(List.of(MenuOrderStatus.READY))))
+                .thenReturn(List.of(sameTable, otherTable));
+        when(menuOrderRepository.save(any(MenuOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = tableBillService.closeBill(1L, 10L, waiter, TableBillPaymentMethod.CASH, false, null);
 
@@ -183,6 +194,10 @@ class TableBillServiceTest {
         assertThat(response.getPaymentMethod()).isEqualTo(TableBillPaymentMethod.CASH);
         assertThat(response.getFixedCommissionAmount()).isNull();
         assertThat(session.isRevoked()).isTrue();
+        assertThat(sameTable.getStatus()).isEqualTo(MenuOrderStatus.SERVED);
+        assertThat(otherTable.getStatus()).isEqualTo(MenuOrderStatus.READY);
+        verify(menuOrderRepository).save(sameTable);
+        verify(menuOrderRepository, never()).save(otherTable);
         verify(waiterCommissionService, never()).recordFixedTableCloseCommission(any(), any());
     }
 

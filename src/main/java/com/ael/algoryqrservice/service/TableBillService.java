@@ -14,9 +14,12 @@ import com.ael.algoryqrservice.model.TableBillItem;
 import com.ael.algoryqrservice.model.TableSession;
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.TableBillDtos;
+import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.model.enums.OrderAuditAction;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.MerchantStaffRepository;
@@ -57,6 +60,8 @@ public class TableBillService {
     private final RestaurantTableRepository restaurantTableRepository;
     private final MerchantStaffRepository merchantStaffRepository;
     private final WaiterCommissionService waiterCommissionService;
+    private final MenuOrderRepository menuOrderRepository;
+    private final OrderAuditService orderAuditService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -485,6 +490,7 @@ public class TableBillService {
         bill.setUpdatedAt(now);
 
         TableBill saved = tableBillRepository.save(bill);
+        serveReadyOrdersForTable(saved, waiter.getId());
         revokeSessionsForTable(bill.getTableId());
         eventPublisher.publishEvent(new BillClosedEvent(
                 saved.getId(),
@@ -804,6 +810,70 @@ public class TableBillService {
             }
         }
         bill.setTotalAmount(total);
+    }
+
+    /**
+     * A closed bill takes only that table's ready tickets off the floor.
+     * Orders on any other table are not loaded.
+     */
+    private void serveReadyOrdersForTable(TableBill bill, Long staffId) {
+        if (bill.getMenuId() == null || bill.getTableId() == null || bill.getId() == null) {
+            return;
+        }
+        List<MenuOrder> ready = menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
+                bill.getMenuId(),
+                bill.getTableId(),
+                List.of(MenuOrderStatus.READY)
+        );
+        if (ready == null || ready.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (MenuOrder order : ready) {
+            if (!bill.getTableId().equals(order.getTableId())) {
+                continue;
+            }
+            order.setStatus(MenuOrderStatus.SERVED);
+            order.setServedAt(now);
+            order.setUpdatedAt(now);
+            if (order.getBillId() == null) {
+                order.setBillId(bill.getId());
+            }
+            MenuOrder saved = menuOrderRepository.save(order);
+            orderAuditService.record(
+                    saved,
+                    OrderAuditAction.STATUS_CHANGED,
+                    staffId,
+                    "{\"from\":\"READY\",\"to\":\"SERVED\"}"
+            );
+        }
+    }
+
+    public List<MenuOrderDtos.OrderResponse> hideClosedTableTickets(List<MenuOrderDtos.OrderResponse> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> billIds = new HashSet<>();
+        for (MenuOrderDtos.OrderResponse order : orders) {
+            if (order.getStatus() == MenuOrderStatus.SERVED && order.getBillId() != null) {
+                billIds.add(order.getBillId());
+            }
+        }
+        if (billIds.isEmpty()) {
+            return orders;
+        }
+        Set<Long> closedIds = tableBillRepository.findAllById(billIds).stream()
+                .filter(bill -> bill.getStatus() == TableBillStatus.CLOSED)
+                .map(TableBill::getId)
+                .collect(Collectors.toSet());
+        if (closedIds.isEmpty()) {
+            return orders;
+        }
+        return orders.stream()
+                .filter(order -> order.getStatus() != MenuOrderStatus.SERVED
+                        || order.getBillId() == null
+                        || !closedIds.contains(order.getBillId()))
+                .toList();
     }
 
     private void revokeSessionsForTable(Long tableId) {

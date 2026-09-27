@@ -93,8 +93,12 @@ public class MenuWaiterAuthService {
     }
 
     private MerchantStaff authenticate(MenuWaiterDtos.WaiterLoginRequest request) {
+        if (request.getMerchantId() == null || request.getMerchantId() <= 0) {
+            throw new BadRequestException("İşletme ID gerekli");
+        }
         String username = request.getUsername().trim();
-        MerchantStaff waiter = merchantStaffRepository.findByUsernameIgnoreCase(username)
+        MerchantStaff waiter = merchantStaffRepository
+                .findByMerchantIdAndUsernameIgnoreCase(request.getMerchantId(), username)
                 .orElseThrow(() -> new BadCredentialsException("Geçersiz kimlik bilgileri"));
         if (!waiter.isActive()) {
             throw new BadCredentialsException("Geçersiz kimlik bilgileri");

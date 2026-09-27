@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_merchant_staff", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_menu_waiter_username", columnNames = "username")
+        @UniqueConstraint(name = "uk_merchant_staff_merchant_username", columnNames = {"merchant_id", "username"})
 }, indexes = {
         @Index(name = "idx_menu_waiter_branch", columnList = "branch_id"),
         @Index(name = "idx_menu_waiter_owner", columnList = "merchant_id")
@@ -35,7 +35,7 @@ public class MerchantStaff {
     @Column(name = "branch_id")
     private Long branchId;
 
-    @Column(nullable = false, unique = true, length = 64)
+    @Column(nullable = false, length = 64)
     private String username;
 
     @Column(name = "password_hash", nullable = false)

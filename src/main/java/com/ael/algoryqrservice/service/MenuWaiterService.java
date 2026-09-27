@@ -53,8 +53,8 @@ public class MenuWaiterService {
         }
 
         String username = normalizeUsername(request.getUsername());
-        if (merchantStaffRepository.existsByUsernameIgnoreCase(username)) {
-            throw new BadRequestException("Bu kullanıcı adı zaten kullanılıyor");
+        if (merchantStaffRepository.existsByMerchantIdAndUsernameIgnoreCase(branch.getUserId(), username)) {
+            throw new BadRequestException("Bu kullanıcı adı bu işletmede zaten kullanılıyor");
         }
 
         String displayName = requireDisplayName(request.getDisplayName());

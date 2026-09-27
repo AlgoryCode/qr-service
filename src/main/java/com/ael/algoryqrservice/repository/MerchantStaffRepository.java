@@ -13,6 +13,10 @@ public interface MerchantStaffRepository extends JpaRepository<MerchantStaff, Lo
 
     Optional<MerchantStaff> findByUsernameIgnoreCase(String username);
 
+    Optional<MerchantStaff> findByMerchantIdAndUsernameIgnoreCase(Long merchantId, String username);
+
+    boolean existsByMerchantIdAndUsernameIgnoreCase(Long merchantId, String username);
+
     List<MerchantStaff> findByBranchIdOrderByDisplayNameAsc(Long branchId);
 
     List<MerchantStaff> findByBranchIdInOrderByDisplayNameAsc(Collection<Long> branchIds);

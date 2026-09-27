@@ -5,6 +5,8 @@ import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -102,6 +104,10 @@ public final class MenuWaiterDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class WaiterLoginRequest {
+        @NotNull
+        @Positive
+        private Long merchantId;
+
         @NotBlank
         @Size(max = 64)
         private String username;
