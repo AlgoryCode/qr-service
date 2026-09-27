@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
@@ -125,6 +126,11 @@ public final class MenuWaiterDtos {
         private String refreshToken;
         private Long staffId;
         private Long branchId;
+
+        @JsonProperty("waiterId")
+        public Long getWaiterId() {
+            return staffId;
+        }
         private String displayName;
         private StaffRole staffRole;
     }
@@ -137,6 +143,11 @@ public final class MenuWaiterDtos {
         private Long staffId;
         private Long branchId;
         private Long merchantId;
+
+        @JsonProperty("waiterId")
+        public Long getWaiterId() {
+            return staffId;
+        }
         private String username;
         private String displayName;
         private StaffRole staffRole;

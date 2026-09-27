@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -166,6 +167,12 @@ public final class MenuOrderDtos {
         private String note;
         private Long staffId;
         private Long createdByStaffId;
+
+        /** Frontend hâlâ waiterId okuyor; kaynak staffId. */
+        @JsonProperty("waiterId")
+        public Long getWaiterId() {
+            return staffId;
+        }
         private Long cancelledByStaffId;
         private String waiterName;
         private String waiterNote;

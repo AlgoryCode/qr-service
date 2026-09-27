@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.model.dto;
 
 import com.ael.algoryqrservice.model.enums.MenuAnalyticsEventType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -324,6 +325,10 @@ public class AnalyticsDtos {
             BigDecimal tipRevenue,
             boolean active
     ) {
+        @JsonProperty("waiterId")
+        public Long waiterId() {
+            return staffId;
+        }
     }
 
     public record WaiterPerformanceProduct(
@@ -363,6 +368,10 @@ public class AnalyticsDtos {
             boolean active,
             List<WaiterPerformanceProduct> topProducts
     ) {
+        @JsonProperty("waiterId")
+        public Long waiterId() {
+            return staffId;
+        }
     }
 
     public record MerchantStaffPerformanceReportResponse(
@@ -503,6 +512,10 @@ public class AnalyticsDtos {
             long orderCount,
             int rank
     ) {
+        @JsonProperty("waiterId")
+        public Long waiterId() {
+            return staffId;
+        }
     }
 
     public record StaffAnalytics(
@@ -601,6 +614,10 @@ public class AnalyticsDtos {
             String displayName,
             long cancelCount
     ) {
+        @JsonProperty("waiterId")
+        public Long waiterId() {
+            return staffId;
+        }
     }
 
     public record CancellationsAnalytics(
@@ -631,6 +648,10 @@ public class AnalyticsDtos {
             LocalDateTime paidAt,
             BigDecimal amount
     ) {
+        @JsonProperty("waiterId")
+        public Long waiterId() {
+            return staffId;
+        }
     }
 
     public record DashboardAnalytics(

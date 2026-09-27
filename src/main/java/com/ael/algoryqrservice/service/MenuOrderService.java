@@ -373,6 +373,9 @@ public class MenuOrderService {
             order.setReadyAt(now);
         } else if (next == MenuOrderStatus.SERVED) {
             order.setServedAt(now);
+            if (actorWaiterId != null) {
+                order.setStaffId(actorWaiterId);
+            }
         }
         order.setUpdatedAt(now);
         MenuOrder saved = menuOrderRepository.save(order);
