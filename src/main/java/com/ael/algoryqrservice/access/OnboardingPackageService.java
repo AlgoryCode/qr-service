@@ -18,6 +18,7 @@ import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
+import com.ael.algoryqrservice.stage.StageTrialFixtureService;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -38,6 +39,7 @@ public class OnboardingPackageService {
     private final SessionAccessPolicy sessionAccessPolicy;
     private final FulfillmentGrantService fulfillmentGrantService;
     private final AuthLinkedUserProvisioner authLinkedUserProvisioner;
+    private final StageTrialFixtureService stageTrialFixtureService;
 
     @Transactional
     public AccessSessionResponse startDemoForAuthLinkedUser(
@@ -113,6 +115,9 @@ public class OnboardingPackageService {
             throw new BadRequestException("Deneme hakki daha once kullanilmis");
         }
         fulfillmentGrantService.grantOnboardingFulfillment(trialLog, planPackage);
+        if (!skipEmailVerification) {
+            stageTrialFixtureService.assign(userId);
+        }
         return AccessSessionMapper.toResponse(sessionAccessService.resolve(userId));
     }
 

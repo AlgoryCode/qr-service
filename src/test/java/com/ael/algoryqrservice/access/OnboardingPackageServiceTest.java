@@ -19,13 +19,13 @@ import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
+import com.ael.algoryqrservice.stage.StageTrialFixtureService;
 import com.ael.algoryqrservice.util.AppTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -59,6 +59,8 @@ class OnboardingPackageServiceTest {
     FulfillmentGrantService fulfillmentGrantService;
     @Mock
     AuthLinkedUserProvisioner authLinkedUserProvisioner;
+    @Mock
+    StageTrialFixtureService stageTrialFixtureService;
 
     private OnboardingPackageService service;
 
@@ -72,7 +74,8 @@ class OnboardingPackageServiceTest {
                 sessionAccessService,
                 new SessionAccessPolicy(),
                 fulfillmentGrantService,
-                authLinkedUserProvisioner
+                authLinkedUserProvisioner,
+                stageTrialFixtureService
         );
     }
 
@@ -90,6 +93,7 @@ class OnboardingPackageServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("daha once");
         verify(trialLogRepository, never()).saveAndFlush(any());
+        verify(stageTrialFixtureService, never()).assign(any());
     }
 
     @Test
@@ -142,6 +146,7 @@ class OnboardingPackageServiceTest {
         assertThat(captor.getValue().getPackageCode()).isEqualTo(CatalogPackages.ULTIMATE_TRIAL_PACKAGE);
         assertThat(captor.getValue().getStatus()).isEqualTo(TrialLogStatus.ACTIVE);
         verify(fulfillmentGrantService).grantOnboardingFulfillment(captor.getValue(), plan);
+        verify(stageTrialFixtureService).assign(7L);
     }
 
     @Test

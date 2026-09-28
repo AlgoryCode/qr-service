@@ -67,6 +67,11 @@ server:
 
 app:
   url: ${APP_URL:http://localhost:3000}
+  stage-trial-fixture:
+    enabled: ${STAGE_TRIAL_FIXTURE_ENABLED:true}
+    template-user-id: ${STAGE_TRIAL_TEMPLATE_USER_ID:0}
+    template-branch-id: ${STAGE_TRIAL_TEMPLATE_BRANCH_ID:0}
+    template-menu-id: ${STAGE_TRIAL_TEMPLATE_MENU_ID:0}
 
 payment:
   service:
@@ -82,6 +87,10 @@ google:
     frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
     handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}
     android-client-id: ${GOOGLE_ANDROID_CLIENT_ID:}
+
+auth:
+  service:
+    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:https://stage.auth.algorycode.com}
 
 fulfillment:
   external:

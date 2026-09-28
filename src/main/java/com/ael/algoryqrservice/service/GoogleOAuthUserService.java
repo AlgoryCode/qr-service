@@ -53,7 +53,7 @@ public class GoogleOAuthUserService {
             return googleUser.get();
         }
 
-        Optional<User> existingByEmail = userRepository.findByEmail(identity.email());
+        Optional<User> existingByEmail = liveUser(userRepository.findByEmail(identity.email()));
         if (existingByEmail.isPresent() && !isGoogleProvider(existingByEmail.get().getProvider())) {
             throw new BadRequestException(providerConflictMessage(existingByEmail.get().getProvider()));
         }
@@ -66,7 +66,7 @@ public class GoogleOAuthUserService {
             throw new BadRequestException("Bu e-posta adresi zaten kayıtlı");
         }
 
-        Optional<User> existingByEmail = userRepository.findByEmail(identity.email());
+        Optional<User> existingByEmail = liveUser(userRepository.findByEmail(identity.email()));
         if (existingByEmail.isPresent()) {
             if (!isGoogleProvider(existingByEmail.get().getProvider())) {
                 throw new BadRequestException(providerConflictMessage(existingByEmail.get().getProvider()));
@@ -101,14 +101,18 @@ public class GoogleOAuthUserService {
     }
 
     private Optional<User> findGoogleUser(String subject) {
-        Optional<User> googleUser = userRepository.findByProviderAndProviderSubject(
+        Optional<User> googleUser = liveUser(userRepository.findByProviderAndProviderSubject(
                 AuthProvider.GOOGLE,
                 subject
-        );
+        ));
         if (googleUser.isPresent()) {
             return googleUser;
         }
-        return userRepository.findByProviderAndProviderSubject(AuthProvider.MOBILE_GOOGLE, subject);
+        return liveUser(userRepository.findByProviderAndProviderSubject(AuthProvider.MOBILE_GOOGLE, subject));
+    }
+
+    private static Optional<User> liveUser(Optional<User> user) {
+        return user.filter(candidate -> candidate.getDeletedAt() == null);
     }
 
     private static AuthProvider requireGoogleProvider(AuthProvider authProvider) {

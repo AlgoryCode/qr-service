@@ -87,6 +87,8 @@ public class SecurityConfig {
                         .requestMatchers("/internal/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()
+                        .requestMatchers(HttpMethod.GET, GoogleOAuthPaths.AUTHORIZE, GoogleOAuthPaths.LEGACY_AUTHORIZE)
+                            .permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/print-agent/jobs/**", "/print-agent/devices/heartbeat")

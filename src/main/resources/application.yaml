@@ -100,6 +100,11 @@ app:
     enabled: ${DEMO_ACCOUNT_ENABLED:false}
     email: ${DEMO_ACCOUNT_EMAIL:}
     password: ${DEMO_ACCOUNT_PASSWORD:}
+  stage-trial-fixture:
+    enabled: ${STAGE_TRIAL_FIXTURE_ENABLED:false}
+    template-user-id: ${STAGE_TRIAL_TEMPLATE_USER_ID:0}
+    template-branch-id: ${STAGE_TRIAL_TEMPLATE_BRANCH_ID:0}
+    template-menu-id: ${STAGE_TRIAL_TEMPLATE_MENU_ID:0}
   storage:
     filer-url: ${STORAGE_FILER_URL:http://localhost:8888}
     s3-endpoint: ${STORAGE_S3_ENDPOINT:}
@@ -251,3 +256,4 @@ auth:
     enabled: ${AUTH_SERVICE_INTERNAL_AUTH_ENABLED:true}
     token: ${AUTH_SERVICE_INTERNAL_TOKEN:}
     header-name: ${AUTH_SERVICE_INTERNAL_HEADER:X-Service-Token}
+    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:}

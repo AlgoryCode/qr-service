@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.security;
 public final class GoogleOAuthPaths {
 
     public static final String AUTHORIZE = "/google-auth/authorize";
+    public static final String LEGACY_AUTHORIZE = "/google_auth/authorize";
     public static final String REDEEM = "/google-auth/redeem";
     public static final String ID_TOKEN = "/google-auth/id-token";
     public static final String CALLBACK = "/google-auth/callback";

@@ -30,6 +30,7 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
             "/waiter/",
             "/admin/",
             "/google-auth/",
+            "/google_auth/",
             "/oauth2/",
             "/actuator/",
             "/healthcheck",
