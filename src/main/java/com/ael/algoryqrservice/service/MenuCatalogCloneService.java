@@ -37,20 +37,20 @@ public class MenuCatalogCloneService {
 
     @Transactional
     public int cloneInto(Menu targetMenu, Long sourceMenuId, Long userId) {
-        return copyCatalog(requireCloneableSource(sourceMenuId, userId), targetMenu, userId);
+        return copyCatalog(requireCloneableSource(sourceMenuId, userId), targetMenu, userId).size();
     }
 
     @Transactional
-    public int cloneFromTemplate(Menu targetMenu, Long sourceMenuId, Long templateUserId) {
+    public Map<Long, Long> cloneFromTemplate(Menu targetMenu, Long sourceMenuId, Long templateUserId) {
         Menu sourceMenu = requireTemplateSource(sourceMenuId, templateUserId);
         return copyCatalog(sourceMenu, targetMenu, targetMenu.getUserId());
     }
 
-    private int copyCatalog(Menu sourceMenu, Menu targetMenu, Long userId) {
+    private Map<Long, Long> copyCatalog(Menu sourceMenu, Menu targetMenu, Long userId) {
         List<MenuProduct> sourceProducts = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(sourceMenu.getMenuId());
         if (sourceProducts.isEmpty()) {
-            return 0;
+            return Map.of();
         }
         entitlementService.assertMenuProductCreationAllowed(userId, sourceProducts.size());
 
@@ -80,7 +80,7 @@ public class MenuCatalogCloneService {
         menuProductPairingService.copyPairings(productIds, taxonomy.categoryIds(), subCategoryIds);
         menuProductOptionService.copyOptions(productIds);
         usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
-        return productIds.size();
+        return productIds;
     }
 
     @Transactional

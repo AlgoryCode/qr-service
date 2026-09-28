@@ -17,6 +17,8 @@ import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.demoonboarding.DemoOnboardingFixtureService;
+import com.ael.algoryqrservice.demoonboarding.DemoOnboardingFixtureService;
 import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.stage.StageTrialFixtureService;
@@ -61,6 +63,8 @@ class OnboardingPackageServiceTest {
     AuthLinkedUserProvisioner authLinkedUserProvisioner;
     @Mock
     StageTrialFixtureService stageTrialFixtureService;
+    @Mock
+    DemoOnboardingFixtureService demoOnboardingFixtureService;
 
     private OnboardingPackageService service;
 
@@ -75,7 +79,8 @@ class OnboardingPackageServiceTest {
                 new SessionAccessPolicy(),
                 fulfillmentGrantService,
                 authLinkedUserProvisioner,
-                stageTrialFixtureService
+                stageTrialFixtureService,
+                demoOnboardingFixtureService
         );
     }
 

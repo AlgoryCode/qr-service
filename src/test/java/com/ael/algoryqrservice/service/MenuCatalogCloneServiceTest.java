@@ -218,9 +218,9 @@ class MenuCatalogCloneServiceTest {
             return product;
         });
 
-        int copied = menuCatalogCloneService.cloneFromTemplate(target, 12L, 1L);
+        Map<Long, Long> copied = menuCatalogCloneService.cloneFromTemplate(target, 12L, 1L);
 
-        assertThat(copied).isEqualTo(1);
+        assertThat(copied).hasSize(1).containsEntry(100L, 500L);
         ArgumentCaptor<MenuProduct> captor = ArgumentCaptor.forClass(MenuProduct.class);
         verify(menuProductRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getName()).isEqualTo("Latte");

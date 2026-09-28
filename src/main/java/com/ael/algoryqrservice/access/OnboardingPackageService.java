@@ -16,6 +16,7 @@ import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
+import com.ael.algoryqrservice.demoonboarding.DemoOnboardingFixtureService;
 import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.stage.StageTrialFixtureService;
@@ -40,6 +41,7 @@ public class OnboardingPackageService {
     private final FulfillmentGrantService fulfillmentGrantService;
     private final AuthLinkedUserProvisioner authLinkedUserProvisioner;
     private final StageTrialFixtureService stageTrialFixtureService;
+    private final DemoOnboardingFixtureService demoOnboardingFixtureService;
 
     @Transactional
     public AccessSessionResponse startDemoForAuthLinkedUser(
@@ -49,7 +51,9 @@ public class OnboardingPackageService {
     ) {
         User user = authLinkedUserProvisioner.ensureUser(userId, email, displayName);
         authLinkedUserProvisioner.refreshDemoProfile(user, displayName);
-        return start(userId, null, BusinessType.OTHER, UsagePurpose.EXPLORE_ALL, true);
+        AccessSessionResponse session = start(userId, null, BusinessType.OTHER, UsagePurpose.EXPLORE_ALL, true);
+        demoOnboardingFixtureService.assign(userId, displayName);
+        return session;
     }
 
     @Transactional
