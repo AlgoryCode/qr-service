@@ -127,6 +127,11 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message", "Bu kullanıcı adı bu işletmede zaten kullanılıyor"));
         }
+        if (lower.contains("uk_demo_onboarding_assignment_user")
+                || lower.contains("demo_onboarding_assignment")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Demo kurulumu zaten tamamlanmis"));
+        }
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "Veri kaydı tamamlanamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin."));
     }

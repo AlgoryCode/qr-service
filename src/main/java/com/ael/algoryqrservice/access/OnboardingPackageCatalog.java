@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.access;
 
 import com.ael.algoryqrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.demo.DemoTrialAccountSupport;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.PlanPackage;
@@ -14,13 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 public class OnboardingPackageCatalog {
 
-    static final int VALIDITY_DAYS = SessionAccessPolicy.ACCOUNT_ONBOARDING_DAYS;
+    static final int VALIDITY_DAYS = DemoTrialAccountSupport.TRIAL_DAYS;
     static final int PRIORITY = 190;
     private static final List<String> FEATURES = List.of(
             "1 ucretsiz sube",
@@ -56,7 +61,15 @@ public class OnboardingPackageCatalog {
         PlanPackage trial = planPackageRepository.findByCodeWithItems(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)
                 .orElseGet(this::newPackage);
         applyDefinition(trial);
-        replaceItems(trial, sourceItems());
+        List<PlanPackageItem> desiredItems = sourceItems();
+        if (desiredItems.isEmpty()) {
+            throw new BadRequestException("Onboarding paketi bulunamadi");
+        }
+        if (trial.getId() == null) {
+            replaceItems(trial, desiredItems);
+        } else {
+            syncItems(trial, desiredItems);
+        }
         PlanPackage saved = planPackageRepository.save(trial);
         if (saved.getItems() == null || saved.getItems().isEmpty()) {
             throw new BadRequestException("Onboarding paketi bulunamadi");
@@ -73,8 +86,12 @@ public class OnboardingPackageCatalog {
     }
 
     private void applyDefinition(PlanPackage trial) {
-        trial.setName("Ultimate Deneme");
-        trial.setDescription("15 gunluk Ultimate deneme paketi");
+        trial.setName(DemoTrialAccountSupport.TRIAL_PACKAGE_DISPLAY_NAME);
+        trial.setDescription(
+                "AlgoryQR "
+                        + DemoTrialAccountSupport.TRIAL_DAYS
+                        + " gunluk Ultimate deneme surumu — dijital menu, garson paneli ve raporlar."
+        );
         trial.setFeatures(new ArrayList<>(FEATURES));
         trial.setPrice(BigDecimal.ZERO);
         trial.setSubtotal(BigDecimal.ZERO);
@@ -112,6 +129,39 @@ public class OnboardingPackageCatalog {
         for (PlanPackageItem source : sourceItems) {
             trial.getItems().add(item(trial, source.getProduct(), source.getQuantity(), source.isUnlimited()));
         }
+    }
+
+    /**
+     * Mevcut paket satırlarını günceller; sil-yeniden-ekle yapmaz (uk package_id+product_id flush sırası 409 üretmesin).
+     */
+    private void syncItems(PlanPackage trial, List<PlanPackageItem> desiredItems) {
+        Map<Long, PlanPackageItem> existingByProductId = new HashMap<>();
+        for (PlanPackageItem existing : trial.getItems()) {
+            if (existing.getProduct() != null && existing.getProduct().getId() != null) {
+                existingByProductId.put(existing.getProduct().getId(), existing);
+            }
+        }
+        Set<Long> desiredProductIds = new HashSet<>();
+        for (PlanPackageItem source : desiredItems) {
+            Product product = source.getProduct();
+            if (product == null || product.getId() == null) {
+                continue;
+            }
+            desiredProductIds.add(product.getId());
+            PlanPackageItem current = existingByProductId.get(product.getId());
+            if (current != null) {
+                current.setQuantity(source.getQuantity());
+                current.setUnlimited(source.isUnlimited());
+            } else {
+                trial.getItems().add(item(trial, product, source.getQuantity(), source.isUnlimited()));
+            }
+        }
+        trial.getItems().removeIf(existing -> {
+            Product product = existing.getProduct();
+            return product == null
+                    || product.getId() == null
+                    || !desiredProductIds.contains(product.getId());
+        });
     }
 
     private static PlanPackageItem item(PlanPackage trial, Product product, Integer quantity, boolean unlimited) {

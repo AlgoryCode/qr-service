@@ -1,0 +1,21 @@
+{
+  "branchName": "Algory Demo Şube",
+  "menuBusinessName": "Algory Demo Menü",
+  "slogan": "AlgoryQR · 15 günlük Ultimate deneme — dijital menü ve raporlar",
+  "chefName": "Algory Demo Şef",
+  "chefAvatarKey": null,
+  "phone": "+90 212 555 01 00",
+  "email": "demo@algoryqr.com",
+  "address": "Caferağa Mah. Moda Cad. No:1, Kadıköy / İstanbul",
+  "logoUrl": null,
+  "logoKey": null,
+  "coverUrl": null,
+  "coverKey": null,
+  "preferredThemeCodes": [
+    "maison-noir",
+    "modern-bistro",
+    "kahve-sokagi",
+    "luxury",
+    "elixir"
+  ]
+}
