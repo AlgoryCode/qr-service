@@ -1,3 +1,4 @@
+-- Re-applies V125 for databases where version 125 was taken by an earlier migration.
 -- Staff usernames are unique per merchant so the same login can exist at different businesses.
 
 DO $$
