@@ -33,6 +33,22 @@ public class DemoOnboardingSalesSeedService {
     private final MenuProductRepository menuProductRepository;
 
     @Transactional
+    public int seedSyntheticSales(
+            Long targetMenuId,
+            Long targetTableId,
+            Long userId,
+            int backfillDays,
+            int maxBills
+    ) {
+        if (targetMenuId == null || targetTableId == null) {
+            return 0;
+        }
+        LocalDateTime now = AppTime.nowLocal();
+        LocalDateTime from = now.minusDays(Math.max(backfillDays, 1));
+        return synthesizeBills(targetMenuId, targetTableId, userId, from, now, maxBills);
+    }
+
+    @Transactional
     public int seedFromTemplateOrSynthetic(
             Long sourceMenuId,
             Long targetMenuId,

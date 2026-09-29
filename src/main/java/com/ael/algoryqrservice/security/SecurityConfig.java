@@ -85,6 +85,7 @@ public class SecurityConfig {
                         .requestMatchers("/internal/integrations/**").permitAll()
                         .requestMatchers("/internal/menu-import/**").permitAll()
                         .requestMatchers("/internal/auth/**").permitAll()
+                        .requestMatchers("/internal/demo/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()
                         .requestMatchers(HttpMethod.GET, GoogleOAuthPaths.AUTHORIZE, GoogleOAuthPaths.LEGACY_AUTHORIZE)

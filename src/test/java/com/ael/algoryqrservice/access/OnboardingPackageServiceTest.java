@@ -17,8 +17,6 @@ import com.ael.algoryqrservice.model.enums.UsagePurpose;
 import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.TrialLogRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
-import com.ael.algoryqrservice.demoonboarding.DemoOnboardingFixtureService;
-import com.ael.algoryqrservice.demoonboarding.DemoOnboardingFixtureService;
 import com.ael.algoryqrservice.service.AuthLinkedUserProvisioner;
 import com.ael.algoryqrservice.service.FulfillmentGrantService;
 import com.ael.algoryqrservice.stage.StageTrialFixtureService;
@@ -64,7 +62,7 @@ class OnboardingPackageServiceTest {
     @Mock
     StageTrialFixtureService stageTrialFixtureService;
     @Mock
-    DemoOnboardingFixtureService demoOnboardingFixtureService;
+    OnboardingPackageCatalog onboardingPackageCatalog;
 
     private OnboardingPackageService service;
 
@@ -80,7 +78,7 @@ class OnboardingPackageServiceTest {
                 fulfillmentGrantService,
                 authLinkedUserProvisioner,
                 stageTrialFixtureService,
-                demoOnboardingFixtureService
+                onboardingPackageCatalog
         );
     }
 
@@ -128,7 +126,7 @@ class OnboardingPackageServiceTest {
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(trialLogRepository.existsByUserId(7L)).thenReturn(false);
         when(sessionAccessService.governingPaid(7L)).thenReturn(Optional.empty());
-        when(packageRepository.findByCodeWithItems(CatalogPackages.ULTIMATE_TRIAL_PACKAGE)).thenReturn(Optional.of(plan));
+        when(onboardingPackageCatalog.ensureDefined()).thenReturn(plan);
         when(trialLogRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             TrialLog log = invocation.getArgument(0);
             log.setId(44L);
@@ -159,6 +157,39 @@ class OnboardingPackageServiceTest {
         assertThatThrownBy(() -> service.start(7L, 3L, null, UsagePurpose.DIGITAL_MENU))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Isletme tipi");
+    }
+
+    @Test
+    void completeDemoSetup_updatesProfileForDemoTrialUser() {
+        User user = User.builder()
+                .id(7L)
+                .email("cafe@demo.algoryqr.local")
+                .businessType(BusinessType.OTHER)
+                .usagePurpose(UsagePurpose.EXPLORE_ALL)
+                .build();
+        TrialLog trial = TrialLog.builder()
+                .userId(7L)
+                .status(TrialLogStatus.ACTIVE)
+                .endsAt(NOW.plusDays(10))
+                .build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(trialLogRepository.findByUserId(7L)).thenReturn(Optional.of(trial));
+
+        service.completeDemoSetup(7L, BusinessType.CAFE, UsagePurpose.WAITER_ORDERS);
+
+        assertThat(user.getBusinessType()).isEqualTo(BusinessType.CAFE);
+        assertThat(user.getUsagePurpose()).isEqualTo(UsagePurpose.WAITER_ORDERS);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void completeDemoSetup_whenNotDemoEmail_thenReject() {
+        User user = User.builder().id(7L).email("merchant@example.com").build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.completeDemoSetup(7L, BusinessType.CAFE, UsagePurpose.REPORTS))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("deneme surumu");
     }
 
     private static User googleUser(LocalDateTime createdAt) {
