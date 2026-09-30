@@ -182,10 +182,16 @@ class TableBillServiceTest {
         when(billPaymentRepository.findByBillIdOrderByPaidAtAsc(10L)).thenReturn(List.of());
         when(billPaymentRepository.save(any(BillPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         MenuOrder sameTable = MenuOrder.builder().id(30L).menuId(1L).tableId(5L).status(MenuOrderStatus.READY).build();
+        MenuOrder confirmed = MenuOrder.builder().id(32L).menuId(1L).tableId(5L).billId(10L)
+                .status(MenuOrderStatus.CONFIRMED).build();
+        MenuOrder preparing = MenuOrder.builder().id(33L).menuId(1L).tableId(5L).billId(10L)
+                .status(MenuOrderStatus.PREPARING).build();
+        MenuOrder otherBill = MenuOrder.builder().id(34L).menuId(1L).tableId(5L).billId(99L)
+                .status(MenuOrderStatus.PREPARING).build();
         MenuOrder otherTable = MenuOrder.builder().id(31L).menuId(1L).tableId(9L).status(MenuOrderStatus.READY).build();
         when(menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
-                eq(1L), eq(5L), eq(List.of(MenuOrderStatus.READY))))
-                .thenReturn(List.of(sameTable, otherTable));
+                eq(1L), eq(5L), eq(List.of(MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, MenuOrderStatus.READY))))
+                .thenReturn(List.of(sameTable, confirmed, preparing, otherBill, otherTable));
         when(menuOrderRepository.save(any(MenuOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = tableBillService.closeBill(1L, 10L, waiter, TableBillPaymentMethod.CASH, false, null);
@@ -195,8 +201,12 @@ class TableBillServiceTest {
         assertThat(response.getFixedCommissionAmount()).isNull();
         assertThat(session.isRevoked()).isTrue();
         assertThat(sameTable.getStatus()).isEqualTo(MenuOrderStatus.SERVED);
+        assertThat(confirmed.getStatus()).isEqualTo(MenuOrderStatus.SERVED);
+        assertThat(preparing.getStatus()).isEqualTo(MenuOrderStatus.SERVED);
+        assertThat(otherBill.getStatus()).isEqualTo(MenuOrderStatus.PREPARING);
         assertThat(otherTable.getStatus()).isEqualTo(MenuOrderStatus.READY);
         verify(menuOrderRepository).save(sameTable);
+        verify(menuOrderRepository, never()).save(otherBill);
         verify(menuOrderRepository, never()).save(otherTable);
         verify(waiterCommissionService, never()).recordFixedTableCloseCommission(any(), any());
     }

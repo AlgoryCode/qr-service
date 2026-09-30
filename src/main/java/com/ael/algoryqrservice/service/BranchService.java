@@ -33,6 +33,7 @@ public class BranchService {
     private final BranchQuotaService branchQuotaService;
     private final ProductImageStorageService productImageStorageService;
     private final SecurityUtils securityUtils;
+    private final KitchenCloseGuard kitchenCloseGuard;
 
     @Transactional(readOnly = true)
     public BranchDtos.ListResponse listMine() {
@@ -97,6 +98,9 @@ public class BranchService {
             branch.setActive(request.getActive());
         }
         if (request.getKitchenEnabled() != null) {
+            if (branch.isKitchenEnabled() && !request.getKitchenEnabled()) {
+                kitchenCloseGuard.requireNoActiveOrders(branch);
+            }
             branch.setKitchenEnabled(request.getKitchenEnabled());
         }
         if (request.getCourierEnabled() != null) {

@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.store.service;
 
+import com.ael.algoryqrservice.service.StoreCourierStaffService;
 import com.ael.algoryqrservice.store.model.Merchant;
 import com.ael.algoryqrservice.store.model.StoreCourier;
 import com.ael.algoryqrservice.store.model.StoreOrder;
@@ -34,7 +35,14 @@ public class StoreOrderPanelService {
             StoreOrderStatus.CONFIRMED,
             StoreOrderStatus.PREPARING,
             StoreOrderStatus.READY,
-            StoreOrderStatus.ON_THE_WAY
+            StoreOrderStatus.ON_THE_WAY,
+            StoreOrderStatus.KITCHEN_PREPARING,
+            StoreOrderStatus.KITCHEN_PREPARED,
+            StoreOrderStatus.KITCHEN_DELIVERED_TO_WAITER,
+            StoreOrderStatus.KITCHEN_DELIVERED_TO_COURIER,
+            StoreOrderStatus.WAITER_TAKEN,
+            StoreOrderStatus.COURIER_TAKEN,
+            StoreOrderStatus.WAITER_DELIVERED_TO_COURIER
     );
 
     private final StoreOrderRepository storeOrderRepository;
@@ -43,6 +51,7 @@ public class StoreOrderPanelService {
     private final StoreOrderService storeOrderService;
     private final StoreOrderMapper storeOrderMapper;
     private final MerchantService merchantService;
+    private final StoreCourierStaffService storeCourierStaffService;
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
@@ -103,6 +112,18 @@ public class StoreOrderPanelService {
     }
 
     @Transactional
+    public StoreOrderDtos.OrderDetail revertKitchen(Long orderId, StoreOrderStatus target) {
+        Merchant merchant = merchantService.requireCurrentMerchant();
+        StoreOrder order = storeOrderService.revertKitchen(
+                merchant.getId(),
+                orderId,
+                target,
+                securityUtils.getCurrentUserId()
+        );
+        return toDetail(merchant.getId(), order);
+    }
+
+    @Transactional
     public StoreOrderDtos.OrderDetail assignCourier(Long orderId, Long courierId) {
         Merchant merchant = merchantService.requireCurrentMerchant();
         StoreOrder order = storeOrderService.assignCourier(
@@ -114,11 +135,33 @@ public class StoreOrderPanelService {
         return toDetail(merchant.getId(), order);
     }
 
+    @Transactional(readOnly = true)
+    public List<StoreOrderDtos.KitchenCourierOption> listKitchenCouriers(Long branchId) {
+        return storeCourierStaffService.listKitchenCouriers(merchantService.requireCurrentMerchant(), branchId);
+    }
+
+    @Transactional
+    public StoreOrderDtos.OrderDetail handoverToCourier(Long orderId, Long courierStaffId) {
+        Merchant merchant = merchantService.requireCurrentMerchant();
+        StoreOrder order = storeCourierStaffService.handoverToCourier(
+                merchant,
+                orderId,
+                courierStaffId,
+                securityUtils.getCurrentUserId()
+        );
+        return toDetail(merchant.getId(), order);
+    }
+
     private StoreOrderDtos.OrderDetail toDetail(Long merchantId, StoreOrder order) {
         StoreCourier courier = order.getCourierId() == null
                 ? null
                 : storeCourierRepository.findByIdAndMerchantIdAndDeletedFalse(order.getCourierId(), merchantId).orElse(null);
-        return storeOrderMapper.toDetail(order, courier, statusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(order.getId()));
+        return storeOrderMapper.toDetail(
+                order,
+                courier,
+                storeCourierStaffService.findCourierStaff(order).orElse(null),
+                statusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())
+        );
     }
 
     private Map<Long, StoreCourier> loadCouriers(Long merchantId) {

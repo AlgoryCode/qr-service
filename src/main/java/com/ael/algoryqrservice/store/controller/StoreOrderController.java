@@ -39,6 +39,13 @@ public class StoreOrderController {
         return ResponseEntity.ok(storeOrderPanelService.list(status, from, to, page, size));
     }
 
+    @GetMapping("/couriers")
+    public ResponseEntity<List<StoreOrderDtos.KitchenCourierOption>> kitchenCouriers(
+            @RequestParam(required = false) Long branchId
+    ) {
+        return ResponseEntity.ok(storeOrderPanelService.listKitchenCouriers(branchId));
+    }
+
     @GetMapping("/{orderId}")
     public ResponseEntity<StoreOrderDtos.OrderDetail> get(@PathVariable Long orderId) {
         return ResponseEntity.ok(storeOrderPanelService.get(orderId));
@@ -57,6 +64,14 @@ public class StoreOrderController {
     @PostMapping("/{orderId}/ready")
     public ResponseEntity<StoreOrderDtos.OrderDetail> ready(@PathVariable Long orderId) {
         return ResponseEntity.ok(storeOrderPanelService.advance(orderId, StoreOrderStatus.READY, null));
+    }
+
+    @PostMapping("/{orderId}/revert")
+    public ResponseEntity<StoreOrderDtos.OrderDetail> revert(
+            @PathVariable Long orderId,
+            @RequestParam StoreOrderStatus to
+    ) {
+        return ResponseEntity.ok(storeOrderPanelService.revertKitchen(orderId, to));
     }
 
     @PostMapping("/{orderId}/dispatch")
@@ -83,6 +98,14 @@ public class StoreOrderController {
             @Valid @RequestBody StoreOrderDtos.TransitionRequest request
     ) {
         return ResponseEntity.ok(storeOrderPanelService.advance(orderId, StoreOrderStatus.CANCELLED, request.reason()));
+    }
+
+    @PostMapping("/{orderId}/courier-handover")
+    public ResponseEntity<StoreOrderDtos.OrderDetail> handoverToCourier(
+            @PathVariable Long orderId,
+            @Valid @RequestBody StoreOrderDtos.CourierHandoverRequest request
+    ) {
+        return ResponseEntity.ok(storeOrderPanelService.handoverToCourier(orderId, request.courierStaffId()));
     }
 
     @PostMapping("/{orderId}/courier")

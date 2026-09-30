@@ -83,9 +83,9 @@ public interface MenuRatingRepository extends JpaRepository<MenuRating, Long> {
             select r
             from MenuRating r
             where r.menuId = :menuId
-              and (:from is null or r.createdAt >= :from)
-              and (:to is null or r.createdAt <= :to)
-              and (:minScore is null or r.score >= :minScore)
+              and (cast(:from as LocalDateTime) is null or r.createdAt >= :from)
+              and (cast(:to as LocalDateTime) is null or r.createdAt <= :to)
+              and (cast(:minScore as Short) is null or r.score >= :minScore)
             order by r.createdAt desc
             """)
     Page<MenuRating> findForOwner(

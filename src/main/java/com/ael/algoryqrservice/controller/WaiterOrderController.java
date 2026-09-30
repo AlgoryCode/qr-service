@@ -84,7 +84,7 @@ public class WaiterOrderController {
 
     @PostMapping("/{orderId}/preparing")
     public ResponseEntity<MenuOrderDtos.OrderResponse> markPreparing(@PathVariable Long orderId) {
-        return ResponseEntity.ok(menuWaiterOrderService.markPreparing(orderId));
+        return ResponseEntity.ok(menuWaiterOrderService.markPreparingByWaiter(orderId));
     }
 
     @PostMapping("/{orderId}/ready")

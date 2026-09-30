@@ -32,6 +32,10 @@ public class StoreOrder {
     @Column(name = "merchant_id", nullable = false)
     private Long merchantId;
 
+    /** Siparişin düştüğü şube mutfağı; mağazanın o anki şubesinden alınır. */
+    @Column(name = "branch_id")
+    private Long branchId;
+
     @Column(name = "order_no", nullable = false, length = 32)
     private String orderNo;
 
@@ -79,7 +83,7 @@ public class StoreOrder {
     private BigDecimal longitude;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 24)
+    @Column(nullable = false, length = 32)
     private StoreOrderStatus status;
 
     @Enumerated(EnumType.STRING)
@@ -122,6 +126,9 @@ public class StoreOrder {
 
     @Column(name = "courier_id")
     private Long courierId;
+
+    @Column(name = "courier_staff_id")
+    private Long courierStaffId;
 
     @Column(name = "assigned_at")
     private LocalDateTime assignedAt;

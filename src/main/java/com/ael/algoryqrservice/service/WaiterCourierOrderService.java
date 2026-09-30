@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,13 @@ public class WaiterCourierOrderService {
             StoreOrderStatus.PREPARING,
             StoreOrderStatus.READY,
             StoreOrderStatus.ON_THE_WAY,
-            StoreOrderStatus.DELIVERED
+            StoreOrderStatus.DELIVERED,
+            StoreOrderStatus.KITCHEN_PREPARING,
+            StoreOrderStatus.KITCHEN_PREPARED,
+            StoreOrderStatus.KITCHEN_DELIVERED_TO_COURIER,
+            StoreOrderStatus.WAITER_DELIVERED_TO_COURIER,
+            StoreOrderStatus.COURIER_TAKEN,
+            StoreOrderStatus.COURIER_DELIVERED_TO_CUSTOMER
     );
 
     private final WaiterAccessService waiterAccessService;
@@ -46,7 +53,8 @@ public class WaiterCourierOrderService {
 
     @Transactional(readOnly = true)
     public List<StoreOrderDtos.OrderDetail> listQueue() {
-        Merchant merchant = findStore(waiterAccessService.requireCourierStaff());
+        MerchantStaff staff = waiterAccessService.requireCourierStaff();
+        Merchant merchant = findStore(staff);
         if (merchant == null) {
             return List.of();
         }
@@ -58,7 +66,9 @@ public class WaiterCourierOrderService {
                 )
                 .getContent()
                 .stream()
-                .map(order -> storeOrderMapper.toDetail(order, couriers.get(order.getCourierId()), List.of()))
+                .filter(order -> BranchScope.serves(order.getBranchId(), staff.getBranchId()))
+                .filter(order -> order.getCourierStaffId() == null || order.getCourierStaffId().equals(staff.getId()))
+                .map(order -> storeOrderMapper.toDetail(order, couriers.get(order.getCourierId()), staff, List.of()))
                 .toList();
     }
 
@@ -79,12 +89,23 @@ public class WaiterCourierOrderService {
         if (existing.getDeliveryType() != StoreDeliveryType.DELIVERY) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu sipariş adrese teslim değil");
         }
+        if (!BranchScope.serves(existing.getBranchId(), staff.getBranchId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu sipariş başka bir şubeye ait");
+        }
+        if (existing.getCourierStaffId() != null && !existing.getCourierStaffId().equals(staff.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu sipariş başka bir kuryeye verildi");
+        }
         StoreOrder saved = storeOrderService.advance(merchant.getId(), orderId, target, staff.getId(), null);
+        if (saved.getCourierStaffId() == null) {
+            saved.setCourierStaffId(staff.getId());
+            saved.setAssignedAt(LocalDateTime.now());
+            saved = storeOrderRepository.save(saved);
+        }
         StoreCourier courier = saved.getCourierId() == null
                 ? null
                 : storeCourierRepository.findByIdAndMerchantIdAndDeletedFalse(saved.getCourierId(), merchant.getId())
                 .orElse(null);
-        return storeOrderMapper.toDetail(saved, courier, List.of());
+        return storeOrderMapper.toDetail(saved, courier, staff, List.of());
     }
 
     private Merchant findStore(MerchantStaff staff) {

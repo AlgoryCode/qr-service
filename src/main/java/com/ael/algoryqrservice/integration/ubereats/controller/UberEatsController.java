@@ -53,6 +53,13 @@ public class UberEatsController {
         return ResponseEntity.ok(connectionService.upsert(request));
     }
 
+    @PutMapping("/connections/me/branch")
+    public ResponseEntity<UberEatsDtos.ConnectionResponse> assignBranch(
+            @RequestBody UberEatsDtos.BranchRequest request
+    ) {
+        return ResponseEntity.ok(connectionService.assignBranch(request.getBranchId()));
+    }
+
     @DeleteMapping("/connections/me")
     public ResponseEntity<UberEatsDtos.ConnectionResponse> disconnect() {
         return ResponseEntity.ok(connectionService.disconnect());

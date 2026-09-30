@@ -19,6 +19,8 @@ import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.model.enums.OrderAuditAction;
 import com.ael.algoryqrservice.model.enums.OrderSource;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.model.Branch;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.RestaurantAreaRepository;
@@ -60,6 +62,7 @@ public class MenuWaiterOrderService {
     private final KitchenUberEatsService kitchenUberEatsService;
     private final KitchenYemekSepetiService kitchenYemekSepetiService;
     private final StockConsumptionService stockConsumptionService;
+    private final BranchRepository branchRepository;
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listPending() {
@@ -228,10 +231,22 @@ public class MenuWaiterOrderService {
                 .stream()
                 .map(menuOrderService::toOrderResponse)
                 .toList();
+        List<MenuOrderDtos.OrderResponse> cancelledToday = menuOrderRepository
+                .findByMenuIdInAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        menuIds,
+                        EnumSet.of(MenuOrderStatus.CANCELLED),
+                        dayRange[0],
+                        dayRange[1]
+                )
+                .stream()
+                .filter(MenuOrderService::reachedKitchen)
+                .map(menuOrderService::toOrderResponse)
+                .toList();
         List<MenuOrderDtos.OrderResponse> combined = new java.util.ArrayList<>(active);
         combined.addAll(tableBillService.hideClosedTableTickets(servedToday));
-        combined.addAll(kitchenUberEatsService.listActiveForOwner(staff.getMerchantId()));
-        combined.addAll(kitchenYemekSepetiService.listActiveForOwner(staff.getMerchantId()));
+        combined.addAll(cancelledToday);
+        combined.addAll(kitchenUberEatsService.listActiveForBranch(staff.getMerchantId(), staff.getBranchId()));
+        combined.addAll(kitchenYemekSepetiService.listActiveForBranch(staff.getMerchantId(), staff.getBranchId()));
         return combined;
     }
 
@@ -294,8 +309,25 @@ public class MenuWaiterOrderService {
 
     @Transactional
     public MenuOrderDtos.OrderResponse cancel(Long orderId, MenuOrderDtos.CancelOrderRequest request) {
-        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
-        MenuOrder order = requireOrderForWaiter(orderId, waiter);
+        return cancelAs(waiterAccessService.requireWaiterStaff(), orderId, request);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse cancelFromKitchen(
+            Long orderId,
+            String source,
+            MenuOrderDtos.CancelOrderRequest request
+    ) {
+        MenuOrderService.requireKitchenCancelSource(source);
+        return cancelAs(waiterAccessService.requireKitchenStaff(), orderId, request);
+    }
+
+    private MenuOrderDtos.OrderResponse cancelAs(
+            MerchantStaff staff,
+            Long orderId,
+            MenuOrderDtos.CancelOrderRequest request
+    ) {
+        MenuOrder order = requireOrderForWaiter(orderId, staff);
         if (!MenuOrderService.isCancellable(order.getStatus())) {
             throw new BadRequestException("Bu sipariş iptal edilemez");
         }
@@ -303,7 +335,7 @@ public class MenuWaiterOrderService {
         order.setStatus(MenuOrderStatus.CANCELLED);
         order.setCancelledAt(now);
         order.setRejectedAt(now);
-        order.setCancelledByStaffId(waiter.getId());
+        order.setCancelledByStaffId(staff.getId());
         if (request != null) {
             order.setCancelReason(request.getReason() != null ? request.getReason() : CancelReason.OTHER);
             order.setCancelReasonNote(trimToNull(request.getReasonNote()));
@@ -312,8 +344,9 @@ public class MenuWaiterOrderService {
         }
         order.setUpdatedAt(now);
         MenuOrder saved = menuOrderRepository.save(order);
+        tableBillService.releaseCancelledOrderItems(saved);
         stockConsumptionService.reverseMenuOrder(saved);
-        orderAuditService.record(saved, OrderAuditAction.CANCELLED, waiter.getId(), null);
+        orderAuditService.record(saved, OrderAuditAction.CANCELLED, staff.getId(), null);
         return menuOrderService.toOrderResponse(saved);
     }
 
@@ -353,9 +386,47 @@ public class MenuWaiterOrderService {
         return markReady(orderId, null);
     }
 
+    /** Mutfak kapalı şubede garson isterse siparişi hazırlanıyor olarak işaretler. */
+    @Transactional
+    public MenuOrderDtos.OrderResponse markPreparingByWaiter(Long orderId) {
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
+        if (isBranchKitchenEnabled(waiter)) {
+            throw new BadRequestException("Mutfak açıkken hazırlık mutfak ekranından ilerler");
+        }
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
+        return menuOrderService.toOrderResponse(
+                menuOrderService.applyKitchenTransition(order, MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, waiter.getId())
+        );
+    }
+
+    /** Mutfak açıkken yalnızca hazır sipariş; kapalıyken onaylı veya hazırlanan sipariş de teslim edilebilir. */
     @Transactional
     public MenuOrderDtos.OrderResponse markServed(Long orderId) {
-        return transitionKitchen(orderId, MenuOrderStatus.READY, MenuOrderStatus.SERVED, false);
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
+        MenuOrderStatus current = order.getStatus();
+        boolean allowed = current == MenuOrderStatus.READY
+                || (!isBranchKitchenEnabled(waiter)
+                && (current == MenuOrderStatus.CONFIRMED || current == MenuOrderStatus.PREPARING));
+        if (!allowed) {
+            throw new BadRequestException("Sipariş durumu bu geçiş için uygun değil: " + current);
+        }
+        return menuOrderService.toOrderResponse(
+                menuOrderService.applyKitchenTransition(order, current, MenuOrderStatus.SERVED, waiter.getId())
+        );
+    }
+
+    private boolean isBranchKitchenEnabled(MerchantStaff staff) {
+        return staff.getBranchId() != null
+                && branchRepository.findById(staff.getBranchId()).map(Branch::isKitchenEnabled).orElse(false);
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse revertKitchen(Long orderId, MenuOrderStatus target, String source) {
+        MenuOrderService.requireKitchenRevertSource(source);
+        MerchantStaff staff = waiterAccessService.requireKitchenStaff();
+        MenuOrder order = requireOrderForWaiter(orderId, staff);
+        return menuOrderService.toOrderResponse(menuOrderService.applyKitchenRevert(order, target, staff.getId()));
     }
 
     private MenuOrderDtos.OrderResponse transitionKitchen(

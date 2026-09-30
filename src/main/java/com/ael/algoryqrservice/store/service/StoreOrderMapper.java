@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.store.service;
 
+import com.ael.algoryqrservice.model.MerchantStaff;
 import com.ael.algoryqrservice.store.model.StoreCourier;
 import com.ael.algoryqrservice.store.model.StoreOrder;
 import com.ael.algoryqrservice.store.model.StoreOrderItem;
@@ -17,6 +18,7 @@ public class StoreOrderMapper {
         return StoreOrderDtos.OrderSummary.builder()
                 .id(order.getId())
                 .orderNo(order.getOrderNo())
+                .branchId(order.getBranchId())
                 .status(order.getStatus())
                 .deliveryType(order.getDeliveryType())
                 .paymentMethod(order.getPaymentMethod())
@@ -36,9 +38,19 @@ public class StoreOrderMapper {
             StoreCourier courier,
             List<StoreOrderStatusHistory> history
     ) {
+        return toDetail(order, courier, null, history);
+    }
+
+    public StoreOrderDtos.OrderDetail toDetail(
+            StoreOrder order,
+            StoreCourier courier,
+            MerchantStaff courierStaff,
+            List<StoreOrderStatusHistory> history
+    ) {
         return StoreOrderDtos.OrderDetail.builder()
                 .id(order.getId())
                 .orderNo(order.getOrderNo())
+                .branchId(order.getBranchId())
                 .publicToken(order.getPublicToken())
                 .status(order.getStatus())
                 .deliveryType(order.getDeliveryType())
@@ -55,6 +67,7 @@ public class StoreOrderMapper {
                 .totalAmount(order.getTotalAmount())
                 .currency(order.getCurrency())
                 .courier(toCourierBrief(courier))
+                .courierStaff(toCourierStaffBrief(order, courierStaff))
                 .items(toItems(order.getItems()))
                 .history(toHistory(history))
                 .rejectReason(order.getRejectReason())
@@ -89,6 +102,16 @@ public class StoreOrderMapper {
                 .id(courier.getId())
                 .fullName(courier.getFullName())
                 .phone(courier.getPhone())
+                .build();
+    }
+
+    private StoreOrderDtos.CourierStaffBrief toCourierStaffBrief(StoreOrder order, MerchantStaff staff) {
+        if (order.getCourierStaffId() == null) {
+            return null;
+        }
+        return StoreOrderDtos.CourierStaffBrief.builder()
+                .id(order.getCourierStaffId())
+                .displayName(staff != null && staff.getId().equals(order.getCourierStaffId()) ? staff.getDisplayName() : null)
                 .build();
     }
 

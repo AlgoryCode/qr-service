@@ -47,6 +47,7 @@ public class StoreOrderService {
 
         StoreOrder order = StoreOrder.builder()
                 .merchantId(merchant.getId())
+                .branchId(merchant.getBranchId())
                 .orderNo(nextOrderNo(merchant.getId()))
                 .publicToken(storeTokenGenerator.generateUnique(storeOrderRepository::existsByPublicToken))
                 .customerId(customerId)
@@ -86,6 +87,21 @@ public class StoreOrderService {
         StoreOrder saved = storeOrderRepository.save(order);
         recordTransition(saved, previous, target, StoreOrderActorType.MERCHANT, actorUserId, reason);
         applyStock(saved, target);
+        return saved;
+    }
+
+    @Transactional
+    public StoreOrder revertKitchen(Long merchantId, Long orderId, StoreOrderStatus target, Long actorUserId) {
+        StoreOrder order = requireOrder(merchantId, orderId);
+        StoreOrderStatus previous = order.getStatus();
+        statusMachine.requireKitchenRevert(previous, target);
+        order.setStatus(target);
+        order.setReadyAt(null);
+        if (target == StoreOrderStatus.CONFIRMED) {
+            order.setPreparingAt(null);
+        }
+        StoreOrder saved = storeOrderRepository.save(order);
+        recordTransition(saved, previous, target, StoreOrderActorType.MERCHANT, actorUserId, null);
         return saved;
     }
 
@@ -174,10 +190,10 @@ public class StoreOrderService {
         LocalDateTime now = LocalDateTime.now();
         switch (target) {
             case CONFIRMED -> order.setConfirmedAt(now);
-            case PREPARING -> order.setPreparingAt(now);
-            case READY -> order.setReadyAt(now);
-            case ON_THE_WAY -> order.setDispatchedAt(now);
-            case DELIVERED -> {
+            case PREPARING, KITCHEN_PREPARING -> order.setPreparingAt(now);
+            case READY, KITCHEN_PREPARED -> order.setReadyAt(now);
+            case ON_THE_WAY, COURIER_TAKEN -> order.setDispatchedAt(now);
+            case DELIVERED, WAITER_DELIVERED_TO_CUSTOMER, COURIER_DELIVERED_TO_CUSTOMER -> {
                 order.setDeliveredAt(now);
                 order.setPaymentStatus(StorePaymentStatus.PAID);
             }
@@ -189,7 +205,8 @@ public class StoreOrderService {
                 order.setCancelledAt(now);
                 order.setCancelReason(reason);
             }
-            case PENDING -> {
+            case PENDING, KITCHEN_DELIVERED_TO_WAITER, KITCHEN_DELIVERED_TO_COURIER,
+                 WAITER_TAKEN, WAITER_DELIVERED_TO_COURIER -> {
             }
         }
     }
