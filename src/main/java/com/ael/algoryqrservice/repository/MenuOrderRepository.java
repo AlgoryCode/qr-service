@@ -28,6 +28,8 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
             Collection<MenuOrderStatus> statuses
     );
 
+    boolean existsByMenuIdInAndStatusIn(Collection<Long> menuIds, Collection<MenuOrderStatus> statuses);
+
     List<MenuOrder> findByCustomerIdAndMenuIdOrderByCreatedAtDesc(Long customerId, Long menuId);
 
     Optional<MenuOrder> findByIdAndCustomerId(Long id, Long customerId);

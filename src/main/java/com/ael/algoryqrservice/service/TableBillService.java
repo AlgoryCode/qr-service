@@ -140,6 +140,42 @@ public class TableBillService {
         return tableBillRepository.save(bill);
     }
 
+    /** Drops the unpaid part of a cancelled order from its open bill; paid quantities stay on record. */
+    @Transactional
+    public void releaseCancelledOrderItems(MenuOrder order) {
+        if (order.getBillId() == null || order.getId() == null) {
+            return;
+        }
+        TableBill bill = tableBillRepository.findById(order.getBillId()).orElse(null);
+        if (bill == null || bill.getStatus() != TableBillStatus.OPEN || bill.getItems() == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        boolean changed = false;
+        for (TableBillItem item : new ArrayList<>(bill.getItems())) {
+            if (!order.getId().equals(item.getSourceOrderId())) {
+                continue;
+            }
+            int paid = item.getPaidQuantity();
+            if (paid <= 0) {
+                bill.removeItem(item);
+                tableBillItemRepository.delete(item);
+                changed = true;
+            } else if (item.getQuantity() > paid) {
+                item.setQuantity(paid);
+                item.setLineTotal(item.getUnitPrice().multiply(BigDecimal.valueOf(paid)));
+                item.setUpdatedAt(now);
+                changed = true;
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        recalculateTotal(bill);
+        bill.setUpdatedAt(now);
+        tableBillRepository.save(bill);
+    }
+
     @Transactional
     public TableBillDtos.BillResponse addItems(
             Long menuId,
@@ -490,7 +526,7 @@ public class TableBillService {
         bill.setUpdatedAt(now);
 
         TableBill saved = tableBillRepository.save(bill);
-        serveReadyOrdersForTable(saved, waiter.getId());
+        serveOpenOrdersForBill(saved, waiter.getId());
         revokeSessionsForTable(bill.getTableId());
         eventPublisher.publishEvent(new BillClosedEvent(
                 saved.getId(),
@@ -816,23 +852,28 @@ public class TableBillService {
      * A closed bill takes only that table's ready tickets off the floor.
      * Orders on any other table are not loaded.
      */
-    private void serveReadyOrdersForTable(TableBill bill, Long staffId) {
+    /** Adisyon kapanınca masadaki açık siparişler, hangi aşamada olursa olsun teslim edilmiş sayılır. */
+    private void serveOpenOrdersForBill(TableBill bill, Long staffId) {
         if (bill.getMenuId() == null || bill.getTableId() == null || bill.getId() == null) {
             return;
         }
-        List<MenuOrder> ready = menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
+        List<MenuOrder> open = menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
                 bill.getMenuId(),
                 bill.getTableId(),
-                List.of(MenuOrderStatus.READY)
+                List.of(MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, MenuOrderStatus.READY)
         );
-        if (ready == null || ready.isEmpty()) {
+        if (open == null || open.isEmpty()) {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        for (MenuOrder order : ready) {
+        for (MenuOrder order : open) {
             if (!bill.getTableId().equals(order.getTableId())) {
                 continue;
             }
+            if (order.getBillId() != null && !order.getBillId().equals(bill.getId())) {
+                continue;
+            }
+            MenuOrderStatus from = order.getStatus();
             order.setStatus(MenuOrderStatus.SERVED);
             order.setServedAt(now);
             order.setUpdatedAt(now);
@@ -844,7 +885,7 @@ public class TableBillService {
                     saved,
                     OrderAuditAction.STATUS_CHANGED,
                     staffId,
-                    "{\"from\":\"READY\",\"to\":\"SERVED\"}"
+                    "{\"from\":\"" + from + "\",\"to\":\"SERVED\"}"
             );
         }
     }

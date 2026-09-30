@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnectionStatus;
 import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class UberEatsConnectionService {
     private final UberEatsClient uberEatsClient;
     private final UberEatsPayloadMapper payloadMapper;
     private final SecurityUtils securityUtils;
+    private final BranchRepository branchRepository;
 
     @Transactional(readOnly = true)
     public List<UberEatsDtos.ConnectionResponse> listMine() {
@@ -77,6 +79,17 @@ public class UberEatsConnectionService {
             connection.setStatus(UberEatsConnectionStatus.PENDING_RESTAURANT);
             connection.setLastError(null);
         }
+        return toResponse(connectionRepository.save(connection));
+    }
+
+    @Transactional
+    public UberEatsDtos.ConnectionResponse assignBranch(Long branchId) {
+        UberEatsConnection connection = requireOwnedConnection();
+        if (branchId != null) {
+            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getUserId())
+                    .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
+        }
+        connection.setBranchId(branchId);
         return toResponse(connectionRepository.save(connection));
     }
 
@@ -149,6 +162,7 @@ public class UberEatsConnectionService {
                 .apiKeyMasked(encryptor.mask(apiKey))
                 .restaurantId(connection.getRestaurantId())
                 .restaurantName(connection.getRestaurantName())
+                .branchId(connection.getBranchId())
                 .status(connection.getStatus())
                 .lastError(connection.getLastError())
                 .lastSyncedAt(connection.getLastSyncedAt())

@@ -32,6 +32,14 @@ public final class YemekSepetiDtos {
     }
 
     @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BranchRequest {
+        /** Boş gönderilirse bağlantı tüm şubelerin mutfağında görünür. */
+        private Long branchId;
+    }
+
+    @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
@@ -42,6 +50,7 @@ public final class YemekSepetiDtos {
         private String webhookSecretMasked;
         private String vendorId;
         private String vendorName;
+        private Long branchId;
         private YemekSepetiConnectionStatus status;
         private String lastError;
         private LocalDateTime lastSyncedAt;

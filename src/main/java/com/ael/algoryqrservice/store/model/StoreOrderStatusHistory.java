@@ -26,11 +26,11 @@ public class StoreOrderStatusHistory {
     private Long orderId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "from_status", length = 24)
+    @Column(name = "from_status", length = 32)
     private StoreOrderStatus fromStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "to_status", nullable = false, length = 24)
+    @Column(name = "to_status", nullable = false, length = 32)
     private StoreOrderStatus toStatus;
 
     @Enumerated(EnumType.STRING)

@@ -38,9 +38,29 @@ public final class StoreOrderDtos {
     }
 
     @Builder
+    public record CourierStaffBrief(Long id, String displayName) {
+    }
+
+    /** Courier staff account as offered to the kitchen; busy while a delivery is on the road. */
+    @Builder
+    public record KitchenCourierOption(
+            Long id,
+            String displayName,
+            Long branchId,
+            boolean available,
+            int waitingCount,
+            int onTheRoadCount
+    ) {
+    }
+
+    public record CourierHandoverRequest(@NotNull Long courierStaffId) {
+    }
+
+    @Builder
     public record OrderSummary(
             Long id,
             String orderNo,
+            Long branchId,
             StoreOrderStatus status,
             StoreDeliveryType deliveryType,
             StorePaymentMethod paymentMethod,
@@ -69,6 +89,7 @@ public final class StoreOrderDtos {
     public record OrderDetail(
             Long id,
             String orderNo,
+            Long branchId,
             String publicToken,
             StoreOrderStatus status,
             StoreDeliveryType deliveryType,
@@ -85,6 +106,7 @@ public final class StoreOrderDtos {
             BigDecimal totalAmount,
             String currency,
             CourierBrief courier,
+            CourierStaffBrief courierStaff,
             List<StorePublicDtos.OrderItemResponse> items,
             List<StatusEvent> history,
             String rejectReason,

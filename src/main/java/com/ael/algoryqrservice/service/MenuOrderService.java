@@ -272,6 +272,7 @@ public class MenuOrderService {
         }
         order.setUpdatedAt(now);
         MenuOrder saved = menuOrderRepository.save(order);
+        tableBillService.releaseCancelledOrderItems(saved);
         stockConsumptionService.reverseMenuOrder(saved);
         orderAuditService.record(saved, OrderAuditAction.CANCELLED, null, null);
         return toOrderResponse(saved);
@@ -304,10 +305,22 @@ public class MenuOrderService {
                 .stream()
                 .map(this::toOrderResponse)
                 .toList();
+        List<MenuOrderDtos.OrderResponse> cancelledToday = menuOrderRepository
+                .findByMenuIdAndStatusInAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        menuId,
+                        List.of(MenuOrderStatus.CANCELLED),
+                        start,
+                        end
+                )
+                .stream()
+                .filter(MenuOrderService::reachedKitchen)
+                .map(this::toOrderResponse)
+                .toList();
         List<MenuOrderDtos.OrderResponse> combined = new ArrayList<>(active);
         combined.addAll(tableBillService.hideClosedTableTickets(servedToday));
-        combined.addAll(kitchenUberEatsService.listActiveForOwner(menu.getUserId()));
-        combined.addAll(kitchenYemekSepetiService.listActiveForOwner(menu.getUserId()));
+        combined.addAll(cancelledToday);
+        combined.addAll(kitchenUberEatsService.listActiveForBranch(menu.getUserId(), menu.getBranchId()));
+        combined.addAll(kitchenYemekSepetiService.listActiveForBranch(menu.getUserId(), menu.getBranchId()));
         return combined;
     }
 
@@ -384,6 +397,61 @@ public class MenuOrderService {
                 OrderAuditAction.STATUS_CHANGED,
                 actorWaiterId,
                 "{\"from\":\"" + expected + "\",\"to\":\"" + next + "\"}"
+        );
+        return saved;
+    }
+
+    @Transactional
+    public MenuOrderDtos.OrderResponse merchantRevertKitchen(
+            Long menuId,
+            Long orderId,
+            MenuOrderStatus target,
+            String source
+    ) {
+        requireKitchenRevertSource(source);
+        requireOwnedMenu(menuId);
+        MenuOrder order = requireOrderForMenu(menuId, orderId);
+        return toOrderResponse(applyKitchenRevert(order, target, null));
+    }
+
+    public static void requireKitchenRevertSource(String source) {
+        if (KitchenUberEatsMapper.isUberEatsSource(source) || KitchenUberEatsMapper.isYemekSepetiSource(source)) {
+            throw new BadRequestException("Pazar yeri siparişleri geri alınamaz");
+        }
+    }
+
+    public static void requireKitchenCancelSource(String source) {
+        if (KitchenUberEatsMapper.isUberEatsSource(source) || KitchenUberEatsMapper.isYemekSepetiSource(source)) {
+            throw new BadRequestException("Pazar yeri siparişleri platform üzerinden iptal edilir");
+        }
+    }
+
+    /** Cancelled tickets that were confirmed first; waiter rejections never hit the kitchen board. */
+    public static boolean reachedKitchen(MenuOrder order) {
+        return order.getConfirmedAt() != null;
+    }
+
+    /** Moves a kitchen ticket back one or more steps (READY → PREPARING/CONFIRMED, PREPARING → CONFIRMED). */
+    public MenuOrder applyKitchenRevert(MenuOrder order, MenuOrderStatus target, Long actorWaiterId) {
+        MenuOrderStatus current = order.getStatus();
+        boolean allowed = (current == MenuOrderStatus.PREPARING && target == MenuOrderStatus.CONFIRMED)
+                || (current == MenuOrderStatus.READY
+                    && (target == MenuOrderStatus.PREPARING || target == MenuOrderStatus.CONFIRMED));
+        if (!allowed) {
+            throw new BadRequestException("Sipariş " + current + " durumundan " + target + " durumuna geri alınamaz");
+        }
+        order.setStatus(target);
+        order.setReadyAt(null);
+        if (target == MenuOrderStatus.CONFIRMED) {
+            order.setPreparedAt(null);
+        }
+        order.setUpdatedAt(LocalDateTime.now());
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(
+                saved,
+                OrderAuditAction.STATUS_CHANGED,
+                actorWaiterId,
+                "{\"from\":\"" + current + "\",\"to\":\"" + target + "\"}"
         );
         return saved;
     }

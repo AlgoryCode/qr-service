@@ -48,6 +48,13 @@ public class YemekSepetiController {
         return ResponseEntity.ok(connectionService.upsert(request));
     }
 
+    @PutMapping("/connections/me/branch")
+    public ResponseEntity<YemekSepetiDtos.ConnectionResponse> assignBranch(
+            @RequestBody YemekSepetiDtos.BranchRequest request
+    ) {
+        return ResponseEntity.ok(connectionService.assignBranch(request.getBranchId()));
+    }
+
     @DeleteMapping("/connections/me")
     public ResponseEntity<YemekSepetiDtos.ConnectionResponse> disconnect() {
         return ResponseEntity.ok(connectionService.disconnect());

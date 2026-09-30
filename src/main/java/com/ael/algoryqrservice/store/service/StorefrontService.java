@@ -114,7 +114,10 @@ public class StorefrontService {
 
     /** Courier contact details only become public once the order is actually out for delivery. */
     private boolean shouldRevealCourier(StoreOrderStatus status) {
-        return status == StoreOrderStatus.ON_THE_WAY || status == StoreOrderStatus.DELIVERED;
+        return status == StoreOrderStatus.ON_THE_WAY
+                || status == StoreOrderStatus.DELIVERED
+                || status == StoreOrderStatus.COURIER_TAKEN
+                || status == StoreOrderStatus.COURIER_DELIVERED_TO_CUSTOMER;
     }
 
     private List<StorePublicDtos.OrderItemResponse> toItems(List<StoreOrderItem> items) {

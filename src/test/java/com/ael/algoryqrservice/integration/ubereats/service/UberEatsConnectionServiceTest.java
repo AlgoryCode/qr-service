@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.integration.ubereats.model.UberEatsConnectionStatus;
 import com.ael.algoryqrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.ael.algoryqrservice.integration.ubereats.repository.UberEatsConnectionRepository;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -38,6 +39,8 @@ class UberEatsConnectionServiceTest {
     private UberEatsClient UberEatsClient;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private BranchRepository branchRepository;
 
     private UberEatsConnectionService connectionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -49,7 +52,8 @@ class UberEatsConnectionServiceTest {
                 encryptor,
                 UberEatsClient,
                 new UberEatsPayloadMapper(),
-                securityUtils
+                securityUtils,
+                branchRepository
         );
     }
 

@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.service.MenuWaiterOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,24 @@ public class WaiterKitchenController {
             @RequestParam(required = false) String source
     ) {
         return ResponseEntity.ok(menuWaiterOrderService.markReady(orderId, source));
+    }
+
+    @PostMapping("/orders/{orderId}/revert")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> revert(
+            @PathVariable Long orderId,
+            @RequestParam MenuOrderStatus to,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuWaiterOrderService.revertKitchen(orderId, to, source));
+    }
+
+    @PostMapping("/orders/{orderId}/cancel")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> cancel(
+            @PathVariable Long orderId,
+            @RequestParam(required = false) String source,
+            @Valid @RequestBody(required = false) MenuOrderDtos.CancelOrderRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterOrderService.cancelFromKitchen(orderId, source, request));
     }
 
     @PatchMapping("/orders/{orderId}/note")

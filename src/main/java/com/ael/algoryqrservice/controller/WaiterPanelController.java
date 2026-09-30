@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.dto.RestaurantAreaDtos;
 import com.ael.algoryqrservice.model.dto.RestaurantTableDtos;
+import com.ael.algoryqrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.MenuOrderService;
 import com.ael.algoryqrservice.service.MenuWaiterService;
@@ -190,6 +191,16 @@ public class WaiterPanelController {
             @RequestParam(required = false) String source
     ) {
         return ResponseEntity.ok(menuOrderService.merchantMarkReady(menuId, orderId, source));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/kitchen-revert")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> revertKitchen(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestParam MenuOrderStatus to,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantRevertKitchen(menuId, orderId, to, source));
     }
 
     @PostMapping("/menu/{menuId}/orders/{orderId}/served")

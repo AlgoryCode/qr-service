@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.repository;
 
 import com.ael.algoryqrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.model.enums.StaffRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -22,6 +23,8 @@ public interface MerchantStaffRepository extends JpaRepository<MerchantStaff, Lo
     List<MerchantStaff> findByBranchIdInOrderByDisplayNameAsc(Collection<Long> branchIds);
 
     Optional<MerchantStaff> findByIdAndBranchId(Long id, Long branchId);
+
+    List<MerchantStaff> findByMerchantIdAndStaffRoleAndActiveTrueOrderByDisplayNameAsc(Long merchantId, StaffRole staffRole);
 
     boolean existsByUsernameIgnoreCase(String username);
 }

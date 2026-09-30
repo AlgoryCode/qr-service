@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.integration.yemeksepeti.model.YemekSepetiConnecti
 import com.ael.algoryqrservice.integration.yemeksepeti.model.YemekSepetiConnectionStatus;
 import com.ael.algoryqrservice.integration.yemeksepeti.model.dto.YemekSepetiDtos;
 import com.ael.algoryqrservice.integration.yemeksepeti.repository.YemekSepetiConnectionRepository;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class YemekSepetiConnectionService {
     private final YemekSepetiConnectionRepository connectionRepository;
     private final YemekSepetiCredentialEncryptor encryptor;
     private final SecurityUtils securityUtils;
+    private final BranchRepository branchRepository;
 
     @Transactional(readOnly = true)
     public List<YemekSepetiDtos.ConnectionResponse> listMine() {
@@ -76,6 +78,17 @@ public class YemekSepetiConnectionService {
         YemekSepetiConnection connection = requireOwnedConnection();
         connection.setStatus(YemekSepetiConnectionStatus.DISCONNECTED);
         connection.setLastError(null);
+        return toResponse(connectionRepository.save(connection));
+    }
+
+    @Transactional
+    public YemekSepetiDtos.ConnectionResponse assignBranch(Long branchId) {
+        YemekSepetiConnection connection = requireOwnedConnection();
+        if (branchId != null) {
+            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getUserId())
+                    .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
+        }
+        connection.setBranchId(branchId);
         return toResponse(connectionRepository.save(connection));
     }
 
@@ -142,6 +155,7 @@ public class YemekSepetiConnectionService {
                 .webhookSecretMasked(encryptor.mask(webhookSecret))
                 .vendorId(connection.getVendorId())
                 .vendorName(connection.getVendorName())
+                .branchId(connection.getBranchId())
                 .status(connection.getStatus())
                 .lastError(connection.getLastError())
                 .lastSyncedAt(connection.getLastSyncedAt())

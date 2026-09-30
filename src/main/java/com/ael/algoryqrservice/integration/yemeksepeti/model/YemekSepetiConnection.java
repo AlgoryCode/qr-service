@@ -41,6 +41,10 @@ public class YemekSepetiConnection {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** Siparişlerin düştüğü şube mutfağı; boşsa tüm şubelerde görünür. */
+    @Column(name = "branch_id")
+    private Long branchId;
+
     @Column(name = "chain_id", nullable = false, length = 128)
     private String chainId;
 

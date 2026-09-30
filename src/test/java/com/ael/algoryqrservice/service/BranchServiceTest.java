@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.enums.MenuChannel;
@@ -19,7 +20,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,6 +44,8 @@ class BranchServiceTest {
     private ProductImageStorageService productImageStorageService;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private KitchenCloseGuard kitchenCloseGuard;
 
     @InjectMocks
     private BranchService branchService;
@@ -111,6 +116,37 @@ class BranchServiceTest {
 
         assertThat(branch.isKitchenEnabled()).isTrue();
         assertThat(response.isKitchenEnabled()).isTrue();
+    }
+
+    @Test
+    void update_whenClosingKitchenWithActiveOrders_thenRejects() {
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(true).build();
+        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        doThrow(new BadRequestException(KitchenCloseGuard.ACTIVE_ORDERS_MESSAGE))
+                .when(kitchenCloseGuard).requireNoActiveOrders(branch);
+
+        assertThatThrownBy(() -> branchService.update(15L, BranchDtos.UpdateRequest.builder()
+                .kitchenEnabled(false)
+                .build()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Aktif olan siparişleriniz var, mutfağı kapatamazsınız");
+        assertThat(branch.isKitchenEnabled()).isTrue();
+        verify(branchRepository, never()).save(any(Branch.class));
+    }
+
+    @Test
+    void update_whenClosingKitchenWithoutActiveOrders_thenTurnsKitchenOff() {
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(true).build();
+        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
+
+        branchService.update(15L, BranchDtos.UpdateRequest.builder().kitchenEnabled(false).build());
+
+        verify(kitchenCloseGuard).requireNoActiveOrders(branch);
+        assertThat(branch.isKitchenEnabled()).isFalse();
     }
 
     @Test

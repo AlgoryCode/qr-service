@@ -33,6 +33,14 @@ public final class UberEatsDtos {
     }
 
     @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BranchRequest {
+        /** Boş gönderilirse bağlantı tüm şubelerin mutfağında görünür. */
+        private Long branchId;
+    }
+
+    @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
@@ -42,6 +50,7 @@ public final class UberEatsDtos {
         private String apiKeyMasked;
         private String restaurantId;
         private String restaurantName;
+        private Long branchId;
         private UberEatsConnectionStatus status;
         private String lastError;
         private LocalDateTime lastSyncedAt;

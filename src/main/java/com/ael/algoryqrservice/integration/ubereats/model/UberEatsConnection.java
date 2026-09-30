@@ -41,6 +41,10 @@ public class UberEatsConnection {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** Siparişlerin düştüğü şube mutfağı; boşsa tüm şubelerde görünür. */
+    @Column(name = "branch_id")
+    private Long branchId;
+
     @Column(name = "seller_id", nullable = false, length = 64)
     private String sellerId;
 

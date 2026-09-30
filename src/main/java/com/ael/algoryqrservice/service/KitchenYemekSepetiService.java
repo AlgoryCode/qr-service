@@ -41,9 +41,17 @@ public class KitchenYemekSepetiService {
     private final YemekSepetiClient yemekSepetiClient;
     private final ObjectMapper objectMapper;
 
+    /** Bağlantı başka şubeye atanmışsa bu şubenin mutfağında görünmez. */
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listActiveForOwner(Long merchantId) {
+    public List<MenuOrderDtos.OrderResponse> listActiveForBranch(Long merchantId, Long branchId) {
         YemekSepetiConnection connection = connectedOrNull(merchantId);
+        if (connection == null || !BranchScope.serves(connection.getBranchId(), branchId)) {
+            return List.of();
+        }
+        return listActive(connection);
+    }
+
+    private List<MenuOrderDtos.OrderResponse> listActive(YemekSepetiConnection connection) {
         if (connection == null) {
             return List.of();
         }
