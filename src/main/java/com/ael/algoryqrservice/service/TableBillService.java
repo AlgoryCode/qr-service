@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.BillPayment;
+import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuOrder;
 import com.ael.algoryqrservice.model.MenuOrderItem;
@@ -19,6 +20,7 @@ import com.ael.algoryqrservice.model.enums.OrderAuditAction;
 import com.ael.algoryqrservice.model.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.model.enums.TableBillStatus;
 import com.ael.algoryqrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
@@ -61,6 +63,7 @@ public class TableBillService {
     private final MerchantStaffRepository merchantStaffRepository;
     private final WaiterCommissionService waiterCommissionService;
     private final MenuOrderRepository menuOrderRepository;
+    private final BranchRepository branchRepository;
     private final OrderAuditService orderAuditService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -848,19 +851,24 @@ public class TableBillService {
         bill.setTotalAmount(total);
     }
 
-    /**
-     * A closed bill takes only that table's ready tickets off the floor.
-     * Orders on any other table are not loaded.
-     */
-    /** Adisyon kapanınca masadaki açık siparişler, hangi aşamada olursa olsun teslim edilmiş sayılır. */
     private void serveOpenOrdersForBill(TableBill bill, Long staffId) {
         if (bill.getMenuId() == null || bill.getTableId() == null || bill.getId() == null) {
             return;
         }
+        boolean kitchenEnabled = kitchenEnabledForMenu(bill.getMenuId());
+        List<MenuOrderStatus> openStatuses = kitchenEnabled
+                ? List.of(MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, MenuOrderStatus.READY)
+                : List.of(
+                        MenuOrderStatus.CONFIRMED,
+                        MenuOrderStatus.PREPARING,
+                        MenuOrderStatus.READY,
+                        MenuOrderStatus.SERVED
+                );
+        MenuOrderStatus target = kitchenEnabled ? MenuOrderStatus.SERVED : MenuOrderStatus.PAID;
         List<MenuOrder> open = menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
                 bill.getMenuId(),
                 bill.getTableId(),
-                List.of(MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, MenuOrderStatus.READY)
+                openStatuses
         );
         if (open == null || open.isEmpty()) {
             return;
@@ -873,9 +881,14 @@ public class TableBillService {
             if (order.getBillId() != null && !order.getBillId().equals(bill.getId())) {
                 continue;
             }
+            if (order.getStatus() == target) {
+                continue;
+            }
             MenuOrderStatus from = order.getStatus();
-            order.setStatus(MenuOrderStatus.SERVED);
-            order.setServedAt(now);
+            order.setStatus(target);
+            if (target == MenuOrderStatus.SERVED) {
+                order.setServedAt(now);
+            }
             order.setUpdatedAt(now);
             if (order.getBillId() == null) {
                 order.setBillId(bill.getId());
@@ -885,9 +898,17 @@ public class TableBillService {
                     saved,
                     OrderAuditAction.STATUS_CHANGED,
                     staffId,
-                    "{\"from\":\"" + from + "\",\"to\":\"SERVED\"}"
+                    "{\"from\":\"" + from + "\",\"to\":\"" + target + "\"}"
             );
         }
+    }
+
+    private boolean kitchenEnabledForMenu(Long menuId) {
+        return menuRepository.findById(menuId)
+                .map(Menu::getBranchId)
+                .flatMap(branchRepository::findById)
+                .map(Branch::isKitchenEnabled)
+                .orElse(false);
     }
 
     public List<MenuOrderDtos.OrderResponse> hideClosedTableTickets(List<MenuOrderDtos.OrderResponse> orders) {
@@ -896,7 +917,8 @@ public class TableBillService {
         }
         Set<Long> billIds = new HashSet<>();
         for (MenuOrderDtos.OrderResponse order : orders) {
-            if (order.getStatus() == MenuOrderStatus.SERVED && order.getBillId() != null) {
+            if ((order.getStatus() == MenuOrderStatus.SERVED || order.getStatus() == MenuOrderStatus.PAID)
+                    && order.getBillId() != null) {
                 billIds.add(order.getBillId());
             }
         }
@@ -911,7 +933,7 @@ public class TableBillService {
             return orders;
         }
         return orders.stream()
-                .filter(order -> order.getStatus() != MenuOrderStatus.SERVED
+                .filter(order -> (order.getStatus() != MenuOrderStatus.SERVED && order.getStatus() != MenuOrderStatus.PAID)
                         || order.getBillId() == null
                         || !closedIds.contains(order.getBillId()))
                 .toList();

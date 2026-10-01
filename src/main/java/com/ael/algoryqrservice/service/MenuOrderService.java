@@ -221,6 +221,7 @@ public class MenuOrderService {
                                     MenuOrderStatus.PREPARING,
                                     MenuOrderStatus.READY,
                                     MenuOrderStatus.SERVED,
+                                    MenuOrderStatus.PAID,
                                     MenuOrderStatus.SUBMITTED,
                                     MenuOrderStatus.CANCELLED
                             )
