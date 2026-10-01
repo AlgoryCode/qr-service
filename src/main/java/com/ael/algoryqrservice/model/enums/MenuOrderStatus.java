@@ -7,6 +7,7 @@ public enum MenuOrderStatus {
     PREPARING,
     READY,
     SERVED,
+    PAID,
     REJECTED,
     CANCELLED
 }
