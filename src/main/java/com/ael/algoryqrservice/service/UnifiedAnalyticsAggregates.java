@@ -55,7 +55,8 @@ public class UnifiedAnalyticsAggregates {
             MenuOrderStatus.CONFIRMED,
             MenuOrderStatus.PREPARING,
             MenuOrderStatus.READY,
-            MenuOrderStatus.SERVED
+            MenuOrderStatus.SERVED,
+            MenuOrderStatus.PAID
     );
 
     private final MenuOrderRepository menuOrderRepository;
@@ -574,7 +575,7 @@ public class UnifiedAnalyticsAggregates {
                 preparing++;
             } else if (order.getStatus() == MenuOrderStatus.READY) {
                 ready++;
-            } else if (order.getStatus() == MenuOrderStatus.SERVED) {
+            } else if (order.getStatus() == MenuOrderStatus.SERVED || order.getStatus() == MenuOrderStatus.PAID) {
                 served++;
             }
             if (order.getConfirmedAt() != null && order.getPreparedAt() != null) {

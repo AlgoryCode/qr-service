@@ -177,6 +177,7 @@ public class MenuWaiterOrderService {
                                 MenuOrderStatus.PREPARING,
                                 MenuOrderStatus.READY,
                                 MenuOrderStatus.SERVED,
+                                MenuOrderStatus.PAID,
                                 MenuOrderStatus.REJECTED,
                                 MenuOrderStatus.CANCELLED
                         ),
