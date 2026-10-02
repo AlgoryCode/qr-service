@@ -405,6 +405,7 @@ public final class MenuDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PublicMenuProfileResponse {
+        private Long menuId;
         private String publicId;
         private String themeId;
         private String businessName;

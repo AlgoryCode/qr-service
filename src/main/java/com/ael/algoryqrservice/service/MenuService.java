@@ -1129,6 +1129,7 @@ public class MenuService {
                 ? null
                 : branchRepository.findById(menu.getBranchId()).orElse(null);
         return MenuDtos.PublicMenuProfileResponse.builder()
+                .menuId(menu.getMenuId())
                 .publicId(menu.getPublicId())
                 .themeId(menu.getThemeId())
                 .businessName(menu.getBusinessName())
