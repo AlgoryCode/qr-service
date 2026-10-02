@@ -113,6 +113,8 @@ public class AccountService {
                 .lastName(user.getLastName())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhone())
+                .businessType(user.getBusinessType() != null ? user.getBusinessType().code() : null)
+                .usagePurpose(user.getUsagePurpose() != null ? user.getUsagePurpose().code() : null)
                 .provider(user.getProvider())
                 .twoFactorEnabled(user.isTwoFactorEnabled())
                 .memberSince(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)

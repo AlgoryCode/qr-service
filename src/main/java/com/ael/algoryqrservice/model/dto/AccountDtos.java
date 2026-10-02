@@ -20,6 +20,8 @@ public final class AccountDtos {
         private String lastName;
         private String email;
         private String phoneNumber;
+        private String businessType;
+        private String usagePurpose;
         private AuthProvider provider;
         private boolean twoFactorEnabled;
         private String memberSince;
