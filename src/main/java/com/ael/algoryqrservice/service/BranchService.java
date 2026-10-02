@@ -225,6 +225,7 @@ public class BranchService {
                         .map(menu -> BranchDtos.MenuSummary.builder()
                                 .menuId(menu.getMenuId())
                                 .qrId(menu.getQrId())
+                                .publicId(menu.getPublicId())
                                 .businessName(menu.getBusinessName())
                                 .active(menu.isActive())
                                 .build())

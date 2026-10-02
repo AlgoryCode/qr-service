@@ -59,6 +59,7 @@ public final class BranchDtos {
     public static class MenuSummary {
         private Long menuId;
         private Long qrId;
+        private String publicId;
         private String businessName;
         private boolean active;
     }
