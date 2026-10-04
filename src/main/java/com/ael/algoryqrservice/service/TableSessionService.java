@@ -8,7 +8,6 @@ import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.TableSession;
 import com.ael.algoryqrservice.model.dto.RestaurantTableDtos;
-import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.repository.TableSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,14 +33,11 @@ public class TableSessionService {
 
     private final TableSessionRepository tableSessionRepository;
     private final RestaurantTableRepository restaurantTableRepository;
-    private final MenuRepository menuRepository;
 
     private static final String WALK_IN_TABLE_NAME = "Misafir";
 
     @Transactional
-    public RestaurantTableDtos.TableSessionResponse openSession(Long qrId, String tableToken) {
-        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
-                .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
+    public RestaurantTableDtos.TableSessionResponse openSession(Menu menu, String tableToken) {
         if (!menu.isPublicAccessEnabled()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Lütfen restoran sahibiyle iletişime geçiniz.");
         }

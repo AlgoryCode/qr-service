@@ -74,14 +74,14 @@ public class MenuOrderService {
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse getCart(Long qrId, String tableSessionToken) {
-        TableSession session = requireSessionForQr(qrId, tableSessionToken);
+    public MenuOrderDtos.OrderResponse getCart(Long menuId, String tableSessionToken) {
+        TableSession session = requireSessionForMenu(menuId, tableSessionToken);
         return toOrderResponse(getOrCreateDraftEntity(session));
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse upsertCart(
-            Long qrId,
+            Long menuId,
             String tableSessionToken,
             MenuOrderDtos.UpdateCartRequest request
     ) {
@@ -89,12 +89,9 @@ public class MenuOrderService {
             throw new BadRequestException("Sepet kalemleri zorunludur");
         }
 
-        TableSession session = requireSessionForQr(qrId, tableSessionToken);
+        TableSession session = requireSessionForMenu(menuId, tableSessionToken);
         MenuOrder order = getOrCreateDraftEntity(session);
         applyCartItems(order, session.getMenuId(), request.getItems());
-        if (request.getAnalyticsSessionId() != null) {
-            order.setAnalyticsSessionId(request.getAnalyticsSessionId());
-        }
         order.setNote(trimToNull(request.getNote()));
         order.setUpdatedAt(LocalDateTime.now());
         return toOrderResponse(menuOrderRepository.save(order));
@@ -162,8 +159,8 @@ public class MenuOrderService {
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse submit(Long qrId, String tableSessionToken, UUID analyticsSessionId) {
-        TableSession session = requireSessionForQr(qrId, tableSessionToken);
+    public MenuOrderDtos.OrderResponse submit(Long menuId, String tableSessionToken, UUID analyticsSessionId) {
+        TableSession session = requireSessionForMenu(menuId, tableSessionToken);
         MenuOrder order = menuOrderRepository
                 .findByTableSessionIdAndStatus(session.getId(), MenuOrderStatus.DRAFT)
                 .orElseThrow(() -> new BadRequestException("Gönderilecek sepet bulunamadı"));
@@ -196,13 +193,13 @@ public class MenuOrderService {
     }
 
     @Transactional
-    public MenuOrderDtos.OrderResponse submit(Long qrId, String tableSessionToken) {
-        return submit(qrId, tableSessionToken, null);
+    public MenuOrderDtos.OrderResponse submit(Long menuId, String tableSessionToken) {
+        return submit(menuId, tableSessionToken, null);
     }
 
     @Transactional(readOnly = true)
-    public MenuOrderDtos.OrderResponse getOrder(Long qrId, String tableSessionToken, Long orderId) {
-        TableSession session = requireSessionForQr(qrId, tableSessionToken);
+    public MenuOrderDtos.OrderResponse getOrder(Long menuId, String tableSessionToken, Long orderId) {
+        TableSession session = requireSessionForMenu(menuId, tableSessionToken);
         MenuOrder order = menuOrderRepository.findByIdAndTableSessionId(orderId, session.getId())
                 .orElseThrow(() -> new NotFoundException("Sipariş bulunamadı"));
         return toOrderResponse(order);
@@ -591,11 +588,9 @@ public class MenuOrderService {
                 });
     }
 
-    private TableSession requireSessionForQr(Long qrId, String tableSessionToken) {
+    private TableSession requireSessionForMenu(Long menuId, String tableSessionToken) {
         TableSession session = tableSessionService.requireActiveSession(tableSessionToken);
-        Menu menu = menuRepository.findByQrIdAndActiveTrueAndDeletedFalse(qrId)
-                .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        if (!session.getMenuId().equals(menu.getMenuId())) {
+        if (!session.getMenuId().equals(menuId)) {
             throw new BadRequestException("Masa oturumu bu menüye ait değil");
         }
         return session;

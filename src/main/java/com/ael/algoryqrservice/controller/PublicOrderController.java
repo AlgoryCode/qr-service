@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.MenuOrderDtos;
+import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.service.MenuOrderService;
 import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.TableSessionService;
@@ -22,8 +23,8 @@ public class PublicOrderController {
             @PathVariable String publicId,
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken
     ) {
-        Long qrId = menuService.requirePublicQrId(publicId);
-        return ResponseEntity.ok(menuOrderService.getCart(qrId, tableSessionToken));
+        Menu menu = menuService.requireActivePublicMenu(publicId);
+        return ResponseEntity.ok(menuOrderService.getCart(menu.getMenuId(), tableSessionToken));
     }
 
     @PutMapping("/{publicId}/cart")
@@ -32,8 +33,8 @@ public class PublicOrderController {
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken,
             @Valid @RequestBody MenuOrderDtos.UpdateCartRequest request
     ) {
-        Long qrId = menuService.requirePublicQrId(publicId);
-        return ResponseEntity.ok(menuOrderService.upsertCart(qrId, tableSessionToken, request));
+        Menu menu = menuService.requireActivePublicMenu(publicId);
+        return ResponseEntity.ok(menuOrderService.upsertCart(menu.getMenuId(), tableSessionToken, request));
     }
 
     @PostMapping("/{publicId}/orders/submit")
@@ -42,9 +43,9 @@ public class PublicOrderController {
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken,
             @RequestBody(required = false) MenuOrderDtos.SubmitOrderRequest request
     ) {
-        Long qrId = menuService.requirePublicQrId(publicId);
+        Menu menu = menuService.requireActivePublicMenu(publicId);
         java.util.UUID sessionId = request == null ? null : request.getAnalyticsSessionId();
-        return ResponseEntity.ok(menuOrderService.submit(qrId, tableSessionToken, sessionId));
+        return ResponseEntity.ok(menuOrderService.submit(menu.getMenuId(), tableSessionToken, sessionId));
     }
 
     @GetMapping("/{publicId}/orders/{orderId}")
@@ -53,7 +54,7 @@ public class PublicOrderController {
             @PathVariable Long orderId,
             @RequestHeader(TableSessionService.TABLE_SESSION_HEADER) String tableSessionToken
     ) {
-        Long qrId = menuService.requirePublicQrId(publicId);
-        return ResponseEntity.ok(menuOrderService.getOrder(qrId, tableSessionToken, orderId));
+        Menu menu = menuService.requireActivePublicMenu(publicId);
+        return ResponseEntity.ok(menuOrderService.getOrder(menu.getMenuId(), tableSessionToken, orderId));
     }
 }

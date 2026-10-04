@@ -50,8 +50,6 @@ public final class MenuOrderDtos {
 
         @Size(max = 1000)
         private String note;
-
-        private UUID analyticsSessionId;
     }
 
     @Data

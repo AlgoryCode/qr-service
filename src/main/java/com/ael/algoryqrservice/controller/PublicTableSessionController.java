@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.RestaurantTableDtos;
+import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.TableSessionService;
 import jakarta.validation.Valid;
@@ -21,9 +22,9 @@ public class PublicTableSessionController {
             @PathVariable String publicId,
             @Valid @RequestBody RestaurantTableDtos.OpenTableSessionRequest request
     ) {
-        Long qrId = menuService.requirePublicQrId(publicId);
+        Menu menu = menuService.requireActivePublicMenu(publicId);
         return ResponseEntity.status(201).body(
-                tableSessionService.openSession(qrId, request.getTableToken())
+                tableSessionService.openSession(menu, request.getTableToken())
         );
     }
 }

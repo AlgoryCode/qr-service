@@ -285,11 +285,6 @@ public class MenuService {
     }
 
     @Transactional(readOnly = true)
-    public Long requirePublicQrId(String publicId) {
-        return requireActivePublicMenu(publicId).getQrId();
-    }
-
-    @Transactional(readOnly = true)
     public MenuDtos.MenuProductPageResponse listProducts(
             Long menuId,
             int page,
