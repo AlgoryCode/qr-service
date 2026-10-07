@@ -3,7 +3,6 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.access.AccessSession;
 import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.client.dto.ExternalEntitlementResponse;
-import com.ael.algoryqrservice.model.FulfillmentDetail;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.SessionContextResponse;
 import com.ael.algoryqrservice.model.dto.SessionEntitlementResponse;
@@ -15,8 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
-
 @Component
 public class SessionContextAssembler {
 
@@ -40,7 +37,7 @@ public class SessionContextAssembler {
         ));
     }
 
-    public SessionContextResponse localAllow(User user, AccessSession session, List<FulfillmentDetail> details) {
+    public SessionContextResponse localAllow(User user, AccessSession session) {
         return response(new Parts(
                 user,
                 session.decision(),
@@ -50,9 +47,9 @@ public class SessionContextAssembler {
                 null,
                 session.endsAt(),
                 session.debtDueAt(),
-                codes(details, FulfillmentDetail::getFeatureCode),
-                codes(details, FulfillmentDetail::getScopeCode),
-                details.stream().map(this::detail).toList()
+                List.of(),
+                List.of(),
+                List.of()
         ));
     }
 
@@ -110,22 +107,6 @@ public class SessionContextAssembler {
                 entitlement.usedQuantity(),
                 entitlement.source()
         );
-    }
-
-    private SessionEntitlementResponse detail(FulfillmentDetail detail) {
-        String source = detail.getSource() == null ? null : detail.getSource().name();
-        return new SessionEntitlementResponse(
-                detail.getFeatureCode(),
-                detail.getScopeCode(),
-                detail.getQuantity(),
-                detail.isUnlimited(),
-                detail.getUsedQuantity(),
-                source
-        );
-    }
-
-    private List<String> codes(List<FulfillmentDetail> details, Function<FulfillmentDetail, String> extractor) {
-        return sorted(details.stream().map(extractor).toList());
     }
 
     private List<String> sorted(List<String> codes) {

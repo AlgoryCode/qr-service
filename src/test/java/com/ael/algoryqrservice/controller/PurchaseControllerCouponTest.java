@@ -3,9 +3,9 @@ package com.ael.algoryqrservice.controller;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.PurchaseInitiateResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseRequest;
+import com.ael.algoryqrservice.model.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.service.AddonPurchaseService;
-import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.ExternalPackageViewService;
 import com.ael.algoryqrservice.service.PurchaseLogService;
 import com.ael.algoryqrservice.service.PurchaseService;
@@ -14,6 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -39,7 +42,6 @@ class PurchaseControllerCouponTest {
                 purchaseService,
                 mock(AddonPurchaseService.class),
                 mock(PurchaseLogService.class),
-                mock(EntitlementService.class),
                 mock(ExternalPackageViewService.class),
                 securityUtils
         );
@@ -51,5 +53,30 @@ class PurchaseControllerCouponTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(initiated);
         verify(purchaseService).purchase(user, request, "127.0.0.1");
+    }
+
+    @Test
+    void getMyEntitlements_whenFulfillmentReturnsRows_thenReturnOk() {
+        SecurityUtils securityUtils = mock(SecurityUtils.class);
+        ExternalPackageViewService externalPackageView = mock(ExternalPackageViewService.class);
+        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        UserEntitlementResponse entitlement = UserEntitlementResponse.builder()
+                .productCode("QR_CREATE")
+                .remainingQuantity(3)
+                .usable(true)
+                .build();
+        when(externalPackageView.entitlements(7L)).thenReturn(Optional.of(List.of(entitlement)));
+        PurchaseController controller = new PurchaseController(
+                mock(PurchaseService.class),
+                mock(AddonPurchaseService.class),
+                mock(PurchaseLogService.class),
+                externalPackageView,
+                securityUtils
+        );
+
+        ResponseEntity<List<UserEntitlementResponse>> response = controller.getMyEntitlements();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsExactly(entitlement);
     }
 }

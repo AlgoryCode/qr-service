@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.controller;
 
 import com.ael.algoryqrservice.model.dto.PlanPackageResponse;
-import com.ael.algoryqrservice.service.PlanPackageService;
+import com.ael.algoryqrservice.service.PublicPackageCatalogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,15 +16,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PackageController {
 
-    private final PlanPackageService planPackageService;
+    private final PublicPackageCatalogService publicPackageCatalogService;
 
     @GetMapping
     public ResponseEntity<List<PlanPackageResponse>> getActivePackages() {
-        return ResponseEntity.ok(planPackageService.getActivePackages());
+        return ResponseEntity.ok(publicPackageCatalogService.getActivePackages());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PlanPackageResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(planPackageService.getById(id));
+        return ResponseEntity.ok(publicPackageCatalogService.getById(id));
     }
 }

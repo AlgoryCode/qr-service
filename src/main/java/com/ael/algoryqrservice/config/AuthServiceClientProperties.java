@@ -11,6 +11,7 @@ public class AuthServiceClientProperties {
     private String token = "";
     private String headerName = "X-Service-Token";
     private String publicBaseUrl = "";
+    private String baseUrl = "http://localhost:8080";
 
     public boolean isEnabled() {
         return enabled;
@@ -42,5 +43,19 @@ public class AuthServiceClientProperties {
 
     public void setPublicBaseUrl(String publicBaseUrl) {
         this.publicBaseUrl = publicBaseUrl;
+    }
+
+    public String getBaseUrl() {
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            return baseUrl;
+        }
+        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
+            return publicBaseUrl;
+        }
+        return "http://localhost:8080";
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
     }
 }

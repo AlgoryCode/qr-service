@@ -23,7 +23,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class FulfillmentServiceClientTest {
 
-    private static final String ACTIVE_PACKAGE_URL = "http://fulfillment.test/api/v1/users/7/active-package";
     private static final String PACKAGE_URL = "http://fulfillment.test/api/v1/users/7/package";
     private static final String ENTITLEMENTS_URL = "http://fulfillment.test/api/v1/users/7/entitlements";
 
@@ -42,27 +41,27 @@ class FulfillmentServiceClientTest {
     }
 
     @Test
-    void lookupActivePackage_whenMissing_thenAbsent() {
-        server.expect(requestTo(ACTIVE_PACKAGE_URL))
+    void findPackage_whenMissing_thenInactive() {
+        server.expect(requestTo(PACKAGE_URL))
                 .andExpect(header("X-Service-Token", "token"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        assertThat(client.lookupActivePackage(7L)).isInstanceOf(ActivePackageLookup.Absent.class);
+        assertThat(client.findPackage(7L).status()).isEqualTo("INACTIVE");
         server.verify();
     }
 
     @Test
-    void lookupActivePackage_whenServerError_thenUnavailable() {
-        server.expect(requestTo(ACTIVE_PACKAGE_URL))
+    void findPackage_whenServerError_thenUnavailable() {
+        server.expect(requestTo(PACKAGE_URL))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatThrownBy(() -> client.lookupActivePackage(7L))
+        assertThatThrownBy(() -> client.findPackage(7L))
                 .isInstanceOf(FulfillmentUnavailableException.class);
     }
 
     @Test
     void findActivePackage_whenServerError_thenEmpty() {
-        server.expect(requestTo(ACTIVE_PACKAGE_URL))
+        server.expect(requestTo(PACKAGE_URL))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThat(client.findActivePackage(7L)).isEmpty();

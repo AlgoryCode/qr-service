@@ -1,29 +1,25 @@
 package com.ael.algoryqrservice.controller;
 
-import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.model.dto.AccountDtos;
 import com.ael.algoryqrservice.model.dto.AccountOverviewDtos;
 import com.ael.algoryqrservice.model.dto.BillingAddressPageResponse;
+import com.ael.algoryqrservice.model.dto.EmailVerificationDtos;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
-import com.ael.algoryqrservice.model.dto.SessionPageResponse;
 import com.ael.algoryqrservice.model.dto.SubscriptionOverviewResponse;
+import com.ael.algoryqrservice.service.AccountCredentialGateway;
 import com.ael.algoryqrservice.service.AccountFacadeService;
-import com.ael.algoryqrservice.util.HttpRequestAuth;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/account")
@@ -31,6 +27,37 @@ import java.util.UUID;
 public class AccountController {
 
     private final AccountFacadeService accountFacade;
+    private final AccountCredentialGateway accountCredentialGateway;
+
+    @GetMapping("/email-verification/status")
+    public ResponseEntity<EmailVerificationDtos.Status> emailVerificationStatus() {
+        return ResponseEntity.ok(accountCredentialGateway.emailStatus());
+    }
+
+    @PostMapping("/email-verification/request-code")
+    public ResponseEntity<EmailVerificationDtos.Status> requestEmailVerificationCode() {
+        return ResponseEntity.ok(accountCredentialGateway.requestEmailCode());
+    }
+
+    @PostMapping("/email-verification/verify")
+    public ResponseEntity<EmailVerificationDtos.Status> verifyEmail(
+            @Valid @RequestBody EmailVerificationDtos.VerifyRequest request
+    ) {
+        return ResponseEntity.ok(accountCredentialGateway.verifyEmail(request));
+    }
+
+    @PostMapping("/password-change/request-code")
+    public ResponseEntity<AccountDtos.PasswordChangeCodeResponse> requestPasswordChangeCode() {
+        return ResponseEntity.ok(accountCredentialGateway.requestPasswordChange());
+    }
+
+    @PostMapping("/password-change/confirm")
+    public ResponseEntity<Void> confirmPasswordChange(
+            @Valid @RequestBody AccountDtos.ConfirmPasswordChangeRequest request
+    ) {
+        accountCredentialGateway.confirmPasswordChange(request);
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping("/myprofile")
     public AccountDtos.MyProfileResponse myProfile() {
@@ -50,11 +77,6 @@ public class AccountController {
         return accountFacade.listBillingAddresses(page, size);
     }
 
-    @GetMapping("/payment-methods")
-    public List<BillingPaymentDtos.PaymentMethod> paymentMethods() {
-        return accountFacade.listPaymentMethods();
-    }
-
     @GetMapping("/purchases")
     public List<PurchaseResponse> purchases() {
         return accountFacade.listPurchases();
@@ -65,32 +87,9 @@ public class AccountController {
         return accountFacade.subscriptionOverview();
     }
 
-    @GetMapping("/sessions")
-    public SessionPageResponse sessions(
-            HttpServletRequest request,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        return accountFacade.listSessions(HttpRequestAuth.readBearerToken(request), page, size);
-    }
-
-    @DeleteMapping("/sessions/{sessionId}")
-    public ResponseEntity<Void> revokeSession(@PathVariable UUID sessionId) {
-        accountFacade.revokeSession(sessionId);
-        return ResponseEntity.noContent().build();
-    }
-
     @GetMapping("/overview")
-    public ResponseEntity<AccountOverviewDtos.OverviewResponse> overview(
-            HttpServletRequest request,
-            @RequestParam(defaultValue = "0") int sessionPage,
-            @RequestParam(defaultValue = "" + AccountOverviewDtos.DEFAULT_SESSION_PAGE_SIZE) int sessionSize
-    ) {
-        AccountOverviewDtos.OverviewResponse body = accountFacade.getOverview(
-                HttpRequestAuth.readBearerToken(request),
-                sessionPage,
-                sessionSize
-        );
+    public ResponseEntity<AccountOverviewDtos.OverviewResponse> overview() {
+        AccountOverviewDtos.OverviewResponse body = accountFacade.getOverview();
         if (body.getProfile() != null && !body.getProfile().isOk()) {
             int status = body.getProfile().getStatus() != null ? body.getProfile().getStatus() : 502;
             if (status == 401) {

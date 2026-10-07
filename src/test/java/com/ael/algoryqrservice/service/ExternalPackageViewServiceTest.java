@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.client.ActivePackageLookup;
 import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.client.PackageView;
 import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.model.enums.AccessDecision;
@@ -23,7 +23,7 @@ class ExternalPackageViewServiceTest {
     @Test
     void purchases_whenActivePackage_thenMapPurchaseAndEntitlement() {
         FulfillmentServiceClient client = mock(FulfillmentServiceClient.class);
-        when(client.lookupActivePackage(7L)).thenReturn(new ActivePackageLookup.Found(activePackage()));
+        when(client.findPackage(7L)).thenReturn(new PackageView("ACTIVE", activePackage()));
         when(client.listEntitlements(7L)).thenReturn(List.of(entitlement()));
         ExternalPackageViewService service = new ExternalPackageViewService(provider(client), new ExternalPackageResponseMapper());
 
@@ -60,7 +60,7 @@ class ExternalPackageViewServiceTest {
     @Test
     void session_whenPackageAbsent_thenRequirePurchase() {
         FulfillmentServiceClient client = mock(FulfillmentServiceClient.class);
-        when(client.lookupActivePackage(7L)).thenReturn(new ActivePackageLookup.Absent());
+        when(client.findPackage(7L)).thenReturn(new PackageView("INACTIVE", null));
         ExternalPackageViewService service = new ExternalPackageViewService(provider(client), new ExternalPackageResponseMapper());
 
         assertThat(service.session(7L)).get().satisfies(session ->

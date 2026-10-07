@@ -19,6 +19,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -71,9 +72,24 @@ public class GlobalExceptionHandler {
                 .body(Map.of("message", ex.getMessage()));
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(ConflictException exception) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (exception.getCode() != null) {
+            body.put("code", exception.getCode());
+        }
+        body.put("message", exception.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(BadRequestException ex) {
-        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        Map<String, String> body = new LinkedHashMap<>();
+        if (ex.getCode() != null) {
+            body.put("code", ex.getCode());
+        }
+        body.put("message", ex.getMessage());
+        return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -132,11 +148,6 @@ public class GlobalExceptionHandler {
                 || lower.contains("uk_merchant_staff_merchant_username")) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message", "Bu kullanıcı adı bu işletmede zaten kullanılıyor"));
-        }
-        if (lower.contains("uk_demo_onboarding_assignment_user")
-                || lower.contains("demo_onboarding_assignment")) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "Demo kurulumu zaten tamamlanmis"));
         }
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "Veri kaydı tamamlanamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin."));

@@ -1,11 +1,11 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import com.ael.algoryqrservice.store.model.Merchant;
 import com.ael.algoryqrservice.store.repository.MerchantRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,8 +31,7 @@ public class MenuCatalogCloneService {
     private final MenuProductPairingService menuProductPairingService;
     private final MenuProductOptionService menuProductOptionService;
     private final ProductImageStorageService productImageStorageService;
-    private final EntitlementService entitlementService;
-    private final FeatureUsageSyncRegistry usageSyncRegistry;
+    private final ProductUsageGateway productUsageGateway;
     private final MerchantRepository merchantRepository;
 
     @Transactional
@@ -52,7 +51,7 @@ public class MenuCatalogCloneService {
         if (sourceProducts.isEmpty()) {
             return Map.of();
         }
-        entitlementService.assertMenuProductCreationAllowed(userId, sourceProducts.size());
+        productUsageGateway.use(userId, CatalogProducts.MENU_PRODUCT, sourceProducts.size());
 
         MenuCategoryService.TaxonomyCloneResult taxonomy = menuCategoryService.cloneTaxonomyToMenu(
                 sourceMenu.getMenuId(),
@@ -79,7 +78,6 @@ public class MenuCatalogCloneService {
 
         menuProductPairingService.copyPairings(productIds, taxonomy.categoryIds(), subCategoryIds);
         menuProductOptionService.copyOptions(productIds);
-        usageSyncRegistry.synchronize(userId, CatalogProducts.MENU_PRODUCT);
         return productIds;
     }
 

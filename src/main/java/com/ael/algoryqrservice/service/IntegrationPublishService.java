@@ -17,8 +17,8 @@ import com.ael.algoryqrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.repository.IntegrationPendingProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuSubCategoryRepository;
-import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -42,8 +42,7 @@ public class IntegrationPublishService {
     private final IntegrationPendingProductRepository pendingProductRepository;
     private final MenuProductRepository menuProductRepository;
     private final MenuSubCategoryRepository menuSubCategoryRepository;
-    private final EntitlementService entitlementService;
-    private final FeatureUsageSyncRegistry usageSyncRegistry;
+    private final ProductUsageGateway productUsageGateway;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
     private final UberEatsConnectionService uberEatsConnectionService;
     private final UberEatsClient uberEatsClient;
@@ -156,7 +155,7 @@ public class IntegrationPublishService {
                 }
             }
 
-            entitlementService.assertMenuProductCreationAllowed(pending.getTenantId(), 1);
+            productUsageGateway.use(pending.getTenantId(), CatalogProducts.MENU_PRODUCT, 1);
             int sortOrder = menuProductRepository
                     .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(pending.getMenuId())
                     .size();
@@ -176,7 +175,6 @@ public class IntegrationPublishService {
                     .build();
             MenuProduct saved = menuProductRepository.save(created);
             pending.setPublishedProductId(saved.getProductId());
-            usageSyncRegistry.synchronize(pending.getTenantId(), CatalogProducts.MENU_PRODUCT);
             menuProductIndexNotifier.productChanged(saved);
             return true;
         } catch (RuntimeException exception) {

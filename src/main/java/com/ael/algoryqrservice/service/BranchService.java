@@ -1,6 +1,9 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.Qr;
@@ -12,6 +15,7 @@ import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +34,8 @@ public class BranchService {
     private final MenuRepository menuRepository;
     private final QrRepository qrRepository;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
-    private final BranchQuotaService branchQuotaService;
+    private final ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
+    private final ProductUsageGateway productUsageGateway;
     private final ProductImageStorageService productImageStorageService;
     private final SecurityUtils securityUtils;
     private final KitchenCloseGuard kitchenCloseGuard;
@@ -49,8 +54,8 @@ public class BranchService {
                 .toList();
         return BranchDtos.ListResponse.builder()
                 .content(content)
-                .quota(branchQuotaService.branchQuota(userId))
-                .menuQuota(branchQuotaService.menuQuota(userId))
+                .quota(branchQuota(userId))
+                .menuQuota(menuQuota(userId))
                 .build();
     }
 
@@ -63,7 +68,7 @@ public class BranchService {
     @Transactional
     public BranchDtos.Response create(BranchDtos.CreateRequest request) {
         Long userId = securityUtils.getCurrentUserId();
-        branchQuotaService.assertCanCreateBranch(userId);
+        consumeBranch(userId);
         Branch branch = branchRepository.save(Branch.builder()
                 .userId(userId)
                 .name(request.getName().trim())
@@ -230,6 +235,35 @@ public class BranchService {
                                 .active(menu.isActive())
                                 .build())
                         .toList())
+                .build();
+    }
+
+    private void consumeBranch(Long userId) {
+        productUsageGateway.use(userId, CatalogProducts.QR_BRANCH, 1);
+    }
+
+    private BranchDtos.Quota branchQuota(Long userId) {
+        int used = (int) branchRepository.countByUserIdAndDeletedFalse(userId);
+        FulfillmentServiceClient client = fulfillmentClients.getIfAvailable();
+        int remaining = client == null ? Math.max(0, 1 - used) : client.remaining(userId, CatalogProducts.QR_BRANCH);
+        return BranchDtos.Quota.builder()
+                .used(used)
+                .allowed(used + remaining)
+                .remaining(remaining)
+                .grandfathered(0)
+                .extraPurchased(0)
+                .canCreate(client == null || remaining > 0)
+                .build();
+    }
+
+    private BranchDtos.MenuQuota menuQuota(Long userId) {
+        FulfillmentServiceClient client = fulfillmentClients.getIfAvailable();
+        int remaining = client == null ? 0 : client.remaining(userId, CatalogProducts.QR_MENU);
+        return BranchDtos.MenuQuota.builder()
+                .extraUsed(0)
+                .extraAllowed(remaining)
+                .extraRemaining(remaining)
+                .canCreateExtra(client == null || remaining > 0)
                 .build();
     }
 

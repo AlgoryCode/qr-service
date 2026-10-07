@@ -3,7 +3,6 @@ package com.ael.algoryqrservice.model.dto;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.UserRole;
-import com.ael.algoryqrservice.trial.domain.TrialLifecycle;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -65,9 +64,6 @@ public final class AdminUserDtos {
         private UserRole role;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
-        private TrialLifecycle trialLifecycle;
-        private boolean trialConsumed;
-        private LocalDateTime trialExpiresAt;
         private String registrationIpAddress;
         private String registrationDevice;
         private String registrationDeviceType;
@@ -98,17 +94,6 @@ public final class AdminUserDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class TrialUpdateRequest {
-        @Min(1)
-        @Max(365)
-        private Integer days;
-        private String status;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class PackageUpdateRequest {
         private String status;
         @Min(1)
@@ -123,27 +108,6 @@ public final class AdminUserDtos {
     public static class PasswordResetResponse {
         private String temporaryPassword;
         private boolean emailed;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ExtendTrialResponse {
-        private Long purchaseId;
-        private String packageName;
-        private LocalDateTime expiresAt;
-        private int daysAdded;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class EndTrialResponse {
-        private Long purchaseId;
-        private String packageName;
-        private LocalDateTime expiresAt;
     }
 
     @Data

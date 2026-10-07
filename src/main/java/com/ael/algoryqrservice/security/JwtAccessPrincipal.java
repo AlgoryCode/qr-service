@@ -54,8 +54,4 @@ public record JwtAccessPrincipal(
     public boolean isWaiter() {
         return JwtService.PRINCIPAL_WAITER.equals(principalType);
     }
-
-    public boolean isDemo() {
-        return JwtService.PRINCIPAL_DEMO.equals(principalType);
-    }
 }

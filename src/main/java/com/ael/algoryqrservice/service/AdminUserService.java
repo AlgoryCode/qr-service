@@ -1,20 +1,17 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.AuthCredentialClient;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
-import com.ael.algoryqrservice.model.DashboardUser;
 import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.AdminUserDtos;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.model.enums.AuthProvider;
-import com.ael.algoryqrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.repository.UserSpecifications;
-import com.ael.algoryqrservice.trial.TrialUseCases;
-import com.ael.algoryqrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,9 +33,7 @@ public class AdminUserService {
     private final PurchaseService purchaseService;
     private final QrRepository qrRepository;
     private final MenuRepository menuRepository;
-    private final SessionService sessionService;
-    private final TrialUseCases trialUseCases;
-    private final EmailVerificationService emailVerificationService;
+    private final AuthCredentialClient authCredentialClient;
 
     @Transactional(readOnly = true)
     public AdminUserDtos.UserPageResponse listUsers(String query, int page, int size) {
@@ -61,7 +56,6 @@ public class AdminUserService {
 
         UserAccessProfile accessProfile = userAccessProfileService.resolve(user.getId());
         List<PurchaseResponse> purchases = purchaseService.getUserPurchases(user.getId());
-        var trial = trialUseCases.snapshot(user.getId());
 
         return AdminUserDtos.UserDetailResponse.builder()
                 .id(user.getId())
@@ -74,9 +68,6 @@ public class AdminUserService {
                 .role(user.getRole())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
-                .trialLifecycle(trial.lifecycle())
-                .trialConsumed(trial.consumed())
-                .trialExpiresAt(trial.expiresAt())
                 .registrationIpAddress(user.getRegistrationIpAddress())
                 .registrationDevice(user.getRegistrationDevice())
                 .registrationDeviceType(user.getRegistrationDeviceType())
@@ -99,7 +90,7 @@ public class AdminUserService {
         boolean emailChanged = applyEmail(user, request);
         userRepository.save(user);
         if (emailChanged) {
-            emailVerificationService.sendForUser(user);
+            authCredentialClient.reissueEmailCode(user.getId(), user.getEmail());
         }
         return getUserById(id);
     }
@@ -139,36 +130,6 @@ public class AdminUserService {
         user.setEmailVerificationExpiresAt(null);
         user.setEmailVerificationSentAt(null);
         return true;
-    }
-
-    @Transactional
-    public AdminUserDtos.ImpersonateResponse impersonateUser(
-            Long userId,
-            DashboardUser adminUser,
-            ClientInfo clientInfo
-    ) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı"));
-
-        if (user.getRole() == UserRole.WAITER) {
-            throw new NotFoundException("Garson hesapları için üye girişi desteklenmiyor");
-        }
-
-        SessionService.SessionTokens tokens = sessionService.createImpersonationSession(
-                user,
-                adminUser.getId(),
-                clientInfo
-        );
-
-        return AdminUserDtos.ImpersonateResponse.builder()
-                .accessToken(tokens.accessToken())
-                .refreshToken(tokens.refreshToken())
-                .userId(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .impersonatorUserId(adminUser.getId())
-                .build();
     }
 
     private AdminUserDtos.UserPageResponse toPageResponse(Page<User> result) {

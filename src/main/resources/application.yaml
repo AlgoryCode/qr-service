@@ -32,19 +32,6 @@ spring:
           multiplier: 2
           max-interval: 10000
           max-attempts: 3
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID:977637390906-8uhh6hohv1o71gasg27tq5i4rpad54ef.apps.googleusercontent.com}
-            client-secret: ${GOOGLE_CLIENT_SECRET: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}
-            authorization-grant-type: authorization_code
-            redirect-uri: ${GOOGLE_CALLBACK_URL:http://localhost:8055/google-auth/callback}
-            scope:
-              - openid
-              - profile
-              - email
 
   flyway:
     enabled: true
@@ -96,19 +83,6 @@ app:
     rate-limit-enabled: ${AUTH_GATEWAY_RATE_LIMIT_ENABLED:true}
     login-max-failures: ${AUTH_GATEWAY_LOGIN_MAX_FAILURES:10}
     login-failure-window-minutes: ${AUTH_GATEWAY_LOGIN_FAILURE_WINDOW_MINUTES:15}
-  demo:
-    enabled: ${DEMO_ACCOUNT_ENABLED:false}
-    email: ${DEMO_ACCOUNT_EMAIL:}
-    password: ${DEMO_ACCOUNT_PASSWORD:}
-  stage-trial-fixture:
-    enabled: ${STAGE_TRIAL_FIXTURE_ENABLED:false}
-    template-user-id: ${STAGE_TRIAL_TEMPLATE_USER_ID:0}
-    template-branch-id: ${STAGE_TRIAL_TEMPLATE_BRANCH_ID:0}
-    template-menu-id: ${STAGE_TRIAL_TEMPLATE_MENU_ID:0}
-  demo-template:
-    enabled: ${DEMO_TEMPLATE_ENABLED:${DEMO_ONBOARDING_FIXTURE_ENABLED:true}}
-    sales-backfill-days: ${DEMO_SALES_BACKFILL_DAYS:${DEMO_ONBOARDING_SALES_BACKFILL_DAYS:35}}
-    sales-max-bills: ${DEMO_SALES_MAX_BILLS:${DEMO_ONBOARDING_SALES_MAX_BILLS:120}}
   storage:
     filer-url: ${STORAGE_FILER_URL:http://localhost:8888}
     s3-endpoint: ${STORAGE_S3_ENDPOINT:}
@@ -242,18 +216,15 @@ jwt:
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
 
-google:
-  oauth:
-    frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
-    handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}
-    android-client-id: ${GOOGLE_ANDROID_CLIENT_ID:}
-
 fulfillment:
   external:
-    enabled: ${FULFILLMENT_EXTERNAL_ENABLED:false}
+    enabled: ${FULFILLMENT_EXTERNAL_ENABLED:true}
     base-url: ${FULFILLMENT_SERVICE_URL:http://localhost:8086}
     auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
     auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}
+  rabbitmq:
+    exchange: ${FULFILLMENT_EVENTS_EXCHANGE:payment.events}
+    routing-key: ${FULFILLMENT_EVENTS_ROUTING_KEY:qr-fulfillment-service.payment.events}
 
 auth:
   service:
@@ -261,3 +232,4 @@ auth:
     token: ${AUTH_SERVICE_INTERNAL_TOKEN:}
     header-name: ${AUTH_SERVICE_INTERNAL_HEADER:X-Service-Token}
     public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:}
+    base-url: ${AUTH_SERVICE_BASE_URL:}

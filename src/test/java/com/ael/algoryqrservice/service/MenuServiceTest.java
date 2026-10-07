@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.MenuSubCategory;
+import com.ael.algoryqrservice.model.dto.CampaignDtos;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.ProductImageDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
@@ -26,6 +27,7 @@ import com.ael.algoryqrservice.repository.QrRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.service.campaign.CampaignService;
 import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
 import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -108,6 +111,8 @@ class MenuServiceTest {
     private MenuProductOptionService menuProductOptionService;
     @Mock
     private MenuCatalogCloneService menuCatalogCloneService;
+    @Mock
+    private CampaignService campaignService;
 
     @InjectMocks
     private MenuService menuService;
@@ -121,6 +126,7 @@ class MenuServiceTest {
         org.mockito.Mockito.lenient().when(menuProductPairingService.loadByProductIds(any()))
                 .thenReturn(Map.of());
         org.mockito.Mockito.lenient().when(menuPublicIdGenerator.generateUnique()).thenReturn("new-public-id");
+        org.mockito.Mockito.lenient().when(campaignService.listActiveCampaigns(any())).thenReturn(List.of());
     }
 
     private static MenuDtos.MenuProductPairingsResponse emptyPairings() {
@@ -402,7 +408,7 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByPublicId_whenPublicAccessDisabled_thenThrowForbidden() {
+    void getMerchantMenu_whenPublicAccessDisabled_thenThrowForbidden() {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
@@ -416,7 +422,7 @@ class MenuServiceTest {
         when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
 
-        assertThatThrownBy(() -> menuService.getPublicMenuByPublicId("pub-test"))
+        assertThatThrownBy(() -> menuService.getMerchantMenu("pub-test"))
                 .isInstanceOf(ForbiddenException.class)
                 .satisfies(ex -> {
                     ForbiddenException forbidden = (ForbiddenException) ex;
@@ -426,7 +432,7 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByPublicId_whenPublicAccessStale_thenResyncAndReturn() {
+    void getMerchantMenu_whenPublicAccessStale_thenResyncAndReturn() {
         Menu disabled = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
@@ -451,24 +457,14 @@ class MenuServiceTest {
         when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(disabled));
         when(menuRepository.findById(10L)).thenReturn(Optional.of(enabled));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
-                TaxonomyDtos.TaxonomyPageResponse.builder()
-                        .content(List.of())
-                        .page(0)
-                        .size(6)
-                        .totalElements(0)
-                        .totalPages(0)
-                        .hasNext(false)
-                        .build()
-        );
+        when(menuProductRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of());
+        when(menuCategoryService.listTaxonomy(any())).thenReturn(List.of());
         when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
         when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
-        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByPublicId("pub-test");
+        MenuDtos.PublicMenuResponse response = menuService.getMerchantMenu("pub-test");
 
         verify(menuPublicAccessService).syncForUser(7L);
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
@@ -477,7 +473,7 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByPublicId_whenPublicAccessEnabled_thenReturnPublicMenu() {
+    void getMerchantMenu_whenPublicAccessEnabled_thenReturnPublicMenu() {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
@@ -490,32 +486,30 @@ class MenuServiceTest {
                 .build();
         when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
-                TaxonomyDtos.TaxonomyPageResponse.builder()
-                        .content(List.of())
-                        .page(0)
-                        .size(6)
-                        .totalElements(0)
-                        .totalPages(0)
-                        .hasNext(false)
-                        .build()
-        );
+        when(menuProductRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of());
+        when(menuCategoryService.listTaxonomy(any())).thenReturn(List.of());
         when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
         when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
-        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByPublicId("pub-test");
+        MenuDtos.PublicMenuResponse response = menuService.getMerchantMenu("pub-test");
 
         assertThat(response.getThemeId()).isEqualTo("soft");
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
         assertThat(response.getProducts()).isEmpty();
+        assertThat(response.getCategories()).isEmpty();
         assertThat(response.getProductPage()).isZero();
-        assertThat(response.getProductSize()).isEqualTo(20);
+        assertThat(response.getProductSize()).isZero();
         assertThat(response.getProductTotalElements()).isZero();
         assertThat(response.isProductHasNext()).isFalse();
+        assertThat(response.getCategoryPage()).isZero();
+        assertThat(response.getCategorySize()).isZero();
+        assertThat(response.getCategoryTotalElements()).isZero();
+        assertThat(response.isCategoryHasNext()).isFalse();
+        assertThat(response.getCampaigns()).isEmpty();
+        assertThat(response.getChefRecommendations()).isEmpty();
+        assertThat(response.getPopularProducts()).isEmpty();
     }
 
     @Test
@@ -594,7 +588,7 @@ class MenuServiceTest {
     }
 
     @Test
-    void getPublicMenuByPublicId_whenManyProducts_thenReturnFirstPageOnly() {
+    void getMerchantMenu_whenManyProducts_thenReturnAllProducts() {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .qrId(2L)
@@ -607,24 +601,23 @@ class MenuServiceTest {
                 .build();
         when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
         when(appProperties.getUrl()).thenReturn("https://example.com");
-        when(menuCategoryService.listTaxonomyPage(any(), eq(0), eq(50), any())).thenReturn(
-                TaxonomyDtos.TaxonomyPageResponse.builder()
-                        .content(List.of())
-                        .page(0)
-                        .size(6)
-                        .totalElements(0)
-                        .totalPages(0)
-                        .hasNext(false)
+        when(menuCategoryService.listTaxonomy(any())).thenReturn(List.of(
+                TaxonomyDtos.MainCategoryResponse.builder()
+                        .id(1L)
+                        .name("Icecek")
+                        .slug("icecek")
+                        .sortOrder(0)
+                        .subs(List.of())
                         .build()
-        );
+        ));
         when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
         when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
         when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of());
         when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
 
-        List<MenuProduct> firstPage = new java.util.ArrayList<>();
-        for (int i = 1; i <= 20; i++) {
-            firstPage.add(MenuProduct.builder()
+        List<MenuProduct> catalog = new java.util.ArrayList<>();
+        for (int i = 1; i <= 45; i++) {
+            catalog.add(MenuProduct.builder()
                     .productId((long) i)
                     .menuId(10L)
                     .name("Urun " + i)
@@ -634,16 +627,78 @@ class MenuServiceTest {
                     .available(true)
                     .build());
         }
-        when(menuProductRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(firstPage, PageRequest.of(0, 20), 45));
+        when(menuProductRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(catalog);
 
-        MenuDtos.PublicMenuResponse response = menuService.getPublicMenuByPublicId("pub-test");
+        MenuDtos.PublicMenuResponse response = menuService.getMerchantMenu("pub-test");
 
-        assertThat(response.getProducts()).hasSize(20);
+        assertThat(response.getProducts()).hasSize(45);
+        assertThat(response.getCategories()).hasSize(1);
         assertThat(response.getProductTotalElements()).isEqualTo(45);
-        assertThat(response.isProductHasNext()).isTrue();
+        assertThat(response.isProductHasNext()).isFalse();
         assertThat(response.getProductPage()).isZero();
-        assertThat(response.getProductSize()).isEqualTo(20);
+        assertThat(response.getProductSize()).isEqualTo(45);
+        assertThat(response.getCategoryTotalElements()).isEqualTo(1);
+        assertThat(response.isCategoryHasNext()).isFalse();
+    }
+
+    @Test
+    void getMerchantMenu_whenHighlightsPresent_thenReturnCampaignsChefAndPopular() {
+        Menu menu = Menu.builder()
+                .menuId(10L)
+                .publicId("pub-test")
+                .userId(7L)
+                .themeId("soft")
+                .businessName("Kafe")
+                .active(true)
+                .publicAccessEnabled(true)
+                .build();
+        when(menuRepository.findByPublicIdAndActiveTrueAndDeletedFalse("pub-test")).thenReturn(Optional.of(menu));
+        when(appProperties.getUrl()).thenReturn("https://example.com");
+        when(menuCategoryService.listTaxonomy(any())).thenReturn(List.of());
+        when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
+        when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
+        when(menuTaxonomyService.loadTagMap()).thenReturn(Map.of(
+                3L, MenuTag.builder().id(3L).slug("populer").name("Popüler").sortOrder(1).build()
+        ));
+        when(menuTaxonomyService.loadAllergenMap()).thenReturn(Map.of());
+        when(campaignService.listActiveCampaigns(10L)).thenReturn(List.of(
+                CampaignDtos.ActiveCampaignResponse.builder()
+                        .id(9L)
+                        .menuId(10L)
+                        .templateCode("stamp")
+                        .name("Kahve kampanyası")
+                        .targetProductIds(List.of(1L))
+                        .build()
+        ));
+        when(menuProductRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of(
+                MenuProduct.builder()
+                        .productId(1L)
+                        .menuId(10L)
+                        .name("Sef tabağı")
+                        .currency("TRY")
+                        .subCategoryId(1L)
+                        .sortOrder(1)
+                        .available(true)
+                        .chefRecommended(true)
+                        .build(),
+                MenuProduct.builder()
+                        .productId(2L)
+                        .menuId(10L)
+                        .name("Popüler tatlı")
+                        .currency("TRY")
+                        .subCategoryId(1L)
+                        .sortOrder(2)
+                        .available(true)
+                        .tagIds(Set.of(3L))
+                        .build()
+        ));
+
+        MenuDtos.PublicMenuResponse response = menuService.getMerchantMenu("pub-test");
+
+        assertThat(response.getCampaigns()).hasSize(1);
+        assertThat(response.getCampaigns().getFirst().getName()).isEqualTo("Kahve kampanyası");
+        assertThat(response.getChefRecommendations()).extracting(MenuDtos.MenuProductResponse::getProductId).containsExactly(1L);
+        assertThat(response.getPopularProducts()).extracting(MenuDtos.MenuProductResponse::getProductId).containsExactly(2L);
     }
 
     @Test

@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.access.AccessSession;
-import com.ael.algoryqrservice.client.ActivePackageLookup;
 import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.client.PackageView;
 import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
@@ -17,8 +17,6 @@ import java.util.Optional;
 
 @Service
 public class ExternalPackageViewService {
-
-    private static final String ACTIVE = "ACTIVE";
 
     private final ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
     private final ExternalPackageResponseMapper mapper;
@@ -82,14 +80,11 @@ public class ExternalPackageViewService {
     }
 
     private Optional<ExternalActivePackageResponse> active(FulfillmentServiceClient client, Long userId) {
-        ActivePackageLookup lookup = client.lookupActivePackage(userId);
-        if (!(lookup instanceof ActivePackageLookup.Found found)) {
+        PackageView view = client.findPackage(userId);
+        if (!"ACTIVE".equals(view.status()) || view.body() == null) {
             return Optional.empty();
         }
-        if (!ACTIVE.equals(found.value().status())) {
-            return Optional.empty();
-        }
-        return Optional.of(found.value());
+        return Optional.of(view.body());
     }
 
     private Optional<FulfillmentServiceClient> client() {

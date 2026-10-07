@@ -1,30 +1,26 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.config.SmartReportQuotaProperties;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.exception.TooManyRequestsException;
 import com.ael.algoryqrservice.messaging.dto.SmartReportStatusMessage;
-import com.ael.algoryqrservice.model.FulfillmentDetail;
-import com.ael.algoryqrservice.model.FulfillmentUsageLog;
 import com.ael.algoryqrservice.model.SmartReportEvent;
 import com.ael.algoryqrservice.model.SmartReportResult;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
-import com.ael.algoryqrservice.model.dto.FulfillmentConsumeResult;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
 import com.ael.algoryqrservice.model.dto.SmartReportModelDtos;
-import com.ael.algoryqrservice.model.enums.FulfillmentReferenceType;
-import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
-import com.ael.algoryqrservice.repository.FulfillmentUsageLogRepository;
 import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.SmartReportEventRepository;
 import com.ael.algoryqrservice.repository.SmartReportResultRepository;
-import com.ael.algoryqrservice.util.AppTime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -59,9 +55,8 @@ public class SmartReportService {
     private final SmartReportQuotaProperties quotaProperties;
     private final SmartReportEventRepository smartReportEventRepository;
     private final SmartReportResultRepository smartReportResultRepository;
-    private final FulfillmentDetailRepository fulfillmentDetailRepository;
-    private final FulfillmentUsageLogRepository fulfillmentUsageLogRepository;
-    private final FulfillmentGateService fulfillmentGateService;
+    private final ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
+    private final ProductUsageGateway productUsageGateway;
     private final ProductRepository productRepository;
     private final SmartReportCompletionNotifier smartReportCompletionNotifier;
     private final ObjectMapper objectMapper;
@@ -161,7 +156,6 @@ public class SmartReportService {
                 .status(SmartReportEvent.STATUS_QUEUED)
                 .build());
 
-        touchSmartReportLastUsage(ownerId, scopedMenuId != null ? scopedMenuId : resolvedBranchId);
 
         Map<String, Object> optionsMap = SmartReportDtos.toOptionsMap(options);
         if (branchOnly) {
@@ -349,7 +343,6 @@ public class SmartReportService {
             }
             smartReportEventRepository.save(reportEvent);
             upsertResult(reportEvent, resultText);
-            touchSmartReportLastUsage(reportEvent.getUserId(), reportEvent.getMenuId());
             SmartReportDtos.AiSmartReportResult parsed = parseResultText(resultText);
             String title = parsed == null ? null : parsed.title();
             smartReportCompletionNotifier.sendReadyEmail(reportEvent.getProcessId(), title);
@@ -375,7 +368,7 @@ public class SmartReportService {
         long used = smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(userId, periodStart);
         int limit = Math.max(quotaProperties.getQuotaLimit(), 0);
         long remaining = Math.max(limit - used, 0);
-        int paidCredits = Math.max(fulfillmentGateService.remainingQuantity(userId, CatalogProducts.SMART_REPORTING, true), 0);
+        int paidCredits = paidCredits(userId);
         BigDecimal addonUnitPrice = productRepository.findByCode(CatalogProducts.SMART_REPORTING_ADDON)
                 .map(com.ael.algoryqrservice.model.Product::getUnitPrice)
                 .orElse(new BigDecimal("200.00"));
@@ -467,34 +460,12 @@ public class SmartReportService {
         smartReportResultRepository.save(existing);
     }
 
-    private void touchSmartReportLastUsage(Long userId, Long menuId) {
-        if (userId == null) {
-            return;
-        }
-        fulfillmentGateService.logFeatureUsage(
-                userId,
-                CatalogProducts.SMART_REPORTING,
-                FulfillmentReferenceType.FEATURE,
-                menuId
-        );
-    }
-
     private Instant resolveLastUsage(Long userId) {
-        Set<Long> detailIds = fulfillmentDetailRepository.findAllActiveByUserId(userId, AppTime.nowLocal()).stream()
-                .filter(detail -> CatalogProducts.SMART_REPORTING.equals(detail.getFeatureCode())
-                        || (detail.getScopeCode() != null && detail.getScopeCode().contains("SMART_REPORTING")))
-                .map(FulfillmentDetail::getId)
-                .collect(java.util.stream.Collectors.toSet());
-        if (detailIds.isEmpty()) {
-            return null;
-        }
-        return fulfillmentUsageLogRepository.findByUserIdOrderByCreatedAtDesc(userId, Pageable.ofSize(100))
+        return smartReportEventRepository.findByUserIdOrderByCreatedAtDesc(userId, Pageable.ofSize(1))
                 .getContent()
                 .stream()
-                .filter(log -> detailIds.contains(log.getDetailId()))
-                .map(FulfillmentUsageLog::getCreatedAt)
-                .filter(Objects::nonNull)
-                .max(Comparator.naturalOrder())
+                .findFirst()
+                .map(SmartReportEvent::getCreatedAt)
                 .map(this::toInstant)
                 .orElse(null);
     }
@@ -557,22 +528,22 @@ public class SmartReportService {
         );
     }
 
+    private int paidCredits(Long userId) {
+        FulfillmentServiceClient client = fulfillmentClients.getIfAvailable();
+        if (client == null) {
+            return 0;
+        }
+        return Math.max(client.openQuantity(userId, CatalogProducts.SMART_REPORTING, "ADDON_PURCHASE"), 0);
+    }
+
     private void assertQuotaAvailable(Long userId) {
         SmartReportDtos.SmartReportQuotaResponse quota = getQuota(userId);
         if (quota.remaining() > 0) {
             return;
         }
         if (quota.paidCredits() > 0) {
-            FulfillmentConsumeResult consumed = fulfillmentGateService.consumeAddon(
-                    userId,
-                    CatalogProducts.SMART_REPORTING,
-                    1,
-                    FulfillmentReferenceType.FEATURE,
-                    null
-            );
-            if (consumed.fullyConsumed(1)) {
-                return;
-            }
+            productUsageGateway.use(userId, CatalogProducts.SMART_REPORTING_ADDON, 1);
+            return;
         }
         String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK
                 ? "Bu haftaki ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin."
