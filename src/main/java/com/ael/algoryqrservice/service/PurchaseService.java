@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.coupon.CouponRedemptionService;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
+import com.ael.algoryqrservice.client.dto.AssignedProduct;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormResponse;
@@ -14,6 +16,7 @@ import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.PaymentEventInbox;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseItem;
@@ -39,6 +42,7 @@ import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
 import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
 import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
@@ -54,6 +58,7 @@ import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +66,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
@@ -102,6 +108,8 @@ public class PurchaseService {
     private final TrialLogRepository trialLogRepository;
     private final CartPricingService cartPricingService;
     private final PurchaseItemRepository purchaseItemRepository;
+    private final PlanPackageRepository planPackageRepository;
+    private final ObjectProvider<FulfillmentServiceClient> fulfillmentServiceClient;
 
     /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
     private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
@@ -280,6 +288,7 @@ public class PurchaseService {
         }
         PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
         purchaseFulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
+        assignPackageAfterPayment(purchase);
         planChangeService.onPurchaseActivated(purchase);
         couponRedemptionService.consume(purchase);
 
@@ -1764,6 +1773,58 @@ public class PurchaseService {
             log.warn("Kart snapshot alinamadi. userId={} paymentMethodId={}", userId, paymentMethodId, exception);
             return CardSnapshot.empty();
         }
+    }
+
+    private void assignPackageAfterPayment(Purchase purchase) {
+        if (fulfillmentServiceClient == null || purchase.getUserId() == null || purchase.getPackageCode() == null) {
+            return;
+        }
+        FulfillmentServiceClient client = fulfillmentServiceClient.getIfAvailable();
+        if (client == null || purchase.getPackageId() == null) {
+            return;
+        }
+        PlanPackage planPackage = planPackageRepository.findByIdWithItems(purchase.getPackageId())
+                .orElseThrow(() -> new BadRequestException("Paket bulunamadi: " + purchase.getPackageId()));
+        List<AssignedProduct> items = planPackage.getItems() == null
+                ? List.of()
+                : planPackage.getItems().stream()
+                .filter(item -> item.getProduct() != null)
+                .map(this::toAssignedPackageItem)
+                .toList();
+        List<AssignedProduct> modules = purchaseItemRepository.findByPurchaseId(purchase.getId()).stream()
+                .map(line -> new AssignedProduct(
+                        line.getProductCode(),
+                        line.getProductName(),
+                        line.getQuantity() == null ? 0 : line.getQuantity(),
+                        line.isUnlimited()
+                ))
+                .toList();
+        client.createPackage(
+                purchase.getUserId(),
+                purchase.getPackageCode(),
+                periodDays(purchase, planPackage),
+                items,
+                modules
+        );
+    }
+
+    private AssignedProduct toAssignedPackageItem(PlanPackageItem item) {
+        return new AssignedProduct(
+                item.getProduct().getCode(),
+                item.getProduct().getName(),
+                item.getQuantity() == null ? 0 : item.getQuantity(),
+                item.isUnlimited()
+        );
+    }
+
+    private int periodDays(Purchase purchase, PlanPackage planPackage) {
+        if (purchase.getStartsAt() != null && purchase.getExpiresAt() != null) {
+            long days = ChronoUnit.DAYS.between(purchase.getStartsAt().toLocalDate(), purchase.getExpiresAt().toLocalDate());
+            if (days > 0 && days <= 3650) {
+                return (int) days;
+            }
+        }
+        return planPackage.getValidityDays();
     }
 
     private static String trimToNull(String value) {

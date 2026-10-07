@@ -8,6 +8,8 @@ import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.PlanPackageItem;
+import com.ael.algoryqrservice.model.Product;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.User;
@@ -31,6 +33,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -230,6 +233,40 @@ class PaymentRequestMapperTest {
         assertThat(result.getBasketItems().get(1).getName()).isEqualTo("Ek sube x2");
         assertThat(result.getBasketItems().get(1).getPrice()).isEqualByComparingTo("1200.00");
         assertThat(basketTotal(result)).isEqualByComparingTo(result.getPaidPrice());
+    }
+
+    @Test
+    void toDebtCheckoutFormRequest_whenPackageHasIncludedProducts_thenCartTravelsInMetadata() {
+        PlanPackage plan = cartPackage();
+        plan.setItems(List.of(PlanPackageItem.builder()
+                .quantity(1)
+                .unlimited(false)
+                .product(Product.builder().code("QR_MENU").name("QR Menu").scopeCode("QR_MENU").build())
+                .build()));
+        Purchase purchase = cartPurchase(new BigDecimal("2200.00"));
+        purchase.setBasePrice(new BigDecimal("1000.00"));
+
+        PaymentCheckoutFormRequest result = mapper.toDebtCheckoutFormRequest(
+                purchase,
+                cartUser(),
+                plan,
+                "127.0.0.1",
+                new AppProperties(),
+                new PaymentClientProperties(),
+                "conversation",
+                1,
+                List.of(moduleLine("QR_BRANCH", "Ek sube", 2, "1200.00"))
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cart = (Map<String, Object>) result.getSourceMetadata().get("cart");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) cart.get("items");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> modules = (List<Map<String, Object>>) cart.get("modules");
+
+        assertThat(items).singleElement().satisfies(item -> assertThat(item.get("productCode")).isEqualTo("QR_MENU"));
+        assertThat(modules).singleElement().satisfies(module -> assertThat(module.get("productCode")).isEqualTo("QR_BRANCH"));
     }
 
     @Test

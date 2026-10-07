@@ -1,10 +1,12 @@
 package com.ael.algoryqrservice.client;
 
+import com.ael.algoryqrservice.client.dto.AssignedProduct;
 import com.ael.algoryqrservice.config.FulfillmentExternalProperties;
 import com.ael.algoryqrservice.exception.FulfillmentQuotaExceededException;
 import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -12,7 +14,9 @@ import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -20,6 +24,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class FulfillmentServiceClientTest {
 
     private static final String ACTIVE_PACKAGE_URL = "http://fulfillment.test/api/v1/users/7/active-package";
+    private static final String PACKAGE_URL = "http://fulfillment.test/api/v1/users/7/package";
     private static final String ENTITLEMENTS_URL = "http://fulfillment.test/api/v1/users/7/entitlements";
 
     private MockRestServiceServer server;
@@ -86,6 +91,46 @@ class FulfillmentServiceClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         assertThat(client.findProductAccess(7L, "QR_CREATE").allowed()).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void createPackage_whenCreated_thenPostPackage() {
+        server.expect(requestTo(PACKAGE_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("X-Service-Token", "token"))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+        client.createPackage(7L, "ULTIMATE_TRIAL_PACKAGE", 15);
+        server.verify();
+    }
+
+    @Test
+    void createPackage_whenLinesPresent_thenPostsItemsAndModules() {
+        server.expect(requestTo(PACKAGE_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("""
+                        {"packageCode":"ULTIMATE_PACKAGE","periodDays":30,"items":[{"productCode":"QR_MENU","productName":"QR Menu","quantity":1,"unlimited":false}],"modules":[{"productCode":"QR_BRANCH","productName":"Ek sube","quantity":2,"unlimited":false}]}
+                        """))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+        client.createPackage(
+                7L,
+                "ULTIMATE_PACKAGE",
+                30,
+                java.util.List.of(new AssignedProduct("QR_MENU", "QR Menu", 1, false)),
+                java.util.List.of(new AssignedProduct("QR_BRANCH", "Ek sube", 2, false))
+        );
+        server.verify();
+    }
+
+    @Test
+    void createPackage_whenConflict_thenTreatAsAlreadyAssigned() {
+        server.expect(requestTo(PACKAGE_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+
+        client.createPackage(7L, "ULTIMATE_TRIAL_PACKAGE", 15);
         server.verify();
     }
 

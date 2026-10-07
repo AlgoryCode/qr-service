@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.client;
 
+import com.ael.algoryqrservice.client.dto.AssignedProduct;
 import com.ael.algoryqrservice.client.dto.EntitlementQuantityRequest;
 import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.client.dto.ExternalConsumeResponse;
@@ -19,7 +20,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -29,6 +32,7 @@ import java.util.Optional;
 public class FulfillmentServiceClient {
 
     private static final String ACTIVE_PACKAGE_PATH = "/api/v1/users/{userId}/active-package";
+    private static final String PACKAGE_PATH = "/api/v1/users/{userId}/package";
     private static final String ENTITLEMENTS_PATH = "/api/v1/users/{userId}/entitlements";
     private static final String PRODUCT_ACCESS_PATH = "/api/v1/users/{userId}/products/{productCode}";
     private static final String CONSUME_PATH = "/api/v1/users/{userId}/entitlements/consume";
@@ -39,6 +43,42 @@ public class FulfillmentServiceClient {
 
     private final RestClient.Builder restClientBuilder;
     private final FulfillmentExternalProperties properties;
+
+    public void createPackage(Long userId, String packageCode, int periodDays) {
+        createPackage(userId, packageCode, periodDays, List.of(), List.of());
+    }
+
+    public void createPackage(
+            Long userId,
+            String packageCode,
+            int periodDays,
+            List<AssignedProduct> items,
+            List<AssignedProduct> modules
+    ) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("packageCode", packageCode);
+        body.put("periodDays", periodDays);
+        body.put("items", items == null ? List.of() : items);
+        body.put("modules", modules == null ? List.of() : modules);
+        try {
+            restClientBuilder.build()
+                    .post()
+                    .uri(properties.getBaseUrl() + PACKAGE_PATH, userId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .header(properties.getAuthHeader(), properties.getAuthToken())
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == HttpStatus.CONFLICT.value()) {
+                return;
+            }
+            throw unavailable(userId, exception);
+        } catch (RestClientException exception) {
+            throw unavailable(userId, exception);
+        }
+    }
 
     public Optional<ExternalActivePackageResponse> findActivePackage(Long userId) {
         try {

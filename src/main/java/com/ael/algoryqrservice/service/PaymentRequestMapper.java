@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.model.PlanPackage;
+import com.ael.algoryqrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.User;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -164,6 +166,7 @@ public class PaymentRequestMapper {
         if (purchase.getSubscriptionId() != null) {
             sourceMetadata.put("subscriptionId", purchase.getSubscriptionId());
         }
+        sourceMetadata.put("cart", cartMetadata(purchase, planPackage, moduleLines));
 
         return PaymentCheckoutFormRequest.builder()
                 .serviceName(appProperties.getServiceName())
@@ -441,6 +444,56 @@ public class PaymentRequestMapper {
             BigDecimal chargeAmount
     ) {
         return toBasketItem(planPackage, chargeAmount, "");
+    }
+
+    private Map<String, Object> cartMetadata(
+            Purchase purchase,
+            PlanPackage planPackage,
+            List<PurchaseItem> moduleLines
+    ) {
+        Map<String, Object> packageLine = new LinkedHashMap<>();
+        packageLine.put("id", planPackage.getId());
+        packageLine.put("code", planPackage.getCode());
+        packageLine.put("name", planPackage.getName());
+        packageLine.put("billingPeriod", purchase.getBillingPeriod() == null ? null : purchase.getBillingPeriod().name());
+        packageLine.put("amount", purchase.getBasePrice() != null ? purchase.getBasePrice() : purchase.getPrice());
+        packageLine.put("currency", planPackage.getCurrency());
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (planPackage.getItems() != null) {
+            for (PlanPackageItem item : planPackage.getItems()) {
+                if (item.getProduct() == null) {
+                    continue;
+                }
+                Map<String, Object> line = new LinkedHashMap<>();
+                line.put("productCode", item.getProduct().getCode());
+                line.put("productName", item.getProduct().getName());
+                line.put("quantity", item.getQuantity());
+                line.put("unlimited", item.isUnlimited());
+                items.add(line);
+            }
+        }
+
+        List<Map<String, Object>> modules = new ArrayList<>();
+        if (moduleLines != null) {
+            for (PurchaseItem line : moduleLines) {
+                Map<String, Object> module = new LinkedHashMap<>();
+                module.put("productCode", line.getProductCode());
+                module.put("productName", line.getProductName());
+                module.put("quantity", line.getQuantity());
+                module.put("unitPrice", line.getUnitPrice());
+                module.put("vatRate", line.getVatRate());
+                module.put("billingType", line.getBillingType() == null ? null : line.getBillingType().name());
+                module.put("lineTotal", line.getLineTotal());
+                modules.add(module);
+            }
+        }
+
+        Map<String, Object> cart = new LinkedHashMap<>();
+        cart.put("package", packageLine);
+        cart.put("items", items);
+        cart.put("modules", modules);
+        return cart;
     }
 
     /**
