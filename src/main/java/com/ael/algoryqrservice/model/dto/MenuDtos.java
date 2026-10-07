@@ -497,6 +497,9 @@ public final class MenuDtos {
         private int categorySize;
         private long categoryTotalElements;
         private boolean categoryHasNext;
+        private List<CampaignDtos.ActiveCampaignResponse> campaigns;
+        private List<MenuProductResponse> chefRecommendations;
+        private List<MenuProductResponse> popularProducts;
     }
 
     @Data

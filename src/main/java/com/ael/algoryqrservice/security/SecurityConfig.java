@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.security;
 
-import com.ael.algoryqrservice.demo.DemoRequestFilter;
 import com.ael.algoryqrservice.print.security.PrintDeviceAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -41,8 +40,6 @@ public class SecurityConfig {
     private final PrintDeviceAuthenticationFilter printDeviceAuthenticationFilter;
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
-    private final AuthRateLimitGatewayFilter authRateLimitGatewayFilter;
-    private final DemoRequestFilter demoRequestFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -59,11 +56,6 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/customer/auth/**").permitAll()
-                        .requestMatchers("/waiter/auth/login", "/waiter/auth/refresh", "/waiter/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/admin/auth/sessions").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/admin/auth/sessions/refresh").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/admin/auth/sessions").permitAll()
                         .requestMatchers("/menu/public/**").permitAll()
                         .requestMatchers("/store/public/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/campaign/claim").permitAll()
@@ -74,7 +66,6 @@ public class SecurityConfig {
                         .requestMatchers("/", "/healthcheck").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/packages/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/products/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/events").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()
@@ -84,12 +75,13 @@ public class SecurityConfig {
                         .requestMatchers("/integrations/odeal/test/**").permitAll()
                         .requestMatchers("/internal/integrations/**").permitAll()
                         .requestMatchers("/internal/menu-import/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/email-verification/resend", "/auth/email-verification/verify")
+                            .permitAll()
                         .requestMatchers("/internal/auth/**").permitAll()
-                        .requestMatchers("/internal/demo/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/users/*/package").permitAll()
+                        .requestMatchers("/internal/notifications/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()
-                        .requestMatchers(HttpMethod.GET, GoogleOAuthPaths.AUTHORIZE, GoogleOAuthPaths.LEGACY_AUTHORIZE)
-                            .permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/print-agent/jobs/**", "/print-agent/devices/heartbeat")
@@ -99,21 +91,10 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
-                .addFilterBefore(authRateLimitGatewayFilter, JwtAuthenticationFilter.class)
-                .addFilterAfter(demoRequestFilter, JwtAuthenticationFilter.class)
-                .addFilterAfter(productAccessGatewayFilter, DemoRequestFilter.class)
+                .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(emailVerificationGatewayFilter, ProductAccessGatewayFilter.class);
 
         return http.build();
-    }
-
-    @Bean
-    public FilterRegistrationBean<DemoRequestFilter> demoRequestFilterRegistration(
-            DemoRequestFilter filter
-    ) {
-        FilterRegistrationBean<DemoRequestFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
     }
 
     @Bean
@@ -130,33 +111,6 @@ public class SecurityConfig {
             EmailVerificationGatewayFilter filter
     ) {
         FilterRegistrationBean<EmailVerificationGatewayFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
-    }
-
-    @Bean
-    public FilterRegistrationBean<AuthRateLimitGatewayFilter> authRateLimitGatewayFilterRegistration(
-            AuthRateLimitGatewayFilter filter
-    ) {
-        FilterRegistrationBean<AuthRateLimitGatewayFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
-    }
-
-    @Bean
-    public FilterRegistrationBean<GoogleOAuthCallbackAliasFilter> googleOAuthCallbackAliasFilterRegistration(
-            GoogleOAuthCallbackAliasFilter filter
-    ) {
-        FilterRegistrationBean<GoogleOAuthCallbackAliasFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
-    }
-
-    @Bean
-    public FilterRegistrationBean<GoogleOAuthCallbackGuardFilter> googleOAuthCallbackGuardFilterRegistration(
-            GoogleOAuthCallbackGuardFilter filter
-    ) {
-        FilterRegistrationBean<GoogleOAuthCallbackGuardFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

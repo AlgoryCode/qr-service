@@ -1,12 +1,8 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.access.TrialLogCloser;
-import com.ael.algoryqrservice.model.PlanPackage;
-import com.ael.algoryqrservice.model.PlanPackageItem;
-import com.ael.algoryqrservice.model.Product;
+import com.ael.algoryqrservice.messaging.fulfillment.FulfillmentQueuePublisher;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.PurchaseFulfillment;
-import com.ael.algoryqrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.model.dto.PaymentCompletedEventDto;
 import com.ael.algoryqrservice.model.dto.PaymentEventMetadata;
 import com.ael.algoryqrservice.model.dto.PurchaseFulfillmentResponse;
@@ -15,12 +11,8 @@ import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
-import com.ael.algoryqrservice.repository.ProductRepository;
 import com.ael.algoryqrservice.repository.PurchaseFulfillmentRepository;
-import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.util.Enums;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,14 +32,8 @@ public class PurchaseFulfillmentService {
 
     private final PurchaseFulfillmentRepository fulfillmentRepository;
     private final PurchaseRepository purchaseRepository;
-    private final PlanPackageRepository planPackageRepository;
-    private final ProductRepository productRepository;
-    private final PurchaseItemRepository purchaseItemRepository;
-    private final PackageEntitlementWriter entitlementWriter;
-    private final PackageActivationService packageActivationService;
     private final MenuPublicAccessService menuPublicAccessService;
-    private final FulfillmentGrantService fulfillmentGrantService;
-    private final TrialLogCloser trialLogCloser;
+    private final FulfillmentQueuePublisher fulfillmentQueuePublisher;
 
     @Transactional
     public void initializeSchedule(Purchase purchase, String serviceName) {
@@ -81,7 +67,6 @@ public class PurchaseFulfillmentService {
     @Transactional
     public void fulfillPaidInstallment(
             Purchase purchase,
-            PlanPackage planPackage,
             PaymentCompletedEventDto event,
             PaymentEventMetadata metadata
     ) {
@@ -128,18 +113,8 @@ public class PurchaseFulfillmentService {
         if (firstPaidInstallment) {
             purchase.setStartsAt(periodStart);
             purchase.setStatus(PurchaseStatus.ACTIVE);
-            if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
-                grantAddonEntitlement(purchase);
-                menuPublicAccessService.syncForUser(purchase.getUserId());
-            } else {
-                grantEntitlements(purchase, planPackage);
-                packageActivationService.activatePurchasedPackage(purchase);
-            }
         }
         purchase.setStatus(PurchaseStatus.ACTIVE);
-        if (purchase.getPurchaseType() == PurchaseType.PAID) {
-            trialLogCloser.endIfActive(purchase.getUserId());
-        }
         purchase.setPaymentId(event.getPaymentId());
         applyCardSnapshotFromEvent(purchase, event);
         if (event.getSubscriptionId() != null && !event.getSubscriptionId().isBlank()) {
@@ -158,8 +133,7 @@ public class PurchaseFulfillmentService {
         }
         purchase.setCancellationReason(null);
         purchaseRepository.save(purchase);
-        entitlementWriter.synchronizePeriod(purchase);
-        tryGrantFulfillment(purchase, planPackage);
+        fulfillmentQueuePublisher.publishPayment(event);
         menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 
@@ -280,49 +254,6 @@ public class PurchaseFulfillmentService {
                 .build();
     }
 
-    private void tryGrantFulfillment(Purchase purchase, PlanPackage planPackage) {
-        try {
-            if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
-                fulfillmentGrantService.grantAddonFulfillment(purchase);
-            } else if (planPackage != null) {
-                fulfillmentGrantService.grantPackageFulfillment(purchase, planPackage);
-            }
-        } catch (Exception e) {
-            log.error("Fulfillment grant failed for purchaseId={}: {}", purchase.getId(), e.getMessage(), e);
-        }
-    }
-
-    private void grantAddonEntitlement(Purchase purchase) {
-        Product product = productRepository.findByCode(purchase.getPackageCode())
-                .orElseThrow(() -> new IllegalStateException("Urun bulunamadi: " + purchase.getPackageCode()));
-        int quantity = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
-                ? 1
-                : purchase.getInstallmentCount();
-        entitlementWriter.grant(purchase, product.getId(), product.getCode(), quantity, false);
-    }
-
-    private void grantEntitlements(Purchase purchase, PlanPackage planPackage) {
-        PlanPackage packageWithItems = planPackageRepository.findByIdWithItems(planPackage.getId())
-                .orElseThrow(() -> new IllegalStateException("Paket bulunamadı: " + planPackage.getId()));
-        for (PlanPackageItem item : packageWithItems.getItems()) {
-            entitlementWriter.grant(
-                    purchase,
-                    item.getProduct().getId(),
-                    item.getProduct().getCode(),
-                    item.getQuantity(),
-                    item.isUnlimited()
-            );
-        }
-        for (PurchaseItem moduleLine : purchaseItemRepository.findByPurchaseId(purchase.getId())) {
-            entitlementWriter.grantModuleLine(
-                    purchase,
-                    moduleLine.getProductId(),
-                    moduleLine.getProductCode(),
-                    moduleLine.getQuantity()
-            );
-        }
-    }
-
     private void recalculatePaidPeriod(Purchase purchase) {
         if (purchase.getStatus() == PurchaseStatus.CANCELLED) {
             return;
@@ -333,8 +264,7 @@ public class PurchaseFulfillmentService {
             purchase.setStatus(PurchaseStatus.EXPIRED);
             purchase.setExpiresAt(LocalDateTime.now());
             purchaseRepository.save(purchase);
-            entitlementWriter.synchronizePeriod(purchase);
-            packageActivationService.ensureSubscriptionState(purchase.getUserId());
+            fulfillmentQueuePublisher.publishRevoked(purchase);
             menuPublicAccessService.syncForUser(purchase.getUserId());
             return;
         }
@@ -351,10 +281,7 @@ public class PurchaseFulfillmentService {
                 ? PurchaseStatus.ACTIVE
                 : PurchaseStatus.EXPIRED);
         purchaseRepository.save(purchase);
-        entitlementWriter.synchronizePeriod(purchase);
-        if (purchase.getStatus() == PurchaseStatus.EXPIRED) {
-            packageActivationService.ensureSubscriptionState(purchase.getUserId());
-        }
+        fulfillmentQueuePublisher.publishGranted(purchase);
         menuPublicAccessService.syncForUser(purchase.getUserId());
     }
 

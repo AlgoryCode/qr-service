@@ -79,7 +79,7 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
         if (!(authentication.getDetails() instanceof JwtAccessPrincipal principal)) {
             return null;
         }
-        if (principal.isCustomer() || principal.isWaiter() || principal.isDemo()) {
+        if (principal.isCustomer() || principal.isWaiter()) {
             return null;
         }
         return principal.userId();

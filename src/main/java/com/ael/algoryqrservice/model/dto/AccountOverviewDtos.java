@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.model.dto;
 
-import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,8 +8,6 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 public final class AccountOverviewDtos {
-
-    public static final int DEFAULT_SESSION_PAGE_SIZE = 50;
 
     private AccountOverviewDtos() {
     }
@@ -42,21 +39,10 @@ public final class AccountOverviewDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SessionsBundle {
-        private SessionPageResponse page;
-        private List<SessionResponse> openSessions;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class OverviewResponse {
         private Section<AccountDtos.MyProfileResponse> profile;
         private Section<SubscriptionOverviewResponse> subscription;
         private Section<List<PurchaseResponse>> purchases;
-        private Section<List<BillingPaymentDtos.PaymentMethod>> paymentMethods;
         private Section<BillingAddressPageResponse> billingAddresses;
-        private Section<SessionsBundle> sessions;
     }
 }

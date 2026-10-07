@@ -7,8 +7,10 @@ import com.ael.algoryqrservice.client.dto.ExternalConsumeResponse;
 import com.ael.algoryqrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.client.dto.ExternalProductAccessResponse;
 import com.ael.algoryqrservice.config.FulfillmentExternalProperties;
+import com.ael.algoryqrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.exception.FulfillmentQuotaExceededException;
 import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
+import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,6 +22,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +35,6 @@ import java.util.Optional;
 @ConditionalOnProperty(prefix = "fulfillment.external", name = "enabled", havingValue = "true")
 public class FulfillmentServiceClient {
 
-    private static final String ACTIVE_PACKAGE_PATH = "/api/v1/users/{userId}/active-package";
     private static final String PACKAGE_PATH = "/api/v1/users/{userId}/package";
     private static final String ENTITLEMENTS_PATH = "/api/v1/users/{userId}/entitlements";
     private static final String PRODUCT_ACCESS_PATH = "/api/v1/users/{userId}/products/{productCode}";
@@ -80,34 +83,31 @@ public class FulfillmentServiceClient {
         }
     }
 
-    public Optional<ExternalActivePackageResponse> findActivePackage(Long userId) {
+    public PackageView findPackage(Long userId) {
         try {
-            ActivePackageLookup lookup = lookupActivePackage(userId);
-            if (lookup instanceof ActivePackageLookup.Found found) {
-                return Optional.of(found.value());
-            }
-            return Optional.empty();
-        } catch (FulfillmentUnavailableException exception) {
-            return Optional.empty();
-        }
-    }
-
-    public ActivePackageLookup lookupActivePackage(Long userId) {
-        try {
-            ExternalActivePackageResponse response = request(ACTIVE_PACKAGE_PATH, userId)
+            ExternalActivePackageResponse response = request(PACKAGE_PATH, userId)
                     .retrieve()
                     .body(ExternalActivePackageResponse.class);
-            if (response == null) {
-                return new ActivePackageLookup.Absent();
-            }
-            return new ActivePackageLookup.Found(response);
+            return new PackageView(statusOf(response), response);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
-                return new ActivePackageLookup.Absent();
+                return new PackageView("INACTIVE", null);
             }
             throw unavailable(userId, exception);
         } catch (RestClientException exception) {
             throw unavailable(userId, exception);
+        }
+    }
+
+    public Optional<ExternalActivePackageResponse> findActivePackage(Long userId) {
+        try {
+            PackageView view = findPackage(userId);
+            if (!"ACTIVE".equals(view.status()) || view.body() == null) {
+                return Optional.empty();
+            }
+            return Optional.of(view.body());
+        } catch (FulfillmentUnavailableException exception) {
+            return Optional.empty();
         }
     }
 
@@ -155,6 +155,40 @@ public class FulfillmentServiceClient {
         return postQuantity(RELEASE_PATH, userId, productCode, quantity);
     }
 
+    public void requireAllowed(Long userId, String productCode) {
+        if (!findProductAccess(userId, productCode).allowed()) {
+            throw new ForbiddenException(productCode + " yetkisi için uygun paket gerekli");
+        }
+    }
+
+    public ExternalConsumeResponse consumeRequired(Long userId, String productCode, int quantity) {
+        try {
+            return consume(userId, productCode, quantity);
+        } catch (FulfillmentQuotaExceededException exception) {
+            throw new ForbiddenException(
+                    "Yetersiz veya süresi dolmuş " + productCode + " hakkı. Lütfen paket satın alın."
+            );
+        }
+    }
+
+    public int remaining(Long userId, String productCode) {
+        return listEntitlements(userId).stream()
+                .filter(item -> matches(item, productCode))
+                .filter(this::open)
+                .mapToInt(this::remainingOf)
+                .max()
+                .orElse(0);
+    }
+
+    public int openQuantity(Long userId, String productCode, String source) {
+        return listEntitlements(userId).stream()
+                .filter(item -> matches(item, productCode))
+                .filter(item -> source == null || source.equals(item.source()))
+                .filter(this::open)
+                .mapToInt(this::granted)
+                .sum();
+    }
+
     private ExternalConsumeResponse postQuantity(String path, Long userId, String productCode, int quantity) {
         try {
             ExternalConsumeResponse body = restClientBuilder.build()
@@ -180,12 +214,50 @@ public class FulfillmentServiceClient {
         }
     }
 
+    private String statusOf(ExternalActivePackageResponse response) {
+        if (response == null || (!"ACTIVE".equals(response.status()) && !"DEMO".equals(response.status()))) {
+            return "INACTIVE";
+        }
+        LocalDate periodEnd = response.periodEnd();
+        if (periodEnd != null && periodEnd.isBefore(LocalDate.now(AppTime.ZONE))) {
+            return "INACTIVE";
+        }
+        return "ACTIVE";
+    }
+
     private RestClient.RequestHeadersSpec<?> request(String path, Long userId) {
         return restClientBuilder.build()
                 .get()
                 .uri(properties.getBaseUrl() + path, userId)
                 .accept(MediaType.APPLICATION_JSON)
                 .header(properties.getAuthHeader(), properties.getAuthToken());
+    }
+
+    private boolean matches(ExternalEntitlementResponse item, String productCode) {
+        return productCode.equals(item.productCode()) || productCode.equals(item.featureCode());
+    }
+
+    private boolean open(ExternalEntitlementResponse item) {
+        if (item.status() != null && !"ACTIVE".equals(item.status())) {
+            return false;
+        }
+        return item.expiresAt() == null || item.expiresAt().isAfter(Instant.now());
+    }
+
+    private int remainingOf(ExternalEntitlementResponse item) {
+        if (item.unlimited()) {
+            return Integer.MAX_VALUE;
+        }
+        int total = item.quantity() == null ? 0 : item.quantity();
+        int used = item.usedQuantity() == null ? 0 : item.usedQuantity();
+        return Math.max(0, total - used);
+    }
+
+    private int granted(ExternalEntitlementResponse item) {
+        if (item.unlimited()) {
+            return Integer.MAX_VALUE;
+        }
+        return item.quantity() == null ? 0 : item.quantity();
     }
 
     private FulfillmentUnavailableException unavailable(Long userId, Exception exception) {

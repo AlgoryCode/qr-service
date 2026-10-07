@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.controller;
 
+import com.ael.algoryqrservice.catalog.CatalogProducts;
 import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.model.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.model.dto.SmartReportDtos;
 import com.ael.algoryqrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.service.AnalyticsService;
-import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.MenuService;
 import com.ael.algoryqrservice.service.SmartReportService;
 import com.ael.algoryqrservice.service.UnifiedAnalyticsService;
@@ -36,7 +38,7 @@ public class AnalyticsController {
     private final AnalyticsService analyticsService;
     private final UnifiedAnalyticsService unifiedAnalyticsService;
     private final SmartReportService smartReportService;
-    private final EntitlementService entitlementService;
+    private final ProductUsageGateway productUsageGateway;
     private final SecurityUtils securityUtils;
     private final MenuService menuService;
 
@@ -244,10 +246,10 @@ public class AnalyticsController {
     }
 
     private void requireOrderAnalyticsScope(Long userId) {
-        if (entitlementService.hasScope(userId, CatalogScopes.SMART_REPORTING_OWNER)
-                || entitlementService.hasScope(userId, CatalogScopes.WAITER_PANEL_OWNER)) {
-            return;
+        try {
+            productUsageGateway.allow(userId, CatalogProducts.SMART_REPORTING);
+        } catch (ForbiddenException reportingDenied) {
+            productUsageGateway.allow(userId, CatalogProducts.WAITER_PANEL);
         }
-        entitlementService.requireScope(userId, CatalogScopes.SMART_REPORTING_OWNER);
     }
 }

@@ -1,15 +1,14 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.access.AccessSession;
-import com.ael.algoryqrservice.access.PackageProductCatalog;
 import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.catalog.CatalogProducts;
-import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.model.enums.MenuPublicAccessDisabledReason;
-import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
 import com.ael.algoryqrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +27,7 @@ public class MenuPublicAccessService {
     }
 
     private final SessionAccessService sessionAccessService;
-    private final PackageProductCatalog packageProductCatalog;
-    private final FulfillmentDetailRepository fulfillmentDetailRepository;
+    private final ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
     private final MenuRepository menuRepository;
 
     @Transactional
@@ -41,21 +39,22 @@ public class MenuPublicAccessService {
         if (!session.isAllow()) {
             return AccessDecision.deny(disabledReason(session.decision()));
         }
-        if (hasQrMenu(userId, session.packageCode())) {
+        if (menuAccessAllowed(userId)) {
             return AccessDecision.allow();
         }
         return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
     }
 
-    private boolean hasQrMenu(Long userId, String packageCode) {
-        if (packageProductCatalog.containsProduct(packageCode, CatalogProducts.QR_MENU)) {
-            return true;
+    private boolean menuAccessAllowed(Long userId) {
+        FulfillmentServiceClient client = fulfillmentClients.getIfAvailable();
+        if (client == null) {
+            return false;
         }
-        return fulfillmentDetailRepository.existsActiveByScopeCode(
-                userId,
-                CatalogScopes.QR_MENU_OWNER,
-                AppTime.nowLocal()
-        );
+        try {
+            return client.findProductAccess(userId, CatalogProducts.QR_MENU).allowed();
+        } catch (FulfillmentUnavailableException exception) {
+            return false;
+        }
     }
 
     @Transactional

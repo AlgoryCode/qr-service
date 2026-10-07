@@ -1,10 +1,6 @@
 package com.ael.algoryqrservice.security;
 
-import com.ael.algoryqrservice.service.CustomerSessionService;
-import com.ael.algoryqrservice.service.DashboardSessionService;
 import com.ael.algoryqrservice.service.JwtService;
-import com.ael.algoryqrservice.service.MenuWaiterSessionService;
-import com.ael.algoryqrservice.service.SessionService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -20,18 +16,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final SessionService sessionService;
-    private final DashboardSessionService dashboardSessionService;
-    private final CustomerSessionService customerSessionService;
-    private final MenuWaiterSessionService menuWaiterSessionService;
-    private final AccessTokenBlacklistService accessTokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -49,35 +39,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String jwt = authHeader.substring(7);
 
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            jwtService.parseValidAccessToken(jwt)
-                    .filter(this::isSessionActive)
-                    .ifPresent(claims -> setAuthentication(request, claims));
+            jwtService.parseValidAccessToken(jwt).ifPresent(this::setAuthentication);
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private boolean isSessionActive(Claims claims) {
-        if (jwtService.isAuthServiceSubject(claims)) {
-            return true;
-        }
-        UUID sessionId = jwtService.extractSessionId(claims);
-        if (jwtService.isDashboardPrincipal(claims)) {
-            return dashboardSessionService.isSessionActive(sessionId);
-        }
-        if (jwtService.isCustomerPrincipal(claims)) {
-            return customerSessionService.isSessionActive(sessionId);
-        }
-        if (jwtService.isWaiterPrincipal(claims)) {
-            return menuWaiterSessionService.isSessionActive(sessionId);
-        }
-        if (accessTokenBlacklistService.isBlacklisted(sessionId)) {
-            return false;
-        }
-        return sessionService.isSessionActive(sessionId);
-    }
-
-    private void setAuthentication(HttpServletRequest request, Claims claims) {
+    private void setAuthentication(Claims claims) {
         String subject = jwtService.extractEmail(claims);
         if (subject == null || subject.isBlank()) {
             return;

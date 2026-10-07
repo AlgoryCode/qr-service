@@ -1,8 +1,9 @@
 package com.ael.algoryqrservice.controller;
 
-import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.model.dto.MenuFixedExpenseDtos;
-import com.ael.algoryqrservice.service.EntitlementService;
 import com.ael.algoryqrservice.service.MenuFixedExpenseService;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
@@ -25,7 +26,7 @@ import java.util.List;
 public class MenuFixedExpenseController {
 
     private final MenuFixedExpenseService menuFixedExpenseService;
-    private final EntitlementService entitlementService;
+    private final ProductUsageGateway productUsageGateway;
     private final SecurityUtils securityUtils;
 
     @GetMapping
@@ -65,10 +66,10 @@ public class MenuFixedExpenseController {
 
     private void requireOrderAnalyticsScope() {
         Long userId = securityUtils.getCurrentUserId();
-        if (entitlementService.hasScope(userId, CatalogScopes.SMART_REPORTING_OWNER)
-                || entitlementService.hasScope(userId, CatalogScopes.WAITER_PANEL_OWNER)) {
-            return;
+        try {
+            productUsageGateway.allow(userId, CatalogProducts.SMART_REPORTING);
+        } catch (ForbiddenException reportingDenied) {
+            productUsageGateway.allow(userId, CatalogProducts.WAITER_PANEL);
         }
-        entitlementService.requireScope(userId, CatalogScopes.SMART_REPORTING_OWNER);
     }
 }

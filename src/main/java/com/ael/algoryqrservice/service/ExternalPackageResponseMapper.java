@@ -20,11 +20,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class ExternalPackageResponseMapper {
 
     private static final String ACTIVE = "ACTIVE";
+    private static final String DEMO = "DEMO";
     private static final int EXPIRY_APPROACHING_DAYS = 7;
 
     public PurchaseResponse toPurchase(ExternalActivePackageResponse active) {
@@ -37,7 +39,7 @@ public class ExternalPackageResponseMapper {
                 .packageCode(active.packageCode())
                 .packageName(active.packageName())
                 .status(purchaseStatus(active.status(), usable))
-                .purchaseType(PurchaseType.PAID)
+                .purchaseType(DEMO.equals(active.status()) ? PurchaseType.TRIAL : PurchaseType.PAID)
                 .startsAt(startOfDay(active.periodStart()))
                 .expiresAt(expiresAt)
                 .purchasedAt(toLocal(active.activatedAt()))
@@ -77,6 +79,13 @@ public class ExternalPackageResponseMapper {
         );
     }
 
+    public Optional<AccessSession> toOpenSession(ExternalActivePackageResponse active) {
+        if (active == null || !isOpen(active.status(), active.periodEnd())) {
+            return Optional.empty();
+        }
+        return Optional.of(toAllowSession(active));
+    }
+
     public List<UserEntitlementResponse> toEntitlements(
             List<ExternalEntitlementResponse> entitlements,
             Long activePurchaseId
@@ -91,7 +100,7 @@ public class ExternalPackageResponseMapper {
     }
 
     public Long purchaseKey(ExternalActivePackageResponse active) {
-        if (active.purchaseId() != null) {
+        if (active.purchaseId() != null && active.purchaseId() > 0) {
             return active.purchaseId();
         }
         if (active.fulfillmentId() != null) {
@@ -152,7 +161,7 @@ public class ExternalPackageResponseMapper {
     }
 
     private boolean isOpen(String status, LocalDate periodEnd) {
-        if (!ACTIVE.equals(status)) {
+        if (!ACTIVE.equals(status) && !DEMO.equals(status)) {
             return false;
         }
         return periodEnd == null || !periodEnd.isBefore(LocalDate.now(AppTime.ZONE));

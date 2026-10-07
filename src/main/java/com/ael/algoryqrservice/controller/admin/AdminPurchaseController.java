@@ -6,7 +6,6 @@ import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseSummaryResponse;
 import com.ael.algoryqrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.service.PurchaseService;
-import com.ael.algoryqrservice.service.RepairFulfillmentJob;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +13,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Locale;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/purchases")
@@ -29,7 +26,6 @@ import java.util.Map;
 public class AdminPurchaseController {
 
     private final PurchaseService purchaseService;
-    private final RepairFulfillmentJob repairFulfillmentJob;
 
     @GetMapping("/{purchaseId}")
     public ResponseEntity<PurchaseSummaryResponse> getPurchase(@PathVariable Long purchaseId) {
@@ -61,9 +57,4 @@ public class AdminPurchaseController {
         throw new BadRequestException("days veya status=INACTIVE gerekli");
     }
 
-    @PostMapping("/{purchaseId}/fulfillment-repairs")
-    public ResponseEntity<Map<String, String>> repairFulfillment(@PathVariable Long purchaseId) {
-        repairFulfillmentJob.repairForPurchase(purchaseId);
-        return ResponseEntity.ok(Map.of("status", "ok", "purchaseId", String.valueOf(purchaseId)));
-    }
 }

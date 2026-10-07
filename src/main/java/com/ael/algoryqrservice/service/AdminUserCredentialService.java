@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.AuthCredentialClient;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.User;
@@ -25,14 +26,13 @@ public class AdminUserCredentialService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final SessionService sessionService;
     private final NotificationPublisherService notificationPublisherService;
-    private final EmailVerificationService emailVerificationService;
+    private final AuthCredentialClient authCredentialClient;
 
     @Transactional
     public void sendEmailVerification(Long userId) {
-        User user = loadUser(userId);
-        emailVerificationService.sendForAdmin(user);
+        loadUser(userId);
+        authCredentialClient.sendEmailCode(userId);
     }
 
     @Transactional
@@ -45,7 +45,6 @@ public class AdminUserCredentialService {
         String temporaryPassword = generatePassword();
         user.setPassword(passwordEncoder.encode(temporaryPassword));
         userRepository.save(user);
-        sessionService.revokeAllActiveSessions(user.getId());
 
         boolean emailed = false;
         if (user.isEmailVerified()) {

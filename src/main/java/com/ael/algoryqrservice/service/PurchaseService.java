@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.coupon.CouponRedemptionService;
+import com.ael.algoryqrservice.client.FulfillmentActivePackageMapper;
 import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.client.PackageView;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.AssignedProduct;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
@@ -12,6 +14,7 @@ import com.ael.algoryqrservice.config.BillingRefundProperties;
 import com.ael.algoryqrservice.config.BillingSubscriptionProperties;
 import com.ael.algoryqrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.exception.UnauthorizedException;
@@ -41,20 +44,14 @@ import com.ael.algoryqrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.model.enums.PaymentStyle;
 import com.ael.algoryqrservice.model.enums.RefundStatus;
 import com.ael.algoryqrservice.model.enums.SubscriptionStatus;
-import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
-import com.ael.algoryqrservice.repository.PlanPackageRepository;
+import com.ael.algoryqrservice.messaging.fulfillment.FulfillmentQueuePublisher;
 import com.ael.algoryqrservice.repository.PaymentEventInboxRepository;
+import com.ael.algoryqrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.repository.TrialLogRepository;
-import com.ael.algoryqrservice.service.entitlement.EntitlementMaintenanceService;
-import com.ael.algoryqrservice.service.entitlement.PackageEntitlementWriter;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
-import com.ael.algoryqrservice.service.entitlement.UserEntitlementQueryService;
-import com.ael.algoryqrservice.purchase.lifecycle.PackagePeriodExtender;
 import com.ael.algoryqrservice.purchase.lifecycle.RemoteSubscriptionCanceller;
-import com.ael.algoryqrservice.model.TrialLog;
 import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,8 +62,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
@@ -78,38 +75,30 @@ import java.util.Optional;
 @Slf4j
 public class PurchaseService {
 
-    private final PlanPackageService planPackageService;
+    private final PlanPackageRepository planPackageRepository;
     private final PurchaseRepository purchaseRepository;
     private final PurchaseLogService purchaseLogService;
     private final PurchaseExpiryService purchaseExpiryService;
     private final PurchaseSelectionPolicy purchaseSelectionPolicy;
-    private final PackageEntitlementWriter entitlementWriter;
-    private final EntitlementMaintenanceService entitlementMaintenanceService;
-    private final UserEntitlementQueryService entitlementQueryService;
+    private final FulfillmentQueuePublisher fulfillmentQueuePublisher;
     private final PaymentServiceClient paymentServiceClient;
     private final PaymentRequestMapper paymentRequestMapper;
     private final AppProperties appProperties;
     private final PaymentClientProperties paymentClientProperties;
     private final PaymentEventInboxRepository paymentEventInboxRepository;
-    private final PackageActivationService packageActivationService;
     private final PurchaseFulfillmentService purchaseFulfillmentService;
     private final BillingAddressService billingAddressService;
     private final MenuPublicAccessService menuPublicAccessService;
-    private final PlanChangeService planChangeService;
     private final SubscriptionRefundPolicy subscriptionRefundPolicy;
-    private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final BillingRefundProperties billingRefundProperties;
     private final BillingSubscriptionProperties billingSubscriptionProperties;
     private final PlatformTransactionManager transactionManager;
-    private final BranchQuotaService branchQuotaService;
     private final RemoteSubscriptionCanceller remoteSubscriptionCanceller;
-    private final PackagePeriodExtender packagePeriodExtender;
     private final CouponRedemptionService couponRedemptionService;
-    private final TrialLogRepository trialLogRepository;
     private final CartPricingService cartPricingService;
     private final PurchaseItemRepository purchaseItemRepository;
-    private final PlanPackageRepository planPackageRepository;
     private final ObjectProvider<FulfillmentServiceClient> fulfillmentServiceClient;
+    private final FulfillmentActivePackageMapper fulfillmentActivePackageMapper;
 
     /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
     private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
@@ -137,7 +126,7 @@ public class PurchaseService {
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, PurchaseRequest request, String clientIp) {
-        PlanPackage planPackage = planPackageService.findActivePackage(request.getPackageId());
+        PlanPackage planPackage = findActivePackage(request.getPackageId());
         if (!planPackage.isPurchasable() || planPackage.isSystemManaged()) {
             throw new BadRequestException("Bu paket satın alınamaz");
         }
@@ -286,10 +275,8 @@ public class PurchaseService {
                 && purchase.getCancellationReason() != PurchaseCancellationReason.PAYMENT_TIMEOUT) {
             throw new InvalidPaymentEventException("Manually cancelled purchase cannot be fulfilled");
         }
-        PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
-        purchaseFulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
+        purchaseFulfillmentService.fulfillPaidInstallment(purchase, event, metadata);
         assignPackageAfterPayment(purchase);
-        planChangeService.onPurchaseActivated(purchase);
         couponRedemptionService.consume(purchase);
 
         purchaseLogService.log(
@@ -360,7 +347,6 @@ public class PurchaseService {
                     PurchaseLogAction.PURCHASE_PAYMENT_FAILED,
                     purchase.getPackageName() + " paketi ödemesi başarısız: " + reason
             );
-            planChangeService.onPurchasePaymentFailed(purchase);
         }
         purchaseFulfillmentService.recordUnpaidInstallment(
                 purchase,
@@ -439,7 +425,7 @@ public class PurchaseService {
             throw new BadRequestException("Borc odemesi icin abonelik uygun degil");
         }
 
-        PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
+        PlanPackage planPackage = findPackage(purchase.getPackageId());
         int nextCycle = resolveNextBillingCycle(purchase);
         String conversationId = paymentRequestMapper.newPaymentAttemptId(user.getId());
         purchase.setPaymentMode(PaymentMode.CHECKOUT_FORM);
@@ -656,7 +642,6 @@ public class PurchaseService {
                     PurchaseLogAction.PURCHASE_CANCELLED,
                     purchase.getPackageName() + " paketi ödeme zaman aşımı nedeniyle iptal edildi"
             );
-            planChangeService.onPurchasePaymentFailed(purchase);
         }
     }
 
@@ -664,7 +649,7 @@ public class PurchaseService {
             Purchase purchase,
             BillingPaymentDtos.RefundablePayment payment
     ) {
-        PlanPackage planPackage = planPackageService.findPackage(purchase.getPackageId());
+        PlanPackage planPackage = findPackage(purchase.getPackageId());
         int installmentCount = purchase.getInstallmentCount() == null || purchase.getInstallmentCount() < 1
                 ? 1
                 : purchase.getInstallmentCount();
@@ -751,23 +736,10 @@ public class PurchaseService {
     @Transactional
     public SubscriptionOverviewResponse getMySubscriptionOverview(Long userId) {
         purchaseExpiryService.expireDueForUser(userId);
-        packageActivationService.ensureSubscriptionState(userId);
-        entitlementMaintenanceService.repairUser(userId);
 
-        List<UserEntitlementResponse> entitlements = entitlementQueryService.forUser(userId);
-
-        PurchaseSummaryResponse activePackage = null;
-        Long activePurchaseId = purchaseSelectionPolicy.activePurchaseId(userId);
-        if (activePurchaseId != null) {
-            activePackage = purchaseRepository.findById(activePurchaseId)
-                    .filter(purchase -> userId.equals(purchase.getUserId()))
-                    .map(this::toSummary)
-                    .orElse(null);
-        }
-        if (activePackage == null) {
-            activePackage = resolveActiveTrialSummary(userId, entitlements);
-        }
-
+        List<UserEntitlementResponse> entitlements = List.of();
+        PurchaseSummaryResponse activePackage = activePackageFromFulfillment(userId);
+        boolean fulfillmentActive = activePackage != null;
         List<PurchaseSummaryResponse> addonPurchases = purchaseRepository
                 .findByUserIdOrderByPurchasedAtDesc(userId)
                 .stream()
@@ -776,104 +748,25 @@ public class PurchaseService {
                 .map(this::toSummary)
                 .toList();
 
-        List<com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse> fulfillmentDetails = List.of();
-        boolean fulfillmentActive = false;
-        try {
-            fulfillmentDetails = fulfillmentDetailRepository.findAllActiveByUserId(userId, java.time.LocalDateTime.now())
-                    .stream()
-                    .map(this::toFulfillmentDetailResponse)
-                    .toList();
-            fulfillmentActive = !fulfillmentDetails.isEmpty();
-        } catch (Exception e) {
-            log.debug("Fulfillment detail fetch failed for userId={}", userId);
-        }
-
         return SubscriptionOverviewResponse.builder()
                 .activePackage(activePackage)
                 .entitlements(entitlements)
                 .addonPurchases(addonPurchases)
-                .branchQuota(branchQuotaService.branchQuota(userId))
-                .menuQuota(branchQuotaService.menuQuota(userId))
-                .fulfillmentDetails(fulfillmentDetails)
+                .fulfillmentDetails(List.of())
                 .fulfillmentActive(fulfillmentActive)
                 .build();
     }
 
-    /**
-     * Deneme (TrialLog) satın alma kaydı oluşturmaz; abonelik ekranı için özet üretir.
-     */
-    private PurchaseSummaryResponse resolveActiveTrialSummary(
-            Long userId,
-            List<UserEntitlementResponse> entitlements
-    ) {
-        LocalDateTime now = AppTime.nowLocal();
-        TrialLog trial = trialLogRepository.findByUserId(userId).orElse(null);
-        if (trial == null || !trial.isActiveAt(now)) {
+    private PurchaseSummaryResponse activePackageFromFulfillment(Long userId) {
+        FulfillmentServiceClient client = fulfillmentServiceClient.getIfAvailable();
+        if (client == null || fulfillmentActivePackageMapper == null) {
+            throw new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor");
+        }
+        PackageView view = client.findPackage(userId);
+        if (!"ACTIVE".equals(view.status()) || view.body() == null) {
             return null;
         }
-
-        PlanPackage planPackage = null;
-        try {
-            planPackage = planPackageService.findPackage(trial.getPackageId());
-        } catch (BadRequestException ignored) {
-            // Paket kataloğundan silinmiş olabilir; TrialLog alanlarıyla devam et.
-        }
-
-        Integer daysUntilExpiry = null;
-        if (trial.getEndsAt() != null) {
-            daysUntilExpiry = (int) java.time.temporal.ChronoUnit.DAYS.between(
-                    now.toLocalDate(),
-                    trial.getEndsAt().toLocalDate()
-            );
-        }
-        boolean expiryApproaching = trial.getEndsAt() != null
-                && !trial.getEndsAt().isAfter(now.plusDays(APPROACHING_DAYS));
-
-        List<UserEntitlementResponse> products = entitlements == null
-                ? List.of()
-                : entitlements.stream()
-                .filter(item -> item.isUsable() && !item.isExpired())
-                .toList();
-
-        return PurchaseSummaryResponse.builder()
-                .purchaseId(null)
-                .userId(userId)
-                .packageId(trial.getPackageId())
-                .packageCode(trial.getPackageCode())
-                .packageName(planPackage != null ? planPackage.getName() : trial.getPackageCode())
-                .price(BigDecimal.ZERO)
-                .currency(planPackage != null ? planPackage.getCurrency() : "TRY")
-                .status(PurchaseStatus.ACTIVE)
-                .purchaseType(PurchaseType.TRIAL)
-                .paymentStyle(null)
-                .startsAt(trial.getStartedAt())
-                .expiresAt(trial.getEndsAt())
-                .purchasedAt(trial.getStartedAt())
-                .daysUntilExpiry(daysUntilExpiry)
-                .expiryApproaching(expiryApproaching)
-                .expired(false)
-                .usable(true)
-                .products(products)
-                .installments(List.of())
-                .build();
-    }
-
-    private com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse toFulfillmentDetailResponse(
-            com.ael.algoryqrservice.model.FulfillmentDetail detail) {
-        return com.ael.algoryqrservice.model.dto.FulfillmentDetailResponse.builder()
-                .id(detail.getId())
-                .fulfillmentId(detail.getFulfillmentId())
-                .featureCode(detail.getFeatureCode())
-                .scopeCode(detail.getScopeCode())
-                .productTypeId(detail.getProductTypeId())
-                .source(detail.getSource())
-                .quantity(detail.getQuantity())
-                .unlimited(detail.isUnlimited())
-                .usedQuantity(detail.getUsedQuantity())
-                .remainingQuantity(detail.remainingQuantity())
-                .startsAt(detail.getStartsAt())
-                .expiresAt(detail.getExpiresAt())
-                .build();
+        return fulfillmentActivePackageMapper.toSummary(view.body());
     }
 
     @Transactional
@@ -904,7 +797,6 @@ public class PurchaseService {
         requireExpirable(purchase.getStatus());
         remoteSubscriptionCanceller.cancelIfNeeded(purchase);
         purchaseExpiryService.expire(purchase);
-        packageActivationService.ensureSubscriptionState(purchase.getUserId());
         menuPublicAccessService.syncForUser(purchase.getUserId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
@@ -921,8 +813,7 @@ public class PurchaseService {
         if (purchase.getPurchaseType() == PurchaseType.ADD_ON) {
             throw new BadRequestException("Eklenti vadesi host paket ile birlikte uzatilir");
         }
-        Purchase extended = packagePeriodExtender.extend(purchase, days);
-        packageActivationService.ensureSubscriptionState(extended.getUserId());
+        extendPurchase(purchase, days);
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
 
@@ -1269,7 +1160,7 @@ public class PurchaseService {
             purchase.setRefundPendingAt(null);
         }
 
-        entitlementWriter.revokeForCancelledPurchase(purchase);
+        fulfillmentQueuePublisher.publishRevoked(purchase);
         menuPublicAccessService.deactivateActiveMenusForUser(purchase.getUserId());
         cancelRemoteSubscriptionBestEffort(purchase);
         purchaseRepository.save(purchase);
@@ -1362,15 +1253,10 @@ public class PurchaseService {
                 || previousStatus == PurchaseStatus.EXPIRED
                 || refundedAmount != null;
         if (needsCleanup) {
-            entitlementWriter.revokeForCancelledPurchase(purchase);
+            fulfillmentQueuePublisher.publishRevoked(purchase);
             menuPublicAccessService.deactivateActiveMenusForUser(userId);
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
-        if (previousStatus == PurchaseStatus.PENDING) {
-            planChangeService.onPurchasePaymentFailed(purchase);
-        }
-        planChangeService.cancelScheduledForUser(userId);
-        packageActivationService.ensureSubscriptionState(userId);
         menuPublicAccessService.syncForUser(userId);
 
         String detail = purchase.getPackageName() + " paketi kullanıcı tarafından iptal edildi";
@@ -1601,7 +1487,7 @@ public class PurchaseService {
                 .expiryApproaching(lifecycle.expiryApproaching())
                 .expired(lifecycle.expired())
                 .usable(lifecycle.usable())
-                .products(entitlementQueryService.forPurchase(purchase))
+                .products(List.of())
                 .installments(purchaseFulfillmentService.getFulfillments(purchase.getId()))
                 .build();
     }
@@ -1749,32 +1635,6 @@ public class PurchaseService {
 
     private static final int APPROACHING_DAYS = 7;
 
-    private record LifecycleSnapshot(
-            boolean usable,
-            boolean expired,
-            Integer daysUntilExpiry,
-            LocalDateTime nextPaymentDueAt,
-            boolean paymentApproaching,
-            boolean expiryApproaching
-    ) {
-    }
-
-    private CardSnapshot resolveCardSnapshot(Long userId, Long paymentMethodId) {
-        if (paymentMethodId == null) {
-            return CardSnapshot.empty();
-        }
-        try {
-            return paymentServiceClient.getPaymentMethods(userId).stream()
-                    .filter(method -> String.valueOf(paymentMethodId).equals(method.id()))
-                    .findFirst()
-                    .map(method -> new CardSnapshot(trimToNull(method.brand()), trimToNull(method.lastFour())))
-                    .orElse(CardSnapshot.empty());
-        } catch (RuntimeException exception) {
-            log.warn("Kart snapshot alinamadi. userId={} paymentMethodId={}", userId, paymentMethodId, exception);
-            return CardSnapshot.empty();
-        }
-    }
-
     private void assignPackageAfterPayment(Purchase purchase) {
         if (fulfillmentServiceClient == null || purchase.getUserId() == null || purchase.getPackageCode() == null) {
             return;
@@ -1825,6 +1685,93 @@ public class PurchaseService {
             }
         }
         return planPackage.getValidityDays();
+    }
+
+    private PlanPackage findActivePackage(Long id) {
+        PlanPackage planPackage = findPackage(id);
+        if (!planPackage.isActive()) {
+            throw new BadRequestException("Paket aktif degil: " + id);
+        }
+        if (planPackage.getItems().isEmpty()) {
+            throw new BadRequestException("Paket icinde urun bulunmuyor: " + id);
+        }
+        return planPackage;
+    }
+
+    private PlanPackage findPackage(Long id) {
+        return planPackageRepository.findByIdWithItems(id)
+                .orElseThrow(() -> new BadRequestException("Paket bulunamadi: " + id));
+    }
+
+    private void extendPurchase(Purchase purchase, int days) {
+        if (days < 1 || days > 3650) {
+            throw new BadRequestException("days 1 ile 3650 arasinda olmalidir");
+        }
+        LocalDateTime now = AppTime.nowLocal();
+        LocalDateTime base = purchase.getExpiresAt() != null && purchase.getExpiresAt().isAfter(now)
+                ? purchase.getExpiresAt()
+                : now;
+        purchase.setExpiresAt(base.plusDays(days));
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        purchase.setSubscriptionGraceEndsAt(null);
+        purchase.setSubscriptionStatusReason("admin_extension");
+        purchase.setSubscriptionStatusChangedAt(now);
+        purchase.setSubscriptionStatusChangedBy("admin");
+        purchase.setCancelAtPeriodEnd(false);
+        if (purchase.getStartsAt() == null) {
+            purchase.setStartsAt(now);
+        }
+        purchaseRepository.save(purchase);
+        fulfillmentQueuePublisher.publishGranted(purchase);
+        if (purchase.getPackageId() != null && purchase.getUserId() != null) {
+            List<Purchase> addons = purchaseRepository.findByUserIdAndStatusAndPurchaseType(
+                    purchase.getUserId(),
+                    PurchaseStatus.ACTIVE,
+                    PurchaseType.ADD_ON
+            );
+            for (Purchase addon : addons) {
+                if (!purchase.getPackageId().equals(addon.getPackageId())) {
+                    continue;
+                }
+                addon.setExpiresAt(purchase.getExpiresAt());
+                purchaseRepository.save(addon);
+                fulfillmentQueuePublisher.publishGranted(addon);
+            }
+        }
+        menuPublicAccessService.syncForUser(purchase.getUserId());
+        purchaseLogService.log(
+                purchase.getId(),
+                purchase.getUserId(),
+                PurchaseLogAction.PURCHASE_EXTENDED,
+                purchase.getPackageName() + " paketi admin tarafindan " + days + " gun uzatildi"
+        );
+    }
+
+    private record LifecycleSnapshot(
+            boolean usable,
+            boolean expired,
+            Integer daysUntilExpiry,
+            LocalDateTime nextPaymentDueAt,
+            boolean paymentApproaching,
+            boolean expiryApproaching
+    ) {
+    }
+
+    private CardSnapshot resolveCardSnapshot(Long userId, Long paymentMethodId) {
+        if (paymentMethodId == null) {
+            return CardSnapshot.empty();
+        }
+        try {
+            return paymentServiceClient.getPaymentMethods(userId).stream()
+                    .filter(method -> String.valueOf(paymentMethodId).equals(method.id()))
+                    .findFirst()
+                    .map(method -> new CardSnapshot(trimToNull(method.brand()), trimToNull(method.lastFour())))
+                    .orElse(CardSnapshot.empty());
+        } catch (RuntimeException exception) {
+            log.warn("Kart snapshot alinamadi. userId={} paymentMethodId={}", userId, paymentMethodId, exception);
+            return CardSnapshot.empty();
+        }
     }
 
     private static String trimToNull(String value) {

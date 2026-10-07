@@ -40,8 +40,8 @@ public class MenuController {
     }
 
     @GetMapping("/public/{publicId}")
-    public ResponseEntity<MenuDtos.PublicMenuResponse> getPublicMenuByPublicId(@PathVariable String publicId) {
-        return ResponseEntity.ok(menuService.getPublicMenuByPublicId(publicId));
+    public ResponseEntity<MenuDtos.PublicMenuResponse> getMerchantMenu(@PathVariable String publicId) {
+        return ResponseEntity.ok(menuService.getMerchantMenu(publicId));
     }
 
     @GetMapping("/public/{publicId}/products")
@@ -79,6 +79,14 @@ public class MenuController {
                 servesPeopleMax,
                 q
         ));
+    }
+
+    @GetMapping("/public/{publicId}/products/{productId}")
+    public ResponseEntity<MenuDtos.MenuProductResponse> getPublicProduct(
+            @PathVariable String publicId,
+            @PathVariable Long productId
+    ) {
+        return ResponseEntity.ok(menuService.getPublicProduct(publicId, productId));
     }
 
     @GetMapping("/public/{publicId}/categories")

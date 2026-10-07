@@ -14,6 +14,15 @@ public final class CatalogScopes {
     public static final String AI_MENU_IMPORT_OWNER = "AI_MENU_IMPORT_OWNER";
     public static final String ONLINE_ORDER_OWNER = "ONLINE_ORDER_OWNER";
 
+    private static final String OWNER_SUFFIX = "_OWNER";
+
     private CatalogScopes() {
+    }
+
+    public static String productCode(String scopeCode) {
+        if (scopeCode != null && scopeCode.endsWith(OWNER_SUFFIX)) {
+            return scopeCode.substring(0, scopeCode.length() - OWNER_SUFFIX.length());
+        }
+        return scopeCode;
     }
 }

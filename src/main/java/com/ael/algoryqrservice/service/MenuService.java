@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
-import com.ael.algoryqrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.catalog.CatalogThemes;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.config.AppProperties;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ForbiddenException;
@@ -14,6 +14,7 @@ import com.ael.algoryqrservice.model.MenuProduct;
 import com.ael.algoryqrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.model.MenuTag;
 import com.ael.algoryqrservice.model.Qr;
+import com.ael.algoryqrservice.model.dto.CampaignDtos;
 import com.ael.algoryqrservice.model.dto.MenuDtos;
 import com.ael.algoryqrservice.model.dto.QrRequest;
 import com.ael.algoryqrservice.model.dto.TaxonomyDtos;
@@ -24,13 +25,14 @@ import com.ael.algoryqrservice.repository.MenuProductRepository;
 import com.ael.algoryqrservice.repository.MenuProductSpecifications;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
-import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.service.campaign.CampaignService;
 import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -72,15 +74,14 @@ public class MenuService {
     private final SecurityUtils securityUtils;
     private final ProductImageStorageService productImageStorageService;
     private final ChefAvatarService chefAvatarService;
-    private final EntitlementService entitlementService;
-    private final FeatureUsageSyncRegistry usageSyncRegistry;
+    private final ProductUsageGateway productUsageGateway;
     private final MenuProductPairingService menuProductPairingService;
     private final MenuProductOptionService menuProductOptionService;
     private final MenuCatalogCloneService menuCatalogCloneService;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
+    private final CampaignService campaignService;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final BranchService branchService;
-    private final BranchQuotaService branchQuotaService;
     private final BranchRepository branchRepository;
     private final MenuPublicIdGenerator menuPublicIdGenerator;
 
@@ -142,7 +143,7 @@ public class MenuService {
             }
         }
         if (validProductCount > 0) {
-            entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), validProductCount);
+            consumeProduct(menu.getUserId(), CatalogProducts.MENU_PRODUCT, validProductCount);
         }
         int index = 0;
         for (Object item : products) {
@@ -191,7 +192,6 @@ public class MenuService {
             menuProductRepository.save(product);
             index++;
         }
-        usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
     }
 
     private java.math.BigDecimal decimalValue(Object value) {
@@ -265,7 +265,7 @@ public class MenuService {
     }
 
     @Transactional
-    public MenuDtos.PublicMenuResponse getPublicMenuByPublicId(String publicId) {
+    public MenuDtos.PublicMenuResponse getMerchantMenu(String publicId) {
         Menu menu = requireActivePublicMenu(publicId);
         return buildPublicResponse(menu);
     }
@@ -360,6 +360,15 @@ public class MenuService {
                 servesPeopleMax,
                 q
         );
+    }
+
+    @Transactional(readOnly = true)
+    public MenuDtos.MenuProductResponse getPublicProduct(String publicId, Long productId) {
+        Menu menu = requireActivePublicMenu(publicId);
+        MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
+                .filter(entry -> entry.getMenuId().equals(menu.getMenuId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        return toProductResponse(product);
     }
 
     @Transactional(readOnly = true)
@@ -578,7 +587,7 @@ public class MenuService {
     private MenuDtos.MenuProductResponse createProductOnMenu(Menu menu, MenuDtos.MenuProductRequest request) {
         Long menuId = menu.getMenuId();
         validateProductRequest(request);
-        entitlementService.assertMenuProductCreationAllowed(menu.getUserId(), 1);
+        consumeProduct(menu.getUserId(), CatalogProducts.MENU_PRODUCT, 1);
         nutritionFactsService.validateForCreate(request.getNutrition());
         MenuSubCategory subCategory = menuCategoryService.requireSubCategory(menuId, request.getSubCategoryId());
         Set<Long> tagIds = normalizeTagIds(request.getTagIds());
@@ -624,7 +633,6 @@ public class MenuService {
                     response.getName()
             );
         }
-        usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
         menuProductIndexNotifier.productChanged(saved);
         return response;
     }
@@ -720,7 +728,6 @@ public class MenuService {
         productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
         product.setDeleted(true);
         menuProductRepository.save(product);
-        usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.MENU_PRODUCT);
         menuProductIndexNotifier.productRemoved(product.getMenuId(), product.getProductId());
     }
 
@@ -763,12 +770,11 @@ public class MenuService {
         if (request.getActive() != null) {
             boolean nextActive = request.getActive();
             if (nextActive && !menu.isActive()) {
-                branchQuotaService.assertMenuActivationAllowed(menu.getUserId(), menu.getBranchId());
+                requireProduct(menu.getUserId(), CatalogProducts.QR_MENU);
             }
             menu.setActive(nextActive);
             qr.setActive(nextActive);
             qrRepository.save(qr);
-            usageSyncRegistry.synchronize(menu.getUserId(), CatalogProducts.QR_MENU);
         }
 
         menuRepository.save(menu);
@@ -1091,32 +1097,75 @@ public class MenuService {
     }
 
     private MenuDtos.PublicMenuResponse buildPublicResponse(Menu menu) {
-        MenuDtos.MenuProductPageResponse productPage = listAvailableProductsPage(
-                menu,
-                0,
-                DEFAULT_PRODUCT_PAGE_SIZE
-        );
-        TaxonomyDtos.TaxonomyPageResponse categoryPage = menuCategoryService.listTaxonomyPage(
-                menu.getMenuId(),
-                0,
-                DEFAULT_CATEGORY_PAGE_SIZE,
-                null
-        );
+        List<MenuDtos.MenuProductResponse> products = listAllAvailableProducts(menu);
+        List<TaxonomyDtos.MainCategoryResponse> categories = menuCategoryService.listTaxonomy(menu.getMenuId());
+        List<CampaignDtos.ActiveCampaignResponse> campaigns = campaignService.listActiveCampaigns(menu.getMenuId());
+        int productCount = products.size();
+        int categoryCount = categories.size();
 
         return MenuDtos.PublicMenuResponse.builder()
                 .menu(toPublicMenuProfile(menu, buildPublicUrl(menu)))
-                .products(productPage.getContent())
-                .categories(categoryPage.getContent())
+                .products(products)
+                .categories(categories)
+                .campaigns(campaigns == null ? List.of() : campaigns)
+                .chefRecommendations(chefRecommendations(products))
+                .popularProducts(popularProducts(products))
                 .themeId(menu.getThemeId())
-                .productPage(productPage.getPage())
-                .productSize(productPage.getSize())
-                .productTotalElements(productPage.getTotalElements())
-                .productHasNext(productPage.isHasNext())
-                .categoryPage(categoryPage.getPage())
-                .categorySize(categoryPage.getSize())
-                .categoryTotalElements(categoryPage.getTotalElements())
-                .categoryHasNext(categoryPage.isHasNext())
+                .productPage(0)
+                .productSize(productCount)
+                .productTotalElements(productCount)
+                .productHasNext(false)
+                .categoryPage(0)
+                .categorySize(categoryCount)
+                .categoryTotalElements(categoryCount)
+                .categoryHasNext(false)
                 .build();
+    }
+
+    private List<MenuDtos.MenuProductResponse> listAllAvailableProducts(Menu menu) {
+        Specification<MenuProduct> spec = buildSearchSpec(
+                menu.getMenuId(),
+                true,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+        List<MenuProduct> products = menuProductRepository.findAll(
+                spec,
+                Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("productId"))
+        );
+        return mapProducts(products, menu.getMenuId());
+    }
+
+    private List<MenuDtos.MenuProductResponse> chefRecommendations(List<MenuDtos.MenuProductResponse> products) {
+        return products.stream().filter(MenuDtos.MenuProductResponse::isChefRecommended).toList();
+    }
+
+    private List<MenuDtos.MenuProductResponse> popularProducts(List<MenuDtos.MenuProductResponse> products) {
+        List<MenuDtos.MenuProductResponse> tagged = products.stream()
+                .filter(product -> product.getTags() != null && product.getTags().stream()
+                        .anyMatch(tag -> tag != null && "populer".equals(tag.getSlug())))
+                .toList();
+        if (!tagged.isEmpty()) {
+            return tagged;
+        }
+        return products.stream()
+                .filter(product -> product.getRatingCount() > 0)
+                .sorted(Comparator
+                        .comparing(MenuDtos.MenuProductResponse::getRatingAvg, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Comparator.comparingLong(MenuDtos.MenuProductResponse::getRatingCount).reversed())
+                        .thenComparing(MenuDtos.MenuProductResponse::getSortOrder))
+                .limit(10)
+                .toList();
     }
 
     private MenuDtos.PublicMenuProfileResponse toPublicMenuProfile(Menu menu, String publicUrl) {
@@ -1153,27 +1202,30 @@ public class MenuService {
     }
 
     private MenuDtos.MenuProductPageResponse toProductPageResponse(Page<MenuProduct> productPage, Long menuId) {
-        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(menuId);
-        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(menuId);
-        Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
-        Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
-        List<Long> productIds = productPage.getContent().stream().map(MenuProduct::getProductId).toList();
-        Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
-                menuProductPairingService.loadByProductIds(productIds);
-        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
-                menuProductOptionService.loadByProductIds(productIds);
-        List<MenuDtos.MenuProductResponse> content = productPage.getContent().stream()
-                .map(product -> toProductResponse(
-                        product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct, optionsByProduct))
-                .toList();
         return MenuDtos.MenuProductPageResponse.builder()
-                .content(content)
+                .content(mapProducts(productPage.getContent(), menuId))
                 .page(productPage.getNumber())
                 .size(productPage.getSize())
                 .totalElements(productPage.getTotalElements())
                 .totalPages(productPage.getTotalPages())
                 .hasNext(productPage.hasNext())
                 .build();
+    }
+
+    private List<MenuDtos.MenuProductResponse> mapProducts(List<MenuProduct> products, Long menuId) {
+        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(menuId);
+        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(menuId);
+        Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
+        Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
+        List<Long> productIds = products.stream().map(MenuProduct::getProductId).toList();
+        Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
+                menuProductPairingService.loadByProductIds(productIds);
+        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
+                menuProductOptionService.loadByProductIds(productIds);
+        return products.stream()
+                .map(product -> toProductResponse(
+                        product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct, optionsByProduct))
+                .toList();
     }
 
     private MenuDtos.MenuProductResponse toProductResponse(MenuProduct product) {
@@ -1456,9 +1508,23 @@ public class MenuService {
         }
     }
 
+    private void consumeProduct(Long userId, String productCode, int amount) {
+        if (userId == null || amount <= 0) {
+            return;
+        }
+        productUsageGateway.use(userId, productCode, amount);
+    }
+
+    private void requireProduct(Long userId, String productCode) {
+        if (userId == null) {
+            return;
+        }
+        productUsageGateway.allow(userId, productCode);
+    }
+
     private void requireAllowedTheme(Long userId, String themeId) {
         if (CatalogThemes.isCustomTheme(themeId)) {
-            entitlementService.requireScope(userId, CatalogScopes.CUSTOM_DESIGN_OWNER);
+            requireProduct(userId, CatalogProducts.CUSTOM_DESIGN);
         }
     }
 

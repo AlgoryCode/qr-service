@@ -1,13 +1,15 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.catalog.CatalogProducts;
-import com.ael.algoryqrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.client.PackageView;
+import com.ael.algoryqrservice.client.dto.ExternalConsumeResponse;
+import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.factory.QrProviderFactory;
 import com.ael.algoryqrservice.model.Purchase;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.Qr;
 import com.ael.algoryqrservice.model.Type;
-import com.ael.algoryqrservice.model.dto.ConsumedEntitlement;
 import com.ael.algoryqrservice.model.dto.QrActiveRequest;
 import com.ael.algoryqrservice.model.dto.QrActiveResponse;
 import com.ael.algoryqrservice.model.dto.QrNameRequest;
@@ -21,8 +23,7 @@ import com.ael.algoryqrservice.provider.QrProvider;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.repository.QrRepository;
-import com.ael.algoryqrservice.service.entitlement.FeatureUsageSyncRegistry;
-import com.ael.algoryqrservice.service.entitlement.PurchaseSelectionPolicy;
+import com.ael.algoryqrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.service.menuindex.MenuProductIndexNotifier;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -31,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.zxing.WriterException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,29 +55,21 @@ public class QrService {
     private final MenuRepository menuRepository;
     private final PurchaseRepository purchaseRepository;
     private final ObjectMapper objectMapper;
-    private final EntitlementService entitlementService;
-    private final PurchaseSelectionPolicy purchaseSelectionPolicy;
-    private final FeatureUsageSyncRegistry usageSyncRegistry;
+    private final ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
+    private final ProductUsageGateway productUsageGateway;
     private final MenuQrSoftDeleteService menuQrSoftDeleteService;
     private final MenuProductIndexNotifier menuProductIndexNotifier;
     private final BranchService branchService;
-    private final BranchQuotaService branchQuotaService;
     private final SecurityUtils securityUtils;
 
     public <T extends QrRequest> QrResponse createQR(T req, Long userId) throws IOException, WriterException {
         Type qrType = Type.from(req.getType());
         if (qrType == Type.MENU) {
-            entitlementService.requireScope(userId, CatalogScopes.QR_MENU_OWNER);
             Long branchId = resolveBranchId(req);
             branchService.requireOwnedForUser(branchId, userId);
-            branchQuotaService.assertAndConsumeMenuCreation(userId, branchId);
-            req.setPurchaseId(purchaseSelectionPolicy.activePurchaseId(userId));
+            applyPurchase(req, productUsageGateway.use(userId, CatalogProducts.QR_MENU, 1));
         } else {
-            entitlementService.requireScope(userId, CatalogScopes.QR_CREATE_OWNER);
-            ConsumedEntitlement consumed = entitlementService.consume(userId, CatalogProducts.QR_CREATE, 1);
-            if (consumed != null && consumed.purchaseId() != null) {
-                req.setPurchaseId(consumed.purchaseId());
-            }
+            applyPurchase(req, productUsageGateway.use(userId, CatalogProducts.QR_CREATE, 1));
         }
         req.setUserId(userId);
 
@@ -122,7 +116,7 @@ public class QrService {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
         List<Qr> qrs = qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId);
-        Long activePurchaseId = purchaseSelectionPolicy.activePurchaseId(userId);
+        Long activePurchaseId = activePurchaseId(userId);
         Map<Long, Purchase> purchasesById = loadPurchasesForQrs(qrs);
 
         List<QrListResponse> filtered = qrs
@@ -149,6 +143,24 @@ public class QrService {
                 .totalPages(totalPages)
                 .hasNext(safePage + 1 < totalPages)
                 .build();
+    }
+
+    private void applyPurchase(QrRequest req, ExternalConsumeResponse consumed) {
+        if (consumed != null && consumed.purchaseId() != null) {
+            req.setPurchaseId(consumed.purchaseId());
+        }
+    }
+
+    private Long activePurchaseId(Long userId) {
+        FulfillmentServiceClient client = fulfillmentClients.getIfAvailable();
+        if (client == null) {
+            throw new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor");
+        }
+        PackageView view = client.findPackage(userId);
+        if (!"ACTIVE".equals(view.status()) || view.body() == null) {
+            return null;
+        }
+        return view.body().purchaseId();
     }
 
     private Map<Long, Purchase> loadPurchasesForQrs(List<Qr> qrs) {
@@ -271,14 +283,13 @@ public class QrService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
 
         if (nextActive) {
-            branchQuotaService.assertMenuActivationAllowed(qr.getUserId(), menu.getBranchId());
+            productUsageGateway.allow(qr.getUserId(), CatalogProducts.QR_MENU);
         }
 
         qr.setActive(nextActive);
         menu.setActive(nextActive);
         qrRepository.save(qr);
         menuRepository.save(menu);
-        usageSyncRegistry.synchronize(qr.getUserId(), CatalogProducts.QR_MENU);
 
         return QrActiveResponse.builder()
                 .qrId(qr.getQrId())
@@ -341,7 +352,6 @@ public class QrService {
             }
         });
 
-        usageSyncRegistry.synchronize(qr.getUserId(), CatalogProducts.QR_CREATE);
     }
 
     private void requireOwnership(Qr qr) {

@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.client.dto.PaymentCardVerificationRequest;
 import com.ael.algoryqrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.config.AppProperties;
@@ -328,25 +327,6 @@ public class PaymentRequestMapper {
         );
     }
 
-    public PaymentCardVerificationRequest toCardVerificationRequest(
-            User user,
-            BillingSnapshot billingSnapshot,
-            String clientIp,
-            AppProperties appProperties,
-            String conversationId
-    ) {
-        return PaymentCardVerificationRequest.builder()
-                .serviceName(appProperties.getServiceName())
-                .sourceReferenceId(String.valueOf(user.getId()))
-                .conversationId(conversationId)
-                .locale("tr")
-                .currency("TRY")
-                .buyer(toBuyer(user, billingSnapshot, clientIp))
-                .shippingAddress(toAddress(billingSnapshot))
-                .billingAddress(toAddress(billingSnapshot))
-                .build();
-    }
-
     private static final DateTimeFormatter PAYMENT_ATTEMPT_TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     public String newPaymentAttemptId(Long userId) {
@@ -358,13 +338,6 @@ public class PaymentRequestMapper {
 
     public String buildConversationId(Long purchaseId) {
         return newPaymentAttemptId(purchaseId);
-    }
-
-    public String buildCardVerificationConversationId(Long userId) {
-        long safeUserId = userId == null ? 0L : userId;
-        String timestamp = AppTime.nowLocal().format(PAYMENT_ATTEMPT_TS);
-        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4);
-        return "qrcardv" + safeUserId + timestamp + suffix;
     }
 
     private PaymentThreeDsRequest.PaymentCardPayload toPaymentCard(PaymentCardDto card) {
@@ -446,6 +419,10 @@ public class PaymentRequestMapper {
         return toBasketItem(planPackage, chargeAmount, "");
     }
 
+    /**
+     * The renewal amount only needs to travel to the payment service when it differs from what
+     * is charged now, which happens once a cart carries ONE_TIME module lines.
+     */
     private Map<String, Object> cartMetadata(
             Purchase purchase,
             PlanPackage planPackage,
@@ -496,10 +473,6 @@ public class PaymentRequestMapper {
         return cart;
     }
 
-    /**
-     * The renewal amount only needs to travel to the payment service when it differs from what
-     * is charged now, which happens once a cart carries ONE_TIME module lines.
-     */
     private BigDecimal resolveRecurringPrice(Purchase purchase, BigDecimal chargeAmount) {
         BigDecimal recurringPrice = purchase.getRecurringPrice();
         if (recurringPrice == null

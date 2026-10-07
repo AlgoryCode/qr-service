@@ -1,24 +1,17 @@
 package com.ael.algoryqrservice.service;
 
-import com.ael.algoryqrservice.access.AccessSession;
-import com.ael.algoryqrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.client.FulfillmentServiceClient;
+import com.ael.algoryqrservice.client.PackageView;
 import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
-import com.ael.algoryqrservice.model.FulfillmentDetail;
+import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.model.dto.UserAccessProfile;
-import com.ael.algoryqrservice.repository.FulfillmentDetailRepository;
-import com.ael.algoryqrservice.service.entitlement.EntitlementMaintenanceService;
 import com.ael.algoryqrservice.service.entitlement.PurchaseExpiryService;
-import com.ael.algoryqrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -26,60 +19,26 @@ public class UserAccessProfileService {
 
     private static final UserAccessProfile EMPTY_PROFILE = new UserAccessProfile(null, List.of(), List.of());
 
-    private final FulfillmentDetailRepository fulfillmentDetailRepository;
     private final PurchaseExpiryService purchaseExpiryService;
-    private final EntitlementMaintenanceService entitlementMaintenanceService;
-    private final PackageActivationService packageActivationService;
-    private final SessionAccessService sessionAccessService;
     private final ObjectProvider<FulfillmentServiceClient> fulfillmentServiceClient;
 
     @Transactional
     public UserAccessProfile resolve(Long userId) {
         purchaseExpiryService.expireDueForUser(userId);
-        packageActivationService.ensureSubscriptionState(userId);
-        entitlementMaintenanceService.repairUser(userId);
-
-        Optional<UserAccessProfile> external = resolveFromFulfillment(userId);
-        if (external.isPresent()) {
-            return external.get();
-        }
-
-        AccessSession session = sessionAccessService.resolve(userId);
-        if (!session.isAllow()) {
-            return EMPTY_PROFILE;
-        }
-
-        List<FulfillmentDetail> details = fulfillmentDetailRepository.findAllActiveByUserId(userId, AppTime.nowLocal());
-        return new UserAccessProfile(
-                session.packageCode(),
-                distinctSortedCodes(details, FulfillmentDetail::getFeatureCode),
-                distinctSortedCodes(details, FulfillmentDetail::getScopeCode)
-        );
-    }
-
-    private Optional<UserAccessProfile> resolveFromFulfillment(Long userId) {
         FulfillmentServiceClient client = fulfillmentServiceClient.getIfAvailable();
         if (client == null) {
-            return Optional.empty();
+            throw new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor");
         }
-        return client.findActivePackage(userId).map(this::toAccessProfile);
+        PackageView view = client.findPackage(userId);
+        if (!"ACTIVE".equals(view.status()) || view.body() == null) {
+            return EMPTY_PROFILE;
+        }
+        return toAccessProfile(view.body());
     }
 
     private UserAccessProfile toAccessProfile(ExternalActivePackageResponse response) {
         List<String> products = response.products() == null ? List.of() : response.products();
         List<String> scopes = response.scopes() == null ? List.of() : response.scopes();
         return new UserAccessProfile(response.packageCode(), products, scopes);
-    }
-
-    private List<String> distinctSortedCodes(
-            List<FulfillmentDetail> details,
-            Function<FulfillmentDetail, String> codeExtractor
-    ) {
-        return details.stream()
-                .map(codeExtractor)
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted()
-                .toList();
     }
 }

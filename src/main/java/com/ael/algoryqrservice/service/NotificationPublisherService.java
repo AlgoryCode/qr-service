@@ -21,7 +21,6 @@ public class NotificationPublisherService {
 
     private static final String MESSAGE_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
     private static final String MESSAGE_TYPE_EMAIL_VERIFICATION = "EMAIL_VERIFICATION";
-    private static final String MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER = "PRO_TRIAL_EXPIRY_REMINDER";
     private static final String MESSAGE_TYPE_SMART_REPORT_READY = "SMART_REPORT_READY";
 
     private final RabbitTemplate rabbitTemplate;
@@ -84,64 +83,6 @@ public class NotificationPublisherService {
                 "E-posta Doğrulama Kodu",
                 MESSAGE_TYPE_EMAIL_VERIFICATION
         );
-    }
-
-    public void publishTrialExpiryReminder(
-            UUID eventId,
-            String email,
-            String userName,
-            String packageName,
-            String expiresAt,
-            String upgradeUrl
-    ) {
-        publishTrialExpiryNotification(eventId, email, userName, packageName, expiresAt, upgradeUrl, 3, false);
-    }
-
-    public void publishTrialExpired(
-            UUID eventId,
-            String email,
-            String userName,
-            String packageName,
-            String expiresAt,
-            String upgradeUrl
-    ) {
-        publishTrialExpiryNotification(eventId, email, userName, packageName, expiresAt, upgradeUrl, 0, true);
-    }
-
-    private void publishTrialExpiryNotification(
-            UUID eventId,
-            String email,
-            String userName,
-            String packageName,
-            String expiresAt,
-            String upgradeUrl,
-            int daysRemaining,
-            boolean expired
-    ) {
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("userName", userName);
-        templateData.put("packageName", packageName);
-        templateData.put("expiresAt", expiresAt);
-        templateData.put("daysRemaining", daysRemaining);
-        templateData.put("upgradeUrl", upgradeUrl);
-        templateData.put("expired", expired);
-        String subject = expired ? "Deneme süreniz sona erdi" : null;
-        NotificationRequestMessage message = new NotificationRequestMessage(
-                eventId,
-                pushNotificationProperties.getChannels(),
-                serviceName,
-                MESSAGE_TYPE_PRO_TRIAL_EXPIRY_REMINDER,
-                new NotificationRecipientsMessage(email, List.of(), List.of()),
-                subject,
-                templateData,
-                false
-        );
-        rabbitTemplate.convertAndSend(
-                pushNotificationProperties.getMessaging().getExchange(),
-                pushNotificationProperties.getMessaging().getRoutingKey(),
-                message
-        );
-        log.info("Trial expiry notification queued. eventId={}, expired={}, email={}", eventId, expired, maskEmail(email));
     }
 
     public void publishSmartReportReady(
