@@ -87,7 +87,6 @@ public class AuthCredentialClient {
                     .uri(trimSlash(baseUrl) + path)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
-                    .header(properties.getHeaderName(), properties.getToken() == null ? "" : properties.getToken())
                     .body(body)
                     .retrieve();
             if (responseType == Void.class) {

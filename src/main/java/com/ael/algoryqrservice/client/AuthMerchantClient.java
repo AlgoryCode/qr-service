@@ -33,7 +33,6 @@ public class AuthMerchantClient {
                     .get()
                     .uri(trimSlash(baseUrl) + MERCHANT_PATH, merchantId)
                     .accept(MediaType.APPLICATION_JSON)
-                    .header(properties.getHeaderName(), properties.getToken() == null ? "" : properties.getToken())
                     .retrieve()
                     .body(MerchantView.class);
             if (view == null || view.id() == null) {

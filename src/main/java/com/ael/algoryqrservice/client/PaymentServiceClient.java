@@ -856,9 +856,6 @@ public class PaymentServiceClient {
 
     private Consumer<HttpHeaders> authHeaders(Long userId) {
         return headers -> {
-            if (properties.getAuthToken() != null && !properties.getAuthToken().isBlank()) {
-                headers.set(properties.getAuthHeader(), properties.getAuthToken());
-            }
             if (userId != null) {
                 headers.set("X-Account-Id", String.valueOf(userId));
             }

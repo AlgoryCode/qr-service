@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.client.AuthMerchantClient;
 import com.ael.algoryqrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.client.PackageView;
 import com.ael.algoryqrservice.client.dto.AssignedProduct;
+import com.ael.algoryqrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.ConflictException;
 import com.ael.algoryqrservice.exception.FulfillmentUnavailableException;
@@ -43,12 +44,26 @@ public class UserPackageAssignmentService {
         if (merchantId == null || merchantId <= 0) {
             throw new BadRequestException("İşletme geçersiz");
         }
-        PackageView view = client().findPackage(merchantId);
+        FulfillmentServiceClient fulfillment = client();
+        PackageView view = fulfillment.findPackage(merchantId);
         if (view.body() == null) {
             return new PackageControl("NONE", null, null);
         }
         String periodEnd = view.body().periodEnd() == null ? null : view.body().periodEnd().toString();
-        return new PackageControl(view.status(), view.body().packageCode(), periodEnd);
+        List<PackageControl.PackageRight> entitlements = fulfillment.listEntitlements(merchantId).stream()
+                .map(this::right)
+                .toList();
+        return new PackageControl(view.status(), view.body().packageCode(), periodEnd, entitlements);
+    }
+
+    private PackageControl.PackageRight right(ExternalEntitlementResponse item) {
+        return new PackageControl.PackageRight(
+                item.productCode() != null ? item.productCode() : item.featureCode(),
+                item.featureCode(),
+                item.quantity(),
+                item.usedQuantity(),
+                item.unlimited()
+        );
     }
 
     public void create(Long merchantId, Long packageId, String packageCode) {
@@ -160,7 +175,24 @@ public class UserPackageAssignmentService {
         return stored.subtract(calculated).abs().compareTo(TOLERANCE) <= 0;
     }
 
-    public record PackageControl(String status, String packageCode, String periodEnd) {
+    public record PackageControl(
+            String status,
+            String packageCode,
+            String periodEnd,
+            List<PackageRight> entitlements
+    ) {
+        public PackageControl(String status, String packageCode, String periodEnd) {
+            this(status, packageCode, periodEnd, List.of());
+        }
+
+        public record PackageRight(
+                String productCode,
+                String featureCode,
+                Integer quantity,
+                Integer usedQuantity,
+                boolean unlimited
+        ) {
+        }
     }
 
     private FulfillmentServiceClient client() {

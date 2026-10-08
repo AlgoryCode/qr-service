@@ -66,11 +66,12 @@ jwt:
 
 auth:
   service:
-    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:https://stage.auth.algorycode.com}
+    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:http://localhost:8080}
+    base-url: ${AUTH_SERVICE_BASE_URL:http://localhost:8080}
 
 fulfillment:
   external:
     enabled: ${FULFILLMENT_EXTERNAL_ENABLED:true}
-    base-url: ${FULFILLMENT_SERVICE_URL:https://stage.fulfillment.algorycode.com}
+    base-url: ${FULFILLMENT_SERVICE_URL:http://localhost:8086}
     auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
     auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}

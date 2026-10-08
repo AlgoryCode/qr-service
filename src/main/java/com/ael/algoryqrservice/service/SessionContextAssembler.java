@@ -88,6 +88,7 @@ public class SessionContextAssembler {
 
     private SessionEntitlementResponse entitlement(ExternalEntitlementResponse entitlement) {
         return new SessionEntitlementResponse(
+                entitlement.productCode() != null ? entitlement.productCode() : entitlement.featureCode(),
                 entitlement.featureCode(),
                 entitlement.scopeCode(),
                 entitlement.quantity(),
