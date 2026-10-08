@@ -879,7 +879,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.ActiveMenuSummary> listActiveMenusForCurrentUser() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return menuRepository.findActiveMenusWithQrByUserId(userId).stream()
                 .map(row -> {
                     Menu menu = (Menu) row[0];
@@ -904,7 +904,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuProductsByQrResponse listProductsByQrId(Long qrId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         List<Object[]> rows = menuProductRepository.findMenuWithProductsByQrIdAndUserId(qrId, userId);
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
@@ -971,7 +971,7 @@ public class MenuService {
     }
 
     private void requireOwnership(Menu menu) {
-        Long currentUserId = securityUtils.getCurrentUserId();
+        Long currentUserId = securityUtils.getCurrentMerchantId();
         if (!currentUserId.equals(menu.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }

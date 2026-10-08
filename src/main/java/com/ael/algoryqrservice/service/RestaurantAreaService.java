@@ -133,7 +133,7 @@ public class RestaurantAreaService {
         Menu menu = menuRepository.findById(menuId)
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        Long currentUserId = securityUtils.getCurrentUserId();
+        Long currentUserId = securityUtils.getCurrentMerchantId();
         if (!currentUserId.equals(menu.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }

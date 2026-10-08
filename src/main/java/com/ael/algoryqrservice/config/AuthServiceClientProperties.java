@@ -52,7 +52,7 @@ public class AuthServiceClientProperties {
         if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
             return publicBaseUrl;
         }
-        return "http://localhost:8080";
+        return "";
     }
 
     public void setBaseUrl(String baseUrl) {

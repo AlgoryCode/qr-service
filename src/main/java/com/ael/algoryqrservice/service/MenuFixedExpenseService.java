@@ -108,7 +108,7 @@ public class MenuFixedExpenseService {
     }
 
     private void requireOwnedMenu(Long menuId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
         if (!userId.equals(menu.getUserId())) {

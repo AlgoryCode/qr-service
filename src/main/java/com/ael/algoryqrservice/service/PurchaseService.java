@@ -1,9 +1,7 @@
 package com.ael.algoryqrservice.service;
 
 import com.ael.algoryqrservice.coupon.CouponRedemptionService;
-import com.ael.algoryqrservice.client.FulfillmentActivePackageMapper;
 import com.ael.algoryqrservice.client.FulfillmentServiceClient;
-import com.ael.algoryqrservice.client.PackageView;
 import com.ael.algoryqrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.client.dto.AssignedProduct;
 import com.ael.algoryqrservice.client.dto.BillingPaymentDtos;
@@ -33,7 +31,6 @@ import com.ael.algoryqrservice.model.dto.PurchaseRequest;
 import com.ael.algoryqrservice.model.dto.PurchaseResponse;
 import com.ael.algoryqrservice.model.dto.PurchaseSummaryResponse;
 import com.ael.algoryqrservice.model.dto.SubscriptionOverviewResponse;
-import com.ael.algoryqrservice.model.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.model.enums.FulfillmentStatus;
 import com.ael.algoryqrservice.model.enums.PaymentMode;
@@ -98,7 +95,7 @@ public class PurchaseService {
     private final CartPricingService cartPricingService;
     private final PurchaseItemRepository purchaseItemRepository;
     private final ObjectProvider<FulfillmentServiceClient> fulfillmentServiceClient;
-    private final FulfillmentActivePackageMapper fulfillmentActivePackageMapper;
+    private final ExternalPackageViewService externalPackageView;
 
     /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
     private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
@@ -736,37 +733,22 @@ public class PurchaseService {
     @Transactional
     public SubscriptionOverviewResponse getMySubscriptionOverview(Long userId) {
         purchaseExpiryService.expireDueForUser(userId);
+        SubscriptionOverviewResponse overview = externalPackageView.overview(userId)
+                .orElseThrow(() -> new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor"));
+        if (overview.getActivePackage() != null) {
+            overview.getActivePackage().setProducts(overview.getEntitlements());
+        }
+        overview.setAddonPurchases(addonPurchases(userId));
+        return overview;
+    }
 
-        List<UserEntitlementResponse> entitlements = List.of();
-        PurchaseSummaryResponse activePackage = activePackageFromFulfillment(userId);
-        boolean fulfillmentActive = activePackage != null;
-        List<PurchaseSummaryResponse> addonPurchases = purchaseRepository
-                .findByUserIdOrderByPurchasedAtDesc(userId)
+    private List<PurchaseSummaryResponse> addonPurchases(Long userId) {
+        return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(userId)
                 .stream()
                 .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
                 .filter(Purchase::isUsable)
                 .map(this::toSummary)
                 .toList();
-
-        return SubscriptionOverviewResponse.builder()
-                .activePackage(activePackage)
-                .entitlements(entitlements)
-                .addonPurchases(addonPurchases)
-                .fulfillmentDetails(List.of())
-                .fulfillmentActive(fulfillmentActive)
-                .build();
-    }
-
-    private PurchaseSummaryResponse activePackageFromFulfillment(Long userId) {
-        FulfillmentServiceClient client = fulfillmentServiceClient.getIfAvailable();
-        if (client == null || fulfillmentActivePackageMapper == null) {
-            throw new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor");
-        }
-        PackageView view = client.findPackage(userId);
-        if (!"ACTIVE".equals(view.status()) || view.body() == null) {
-            return null;
-        }
-        return fulfillmentActivePackageMapper.toSummary(view.body());
     }
 
     @Transactional

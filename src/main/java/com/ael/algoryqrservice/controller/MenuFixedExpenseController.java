@@ -65,7 +65,7 @@ public class MenuFixedExpenseController {
     }
 
     private void requireOrderAnalyticsScope() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         try {
             productUsageGateway.allow(userId, CatalogProducts.SMART_REPORTING);
         } catch (ForbiddenException reportingDenied) {

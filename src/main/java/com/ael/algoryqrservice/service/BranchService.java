@@ -42,7 +42,7 @@ public class BranchService {
 
     @Transactional(readOnly = true)
     public BranchDtos.ListResponse listMine() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         List<Branch> branches = branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(userId);
         Map<Long, List<Menu>> menusByBranch = menuRepository
                 .findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(userId, MenuChannel.QR)
@@ -67,7 +67,7 @@ public class BranchService {
 
     @Transactional
     public BranchDtos.Response create(BranchDtos.CreateRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         consumeBranch(userId);
         Branch branch = branchRepository.save(Branch.builder()
                 .userId(userId)
@@ -201,7 +201,7 @@ public class BranchService {
 
     @Transactional
     public Branch requireOwned(Long branchId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şube bulunamadı"));
     }

@@ -24,7 +24,9 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public AccountDtos.MyProfileResponse getMyProfile() {
-        return toProfileResponse(securityUtils.getCurrentUser());
+        return securityUtils.findCurrentUser()
+                .map(this::toProfileResponse)
+                .orElseGet(this::profileFromToken);
     }
 
     @Transactional
@@ -106,9 +108,24 @@ public class AccountService {
         userRepository.save(user);
     }
 
+    private AccountDtos.MyProfileResponse profileFromToken() {
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return AccountDtos.MyProfileResponse.builder()
+                .userId(merchantId)
+                .merchantId(merchantId)
+                .email(securityUtils.currentLogin())
+                .notifyEmailImportant(true)
+                .notifyScanAlerts(true)
+                .notifyWeeklyReport(false)
+                .notifyMarketingEmails(false)
+                .notifyPushBrowser(false)
+                .build();
+    }
+
     private AccountDtos.MyProfileResponse toProfileResponse(User user) {
         return AccountDtos.MyProfileResponse.builder()
                 .userId(user.getId())
+                .merchantId(securityUtils.getCurrentMerchantId())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .email(user.getEmail())

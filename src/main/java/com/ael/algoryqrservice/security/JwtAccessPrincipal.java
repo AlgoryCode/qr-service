@@ -10,7 +10,8 @@ public record JwtAccessPrincipal(
         List<String> products,
         String activePackage,
         String principalType,
-        Long branchId
+        Long branchId,
+        Long merchantId
 ) {
     public JwtAccessPrincipal(
             Long userId,
@@ -18,7 +19,7 @@ public record JwtAccessPrincipal(
             List<String> products,
             String activePackage
     ) {
-        this(userId, scopes, products, activePackage, JwtService.PRINCIPAL_APP, null);
+        this(userId, scopes, products, activePackage, JwtService.PRINCIPAL_APP, null, null);
     }
 
     public JwtAccessPrincipal(
@@ -28,7 +29,18 @@ public record JwtAccessPrincipal(
             String activePackage,
             String principalType
     ) {
-        this(userId, scopes, products, activePackage, principalType, null);
+        this(userId, scopes, products, activePackage, principalType, null, null);
+    }
+
+    public JwtAccessPrincipal(
+            Long userId,
+            List<String> scopes,
+            List<String> products,
+            String activePackage,
+            String principalType,
+            Long branchId
+    ) {
+        this(userId, scopes, products, activePackage, principalType, branchId, null);
     }
 
     public JwtAccessPrincipal {

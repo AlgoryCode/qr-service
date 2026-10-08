@@ -3,7 +3,6 @@ package com.ael.algoryqrservice.service;
 import com.ael.algoryqrservice.access.AccessSession;
 import com.ael.algoryqrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.client.dto.ExternalEntitlementResponse;
-import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.SessionContextResponse;
 import com.ael.algoryqrservice.model.dto.SessionEntitlementResponse;
 import com.ael.algoryqrservice.model.dto.SessionUserResponse;
@@ -14,11 +13,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+
 @Component
 public class SessionContextAssembler {
 
     public SessionContextResponse paid(
-            User user,
+            SessionUserResponse user,
             ExternalActivePackageResponse activePackage,
             List<ExternalEntitlementResponse> entitlements
     ) {
@@ -37,7 +37,7 @@ public class SessionContextAssembler {
         ));
     }
 
-    public SessionContextResponse localAllow(User user, AccessSession session) {
+    public SessionContextResponse localAllow(SessionUserResponse user, AccessSession session) {
         return response(new Parts(
                 user,
                 session.decision(),
@@ -53,7 +53,7 @@ public class SessionContextAssembler {
         ));
     }
 
-    public SessionContextResponse blocked(User user, AccessSession session) {
+    public SessionContextResponse blocked(SessionUserResponse user, AccessSession session) {
         return response(new Parts(
                 user,
                 session.decision(),
@@ -71,7 +71,7 @@ public class SessionContextAssembler {
 
     private SessionContextResponse response(Parts parts) {
         return new SessionContextResponse(
-                user(parts.user()),
+                parts.user(),
                 parts.decision(),
                 parts.packageCode(),
                 parts.packageName(),
@@ -83,18 +83,6 @@ public class SessionContextAssembler {
                 parts.products(),
                 parts.scopes(),
                 parts.entitlements()
-        );
-    }
-
-    private SessionUserResponse user(User user) {
-        return new SessionUserResponse(
-                user.getId(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getProvider(),
-                user.getRole()
         );
     }
 
@@ -124,7 +112,7 @@ public class SessionContextAssembler {
     }
 
     private record Parts(
-            User user,
+            SessionUserResponse user,
             AccessDecision decision,
             String packageCode,
             String packageName,

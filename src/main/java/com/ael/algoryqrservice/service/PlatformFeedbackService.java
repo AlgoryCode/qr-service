@@ -76,7 +76,7 @@ public class PlatformFeedbackService {
 
     @Transactional(readOnly = true)
     public PlatformFeedbackDtos.FeedbackPageResponse listMine(int page, int size) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return list(userId, null, null, page, size);
     }
 

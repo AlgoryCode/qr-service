@@ -77,9 +77,9 @@ public class AuthCredentialClient {
     }
 
     private <T> T post(String path, Object body, Class<T> responseType) {
-        String baseUrl = properties.getPublicBaseUrl();
+        String baseUrl = properties.getBaseUrl();
         if (baseUrl == null || baseUrl.isBlank()) {
-            throw new BadRequestException("Auth servisi kullanılamıyor");
+            throw new BadRequestException("Auth servisi adresi tanımlı değil");
         }
         try {
             RestClient.ResponseSpec response = restClientBuilder.build()

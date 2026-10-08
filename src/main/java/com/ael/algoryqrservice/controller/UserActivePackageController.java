@@ -18,12 +18,12 @@ public class UserActivePackageController {
     private final SessionContextService sessionContextService;
     private final SecurityUtils securityUtils;
 
-    @GetMapping("/{userId}/package")
-    public SessionContextResponse findPackage(@PathVariable Long userId) {
-        Long accountUserId = securityUtils.getCurrentUserId();
-        if (!userId.equals(accountUserId) && !securityUtils.matchesTokenUser(userId)) {
-            throw new ForbiddenException("Aktif paket bu kullanıcıya ait değil");
+    @GetMapping("/{merchantId}/package")
+    public SessionContextResponse findPackage(@PathVariable Long merchantId) {
+        Long accountMerchantId = securityUtils.getCurrentMerchantId();
+        if (!merchantId.equals(accountMerchantId) && !securityUtils.matchesTokenUser(merchantId)) {
+            throw new ForbiddenException("Aktif paket bu işletmeye ait değil");
         }
-        return sessionContextService.resolve(accountUserId);
+        return sessionContextService.resolve(accountMerchantId);
     }
 }

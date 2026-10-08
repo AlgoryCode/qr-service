@@ -69,7 +69,7 @@ public class UserAccountingService {
             throw new BadRequestException("Kayıt türü zorunludur");
         }
 
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireAllowAccess(userId);
         String title = requireText(request.getTitle(), "Başlık zorunludur", 200);
         BigDecimal amount = requirePositiveAmount(request.getAmount());
@@ -175,7 +175,7 @@ public class UserAccountingService {
             int page,
             int size
     ) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireAllowAccess(userId);
         AccountingEntryType typeFilter = parseTypeFilter(type);
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
@@ -224,7 +224,7 @@ public class UserAccountingService {
 
     @Transactional(readOnly = true)
     public UserAccountingDtos.EntryDetailResponse getDetailForCurrentUser(Long entryId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireAllowAccess(userId);
         UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
                 .filter(e -> e.getUserId().equals(userId))
@@ -289,7 +289,7 @@ public class UserAccountingService {
 
     @Transactional
     public void deleteManual(Long entryId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireAllowAccess(userId);
         UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
                 .filter(e -> e.getUserId().equals(userId))

@@ -44,7 +44,7 @@ public class PlatformFeedbackController {
     public ResponseEntity<ProductImageDtos.UploadResponse> uploadScreenshot(
             @RequestParam("file") MultipartFile file
     ) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.status(201).body(productImageStorageService.uploadFeedbackScreenshot(userId, file));
     }
 }

@@ -22,12 +22,12 @@ public class AccessSessionController {
 
     @GetMapping("/session")
     public AccessSessionResponse session() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return AccessSessionMapper.toResponse(sessionAccessService.resolve(userId));
     }
 
     @GetMapping("/context")
     public SessionContextResponse context() {
-        return sessionContextService.resolve(securityUtils.getCurrentUserId());
+        return sessionContextService.resolve(securityUtils.getCurrentMerchantId());
     }
 }

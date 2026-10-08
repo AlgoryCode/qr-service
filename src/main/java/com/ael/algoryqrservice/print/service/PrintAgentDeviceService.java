@@ -40,7 +40,7 @@ public class PrintAgentDeviceService {
 
     @Transactional
     public PrintAgentDtos.PairingCodeResponse createPairingCode(Long branchId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Branch branch = requireOwnedBranch(branchId, userId);
         String code = tokenService.generatePairingCode();
         LocalDateTime now = LocalDateTime.now();
@@ -90,7 +90,7 @@ public class PrintAgentDeviceService {
 
     @Transactional(readOnly = true)
     public PrintAgentDtos.SettingsResponse getSettings(Long branchId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Branch branch = requireOwnedBranch(branchId, userId);
         return PrintAgentDtos.SettingsResponse.builder()
                 .userId(userId)
@@ -104,7 +104,7 @@ public class PrintAgentDeviceService {
 
     @Transactional
     public PrintAgentDtos.ApiKeyResponse createApiKey(PrintAgentDtos.CreateApiKeyRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Branch branch = requireOwnedBranch(request.getBranchId(), userId);
         String deviceName = request.getDeviceName() == null || request.getDeviceName().isBlank()
                 ? "Print Agent"
@@ -167,7 +167,7 @@ public class PrintAgentDeviceService {
 
     @Transactional(readOnly = true)
     public List<PrintAgentDtos.DeviceResponse> listDevices(Long branchId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireOwnedBranch(branchId, userId);
         return deviceRepository.findByMerchantIdAndBranchIdOrderByIdDesc(userId, branchId).stream()
                 .map(this::toDeviceResponse)
@@ -176,7 +176,7 @@ public class PrintAgentDeviceService {
 
     @Transactional
     public PrintAgentDtos.DeviceResponse setDeviceEnabled(Long deviceId, boolean enabled) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         PrintAgentDevice device = deviceRepository.findByIdAndMerchantId(deviceId, userId)
                 .orElseThrow(() -> new NotFoundException("Yazici cihaz bulunamadi"));
         device.setEnabled(enabled);
@@ -208,7 +208,7 @@ public class PrintAgentDeviceService {
 
     @Transactional
     public PrintAgentDtos.JobResponse retryJobForOwner(Long jobId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         PrintJob job = printJobRepository.findByIdAndMerchantId(jobId, userId)
                 .orElseThrow(() -> new NotFoundException("Print job bulunamadi"));
         return printJobService.requeue(job);
@@ -221,7 +221,7 @@ public class PrintAgentDeviceService {
 
     @Transactional(readOnly = true)
     public List<PrintAgentDtos.JobResponse> listFailedJobs(Long branchId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireOwnedBranch(branchId, userId);
         return printJobRepository
                 .findByMerchantIdAndBranchIdAndStatusOrderByCreatedAtDesc(userId, branchId, PrintJobStatus.FAILED)
@@ -233,7 +233,7 @@ public class PrintAgentDeviceService {
 
     @Transactional
     public Branch setPrintKitchenEnabled(Long branchId, boolean enabled) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Branch branch = requireOwnedBranch(branchId, userId);
         branch.setPrintKitchenEnabled(enabled);
         return branchRepository.save(branch);

@@ -39,19 +39,19 @@ public class UserPackageAssignmentService {
     private final PlanPackageRepository planPackageRepository;
     private final PackagePricingService packagePricingService;
 
-    public void create(Long userId, Long packageId, String packageCode) {
-        if (userId == null || userId <= 0) {
-            throw new BadRequestException("Kullanıcı geçersiz");
+    public void create(Long merchantId, Long packageId, String packageCode) {
+        if (merchantId == null || merchantId <= 0) {
+            throw new BadRequestException("İşletme geçersiz");
         }
-        AuthMerchantClient.MerchantView merchant = authMerchantClient.findMerchant(userId);
+        AuthMerchantClient.MerchantView merchant = authMerchantClient.findMerchant(merchantId);
         if (!ACTIVE.equals(merchant.status())) {
             throw new BadRequestException(ACCOUNT_INACTIVE, "Hesap aktif değil");
         }
-        PackageView current = client().findPackage(userId);
+        PackageView current = client().findPackage(merchantId);
         if (ACTIVE.equals(current.status())) {
             throw new ConflictException(PACKAGE_EXISTS, "Aktif paket mevcut");
         }
-        if (userDebtService.findDebt(userId).isPresent()) {
+        if (userDebtService.findDebt(merchantId).isPresent()) {
             throw new BadRequestException(ACCOUNT_IN_DEBT, "Hesap borcu var");
         }
         Long resolvedId = resolvePackageId(packageId, packageCode);
@@ -62,7 +62,7 @@ public class UserPackageAssignmentService {
             requirePrice(plan, packagePricingService.calculate(plan.getItems()));
         }
         client().createPackage(
-                userId,
+                merchantId,
                 plan.getCode(),
                 plan.getValidityDays(),
                 assignedItems(plan),

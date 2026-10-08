@@ -52,9 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String principalType = jwtService.extractPrincipalType(claims);
-        Long userId = jwtService.isAuthServiceSubject(claims)
-                ? jwtService.extractPackageOwnerId(claims)
-                : jwtService.extractUserId(claims);
+        String subjectType = jwtService.extractSubjectType(claims);
+        Long merchantId = null;
+        if (JwtService.SUBJECT_MERCHANT.equals(subjectType) || JwtService.SUBJECT_STAFF.equals(subjectType)) {
+            merchantId = jwtService.extractPackageOwnerId(claims);
+        }
+        Long userId = merchantId != null ? merchantId : jwtService.extractUserId(claims);
         List<String> roles = jwtService.extractRoles(claims);
         List<String> scopes;
         List<String> products;
@@ -87,7 +90,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 products,
                 activePackage,
                 principalType,
-                branchId
+                branchId,
+                merchantId
         ));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }
