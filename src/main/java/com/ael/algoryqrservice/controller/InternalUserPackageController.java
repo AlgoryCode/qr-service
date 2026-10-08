@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,6 +26,16 @@ public class InternalUserPackageController {
 
     private final UserPackageAssignmentService userPackageAssignmentService;
     private final AuthServiceClientProperties authServiceClientProperties;
+
+    @GetMapping("/{merchantId}/package")
+    public UserPackageAssignmentService.PackageControl read(
+            @PathVariable Long merchantId,
+            @RequestHeader(value = "X-Service-Token", required = false) String serviceTokenFallback,
+            HttpServletRequest httpRequest
+    ) {
+        requireServiceToken(resolveToken(httpRequest, serviceTokenFallback));
+        return userPackageAssignmentService.read(merchantId);
+    }
 
     @PostMapping("/{merchantId}/package")
     public ResponseEntity<Void> create(

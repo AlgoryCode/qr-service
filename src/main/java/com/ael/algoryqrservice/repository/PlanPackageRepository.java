@@ -29,6 +29,8 @@ public interface PlanPackageRepository extends JpaRepository<PlanPackage, Long> 
 
     List<PlanPackage> findByActiveTrueOrderByPriceAsc();
 
+    List<PlanPackage> findByActiveOrderByPriceAsc(boolean active);
+
     Optional<PlanPackage> findFirstByActiveTrueAndPurchasableFalseAndSystemManagedFalseOrderByPriorityDesc();
 
     @EntityGraph(attributePaths = {"items", "items.product"})

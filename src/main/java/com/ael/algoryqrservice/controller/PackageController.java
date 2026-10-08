@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,8 +20,8 @@ public class PackageController {
     private final PublicPackageCatalogService publicPackageCatalogService;
 
     @GetMapping
-    public ResponseEntity<List<PlanPackageResponse>> getActivePackages() {
-        return ResponseEntity.ok(publicPackageCatalogService.getActivePackages());
+    public ResponseEntity<List<PlanPackageResponse>> list(@RequestParam(required = false) Boolean active) {
+        return ResponseEntity.ok(publicPackageCatalogService.list(active));
     }
 
     @GetMapping("/{id}")

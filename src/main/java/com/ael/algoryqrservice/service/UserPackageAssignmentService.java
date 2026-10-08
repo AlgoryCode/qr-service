@@ -39,6 +39,18 @@ public class UserPackageAssignmentService {
     private final PlanPackageRepository planPackageRepository;
     private final PackagePricingService packagePricingService;
 
+    public PackageControl read(Long merchantId) {
+        if (merchantId == null || merchantId <= 0) {
+            throw new BadRequestException("İşletme geçersiz");
+        }
+        PackageView view = client().findPackage(merchantId);
+        if (view.body() == null) {
+            return new PackageControl("NONE", null, null);
+        }
+        String periodEnd = view.body().periodEnd() == null ? null : view.body().periodEnd().toString();
+        return new PackageControl(view.status(), view.body().packageCode(), periodEnd);
+    }
+
     public void create(Long merchantId, Long packageId, String packageCode) {
         if (merchantId == null || merchantId <= 0) {
             throw new BadRequestException("İşletme geçersiz");
@@ -146,6 +158,9 @@ public class UserPackageAssignmentService {
             return false;
         }
         return stored.subtract(calculated).abs().compareTo(TOLERANCE) <= 0;
+    }
+
+    public record PackageControl(String status, String packageCode, String periodEnd) {
     }
 
     private FulfillmentServiceClient client() {
