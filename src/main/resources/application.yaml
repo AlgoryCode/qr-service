@@ -231,5 +231,5 @@ auth:
     enabled: ${AUTH_SERVICE_INTERNAL_AUTH_ENABLED:true}
     token: ${AUTH_SERVICE_INTERNAL_TOKEN:}
     header-name: ${AUTH_SERVICE_INTERNAL_HEADER:X-Service-Token}
-    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:}
-    base-url: ${AUTH_SERVICE_BASE_URL:}
+    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:http://localhost:8080}
+    base-url: ${AUTH_SERVICE_BASE_URL:http://localhost:8080}

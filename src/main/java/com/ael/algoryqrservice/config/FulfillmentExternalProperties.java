@@ -11,8 +11,15 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "fulfillment.external")
 public class FulfillmentExternalProperties {
 
-    private boolean enabled = false;
+    private boolean enabled = true;
     private String baseUrl = "http://localhost:8086";
     private String authToken = "";
     private String authHeader = "X-Service-Token";
+
+    public String getBaseUrl() {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "http://localhost:8086";
+        }
+        return baseUrl;
+    }
 }

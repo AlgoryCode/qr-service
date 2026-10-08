@@ -69,7 +69,6 @@ public class FulfillmentServiceClient {
                     .uri(properties.getBaseUrl() + PACKAGE_PATH, userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
-                    .header(properties.getAuthHeader(), properties.getAuthToken())
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
@@ -133,7 +132,6 @@ public class FulfillmentServiceClient {
                     .get()
                     .uri(properties.getBaseUrl() + PRODUCT_ACCESS_PATH, userId, productCode)
                     .accept(MediaType.APPLICATION_JSON)
-                    .header(properties.getAuthHeader(), properties.getAuthToken())
                     .retrieve()
                     .body(ExternalProductAccessResponse.class);
             if (body == null) {
@@ -196,7 +194,6 @@ public class FulfillmentServiceClient {
                     .uri(properties.getBaseUrl() + path, userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
-                    .header(properties.getAuthHeader(), properties.getAuthToken())
                     .body(new EntitlementQuantityRequest(productCode, quantity))
                     .retrieve()
                     .body(ExternalConsumeResponse.class);
@@ -229,8 +226,7 @@ public class FulfillmentServiceClient {
         return restClientBuilder.build()
                 .get()
                 .uri(properties.getBaseUrl() + path, userId)
-                .accept(MediaType.APPLICATION_JSON)
-                .header(properties.getAuthHeader(), properties.getAuthToken());
+                .accept(MediaType.APPLICATION_JSON);
     }
 
     private boolean matches(ExternalEntitlementResponse item, String productCode) {

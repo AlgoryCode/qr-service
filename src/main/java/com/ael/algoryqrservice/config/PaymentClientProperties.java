@@ -11,9 +11,16 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "payment.service")
 public class PaymentClientProperties {
 
-    private String url = "http://paymentservice:8080";
+    private String url = "http://localhost:8080";
     private int pendingTimeoutMinutes = 30;
     private String authToken = "";
     private String authHeader = "X-Service-Token";
     private String gatewayProvider;
+
+    public String getUrl() {
+        if (url == null || url.isBlank()) {
+            return "http://localhost:8080";
+        }
+        return url;
+    }
 }
