@@ -32,7 +32,13 @@ public class PublicPackageCatalogService {
 
     @Transactional(readOnly = true)
     public List<PlanPackageResponse> getActivePackages() {
-        List<PlanPackage> ordered = planPackageRepository.findByActiveTrueOrderByPriceAsc();
+        return list(Boolean.TRUE);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlanPackageResponse> list(Boolean active) {
+        boolean enabled = active == null || active;
+        List<PlanPackage> ordered = planPackageRepository.findByActiveOrderByPriceAsc(enabled);
         if (ordered.isEmpty()) {
             return List.of();
         }
