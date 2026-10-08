@@ -90,7 +90,8 @@ public class JwtService {
     }
 
     public Long extractPackageOwnerId(Claims claims) {
-        if (SUBJECT_STAFF.equals(extractSubjectType(claims))) {
+        String subjectType = extractSubjectType(claims);
+        if (SUBJECT_MERCHANT.equals(subjectType) || SUBJECT_STAFF.equals(subjectType)) {
             Long merchantId = extractMerchantId(claims);
             if (merchantId != null) {
                 return merchantId;

@@ -26,7 +26,7 @@ public class YemekSepetiConnectionService {
 
     @Transactional(readOnly = true)
     public List<YemekSepetiDtos.ConnectionResponse> listMine() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return connectionRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
@@ -39,7 +39,7 @@ public class YemekSepetiConnectionService {
 
     @Transactional
     public YemekSepetiDtos.ConnectionResponse upsert(YemekSepetiDtos.UpsertConnectionRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         YemekSepetiConnection connection = connectionRepository
                 .findByUserId(userId)
                 .orElseGet(() -> YemekSepetiConnection.builder()
@@ -94,7 +94,7 @@ public class YemekSepetiConnectionService {
 
     @Transactional(readOnly = true)
     public YemekSepetiConnection requireOwnedConnection() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return connectionRepository.findByUserId(userId)
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti bağlantısı bulunamadı"));
     }

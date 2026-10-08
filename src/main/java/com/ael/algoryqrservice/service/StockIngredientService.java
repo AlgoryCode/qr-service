@@ -34,7 +34,7 @@ public class StockIngredientService {
     @Transactional(readOnly = true)
     public StockDtos.IngredientPageResponse list(Long branchId, boolean lowOnly, int page, int size) {
         branchService.requireOwned(branchId);
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Page<StockIngredient> result = ingredientRepository.search(
                 branchId,
                 userId,
@@ -165,7 +165,7 @@ public class StockIngredientService {
     }
 
     private StockIngredient requireOwned(Long ingredientId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return ingredientRepository.findByIdAndUserIdAndDeletedFalse(ingredientId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hammadde bulunamadı"));
     }

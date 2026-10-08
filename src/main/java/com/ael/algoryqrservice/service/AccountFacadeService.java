@@ -11,8 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 @Service
 @RequiredArgsConstructor
@@ -44,29 +42,11 @@ public class AccountFacadeService {
     }
 
     public AccountOverviewDtos.OverviewResponse getOverview() {
-        CompletableFuture<AccountOverviewDtos.Section<AccountDtos.MyProfileResponse>> profileFuture =
-                CompletableFuture.supplyAsync(() -> sectionFromCall(() -> accountService.getMyProfile()));
-        CompletableFuture<AccountOverviewDtos.Section<SubscriptionOverviewResponse>> subscriptionFuture =
-                CompletableFuture.supplyAsync(this::subscriptionOverviewSection);
-        CompletableFuture<AccountOverviewDtos.Section<List<PurchaseResponse>>> purchasesFuture =
-                CompletableFuture.supplyAsync(this::purchasesSection);
-        CompletableFuture<AccountOverviewDtos.Section<BillingAddressPageResponse>> billingAddressesFuture =
-                CompletableFuture.supplyAsync(() -> sectionFromCall(
-                        () -> billingAddressService.list(userId(), 0, 50)
-                ));
-
-        CompletableFuture.allOf(
-                profileFuture,
-                subscriptionFuture,
-                purchasesFuture,
-                billingAddressesFuture
-        ).join();
-
         return AccountOverviewDtos.OverviewResponse.builder()
-                .profile(profileFuture.join())
-                .subscription(subscriptionFuture.join())
-                .purchases(purchasesFuture.join())
-                .billingAddresses(billingAddressesFuture.join())
+                .profile(sectionFromCall(() -> accountService.getMyProfile()))
+                .subscription(subscriptionOverviewSection())
+                .purchases(purchasesSection())
+                .billingAddresses(sectionFromCall(() -> billingAddressService.list(userId(), 0, 50)))
                 .build();
     }
 
@@ -83,8 +63,6 @@ public class AccountFacadeService {
             return AccountOverviewDtos.Section.success(supplier.get());
         } catch (RestClientResponseException ex) {
             return AccountOverviewDtos.Section.failure(ex.getStatusCode().value(), ex.getResponseBodyAsString());
-        } catch (CompletionException ex) {
-            return mapThrowable(ex.getCause());
         } catch (RuntimeException ex) {
             return mapThrowable(ex);
         }
@@ -101,7 +79,7 @@ public class AccountFacadeService {
     }
 
     private Long userId() {
-        return securityUtils.getCurrentUserId();
+        return securityUtils.getCurrentMerchantId();
     }
 
     @FunctionalInterface

@@ -105,7 +105,7 @@ public class StoreOrderPanelService {
                 merchant.getId(),
                 orderId,
                 target,
-                securityUtils.getCurrentUserId(),
+                securityUtils.getCurrentMerchantId(),
                 reason
         );
         return toDetail(merchant.getId(), order);
@@ -118,7 +118,7 @@ public class StoreOrderPanelService {
                 merchant.getId(),
                 orderId,
                 target,
-                securityUtils.getCurrentUserId()
+                securityUtils.getCurrentMerchantId()
         );
         return toDetail(merchant.getId(), order);
     }
@@ -130,7 +130,7 @@ public class StoreOrderPanelService {
                 merchant.getId(),
                 orderId,
                 courierId,
-                securityUtils.getCurrentUserId()
+                securityUtils.getCurrentMerchantId()
         );
         return toDetail(merchant.getId(), order);
     }
@@ -147,7 +147,7 @@ public class StoreOrderPanelService {
                 merchant,
                 orderId,
                 courierStaffId,
-                securityUtils.getCurrentUserId()
+                securityUtils.getCurrentMerchantId()
         );
         return toDetail(merchant.getId(), order);
     }

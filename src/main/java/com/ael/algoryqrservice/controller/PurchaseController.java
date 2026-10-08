@@ -61,19 +61,19 @@ public class PurchaseController {
 
     @GetMapping("/my")
     public ResponseEntity<List<PurchaseResponse>> getMyPurchases() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.getUserPurchases(userId));
     }
 
     @GetMapping("/my/subscription-overview")
     public ResponseEntity<SubscriptionOverviewResponse> getMySubscriptionOverview() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.getMySubscriptionOverview(userId));
     }
 
     @GetMapping("/my/entitlements")
     public ResponseEntity<List<UserEntitlementResponse>> getMyEntitlements() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(externalPackageView.entitlements(userId).orElseGet(List::of));
     }
 

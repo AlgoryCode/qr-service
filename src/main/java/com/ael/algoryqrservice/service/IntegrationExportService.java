@@ -285,7 +285,7 @@ public class IntegrationExportService {
         Menu menu = menuRepository.findById(menuId)
                 .filter(existing -> !existing.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        Long currentUserId = securityUtils.getCurrentUserId();
+        Long currentUserId = securityUtils.getCurrentMerchantId();
         if (!currentUserId.equals(menu.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }

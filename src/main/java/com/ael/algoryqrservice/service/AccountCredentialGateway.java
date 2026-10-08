@@ -20,21 +20,21 @@ public class AccountCredentialGateway {
     private final EmailVerificationGate emailVerificationGate;
 
     public EmailVerificationDtos.Status emailStatus() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         EmailVerificationDtos.Status status = authCredentialClient.emailStatus(userId);
         syncVerified(userId, status.verified());
         return status;
     }
 
     public EmailVerificationDtos.Status requestEmailCode() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         EmailVerificationDtos.Status status = authCredentialClient.requestEmailCode(userId);
         syncVerified(userId, status.verified());
         return status;
     }
 
     public EmailVerificationDtos.Status verifyEmail(EmailVerificationDtos.VerifyRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         EmailVerificationDtos.Status status = authCredentialClient.verifyEmail(userId, request.code());
         syncVerified(userId, status.verified());
         return status;
@@ -54,12 +54,12 @@ public class AccountCredentialGateway {
     }
 
     public AccountDtos.PasswordChangeCodeResponse requestPasswordChange() {
-        return authCredentialClient.requestPasswordChange(securityUtils.getCurrentUserId());
+        return authCredentialClient.requestPasswordChange(securityUtils.getCurrentMerchantId());
     }
 
     public void confirmPasswordChange(AccountDtos.ConfirmPasswordChangeRequest request) {
         authCredentialClient.confirmPasswordChange(
-                securityUtils.getCurrentUserId(),
+                securityUtils.getCurrentMerchantId(),
                 request.getCode(),
                 request.getNewPassword(),
                 request.getConfirmPassword()

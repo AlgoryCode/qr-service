@@ -42,7 +42,7 @@ public class MerchantCustomerService {
 
     @Transactional(readOnly = true)
     public List<MenuWaiterDtos.CustomerListItem> listCustomersForCurrentBusiness() {
-        Long businessId = securityUtils.getCurrentUserId();
+        Long businessId = securityUtils.getCurrentMerchantId();
         List<CustomerMembership> memberships = customerMembershipRepository
                 .findByBusinessIdAndStatusOrderByJoinedAtDesc(businessId, MembershipStatus.ACTIVE);
         return mapMemberships(memberships);
@@ -97,7 +97,7 @@ public class MerchantCustomerService {
     private Menu requireOwnedMenu(Long menuId) {
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        Long currentUserId = securityUtils.getCurrentUserId();
+        Long currentUserId = securityUtils.getCurrentMerchantId();
         if (!currentUserId.equals(menu.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }

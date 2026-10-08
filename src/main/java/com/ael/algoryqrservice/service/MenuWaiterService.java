@@ -142,7 +142,7 @@ public class MenuWaiterService {
     }
 
     private Branch requireOwnedBranch(Long branchId) {
-        return branchService.requireOwnedForUser(branchId, securityUtils.getCurrentUserId());
+        return branchService.requireOwnedForUser(branchId, securityUtils.getCurrentMerchantId());
     }
 
     private MerchantStaff requireWaiter(Long branchId, Long staffId) {

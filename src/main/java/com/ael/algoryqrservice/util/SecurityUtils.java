@@ -25,36 +25,51 @@ public class SecurityUtils {
     private final CustomerRepository customerRepository;
     private final MerchantStaffRepository merchantStaffRepository;
 
-    public User getCurrentUser() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
+    public Optional<User> findCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return Optional.empty();
+        }
+        return userRepository.findByEmail(authentication.getName());
     }
 
-    public Long getCurrentUserId() {
+    public String currentLogin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new UnauthorizedException("Kullanıcı bulunamadı");
+        }
+        return authentication.getName();
+    }
+
+    public User getCurrentUser() {
+        return findCurrentUser().orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
+    }
+
+    public Long getCurrentMerchantId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && principal.userId() != null
                 && !principal.isCustomer()
                 && !principal.isWaiter()) {
-            return accountUserId(authentication.getName(), principal.userId());
+            if (principal.merchantId() != null) {
+                return principal.merchantId();
+            }
+            if (principal.userId() != null) {
+                return principal.userId();
+            }
         }
         return getCurrentUser().getId();
     }
 
-    public boolean matchesTokenUser(Long userId) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (userId == null || authentication == null || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)) {
-            return false;
-        }
-        return userId.equals(principal.userId());
+    public Long getCurrentUserId() {
+        return getCurrentMerchantId();
     }
 
-    private Long accountUserId(String login, Long tokenUserId) {
-        if (login == null || login.isBlank()) {
-            return tokenUserId;
+    public boolean matchesTokenUser(Long merchantId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (merchantId == null || authentication == null || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)) {
+            return false;
         }
-        return userRepository.findByEmail(login).map(User::getId).orElse(tokenUserId);
+        return merchantId.equals(principal.merchantId()) || merchantId.equals(principal.userId());
     }
 
     public Customer getCurrentCustomer() {

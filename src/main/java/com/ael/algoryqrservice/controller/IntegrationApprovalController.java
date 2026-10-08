@@ -69,7 +69,7 @@ public class IntegrationApprovalController {
             @Valid @RequestBody IntegrationPendingProductDtos.ApprovalRequest request
     ) {
         return ResponseEntity.ok(
-                approvalService.approve(menuId, id, request, securityUtils.getCurrentUserId())
+                approvalService.approve(menuId, id, request, securityUtils.getCurrentMerchantId())
         );
     }
 
@@ -79,7 +79,7 @@ public class IntegrationApprovalController {
             @Valid @RequestBody IntegrationPendingProductDtos.BulkApproveRequest request
     ) {
         return ResponseEntity.ok(
-                approvalService.bulkApprove(menuId, request, securityUtils.getCurrentUserId())
+                approvalService.bulkApprove(menuId, request, securityUtils.getCurrentMerchantId())
         );
     }
 

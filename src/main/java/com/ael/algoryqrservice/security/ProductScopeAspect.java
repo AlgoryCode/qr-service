@@ -26,6 +26,6 @@ public class ProductScopeAspect {
     }
 
     private void enforceScope(String scopeCode) {
-        productUsageGateway.allow(securityUtils.getCurrentUserId(), CatalogScopes.productCode(scopeCode));
+        productUsageGateway.allow(securityUtils.getCurrentMerchantId(), CatalogScopes.productCode(scopeCode));
     }
 }

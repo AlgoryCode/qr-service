@@ -78,7 +78,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/email-verification/resend", "/auth/email-verification/verify")
                             .permitAll()
                         .requestMatchers("/internal/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/internal/users/*/package").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/merchants/*/package", "/internal/users/*/package").permitAll()
                         .requestMatchers("/internal/notifications/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()

@@ -210,7 +210,7 @@ public class AiMenuImportService {
     }
 
     private Menu requireOwnedMenuEntity(Long menuId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Menu menu = menuRepository.findById(menuId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));

@@ -19,22 +19,22 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 @RestController
-@RequestMapping("/internal/users")
+@RequestMapping({"/internal/merchants", "/internal/users"})
 @RequiredArgsConstructor
 public class InternalUserPackageController {
 
     private final UserPackageAssignmentService userPackageAssignmentService;
     private final AuthServiceClientProperties authServiceClientProperties;
 
-    @PostMapping("/{userId}/package")
+    @PostMapping("/{merchantId}/package")
     public ResponseEntity<Void> create(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @Valid @RequestBody CreateUserPackageRequest request,
             @RequestHeader(value = "X-Service-Token", required = false) String serviceTokenFallback,
             HttpServletRequest httpRequest
     ) {
         requireServiceToken(resolveToken(httpRequest, serviceTokenFallback));
-        userPackageAssignmentService.create(userId, request.packageId(), request.packageCode());
+        userPackageAssignmentService.create(merchantId, request.packageId(), request.packageCode());
         return ResponseEntity.noContent().build();
     }
 

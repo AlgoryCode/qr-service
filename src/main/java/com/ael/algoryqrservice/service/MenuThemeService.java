@@ -35,7 +35,7 @@ public class MenuThemeService {
 
     @Transactional(readOnly = true)
     public List<ThemeDtos.ThemeResponse> listAllowedThemesForCurrentUser() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return listAssignedThemes(userId);
     }
 

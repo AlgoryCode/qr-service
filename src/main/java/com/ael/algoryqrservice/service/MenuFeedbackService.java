@@ -205,7 +205,7 @@ public class MenuFeedbackService {
     }
 
     private Menu requireOwnedMenu(Long menuId) {
-        Long ownerId = securityUtils.getCurrentUserId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         Menu menu = menuRepository.findById(menuId)
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));

@@ -42,7 +42,7 @@ public class MerchantSetupService {
 
     @Transactional(readOnly = true)
     public StoreDtos.SetupPrefillResponse prefill() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         List<Branch> branches = branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(userId);
         List<Menu> menus = cloneableMenus(userId);
         Map<Long, String> branchNames = branches.stream()
@@ -57,7 +57,7 @@ public class MerchantSetupService {
 
     @Transactional
     public StoreDtos.MerchantResponse setup(StoreDtos.SetupRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         if (merchantRepository.existsByUserIdAndDeletedFalse(userId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Mağaza kurulumu zaten tamamlanmış");
         }

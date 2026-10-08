@@ -33,7 +33,7 @@ public class UberEatsMenuConnectionService {
 
     @Transactional(readOnly = true)
     public List<UberEatsMenuDtos.ConnectionResponse> listMine() {
-        return connectionRepository.findByUserIdOrderByUpdatedAtDesc(securityUtils.getCurrentUserId())
+        return connectionRepository.findByUserIdOrderByUpdatedAtDesc(securityUtils.getCurrentMerchantId())
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -46,7 +46,7 @@ public class UberEatsMenuConnectionService {
 
     @Transactional
     public UberEatsMenuDtos.ConnectionResponse upsert(UberEatsMenuDtos.UpsertConnectionRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         Menu menu = requireOwnedMenu(request.getMenuId(), userId);
         UberEatsMenuConnection connection = connectionRepository.findByUserIdAndMenuId(userId, menu.getMenuId())
                 .orElseGet(() -> UberEatsMenuConnection.builder()
@@ -98,7 +98,7 @@ public class UberEatsMenuConnectionService {
 
     @Transactional(readOnly = true)
     public UberEatsMenuConnection requireOwnedConnection(Long menuId) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         requireOwnedMenu(menuId, userId);
         return connectionRepository.findByUserIdAndMenuId(userId, menuId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));

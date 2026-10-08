@@ -30,7 +30,7 @@ public class UberEatsConnectionService {
 
     @Transactional(readOnly = true)
     public List<UberEatsDtos.ConnectionResponse> listMine() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return connectionRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
@@ -43,7 +43,7 @@ public class UberEatsConnectionService {
 
     @Transactional
     public UberEatsDtos.ConnectionResponse upsert(UberEatsDtos.UpsertConnectionRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         UberEatsConnection connection = connectionRepository
                 .findByUserId(userId)
                 .orElseGet(() -> UberEatsConnection.builder()
@@ -109,7 +109,7 @@ public class UberEatsConnectionService {
 
     @Transactional(readOnly = true)
     public UberEatsConnection requireOwnedConnection() {
-        Long userId = securityUtils.getCurrentUserId();
+        Long userId = securityUtils.getCurrentMerchantId();
         return connectionRepository.findByUserId(userId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
     }
