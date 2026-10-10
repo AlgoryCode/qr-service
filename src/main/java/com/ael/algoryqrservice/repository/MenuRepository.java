@@ -48,6 +48,17 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     List<Object[]> findActiveMenusWithQrByUserId(@Param("userId") Long userId);
 
     @Query("""
+            select menu, qr
+            from Menu menu, Qr qr
+            where menu.userId = :userId
+              and menu.qrId = qr.qrId
+              and menu.deleted = false
+              and qr.deleted = false
+            order by menu.menuId desc
+            """)
+    List<Object[]> findMenusWithQrByUserId(@Param("userId") Long userId);
+
+    @Query("""
             select menu.qrId
             from Menu menu
             where menu.userId = :userId

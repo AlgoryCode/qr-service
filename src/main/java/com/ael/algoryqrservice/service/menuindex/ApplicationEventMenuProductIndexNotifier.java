@@ -24,7 +24,7 @@ public class ApplicationEventMenuProductIndexNotifier implements MenuProductInde
 
     @Override
     public void productChanged(MenuProduct product) {
-        if (product == null || product.getProductId() == null) {
+        if (product == null || product.getProductId() == null || product.getMenuId() == null) {
             return;
         }
         if (product.isDeleted()) {
@@ -40,7 +40,7 @@ public class ApplicationEventMenuProductIndexNotifier implements MenuProductInde
             return;
         }
         List<MenuProduct> indexable = products.stream()
-                .filter(product -> product != null && product.getProductId() != null && !product.isDeleted())
+                .filter(product -> product != null && product.getProductId() != null && product.getMenuId() != null && !product.isDeleted())
                 .toList();
         publish(documentFactory.createAll(indexable));
     }

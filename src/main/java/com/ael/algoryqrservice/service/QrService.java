@@ -66,7 +66,9 @@ public class QrService {
         Type qrType = Type.from(req.getType());
         if (qrType == Type.MENU) {
             Long branchId = resolveBranchId(req);
-            branchService.requireOwnedForUser(branchId, userId);
+            if (branchId != null) {
+                branchService.requireOwnedForUser(branchId, userId);
+            }
             applyPurchase(req, productUsageGateway.use(userId, CatalogProducts.QR_MENU, 1));
         } else {
             applyPurchase(req, productUsageGateway.use(userId, CatalogProducts.QR_CREATE, 1));
@@ -364,19 +366,23 @@ public class QrService {
     private Long resolveBranchId(QrRequest request) {
         Map<String, Object> details = request.getDetails();
         if (details == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
+            return null;
         }
         Object raw = details.get("branchId");
         if (raw instanceof Number number) {
             return number.longValue();
         }
-        if (raw != null) {
-            try {
-                return Long.parseLong(raw.toString().trim());
-            } catch (NumberFormatException ignored) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
-            }
+        if (raw == null) {
+            return null;
         }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
+        String text = raw.toString().trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException ignored) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçerli bir şube seçin");
+        }
     }
 }

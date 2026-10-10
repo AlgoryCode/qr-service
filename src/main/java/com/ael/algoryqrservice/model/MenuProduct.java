@@ -28,8 +28,11 @@ public class MenuProduct extends QrBaseModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long productId;
 
-    @Column(nullable = false)
+    @Column(name = "menu_id")
     private Long menuId;
+
+    @Column(name = "user_id")
+    private Long userId;
 
     @Column(nullable = false)
     private String name;
@@ -42,7 +45,7 @@ public class MenuProduct extends QrBaseModel {
     @Column(nullable = false)
     private String currency = "TRY";
 
-    @Column(name = "sub_category_id", nullable = false)
+    @Column(name = "sub_category_id")
     private Long subCategoryId;
 
     @Column(nullable = false)

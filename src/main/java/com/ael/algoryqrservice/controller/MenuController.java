@@ -238,6 +238,11 @@ public class MenuController {
         return ResponseEntity.ok(menuService.listActiveMenusForCurrentUser());
     }
 
+    @GetMapping("/my")
+    public ResponseEntity<List<MenuDtos.ActiveMenuSummary>> listMyMenus() {
+        return ResponseEntity.ok(menuService.listMenusForCurrentUser());
+    }
+
     @GetMapping("/by-qr/{qrId}")
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenuByQrId(@PathVariable Long qrId) {
         MenuDtos.MenuProfileResponse profile = menuService.getMenuProfileByQrId(qrId);
@@ -265,6 +270,36 @@ public class MenuController {
     @GetMapping("/{menuId}")
     public ResponseEntity<MenuDtos.MenuProfileResponse> getMenu(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuService.getMenuProfile(menuId));
+    }
+
+    @PutMapping("/{menuId}/branch")
+    public ResponseEntity<MenuDtos.MenuProfileResponse> assignMenuBranch(
+            @PathVariable Long menuId,
+            @RequestBody MenuDtos.AssignBranchRequest request
+    ) throws Exception {
+        Long branchId = request == null ? null : request.getBranchId();
+        return ResponseEntity.ok(menuService.assignMenuBranch(menuId, branchId));
+    }
+
+    @GetMapping("/catalog/products")
+    public ResponseEntity<List<MenuDtos.MenuProductResponse>> listCatalogProducts() {
+        return ResponseEntity.ok(menuService.listCatalogProducts());
+    }
+
+    @PostMapping("/catalog/products")
+    public ResponseEntity<MenuDtos.MenuProductResponse> createCatalogProduct(
+            @RequestBody MenuDtos.MenuProductRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuService.createCatalogProduct(request));
+    }
+
+    @PostMapping("/{menuId}/products/{productId}/assign")
+    public ResponseEntity<MenuDtos.MenuProductResponse> addExistingProduct(
+            @PathVariable Long menuId,
+            @PathVariable Long productId,
+            @RequestBody(required = false) MenuDtos.AssignProductRequest request
+    ) {
+        return ResponseEntity.ok(menuService.addExistingProduct(menuId, productId, request));
     }
 
     @PatchMapping("/{menuId}")

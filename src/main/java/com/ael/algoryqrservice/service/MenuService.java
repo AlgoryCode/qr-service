@@ -97,10 +97,9 @@ public class MenuService {
         requireAllowedTheme(qr.getUserId(), themeId);
         String businessName = requireNonBlank(stringValue(details.get("businessName")), "businessName zorunludur");
         Long branchId = longValue(details.get("branchId"));
-        if (branchId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Şube seçimi zorunludur");
+        if (branchId != null) {
+            branchService.requireOwnedForUser(branchId, qr.getUserId());
         }
-        branchService.requireOwnedForUser(branchId, qr.getUserId());
 
         Menu menu = Menu.builder()
                 .qrId(qr.getQrId())
@@ -174,6 +173,7 @@ public class MenuService {
             ServesPeopleSupport.Range serves = servesPeopleSupport.resolveFromSeed(servesMin, servesMax, name);
             MenuProduct product = MenuProduct.builder()
                     .menuId(menu.getMenuId())
+                    .userId(menu.getUserId())
                     .name(name.trim())
                     .description(trimToNull(stringValue(map.get("description"))))
                     .price(decimalValue(map.get("price")))
@@ -571,6 +571,181 @@ public class MenuService {
         return createProductOnMenu(menu, request);
     }
 
+    @Transactional(readOnly = true)
+    public List<MenuDtos.MenuProductResponse> listCatalogProducts() {
+        Long userId = securityUtils.getCurrentUserId();
+        return menuProductRepository.findByUserIdAndDeletedFalseOrderByProductIdDesc(userId).stream()
+                .map(this::toProductResponse)
+                .toList();
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductResponse createCatalogProduct(MenuDtos.MenuProductRequest request) {
+        if (request == null || request.getName() == null || request.getName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
+        }
+        Long userId = securityUtils.getCurrentUserId();
+        consumeProduct(userId, CatalogProducts.MENU_PRODUCT, 1);
+        if (request.getNutrition() != null) {
+            nutritionFactsService.validateForCreate(request.getNutrition());
+        }
+        Set<Long> tagIds = normalizeTagIds(request.getTagIds());
+        tagIds = applyChefRecommended(tagIds, request.getChefRecommended());
+        menuTaxonomyService.requireTags(tagIds);
+        Set<Long> allergenIds = normalizeTagIds(request.getAllergenIds());
+        menuTaxonomyService.requireAllergens(allergenIds);
+        ServesPeopleSupport.Range serves = servesPeopleSupport.normalize(
+                request.getServesPeopleMin(),
+                request.getServesPeopleMax()
+        );
+        MenuProduct product = MenuProduct.builder()
+                .userId(userId)
+                .name(request.getName().trim())
+                .description(trimToNull(request.getDescription()))
+                .price(request.getPrice())
+                .currency(request.getCurrency() != null && !request.getCurrency().isBlank() ? request.getCurrency().trim() : "TRY")
+                .tagIds(tagIds)
+                .allergenIds(allergenIds)
+                .chefRecommended(resolveChefRecommended(tagIds, request.getChefRecommended()))
+                .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0)
+                .imageUrl(resolveProductImageUrl(request.getImageUrl()))
+                .available(request.getAvailable() == null || request.getAvailable())
+                .servesPeopleMin(serves.min())
+                .servesPeopleMax(serves.max())
+                .nutrition(request.getNutrition() != null ? request.getNutrition() : new NutritionFacts())
+                .build();
+        MenuProduct saved = menuProductRepository.save(product);
+        if (request.getOptionGroups() != null) {
+            menuProductOptionService.replace(saved.getProductId(), request.getOptionGroups());
+        }
+        return toProductResponse(saved);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductResponse addExistingProduct(
+            Long menuId,
+            Long productId,
+            MenuDtos.AssignProductRequest request
+    ) {
+        Menu menu = ensureOwnedMenu(menuId);
+        MenuProduct source = requireOwnedCatalogProduct(productId);
+        if (menuId.equals(source.getMenuId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ürün zaten bu menüde");
+        }
+        Long subCategoryId = request != null ? request.getSubCategoryId() : null;
+        if (subCategoryId == null) {
+            subCategoryId = source.getSubCategoryId();
+        }
+        MenuSubCategory subCategory = menuCategoryService.requireSubCategory(menuId, subCategoryId);
+        if (source.getMenuId() == null) {
+            source.setMenuId(menuId);
+            source.setSubCategoryId(subCategory.getId());
+            if (source.getUserId() == null) {
+                source.setUserId(menu.getUserId());
+            }
+            MenuProduct saved = menuProductRepository.save(source);
+            menuProductIndexNotifier.productChanged(saved);
+            return toProductResponse(saved);
+        }
+        MenuProduct copy = MenuProduct.builder()
+                .menuId(menuId)
+                .userId(menu.getUserId())
+                .name(source.getName())
+                .description(source.getDescription())
+                .price(source.getPrice())
+                .currency(source.getCurrency())
+                .subCategoryId(subCategory.getId())
+                .tagIds(source.getTagIds() == null ? new java.util.HashSet<>() : new java.util.HashSet<>(source.getTagIds()))
+                .allergenIds(source.getAllergenIds() == null ? new java.util.HashSet<>() : new java.util.HashSet<>(source.getAllergenIds()))
+                .chefRecommended(source.isChefRecommended())
+                .sortOrder(nextSortOrder(menuId))
+                .imageUrl(source.getImageUrl())
+                .available(source.isAvailable())
+                .servesPeopleMin(source.getServesPeopleMin())
+                .servesPeopleMax(source.getServesPeopleMax())
+                .nutrition(source.getNutrition())
+                .build();
+        consumeProduct(menu.getUserId(), CatalogProducts.MENU_PRODUCT, 1);
+        MenuProduct saved = menuProductRepository.save(copy);
+        menuProductIndexNotifier.productChanged(saved);
+        return toProductResponse(saved);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProfileResponse assignMenuBranch(Long menuId, Long branchId) throws Exception {
+        Menu menu = ensureOwnedQrMenu(menuId);
+        Long previousBranchId = menu.getBranchId();
+        if (Objects.equals(previousBranchId, branchId)) {
+            return toMenuProfile(menu, buildPublicUrl(menu), null);
+        }
+        if (branchId != null) {
+            branchService.requireOwnedForUser(branchId, menu.getUserId());
+        }
+        menu.setBranchId(branchId);
+        menuRepository.save(menu);
+        return toMenuProfile(menu, buildPublicUrl(menu), null);
+    }
+
+    private MenuDtos.MenuProductResponse updateCatalogProduct(
+            MenuProduct product,
+            MenuDtos.MenuProductRequest request
+    ) {
+        requireOwnedCatalogProduct(product.getProductId());
+        if (request == null || request.getName() == null || request.getName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
+        }
+        Set<Long> tagIds = normalizeTagIds(request.getTagIds());
+        tagIds = applyChefRecommended(tagIds, request.getChefRecommended());
+        menuTaxonomyService.requireTags(tagIds);
+        Set<Long> allergenIds = normalizeTagIds(request.getAllergenIds());
+        menuTaxonomyService.requireAllergens(allergenIds);
+        ServesPeopleSupport.Range serves = servesPeopleSupport.normalize(
+                request.getServesPeopleMin(),
+                request.getServesPeopleMax()
+        );
+        product.setName(request.getName().trim());
+        product.setDescription(trimToNull(request.getDescription()));
+        product.setPrice(request.getPrice());
+        if (request.getCurrency() != null && !request.getCurrency().isBlank()) {
+            product.setCurrency(request.getCurrency().trim());
+        }
+        product.setTagIds(tagIds);
+        product.setAllergenIds(allergenIds);
+        product.setChefRecommended(resolveChefRecommended(tagIds, request.getChefRecommended()));
+        String newImageUrl = resolveProductImageUrl(request.getImageUrl());
+        if (!Objects.equals(product.getImageUrl(), newImageUrl)) {
+            productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
+            product.setImageUrl(newImageUrl);
+        }
+        if (request.getAvailable() != null) {
+            product.setAvailable(request.getAvailable());
+        }
+        product.setServesPeopleMin(serves.min());
+        product.setServesPeopleMax(serves.max());
+        if (request.getNutrition() != null) {
+            product.setNutrition(nutritionFactsService.merge(product.getNutrition(), request.getNutrition()));
+        }
+        MenuProduct saved = menuProductRepository.save(product);
+        if (request.getOptionGroups() != null) {
+            menuProductOptionService.replace(saved.getProductId(), request.getOptionGroups());
+        }
+        return toProductResponse(saved);
+    }
+
+    private MenuProduct requireOwnedCatalogProduct(Long productId) {
+        MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        Long userId = securityUtils.getCurrentUserId();
+        if (product.getMenuId() != null) {
+            ensureOwnedMenu(product.getMenuId());
+            return product;
+        }
+        if (product.getUserId() == null || !product.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu ürüne erişim yetkiniz yok");
+        }
+        return product;
+    }
+
     @Transactional
     public MenuDtos.MenuProductResponse createProductForOwner(
             Long menuId,
@@ -603,6 +778,7 @@ public class MenuService {
 
         MenuProduct product = MenuProduct.builder()
                 .menuId(menu.getMenuId())
+                .userId(menu.getUserId())
                 .name(request.getName().trim())
                 .description(trimToNull(request.getDescription()))
                 .price(request.getPrice())
@@ -641,6 +817,9 @@ public class MenuService {
     public MenuDtos.MenuProductResponse updateProduct(Long productId, MenuDtos.MenuProductRequest request) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+        if (product.getMenuId() == null) {
+            return updateCatalogProduct(product, request);
+        }
         Menu menu = ensureOwnedMenu(product.getMenuId());
         validateProductRequest(request);
         MenuSubCategory subCategory = menuCategoryService.requireSubCategory(
@@ -710,7 +889,11 @@ public class MenuService {
     public MenuDtos.MenuProductResponse patchProductNutrition(Long productId, NutritionFacts patch) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
-        ensureOwnedMenu(product.getMenuId());
+        if (product.getMenuId() == null) {
+            requireOwnedCatalogProduct(product.getProductId());
+        } else {
+            ensureOwnedMenu(product.getMenuId());
+        }
         if (patch == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ögesi bilgisi zorunludur");
         }
@@ -722,9 +905,10 @@ public class MenuService {
 
     @Transactional
     public void deleteProduct(Long productId) {
-        MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
-        Menu menu = ensureOwnedMenu(product.getMenuId());
+        MenuProduct product = requireOwnedCatalogProduct(productId);
+        if (product.getMenuId() != null) {
+            ensureOwnedMenu(product.getMenuId());
+        }
         productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
         product.setDeleted(true);
         menuProductRepository.save(product);
@@ -881,25 +1065,35 @@ public class MenuService {
     public List<MenuDtos.ActiveMenuSummary> listActiveMenusForCurrentUser() {
         Long userId = securityUtils.getCurrentMerchantId();
         return menuRepository.findActiveMenusWithQrByUserId(userId).stream()
-                .map(row -> {
-                    Menu menu = (Menu) row[0];
-                    Qr qr = (Qr) row[1];
-                    return MenuDtos.ActiveMenuSummary.builder()
-                            .menuId(menu.getMenuId())
-                            .qrId(menu.getQrId())
-                            .publicId(menu.getPublicId())
-                            .branchId(menu.getBranchId())
-                            .businessName(menu.getBusinessName())
-                            .themeId(menu.getThemeId())
-                            .publicUrl(buildPublicUrl(menu))
-                            .active(menu.isActive())
-                            .qr(MenuDtos.QrNameBrief.builder()
-                                    .id(qr.getQrId())
-                                    .name(qr.getQrName())
-                                    .build())
-                            .build();
-                })
+                .map(this::toMenuSummary)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MenuDtos.ActiveMenuSummary> listMenusForCurrentUser() {
+        Long userId = securityUtils.getCurrentUserId();
+        return menuRepository.findMenusWithQrByUserId(userId).stream()
+                .map(this::toMenuSummary)
+                .toList();
+    }
+
+    private MenuDtos.ActiveMenuSummary toMenuSummary(Object[] row) {
+        Menu menu = (Menu) row[0];
+        Qr qr = (Qr) row[1];
+        return MenuDtos.ActiveMenuSummary.builder()
+                .menuId(menu.getMenuId())
+                .qrId(menu.getQrId())
+                .publicId(menu.getPublicId())
+                .branchId(menu.getBranchId())
+                .businessName(menu.getBusinessName())
+                .themeId(menu.getThemeId())
+                .publicUrl(buildPublicUrl(menu))
+                .active(menu.isActive())
+                .qr(MenuDtos.QrNameBrief.builder()
+                        .id(qr.getQrId())
+                        .name(qr.getQrName())
+                        .build())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -1235,10 +1429,11 @@ public class MenuService {
             pairingsByProduct = menuProductPairingService.loadByProductIds(List.of(product.getProductId()));
             optionsByProduct = menuProductOptionService.loadByProductIds(List.of(product.getProductId()));
         }
+        Long menuId = product.getMenuId();
         return toProductResponse(
                 product,
-                menuCategoryService.loadSubCategoryMap(product.getMenuId()),
-                menuCategoryService.loadCategoryMap(product.getMenuId()),
+                menuId == null ? Map.of() : menuCategoryService.loadSubCategoryMap(menuId),
+                menuId == null ? Map.of() : menuCategoryService.loadCategoryMap(menuId),
                 menuTaxonomyService.loadTagMap(),
                 menuTaxonomyService.loadAllergenMap(),
                 pairingsByProduct,

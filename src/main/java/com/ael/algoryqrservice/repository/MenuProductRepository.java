@@ -60,6 +60,8 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
 
     Optional<MenuProduct> findByProductIdAndDeletedFalse(Long productId);
 
+    List<MenuProduct> findByUserIdAndDeletedFalseOrderByProductIdDesc(Long userId);
+
     List<MenuProduct> findByProductIdInAndDeletedFalse(Collection<Long> productIds);
 
     long countBySubCategoryIdAndDeletedFalse(Long subCategoryId);
@@ -69,10 +71,8 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
     @Query("""
             select count(p)
             from MenuProduct p
-            join Menu m on p.menuId = m.menuId
-            where m.userId = :userId
+            where p.userId = :userId
               and p.deleted = false
-              and m.deleted = false
             """)
     long countActiveProductsForUser(@Param("userId") Long userId);
 

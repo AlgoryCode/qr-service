@@ -528,6 +528,22 @@ public final class MenuDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class AssignBranchRequest {
+        private Long branchId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AssignProductRequest {
+        private Long subCategoryId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ProductSearchFilter {
         private Long mainCategoryId;
         private Long subCategoryId;
