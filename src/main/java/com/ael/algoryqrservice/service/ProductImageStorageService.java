@@ -26,13 +26,21 @@ import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -79,6 +87,10 @@ public class ProductImageStorageService {
 
     public ProductImageDtos.UploadResponse uploadCategoryCover(Long menuId, Long categoryId, MultipartFile file) {
         return uploadWithPrefix(menuId, file, "menus/" + menuId + "/categories/" + categoryId + "/");
+    }
+
+    public ProductImageDtos.UploadResponse uploadLibraryCategoryCover(Long userId, Long categoryId, MultipartFile file) {
+        return uploadWithPrefix(userId, file, "catalog/" + userId + "/categories/" + categoryId + "/");
     }
 
     public ProductImageDtos.UploadResponse uploadBranchPhoto(Long branchId, MultipartFile file) {
@@ -270,6 +282,21 @@ public class ProductImageStorageService {
 
     public String buildPublicUrl(String objectKey) {
         return trimTrailingSlash(storageProperties.getPublicBaseUrl()) + "/" + objectKey;
+    }
+
+    /**
+     * Lists object keys under a prefix (e.g. {@code themes/kahve-sokagi/v1/}).
+     * Returns empty list when the prefix is missing or storage is unreachable.
+     */
+    public List<String> listObjectKeysUnderPrefix(String prefix) {
+        if (prefix == null || prefix.isBlank()) {
+            return List.of();
+        }
+        String normalizedPrefix = prefix.endsWith("/") ? prefix : prefix + "/";
+        if (storageProperties.isS3Mode()) {
+            return listObjectKeysUnderPrefixViaS3(normalizedPrefix);
+        }
+        return listObjectKeysUnderPrefixViaFiler(normalizedPrefix);
     }
 
     @PreDestroy
@@ -500,6 +527,73 @@ public class ProductImageStorageService {
 
     private String filerObjectPath(String objectKey) {
         return "/buckets/" + storageProperties.getBucket() + "/" + objectKey;
+    }
+
+    private List<String> listObjectKeysUnderPrefixViaFiler(String prefix) {
+        String directoryKey = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
+        String filerPath = filerObjectPath(directoryKey) + "/";
+        try {
+            String body = filerClient().get()
+                    .uri(filerPath)
+                    .retrieve()
+                    .body(String.class);
+            if (body == null || body.isBlank()) {
+                return List.of();
+            }
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(body);
+            JsonNode entries = root.get("Entries");
+            if (entries == null || !entries.isArray()) {
+                return List.of();
+            }
+            List<String> keys = new ArrayList<>();
+            String bucketPrefix = "/buckets/" + storageProperties.getBucket() + "/";
+            for (JsonNode entry : entries) {
+                JsonNode isDirectory = entry.get("IsDirectory");
+                if (isDirectory != null && isDirectory.asBoolean(false)) {
+                    continue;
+                }
+                String fullPath = entry.path("FullPath").asText("");
+                String name = entry.path("Name").asText("");
+                if (!fullPath.isBlank() && fullPath.startsWith(bucketPrefix)) {
+                    keys.add(fullPath.substring(bucketPrefix.length()));
+                } else if (!name.isBlank()) {
+                    keys.add(prefix + name);
+                }
+            }
+            keys.sort(String::compareTo);
+            return keys;
+        } catch (Exception exception) {
+            if (log.isDebugEnabled()) {
+                log.debug("Filer list failed for prefix={}", prefix, exception);
+            }
+            return List.of();
+        }
+    }
+
+    private List<String> listObjectKeysUnderPrefixViaS3(String prefix) {
+        S3Client client = s3Client();
+        ensureBucketExists(client);
+        List<String> keys = new ArrayList<>();
+        String continuationToken = null;
+        do {
+            ListObjectsV2Request.Builder request = ListObjectsV2Request.builder()
+                    .bucket(storageProperties.getBucket())
+                    .prefix(prefix);
+            if (continuationToken != null) {
+                request.continuationToken(continuationToken);
+            }
+            ListObjectsV2Response response = client.listObjectsV2(request.build());
+            for (S3Object object : response.contents()) {
+                String key = object.key();
+                if (key != null && !key.isBlank() && !key.endsWith("/")) {
+                    keys.add(key);
+                }
+            }
+            continuationToken = response.isTruncated() ? response.nextContinuationToken() : null;
+        } while (continuationToken != null);
+        keys.sort(String::compareTo);
+        return keys;
     }
 
     private String resolveObjectKey(String objectKey, String imageUrl) {

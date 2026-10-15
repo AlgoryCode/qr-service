@@ -45,6 +45,45 @@ public final class ThemeDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ThemePackAssetResponse {
+        /** Logical key (hero, yerli-uretim, logo, …) derived from filename when possible. */
+        private String assetKey;
+        private String fileName;
+        private String objectKey;
+        private String url;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ThemePackResponse {
+        private Long id;
+        private String code;
+        private String name;
+        private String packVersion;
+        private List<ThemePackAssetResponse> assets;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PublicThemeSummaryResponse {
+        private Long id;
+        private String code;
+        private String name;
+        private int sortOrder;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ReplaceThemesRequest {
         /**
          * Full replacement set for the member. Empty list clears all assignments.
