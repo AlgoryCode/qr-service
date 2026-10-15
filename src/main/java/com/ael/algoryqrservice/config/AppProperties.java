@@ -29,6 +29,8 @@ public class AppProperties {
     @Setter
     public static class MenuSettings {
         private int categoryMaxDepth = 10;
+        /** Seaweed object key segment: themes/{code}/{packVersion}/… */
+        private String themePackVersion = "v1";
     }
 
     @Getter
