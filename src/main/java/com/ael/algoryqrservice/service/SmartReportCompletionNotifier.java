@@ -54,15 +54,14 @@ public class SmartReportCompletionNotifier {
             return;
         }
 
-        event.setNotificationSentAt(LocalDateTime.now());
-        smartReportEventRepository.save(event);
-
         User user = userRepository.findById(event.getUserId()).orElse(null);
         if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
             log.warn("Smart report ready email skipped; user missing. processId={}", processId);
+            markNotificationSent(event);
             return;
         }
         if (!user.isNotifyEmailImportant()) {
+            markNotificationSent(event);
             return;
         }
 
@@ -71,17 +70,27 @@ public class SmartReportCompletionNotifier {
         if (displayName == null || displayName.isBlank()) {
             displayName = user.getEmail();
         }
+        String menuName = event.getMenuName();
+        if (menuName == null || menuName.isBlank()) {
+            menuName = "Menü";
+        }
 
         notificationPublisherService.publishSmartReportReady(
                 deterministicEventId(processId),
                 user.getEmail(),
                 displayName,
-                event.getMenuName(),
+                menuName,
                 title,
                 event.getFromDate().format(PERIOD_FORMATTER),
                 event.getToDate().format(PERIOD_FORMATTER),
                 appUrl + "/dashboard/dijital-menu/akilli-raporlar/" + processId
         );
+        markNotificationSent(event);
+    }
+
+    private void markNotificationSent(SmartReportEvent event) {
+        event.setNotificationSentAt(LocalDateTime.now());
+        smartReportEventRepository.save(event);
     }
 
     UUID deterministicEventId(UUID processId) {
