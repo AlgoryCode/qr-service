@@ -54,10 +54,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String principalType = jwtService.extractPrincipalType(claims);
         String subjectType = jwtService.extractSubjectType(claims);
         Long merchantId = null;
-        if (JwtService.SUBJECT_MERCHANT.equals(subjectType) || JwtService.SUBJECT_STAFF.equals(subjectType)) {
+        Long userId;
+        if (JwtService.SUBJECT_STAFF.equals(subjectType)) {
+            principalType = JwtService.PRINCIPAL_WAITER;
+            merchantId = jwtService.extractMerchantId(claims);
+            userId = jwtService.extractUserId(claims);
+        } else if (JwtService.SUBJECT_MERCHANT.equals(subjectType)) {
             merchantId = jwtService.extractPackageOwnerId(claims);
+            userId = merchantId != null ? merchantId : jwtService.extractUserId(claims);
+        } else {
+            userId = jwtService.extractUserId(claims);
         }
-        Long userId = merchantId != null ? merchantId : jwtService.extractUserId(claims);
         List<String> roles = jwtService.extractRoles(claims);
         List<String> scopes;
         List<String> products;

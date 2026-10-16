@@ -43,8 +43,14 @@ public class MenuProductOptionGroup {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "product_id", nullable = false)
+    @Column(name = "product_id")
     private Long productId;
+
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "library_group_id")
+    private Long libraryGroupId;
 
     @Column(nullable = false, length = 120)
     private String name;

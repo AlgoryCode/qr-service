@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -291,6 +292,102 @@ public class MenuController {
             @RequestBody MenuDtos.MenuProductRequest request
     ) {
         return ResponseEntity.status(201).body(menuService.createCatalogProduct(request));
+    }
+
+    @GetMapping("/catalog/option-groups")
+    public ResponseEntity<List<MenuDtos.MenuProductOptionGroupResponse>> listCatalogOptionGroups() {
+        return ResponseEntity.ok(menuService.listCatalogOptionGroups());
+    }
+
+    @PostMapping("/catalog/option-groups")
+    public ResponseEntity<MenuDtos.MenuProductOptionGroupResponse> createCatalogOptionGroup(
+            @RequestBody MenuDtos.MenuProductOptionGroupRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuService.createCatalogOptionGroup(request));
+    }
+
+    @PutMapping("/catalog/option-groups/{groupId}")
+    public ResponseEntity<MenuDtos.MenuProductOptionGroupResponse> updateCatalogOptionGroup(
+            @PathVariable Long groupId,
+            @RequestBody MenuDtos.MenuProductOptionGroupRequest request
+    ) {
+        return ResponseEntity.ok(menuService.updateCatalogOptionGroup(groupId, request));
+    }
+
+    @DeleteMapping("/catalog/option-groups/{groupId}")
+    public ResponseEntity<Void> deleteCatalogOptionGroup(@PathVariable Long groupId) {
+        menuService.deleteCatalogOptionGroup(groupId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/catalog/option-groups/{groupId}/assign")
+    public ResponseEntity<MenuDtos.MenuProductOptionGroupResponse> assignCatalogOptionGroup(
+            @PathVariable Long groupId,
+            @RequestBody MenuDtos.AssignOptionGroupRequest request
+    ) {
+        List<Long> productIds = request == null ? List.of() : request.getProductIds();
+        return ResponseEntity.ok(menuService.assignCatalogOptionGroup(groupId, productIds));
+    }
+
+    @GetMapping("/catalog/categories")
+    public ResponseEntity<List<TaxonomyDtos.MainCategoryResponse>> listCatalogCategories() {
+        return ResponseEntity.ok(menuService.listCatalogCategories());
+    }
+
+    @PostMapping("/catalog/categories")
+    public ResponseEntity<TaxonomyDtos.MainCategoryResponse> createCatalogCategory(
+            @RequestBody TaxonomyDtos.MainCategoryRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuService.createCatalogCategory(request));
+    }
+
+    @PutMapping("/catalog/categories/{categoryId}")
+    public ResponseEntity<TaxonomyDtos.MainCategoryResponse> updateCatalogCategory(
+            @PathVariable Long categoryId,
+            @RequestBody TaxonomyDtos.MainCategoryUpdateRequest request
+    ) {
+        return ResponseEntity.ok(menuService.updateCatalogCategory(categoryId, request));
+    }
+
+    @DeleteMapping("/catalog/categories/{categoryId}")
+    public ResponseEntity<Void> deleteCatalogCategory(@PathVariable Long categoryId) {
+        menuService.deleteCatalogCategory(categoryId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/catalog/categories/{categoryId}/cover")
+    public ResponseEntity<TaxonomyDtos.MainCategoryResponse> uploadCatalogCategoryCover(
+            @PathVariable Long categoryId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(menuService.uploadCatalogCategoryCover(categoryId, file));
+    }
+
+    @DeleteMapping("/catalog/categories/{categoryId}/cover")
+    public ResponseEntity<TaxonomyDtos.MainCategoryResponse> clearCatalogCategoryCover(@PathVariable Long categoryId) {
+        return ResponseEntity.ok(menuService.clearCatalogCategoryCover(categoryId));
+    }
+
+    @PostMapping("/catalog/categories/{categoryId}/subs")
+    public ResponseEntity<TaxonomyDtos.SubCategoryResponse> createCatalogSubCategory(
+            @PathVariable Long categoryId,
+            @RequestBody TaxonomyDtos.SubCategoryRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuService.createCatalogSubCategory(categoryId, request));
+    }
+
+    @PutMapping("/catalog/subs/{subId}")
+    public ResponseEntity<TaxonomyDtos.SubCategoryResponse> updateCatalogSubCategory(
+            @PathVariable Long subId,
+            @RequestBody TaxonomyDtos.SubCategoryUpdateRequest request
+    ) {
+        return ResponseEntity.ok(menuService.updateCatalogSubCategory(subId, request));
+    }
+
+    @DeleteMapping("/catalog/subs/{subId}")
+    public ResponseEntity<Void> deleteCatalogSubCategory(@PathVariable Long subId) {
+        menuService.deleteCatalogSubCategory(subId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{menuId}/products/{productId}/assign")

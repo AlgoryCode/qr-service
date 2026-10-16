@@ -4,10 +4,13 @@ import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Menu;
 import com.ael.algoryqrservice.model.RestaurantArea;
+import com.ael.algoryqrservice.model.RestaurantLayout;
 import com.ael.algoryqrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.model.dto.RestaurantAreaDtos;
+import com.ael.algoryqrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.repository.RestaurantAreaRepository;
+import com.ael.algoryqrservice.repository.RestaurantLayoutRepository;
 import com.ael.algoryqrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ public class RestaurantAreaService {
 
     private final RestaurantAreaRepository restaurantAreaRepository;
     private final RestaurantTableRepository restaurantTableRepository;
+    private final RestaurantLayoutRepository restaurantLayoutRepository;
     private final MenuRepository menuRepository;
     private final SecurityUtils securityUtils;
 
@@ -52,6 +56,7 @@ public class RestaurantAreaService {
 
         LocalDateTime now = LocalDateTime.now();
         RestaurantArea area = RestaurantArea.builder()
+                .userId(menu.getUserId())
                 .menuId(menu.getMenuId())
                 .name(name)
                 .sortOrder(sortOrder)
@@ -93,6 +98,76 @@ public class RestaurantAreaService {
         restaurantAreaRepository.delete(area);
     }
 
+    @Transactional(readOnly = true)
+    public List<RestaurantAreaDtos.AreaResponse> listOwnedAreas(Long layoutId) {
+        Long userId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        return restaurantAreaRepository.findByLayoutIdOrderBySortOrderAscIdAsc(layout.getId()).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public RestaurantAreaDtos.AreaResponse createOwnedArea(
+            Long layoutId,
+            RestaurantAreaDtos.CreateAreaRequest request
+    ) {
+        Long userId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        String name = requireName(request == null ? null : request.getName());
+        if (ownedAreaNameTaken(layout.getId(), name, null)) {
+            throw new BadRequestException("Bu alan adı zaten kullanılıyor");
+        }
+        int sortOrder = restaurantAreaRepository.findByLayoutIdOrderBySortOrderAscIdAsc(layout.getId()).stream()
+                .mapToInt(RestaurantArea::getSortOrder)
+                .max()
+                .orElse(0) + 10;
+        LocalDateTime now = LocalDateTime.now();
+        RestaurantArea area = RestaurantArea.builder()
+                .userId(userId)
+                .layoutId(layout.getId())
+                .menuId(linkedMenuId(layout))
+                .name(name)
+                .sortOrder(sortOrder)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        return toResponse(restaurantAreaRepository.save(area));
+    }
+
+    @Transactional
+    public RestaurantAreaDtos.AreaResponse updateOwnedArea(
+            Long layoutId,
+            Long areaId,
+            RestaurantAreaDtos.UpdateAreaRequest request
+    ) {
+        Long userId = securityUtils.getCurrentMerchantId();
+        RestaurantArea area = requireOwnedArea(userId, layoutId, areaId);
+        if (request != null && request.getName() != null) {
+            String name = requireName(request.getName());
+            if (ownedAreaNameTaken(layoutId, name, area.getId())) {
+                throw new BadRequestException("Bu alan adı zaten kullanılıyor");
+            }
+            area.setName(name);
+        }
+        area.setUpdatedAt(LocalDateTime.now());
+        return toResponse(restaurantAreaRepository.save(area));
+    }
+
+    @Transactional
+    public void deleteOwnedArea(Long layoutId, Long areaId) {
+        Long userId = securityUtils.getCurrentMerchantId();
+        RestaurantArea area = requireOwnedArea(userId, layoutId, areaId);
+        List<RestaurantTable> tables = restaurantTableRepository.findByUserIdAndAreaIdAndDeletedFalse(userId, area.getId());
+        LocalDateTime now = LocalDateTime.now();
+        for (RestaurantTable table : tables) {
+            table.setAreaId(null);
+            table.setUpdatedAt(now);
+        }
+        restaurantTableRepository.saveAll(tables);
+        restaurantAreaRepository.delete(area);
+    }
+
     public RestaurantArea requireArea(Long menuId, Long areaId) {
         return restaurantAreaRepository.findByIdAndMenuId(areaId, menuId)
                 .orElseThrow(() -> new NotFoundException("Alan bulunamadı"));
@@ -103,6 +178,40 @@ public class RestaurantAreaService {
             throw new BadRequestException("Alan adı zorunludur");
         }
         return raw.trim();
+    }
+
+    private RestaurantLayout requireOwnedLayout(Long userId, Long layoutId) {
+        if (layoutId == null) {
+            throw new NotFoundException("Düzen bulunamadı");
+        }
+        return restaurantLayoutRepository.findByIdAndUserId(layoutId, userId)
+                .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
+    }
+
+    private RestaurantArea requireOwnedArea(Long userId, Long layoutId, Long areaId) {
+        RestaurantArea area = restaurantAreaRepository.findByIdAndUserId(areaId, userId)
+                .orElseThrow(() -> new NotFoundException("Alan bulunamadı"));
+        if (!layoutId.equals(area.getLayoutId())) {
+            throw new NotFoundException("Alan bulunamadı");
+        }
+        return area;
+    }
+
+    private Long linkedMenuId(RestaurantLayout layout) {
+        if (layout.getBranchId() == null) {
+            return null;
+        }
+        return menuRepository.findByBranchIdAndChannelAndDeletedFalse(layout.getBranchId(), MenuChannel.QR)
+                .stream()
+                .findFirst()
+                .map(Menu::getMenuId)
+                .orElse(null);
+    }
+
+    private boolean ownedAreaNameTaken(Long layoutId, String name, Long excludeId) {
+        return restaurantAreaRepository.findByLayoutIdOrderBySortOrderAscIdAsc(layoutId).stream()
+                .filter(area -> excludeId == null || !excludeId.equals(area.getId()))
+                .anyMatch(area -> normalizeName(area.getName()).equals(normalizeName(name)));
     }
 
     private boolean areaNameTaken(Long menuId, String name, Long excludeId) {

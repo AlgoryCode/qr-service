@@ -1,15 +1,14 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.AuthStaffClient;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.MerchantStaff;
-import com.ael.algoryqrservice.model.User;
 import com.ael.algoryqrservice.model.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.repository.MerchantStaffRepository;
-import com.ael.algoryqrservice.repository.UserRepository;
 import com.ael.algoryqrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,61 +24,60 @@ import java.util.Locale;
 public class MenuWaiterService {
 
     private final MerchantStaffRepository merchantStaffRepository;
-    private final UserRepository userRepository;
     private final BranchService branchService;
     private final PasswordEncoder passwordEncoder;
     private final SecurityUtils securityUtils;
+    private final AuthStaffClient authStaffClient;
+
+    @Transactional(readOnly = true)
+    public MenuWaiterDtos.StaffListResponse listMerchantStaff() {
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        List<MenuWaiterDtos.WaiterResponse> staff = merchantStaffRepository
+                .findByMerchantIdOrderByDisplayNameAsc(merchantId)
+                .stream()
+                .map(this::toWaiterResponse)
+                .toList();
+        return MenuWaiterDtos.StaffListResponse.builder()
+                .staff(staff)
+                .build();
+    }
 
     @Transactional(readOnly = true)
     public MenuWaiterDtos.UsersPageResponse listWaiters(Long branchId) {
         Branch branch = requireOwnedBranch(branchId);
-        MenuWaiterDtos.OwnerSummary owner = getOwnerSummary(branch);
         List<MenuWaiterDtos.WaiterResponse> waiters = merchantStaffRepository
                 .findByBranchIdOrderByDisplayNameAsc(branch.getId())
                 .stream()
                 .map(this::toWaiterResponse)
                 .toList();
         return MenuWaiterDtos.UsersPageResponse.builder()
-                .owner(owner)
                 .waiters(waiters)
                 .build();
     }
 
     @Transactional
+    public MenuWaiterDtos.WaiterResponse createMerchantStaff(MenuWaiterDtos.CreateWaiterRequest request) {
+        return persistStaff(securityUtils.getCurrentMerchantId(), null, request);
+    }
+
+    @Transactional
     public MenuWaiterDtos.WaiterResponse createWaiter(Long branchId, MenuWaiterDtos.CreateWaiterRequest request) {
         Branch branch = requireOwnedBranch(branchId);
-        if (request == null) {
-            throw new BadRequestException("İstek gövdesi zorunludur");
-        }
+        return persistStaff(branch.getUserId(), branch, request);
+    }
 
-        String username = normalizeUsername(request.getUsername());
-        if (merchantStaffRepository.existsByMerchantIdAndUsernameIgnoreCase(branch.getUserId(), username)) {
-            throw new BadRequestException("Bu kullanıcı adı bu işletmede zaten kullanılıyor");
+    @Transactional
+    public MenuWaiterDtos.WaiterResponse assignBranch(Long staffId, Long branchId) {
+        MerchantStaff staff = requireMerchantStaff(staffId);
+        if (branchId == null) {
+            staff.setBranchId(null);
+        } else {
+            Branch branch = requireOwnedBranch(branchId);
+            assertRoleAllowedOnBranch(staff.resolvedStaffRole(), branch);
+            staff.setBranchId(branch.getId());
         }
-
-        String displayName = requireDisplayName(request.getDisplayName());
-        StaffRole staffRole = request.getStaffRole() == null ? StaffRole.WAITER : request.getStaffRole();
-        if (staffRole == StaffRole.KITCHEN && !branch.isKitchenEnabled()) {
-            throw new BadRequestException("Önce şube ayarlarından mutfağı ekleyin");
-        }
-        if (staffRole == StaffRole.COURIER && !branch.isCourierEnabled()) {
-            throw new BadRequestException("Önce şube bilgilerinden kuryeyi açın");
-        }
-        LocalDateTime now = LocalDateTime.now();
-
-        MerchantStaff waiter = MerchantStaff.builder()
-                .merchantId(branch.getUserId())
-                .branchId(branch.getId())
-                .username(username)
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .displayName(displayName)
-                .staffRole(staffRole)
-                .active(true)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        return toWaiterResponse(merchantStaffRepository.save(waiter));
+        staff.setUpdatedAt(LocalDateTime.now());
+        return toWaiterResponse(saveAndSync(staff));
     }
 
     @Transactional
@@ -89,8 +87,21 @@ public class MenuWaiterService {
             MenuWaiterDtos.UpdateWaiterRequest request
     ) {
         requireOwnedBranch(branchId);
-        MerchantStaff waiter = requireWaiter(branchId, staffId);
+        return applyUpdate(requireWaiter(branchId, staffId), request);
+    }
 
+    @Transactional
+    public MenuWaiterDtos.WaiterResponse updateMerchantStaff(
+            Long staffId,
+            MenuWaiterDtos.UpdateWaiterRequest request
+    ) {
+        return applyUpdate(requireMerchantStaff(staffId), request);
+    }
+
+    private MenuWaiterDtos.WaiterResponse applyUpdate(
+            MerchantStaff waiter,
+            MenuWaiterDtos.UpdateWaiterRequest request
+    ) {
         if (request != null) {
             if (request.getDisplayName() != null) {
                 waiter.setDisplayName(requireDisplayName(request.getDisplayName()));
@@ -118,27 +129,75 @@ public class MenuWaiterService {
         }
 
         waiter.setUpdatedAt(LocalDateTime.now());
-        return toWaiterResponse(merchantStaffRepository.save(waiter));
+        return toWaiterResponse(saveAndSync(waiter));
     }
 
     @Transactional
     public void deleteWaiter(Long branchId, Long staffId) {
         requireOwnedBranch(branchId);
-        MerchantStaff waiter = requireWaiter(branchId, staffId);
-        waiter.setActive(false);
-        waiter.setUpdatedAt(LocalDateTime.now());
-        merchantStaffRepository.save(waiter);
+        deactivate(requireWaiter(branchId, staffId));
     }
 
-    private MenuWaiterDtos.OwnerSummary getOwnerSummary(Branch branch) {
-        User owner = userRepository.findById(branch.getUserId())
-                .orElseThrow(() -> new NotFoundException("İşletme sahibi bulunamadı"));
-        return MenuWaiterDtos.OwnerSummary.builder()
-                .id(owner.getId())
-                .firstName(owner.getFirstName())
-                .lastName(owner.getLastName())
-                .email(owner.getEmail())
+    @Transactional
+    public void deleteMerchantStaff(Long staffId) {
+        deactivate(requireMerchantStaff(staffId));
+    }
+
+    private void deactivate(MerchantStaff waiter) {
+        waiter.setActive(false);
+        waiter.setUpdatedAt(LocalDateTime.now());
+        saveAndSync(waiter);
+    }
+
+    private MenuWaiterDtos.WaiterResponse persistStaff(
+            Long merchantId,
+            Branch branch,
+            MenuWaiterDtos.CreateWaiterRequest request
+    ) {
+        if (request == null) {
+            throw new BadRequestException("İstek gövdesi zorunludur");
+        }
+
+        String username = normalizeUsername(request.getUsername());
+        if (merchantStaffRepository.existsByMerchantIdAndUsernameIgnoreCase(merchantId, username)) {
+            throw new BadRequestException("Bu kullanıcı adı bu işletmede zaten kullanılıyor");
+        }
+
+        String displayName = requireDisplayName(request.getDisplayName());
+        StaffRole staffRole = request.getStaffRole() == null ? StaffRole.WAITER : request.getStaffRole();
+        if (branch != null) {
+            assertRoleAllowedOnBranch(staffRole, branch);
+        }
+        LocalDateTime now = LocalDateTime.now();
+
+        MerchantStaff waiter = MerchantStaff.builder()
+                .merchantId(merchantId)
+                .branchId(branch == null ? null : branch.getId())
+                .username(username)
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .displayName(displayName)
+                .staffRole(staffRole)
+                .active(true)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
+
+        return toWaiterResponse(saveAndSync(waiter));
+    }
+
+    private MerchantStaff saveAndSync(MerchantStaff staff) {
+        MerchantStaff saved = merchantStaffRepository.save(staff);
+        authStaffClient.upsert(saved);
+        return saved;
+    }
+
+    private void assertRoleAllowedOnBranch(StaffRole staffRole, Branch branch) {
+        if (staffRole == StaffRole.KITCHEN && !branch.isKitchenEnabled()) {
+            throw new BadRequestException("Önce şube ayarlarından mutfağı ekleyin");
+        }
+        if (staffRole == StaffRole.COURIER && !branch.isCourierEnabled()) {
+            throw new BadRequestException("Önce şube bilgilerinden kuryeyi açın");
+        }
     }
 
     private Branch requireOwnedBranch(Long branchId) {
@@ -147,7 +206,12 @@ public class MenuWaiterService {
 
     private MerchantStaff requireWaiter(Long branchId, Long staffId) {
         return merchantStaffRepository.findByIdAndBranchId(staffId, branchId)
-                .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Personel bulunamadı"));
+    }
+
+    private MerchantStaff requireMerchantStaff(Long staffId) {
+        return merchantStaffRepository.findByIdAndMerchantId(staffId, securityUtils.getCurrentMerchantId())
+                .orElseThrow(() -> new NotFoundException("Personel bulunamadı"));
     }
 
     private MenuWaiterDtos.WaiterResponse toWaiterResponse(MerchantStaff waiter) {

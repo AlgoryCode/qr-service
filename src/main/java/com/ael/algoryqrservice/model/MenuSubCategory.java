@@ -28,7 +28,7 @@ public class MenuSubCategory extends QrBaseModel {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "menu_id", nullable = false)
+    @Column(name = "menu_id")
     private Long menuId;
 
     @Column(name = "menu_category_id", nullable = false)

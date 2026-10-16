@@ -275,6 +275,166 @@ public class MenuCategoryService {
         menuSubCategoryRepository.save(sub);
     }
 
+    @Transactional(readOnly = true)
+    public List<TaxonomyDtos.MainCategoryResponse> listLibrary(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        List<MenuCategory> categories = menuCategoryRepository
+                .findByUserIdAndMenuIdIsNullAndDeletedFalseOrderBySortOrderAscIdAsc(userId);
+        if (categories.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = categories.stream().map(MenuCategory::getId).toList();
+        Map<Long, List<MenuSubCategory>> byParent = menuSubCategoryRepository
+                .findByMenuCategoryIdInAndDeletedFalseOrderBySortOrderAscIdAsc(ids)
+                .stream()
+                .collect(Collectors.groupingBy(MenuSubCategory::getMenuCategoryId));
+        List<TaxonomyDtos.MainCategoryResponse> result = new ArrayList<>();
+        for (MenuCategory category : categories) {
+            result.add(toMainResponse(category, byParent.getOrDefault(category.getId(), List.of())));
+        }
+        return result;
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse createLibrary(Long userId, TaxonomyDtos.MainCategoryRequest request) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Oturum bulunamadı");
+        }
+        String name = requireName(request == null ? null : request.getName());
+        String slug = resolveLibrarySlug(userId, null, request == null ? null : request.getSlug(), name, true);
+        MenuCategory saved = menuCategoryRepository.save(MenuCategory.builder()
+                .userId(userId)
+                .slug(slug)
+                .name(name)
+                .sortOrder(request == null || request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .deleted(false)
+                .build());
+        return toMainResponse(saved, List.of());
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse updateLibrary(
+            Long userId,
+            Long categoryId,
+            TaxonomyDtos.MainCategoryUpdateRequest request
+    ) {
+        MenuCategory category = requireLibraryCategory(userId, categoryId);
+        if (request.getName() != null && !request.getName().isBlank()) {
+            category.setName(request.getName().trim());
+        }
+        if (request.getSortOrder() != null) {
+            category.setSortOrder(request.getSortOrder());
+        }
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        return listLibrary(userId).stream()
+                .filter(item -> item.getId().equals(categoryId))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Transactional
+    public void deleteLibrary(Long userId, Long categoryId) {
+        MenuCategory category = requireLibraryCategory(userId, categoryId);
+        if (menuSubCategoryRepository.countByMenuCategoryIdAndDeletedFalse(categoryId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Alt kategorisi olan kategori silinemez");
+        }
+        String previousKey = category.getImageKey();
+        category.setDeleted(true);
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        productImageStorageService.deleteQuietly(previousKey);
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse uploadLibraryCover(Long userId, Long categoryId, MultipartFile file) {
+        MenuCategory category = requireLibraryCategory(userId, categoryId);
+        ProductImageDtos.UploadResponse uploaded = productImageStorageService.uploadLibraryCategoryCover(userId, categoryId, file);
+        String previousKey = category.getImageKey();
+        category.setImageUrl(uploaded.imageUrl());
+        category.setImageKey(uploaded.objectKey());
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(uploaded.objectKey())) {
+            productImageStorageService.deleteQuietly(previousKey);
+        }
+        return toMainResponse(category, subsOf(categoryId));
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse clearLibraryCover(Long userId, Long categoryId) {
+        MenuCategory category = requireLibraryCategory(userId, categoryId);
+        String previousKey = category.getImageKey();
+        category.setImageUrl(null);
+        category.setImageKey(null);
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        productImageStorageService.deleteQuietly(previousKey);
+        return toMainResponse(category, subsOf(categoryId));
+    }
+
+    @Transactional
+    public TaxonomyDtos.SubCategoryResponse createLibrarySub(
+            Long userId,
+            Long categoryId,
+            TaxonomyDtos.SubCategoryRequest request
+    ) {
+        requireLibraryCategory(userId, categoryId);
+        String name = requireName(request == null ? null : request.getName());
+        String slug = resolveLibrarySlug(userId, categoryId, request == null ? null : request.getSlug(), name, false);
+        MenuSubCategory saved = menuSubCategoryRepository.save(MenuSubCategory.builder()
+                .menuCategoryId(categoryId)
+                .slug(slug)
+                .name(name)
+                .sortOrder(request == null || request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .deleted(false)
+                .build());
+        return toSubResponse(saved);
+    }
+
+    @Transactional
+    public TaxonomyDtos.SubCategoryResponse updateLibrarySub(
+            Long userId,
+            Long subId,
+            TaxonomyDtos.SubCategoryUpdateRequest request
+    ) {
+        MenuSubCategory sub = requireLibrarySubCategory(userId, subId);
+        if (request.getMainCategoryId() != null) {
+            requireLibraryCategory(userId, request.getMainCategoryId());
+            sub.setMenuCategoryId(request.getMainCategoryId());
+        }
+        if (request.getName() != null && !request.getName().isBlank()) {
+            sub.setName(request.getName().trim());
+        }
+        if (request.getSortOrder() != null) {
+            sub.setSortOrder(request.getSortOrder());
+        }
+        sub.setUpdatedAt(LocalDateTime.now());
+        return toSubResponse(menuSubCategoryRepository.save(sub));
+    }
+
+    @Transactional
+    public void deleteLibrarySub(Long userId, Long subId) {
+        MenuSubCategory sub = requireLibrarySubCategory(userId, subId);
+        if (menuProductRepository.countBySubCategoryIdAndDeletedFalse(subId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ürünü olan alt kategori silinemez");
+        }
+        sub.setDeleted(true);
+        sub.setUpdatedAt(LocalDateTime.now());
+        menuSubCategoryRepository.save(sub);
+    }
+
+    @Transactional(readOnly = true)
+    public MenuSubCategory requireLibrarySubCategory(Long userId, Long subCategoryId) {
+        return requireLibrarySubCategoryInternal(userId, subCategoryId);
+    }
+
     public record TaxonomyCloneResult(Map<Long, Long> categoryIds, Map<Long, Long> subCategoryIds) {
     }
 
@@ -318,6 +478,42 @@ public class MenuCategoryService {
             sourceSubToTargetSub.put(source.getId(), copied.getId());
         }
         return new TaxonomyCloneResult(sourceCategoryToTarget, sourceSubToTargetSub);
+    }
+
+    private MenuCategory requireLibraryCategory(Long userId, Long categoryId) {
+        if (userId == null || categoryId == null) {
+            throw new BadRequestException("Kategori bulunamadi");
+        }
+        return menuCategoryRepository.findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(categoryId, userId)
+                .orElseThrow(() -> new BadRequestException("Kategori bulunamadi: " + categoryId));
+    }
+
+    private MenuSubCategory requireLibrarySubCategoryInternal(Long userId, Long subCategoryId) {
+        if (subCategoryId == null) {
+            throw new BadRequestException("subCategoryId zorunludur");
+        }
+        MenuSubCategory sub = menuSubCategoryRepository.findByIdAndDeletedFalse(subCategoryId)
+                .orElseThrow(() -> new BadRequestException("Alt kategori bulunamadi: " + subCategoryId));
+        requireLibraryCategory(userId, sub.getMenuCategoryId());
+        return sub;
+    }
+
+    private List<MenuSubCategory> subsOf(Long categoryId) {
+        return menuSubCategoryRepository.findByMenuCategoryIdAndDeletedFalseOrderBySortOrderAscIdAsc(categoryId);
+    }
+
+    private String resolveLibrarySlug(Long userId, Long categoryId, String requested, String name, boolean forCategory) {
+        String base = requested == null || requested.isBlank() ? slugify(name) : requireSlug(requested);
+        if (forCategory) {
+            if (menuCategoryRepository.existsByUserIdAndMenuIdIsNullAndSlugAndDeletedFalse(userId, base)) {
+                throw new BadRequestException("Kategori slug zaten var: " + base);
+            }
+            return base;
+        }
+        if (menuSubCategoryRepository.existsByMenuCategoryIdAndSlugAndDeletedFalse(categoryId, base)) {
+            throw new BadRequestException("Alt kategori slug zaten var: " + base);
+        }
+        return base;
     }
 
     private Long requireMenuUserId(Long menuId) {
