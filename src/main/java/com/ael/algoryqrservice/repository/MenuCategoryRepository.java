@@ -12,7 +12,13 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategory, Long
 
     List<MenuCategory> findByUserIdAndDeletedFalseOrderBySortOrderAscIdAsc(Long userId);
 
+    List<MenuCategory> findByUserIdAndMenuIdIsNullAndDeletedFalseOrderBySortOrderAscIdAsc(Long userId);
+
     Optional<MenuCategory> findByIdAndMenuIdAndDeletedFalse(Long id, Long menuId);
+
+    Optional<MenuCategory> findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(Long id, Long userId);
+
+    boolean existsByUserIdAndMenuIdIsNullAndSlugAndDeletedFalse(Long userId, String slug);
 
     Optional<MenuCategory> findByIdAndUserIdAndDeletedFalse(Long id, Long userId);
 

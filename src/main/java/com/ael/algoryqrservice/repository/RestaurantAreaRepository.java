@@ -18,4 +18,14 @@ public interface RestaurantAreaRepository extends JpaRepository<RestaurantArea, 
     Optional<RestaurantArea> findByIdAndMenuId(Long id, Long menuId);
 
     boolean existsByMenuIdAndNameIgnoreCase(Long menuId, String name);
+
+    List<RestaurantArea> findByUserIdOrderBySortOrderAscIdAsc(Long userId);
+
+    Optional<RestaurantArea> findByIdAndUserId(Long id, Long userId);
+
+    List<RestaurantArea> findByUserIdAndMenuIdIsNullOrderBySortOrderAscIdAsc(Long userId);
+
+    List<RestaurantArea> findByLayoutIdOrderBySortOrderAscIdAsc(Long layoutId);
+
+    List<RestaurantArea> findByLayoutIdInOrderBySortOrderAscIdAsc(Collection<Long> layoutIds);
 }

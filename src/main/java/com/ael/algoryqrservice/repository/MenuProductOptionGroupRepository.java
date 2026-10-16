@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface MenuProductOptionGroupRepository extends JpaRepository<MenuProductOptionGroup, Long> {
 
@@ -17,6 +18,16 @@ public interface MenuProductOptionGroupRepository extends JpaRepository<MenuProd
 
     @EntityGraph(attributePaths = "options")
     List<MenuProductOptionGroup> findByProductIdInOrderBySortOrderAscIdAsc(Collection<Long> productIds);
+
+    @EntityGraph(attributePaths = "options")
+    List<MenuProductOptionGroup> findByUserIdAndProductIdIsNullOrderBySortOrderAscIdAsc(Long userId);
+
+    @EntityGraph(attributePaths = "options")
+    Optional<MenuProductOptionGroup> findByIdAndUserIdAndProductIdIsNull(Long id, Long userId);
+
+    List<MenuProductOptionGroup> findByLibraryGroupIdIn(Collection<Long> libraryGroupIds);
+
+    List<MenuProductOptionGroup> findByLibraryGroupIdAndProductIdIn(Long libraryGroupId, Collection<Long> productIds);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from MenuProductOptionGroup g where g.productId = :productId")

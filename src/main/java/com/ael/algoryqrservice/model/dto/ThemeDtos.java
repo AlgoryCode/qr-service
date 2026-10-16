@@ -45,10 +45,6 @@ public final class ThemeDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class ThemePackAssetResponse {
         /** Logical key (hero, yerli-uretim, logo, …) derived from filename when possible. */
         private String assetKey;

@@ -82,29 +82,28 @@ public class MenuWaiterOrderService {
     public List<MenuWaiterDtos.TableOrderSummary> listTables() {
         MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
         List<Menu> menus = waiterAccessService.menusForWaiter(waiter);
-        if (menus.isEmpty()) {
+        List<RestaurantTable> tables = waiterAccessService.tablesForWaiter(waiter);
+        if (tables.isEmpty()) {
             return List.of();
         }
         List<Long> menuIds = menus.stream().map(Menu::getMenuId).toList();
         Map<Long, Menu> menusById = menus.stream()
                 .collect(Collectors.toMap(Menu::getMenuId, Function.identity(), (a, b) -> a));
         boolean showMenuName = menus.size() > 1;
+        Map<Long, String> areaNames = waiterAccessService.areaNamesForTables(tables);
 
-        List<RestaurantTable> tables = restaurantTableRepository
-                .findByMenuIdInOrderByTableNumberAscNameAsc(menuIds);
-        Map<Long, String> areaNames = restaurantAreaRepository
-                .findByMenuIdInOrderBySortOrderAscIdAsc(menuIds).stream()
-                .collect(Collectors.toMap(RestaurantArea::getId, RestaurantArea::getName, (a, b) -> a));
-
-        List<MenuOrder> pendingOrders = menuOrderRepository
-                .findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.SUBMITTED);
-        List<MenuOrder> kitchenOrders = menuOrderRepository
-                .findByMenuIdInAndStatusInOrderBySubmittedAtDesc(
+        List<MenuOrder> pendingOrders = menuIds.isEmpty()
+                ? List.of()
+                : menuOrderRepository.findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.SUBMITTED);
+        List<MenuOrder> kitchenOrders = menuIds.isEmpty()
+                ? List.of()
+                : menuOrderRepository.findByMenuIdInAndStatusInOrderBySubmittedAtDesc(
                         menuIds,
                         EnumSet.of(MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING)
                 );
-        List<MenuOrder> readyOrders = menuOrderRepository
-                .findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.READY);
+        List<MenuOrder> readyOrders = menuIds.isEmpty()
+                ? List.of()
+                : menuOrderRepository.findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.READY);
 
         Map<Long, List<MenuOrder>> pendingByTable = pendingOrders.stream()
                 .collect(Collectors.groupingBy(MenuOrder::getTableId));

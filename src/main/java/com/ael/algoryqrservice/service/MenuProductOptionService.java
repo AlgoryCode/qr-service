@@ -10,8 +10,10 @@ import com.ael.algoryqrservice.model.enums.MenuProductOptionUnit;
 import com.ael.algoryqrservice.repository.MenuProductOptionGroupRepository;
 import com.ael.algoryqrservice.util.Enums;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -82,56 +84,123 @@ public class MenuProductOptionService {
             if (groupRequest == null) {
                 continue;
             }
-            String groupName = trimRequired(groupRequest.getName(), "Opsiyon grubu adı zorunludur");
-            MenuProductOptionGroupKind kind = resolveKind(groupRequest.getKind());
-            MenuProductOptionUnit unit = resolveUnit(kind, groupRequest.getUnit());
-            int minSelect = groupRequest.getMinSelect() == null ? 0 : groupRequest.getMinSelect();
-            int maxSelect = groupRequest.getMaxSelect() == null ? 1 : groupRequest.getMaxSelect();
-            if (minSelect < 0 || maxSelect < 1 || minSelect > maxSelect) {
-                throw new BadRequestException("Opsiyon grubu seçim aralığı geçersiz: " + groupName);
-            }
-            MenuProductOptionGroup group = MenuProductOptionGroup.builder()
-                    .productId(productId)
-                    .name(groupName)
-                    .kind(kind)
-                    .unit(unit)
-                    .minSelect(minSelect)
-                    .maxSelect(maxSelect)
-                    .sortOrder(groupRequest.getSortOrder() != null ? groupRequest.getSortOrder() : groupSort)
-                    .options(new ArrayList<>())
-                    .build();
-            int optionSort = 0;
-            List<MenuDtos.MenuProductOptionRequest> options =
-                    groupRequest.getOptions() == null ? List.of() : groupRequest.getOptions();
-            if (options.isEmpty()) {
-                throw new BadRequestException("Opsiyon grubunda en az bir seçenek olmalı: " + groupName);
-            }
-            for (MenuDtos.MenuProductOptionRequest optionRequest : options) {
-                if (optionRequest == null) {
-                    continue;
-                }
-                String optionName = trimRequired(optionRequest.getName(), "Opsiyon adı zorunludur");
-                BigDecimal delta = optionRequest.getPriceDelta() == null
-                        ? BigDecimal.ZERO
-                        : optionRequest.getPriceDelta();
-                MenuProductOption option = MenuProductOption.builder()
-                        .name(optionName)
-                        .priceDelta(delta)
-                        .available(optionRequest.getAvailable() == null || optionRequest.getAvailable())
-                        .sortOrder(optionRequest.getSortOrder() != null ? optionRequest.getSortOrder() : optionSort)
-                        .build();
-                group.addOption(option);
-                optionSort++;
-            }
-            if (group.getOptions().isEmpty()) {
-                throw new BadRequestException("Opsiyon grubunda en az bir seçenek olmalı: " + groupName);
-            }
-            groups.add(group);
+            groups.add(buildGroup(productId, groupRequest, groupSort));
             groupSort++;
         }
         if (!groups.isEmpty()) {
             optionGroupRepository.saveAll(groups);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<MenuDtos.MenuProductOptionGroupResponse> listLibrary(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        List<MenuProductOptionGroup> groups =
+                optionGroupRepository.findByUserIdAndProductIdIsNullOrderBySortOrderAscIdAsc(userId);
+        Map<Long, List<Long>> productIdsByGroup = new LinkedHashMap<>();
+        List<Long> groupIds = groups.stream().map(MenuProductOptionGroup::getId).toList();
+        if (!groupIds.isEmpty()) {
+            for (MenuProductOptionGroup assigned : optionGroupRepository.findByLibraryGroupIdIn(groupIds)) {
+                if (assigned.getProductId() == null || assigned.getLibraryGroupId() == null) {
+                    continue;
+                }
+                productIdsByGroup
+                        .computeIfAbsent(assigned.getLibraryGroupId(), ignored -> new ArrayList<>())
+                        .add(assigned.getProductId());
+            }
+        }
+        return groups.stream()
+                .map(group -> {
+                    MenuDtos.MenuProductOptionGroupResponse response = toResponses(List.of(group)).get(0);
+                    response.setProductIds(productIdsByGroup.getOrDefault(group.getId(), List.of()));
+                    return response;
+                })
+                .toList();
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductOptionGroupResponse createLibrary(
+            Long userId,
+            MenuDtos.MenuProductOptionGroupRequest request
+    ) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Oturum gerekli");
+        }
+        if (request == null) {
+            throw new BadRequestException("Opsiyon grubu zorunludur");
+        }
+        MenuProductOptionGroup group = buildGroup(null, request, 0);
+        group.setUserId(userId);
+        group.setProductId(null);
+        MenuProductOptionGroup saved = optionGroupRepository.save(group);
+        MenuDtos.MenuProductOptionGroupResponse response = toResponses(List.of(saved)).get(0);
+        response.setProductIds(List.of());
+        return response;
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductOptionGroupResponse updateLibrary(
+            Long userId,
+            Long groupId,
+            MenuDtos.MenuProductOptionGroupRequest request
+    ) {
+        if (request == null) {
+            throw new BadRequestException("Opsiyon grubu zorunludur");
+        }
+        MenuProductOptionGroup group = requireLibrary(userId, groupId);
+        MenuProductOptionGroup rebuilt = buildGroup(null, request, group.getSortOrder());
+        group.setName(rebuilt.getName());
+        group.setKind(rebuilt.getKind());
+        group.setUnit(rebuilt.getUnit());
+        group.setMinSelect(rebuilt.getMinSelect());
+        group.setMaxSelect(rebuilt.getMaxSelect());
+        if (request.getSortOrder() != null) {
+            group.setSortOrder(request.getSortOrder());
+        }
+        group.clearOptions();
+        for (MenuProductOption option : new ArrayList<>(rebuilt.getOptions())) {
+            group.addOption(option);
+        }
+        MenuProductOptionGroup saved = optionGroupRepository.save(group);
+        MenuDtos.MenuProductOptionGroupResponse response = toResponses(List.of(saved)).get(0);
+        response.setProductIds(assignedProductIds(groupId));
+        return response;
+    }
+
+    @Transactional
+    public void deleteLibrary(Long userId, Long groupId) {
+        optionGroupRepository.delete(requireLibrary(userId, groupId));
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductOptionGroupResponse assignLibrary(
+            Long userId,
+            Long groupId,
+            List<Long> productIds
+    ) {
+        MenuProductOptionGroup source = requireLibrary(userId, groupId);
+        LinkedHashSet<Long> ids = uniqueIds(productIds);
+        if (ids.isEmpty()) {
+            throw new BadRequestException("En az bir ürün seçin");
+        }
+        LinkedHashSet<Long> already = optionGroupRepository.findByLibraryGroupIdAndProductIdIn(groupId, ids).stream()
+                .map(MenuProductOptionGroup::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (Long productId : ids) {
+            if (already.contains(productId)) {
+                continue;
+            }
+            MenuProductOptionGroup copy = copyGroup(source, productId);
+            copy.setLibraryGroupId(source.getId());
+            copy.setUserId(null);
+            optionGroupRepository.save(copy);
+        }
+        MenuDtos.MenuProductOptionGroupResponse response = toResponses(List.of(source)).get(0);
+        response.setProductIds(assignedProductIds(groupId));
+        return response;
     }
 
     @Transactional
@@ -268,6 +337,73 @@ public class MenuProductOptionService {
         return productId + ":" + optionPart;
     }
 
+    private MenuProductOptionGroup requireLibrary(Long userId, Long groupId) {
+        if (userId == null || groupId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Opsiyon grubu bulunamadı");
+        }
+        return optionGroupRepository.findByIdAndUserIdAndProductIdIsNull(groupId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Opsiyon grubu bulunamadı"));
+    }
+
+    private List<Long> assignedProductIds(Long groupId) {
+        return optionGroupRepository.findByLibraryGroupIdIn(List.of(groupId)).stream()
+                .map(MenuProductOptionGroup::getProductId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private MenuProductOptionGroup buildGroup(
+            Long productId,
+            MenuDtos.MenuProductOptionGroupRequest groupRequest,
+            int fallbackSort
+    ) {
+        String groupName = trimRequired(groupRequest.getName(), "Opsiyon grubu adı zorunludur");
+        MenuProductOptionGroupKind kind = resolveKind(groupRequest.getKind());
+        MenuProductOptionUnit unit = resolveUnit(kind, groupRequest.getUnit());
+        int minSelect = groupRequest.getMinSelect() == null ? 0 : groupRequest.getMinSelect();
+        int maxSelect = groupRequest.getMaxSelect() == null ? 1 : groupRequest.getMaxSelect();
+        if (minSelect < 0 || maxSelect < 1 || minSelect > maxSelect) {
+            throw new BadRequestException("Opsiyon grubu seçim aralığı geçersiz: " + groupName);
+        }
+        MenuProductOptionGroup group = MenuProductOptionGroup.builder()
+                .productId(productId)
+                .name(groupName)
+                .kind(kind)
+                .unit(unit)
+                .minSelect(minSelect)
+                .maxSelect(maxSelect)
+                .sortOrder(groupRequest.getSortOrder() != null ? groupRequest.getSortOrder() : fallbackSort)
+                .options(new ArrayList<>())
+                .build();
+        int optionSort = 0;
+        List<MenuDtos.MenuProductOptionRequest> options =
+                groupRequest.getOptions() == null ? List.of() : groupRequest.getOptions();
+        if (options.isEmpty()) {
+            throw new BadRequestException("Opsiyon grubunda en az bir seçenek olmalı: " + groupName);
+        }
+        for (MenuDtos.MenuProductOptionRequest optionRequest : options) {
+            if (optionRequest == null) {
+                continue;
+            }
+            String optionName = trimRequired(optionRequest.getName(), "Opsiyon adı zorunludur");
+            BigDecimal delta = optionRequest.getPriceDelta() == null
+                    ? BigDecimal.ZERO
+                    : optionRequest.getPriceDelta();
+            group.addOption(MenuProductOption.builder()
+                    .name(optionName)
+                    .priceDelta(delta)
+                    .available(optionRequest.getAvailable() == null || optionRequest.getAvailable())
+                    .sortOrder(optionRequest.getSortOrder() != null ? optionRequest.getSortOrder() : optionSort)
+                    .build());
+            optionSort++;
+        }
+        if (group.getOptions().isEmpty()) {
+            throw new BadRequestException("Opsiyon grubunda en az bir seçenek olmalı: " + groupName);
+        }
+        return group;
+    }
+
     private static List<MenuDtos.MenuProductOptionGroupResponse> toResponses(List<MenuProductOptionGroup> groups) {
         return groups.stream()
                 .map(group -> MenuDtos.MenuProductOptionGroupResponse.builder()
@@ -299,6 +435,7 @@ public class MenuProductOptionService {
     private static MenuProductOptionGroup copyGroup(MenuProductOptionGroup source, Long targetProductId) {
         MenuProductOptionGroup copy = MenuProductOptionGroup.builder()
                 .productId(targetProductId)
+                .libraryGroupId(source.getLibraryGroupId())
                 .name(source.getName())
                 .kind(source.getKind() == null ? MenuProductOptionGroupKind.CUSTOM : source.getKind())
                 .unit(source.getUnit() == null ? MenuProductOptionUnit.NONE : source.getUnit())

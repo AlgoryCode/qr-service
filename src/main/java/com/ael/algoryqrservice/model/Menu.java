@@ -73,6 +73,9 @@ public class Menu extends QrBaseModel {
     private String email;
     private String address;
 
+    @Column(name = "google_reviews_url", length = 1024)
+    private String googleReviewsUrl;
+
     private Long packageId;
 
     @Column(nullable = false)

@@ -246,12 +246,12 @@ public class MenuService {
 
     public String buildPublicUrl(Menu menu) {
         String base = trimTrailingSlash(appProperties.getUrl());
-        return base + "/menu/" + menu.getPublicId();
+        return base + "/" + menu.getPublicId();
     }
 
     public String buildPublicUrlForPublicId(String publicId) {
         String base = trimTrailingSlash(appProperties.getUrl());
-        return base + "/menu/" + publicId;
+        return base + "/" + publicId;
     }
 
     @Transactional(readOnly = true)
@@ -598,8 +598,15 @@ public class MenuService {
                 request.getServesPeopleMin(),
                 request.getServesPeopleMax()
         );
+        Long subCategoryId = request.getSubCategoryId();
+        if (subCategoryId != null && subCategoryId > 0) {
+            menuCategoryService.requireLibrarySubCategory(userId, subCategoryId);
+        } else {
+            subCategoryId = null;
+        }
         MenuProduct product = MenuProduct.builder()
                 .userId(userId)
+                .subCategoryId(subCategoryId)
                 .name(request.getName().trim())
                 .description(trimToNull(request.getDescription()))
                 .price(request.getPrice())
@@ -619,6 +626,102 @@ public class MenuService {
             menuProductOptionService.replace(saved.getProductId(), request.getOptionGroups());
         }
         return toProductResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MenuDtos.MenuProductOptionGroupResponse> listCatalogOptionGroups() {
+        return menuProductOptionService.listLibrary(securityUtils.getCurrentUserId());
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductOptionGroupResponse createCatalogOptionGroup(
+            MenuDtos.MenuProductOptionGroupRequest request
+    ) {
+        return menuProductOptionService.createLibrary(securityUtils.getCurrentUserId(), request);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductOptionGroupResponse updateCatalogOptionGroup(
+            Long groupId,
+            MenuDtos.MenuProductOptionGroupRequest request
+    ) {
+        return menuProductOptionService.updateLibrary(securityUtils.getCurrentUserId(), groupId, request);
+    }
+
+    @Transactional
+    public void deleteCatalogOptionGroup(Long groupId) {
+        menuProductOptionService.deleteLibrary(securityUtils.getCurrentUserId(), groupId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaxonomyDtos.MainCategoryResponse> listCatalogCategories() {
+        return menuCategoryService.listLibrary(securityUtils.getCurrentUserId());
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse createCatalogCategory(TaxonomyDtos.MainCategoryRequest request) {
+        return menuCategoryService.createLibrary(securityUtils.getCurrentUserId(), request);
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse updateCatalogCategory(
+            Long categoryId,
+            TaxonomyDtos.MainCategoryUpdateRequest request
+    ) {
+        return menuCategoryService.updateLibrary(securityUtils.getCurrentUserId(), categoryId, request);
+    }
+
+    @Transactional
+    public void deleteCatalogCategory(Long categoryId) {
+        menuCategoryService.deleteLibrary(securityUtils.getCurrentUserId(), categoryId);
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse uploadCatalogCategoryCover(Long categoryId, org.springframework.web.multipart.MultipartFile file) {
+        return menuCategoryService.uploadLibraryCover(securityUtils.getCurrentUserId(), categoryId, file);
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse clearCatalogCategoryCover(Long categoryId) {
+        return menuCategoryService.clearLibraryCover(securityUtils.getCurrentUserId(), categoryId);
+    }
+
+    @Transactional
+    public TaxonomyDtos.SubCategoryResponse createCatalogSubCategory(
+            Long categoryId,
+            TaxonomyDtos.SubCategoryRequest request
+    ) {
+        return menuCategoryService.createLibrarySub(securityUtils.getCurrentUserId(), categoryId, request);
+    }
+
+    @Transactional
+    public TaxonomyDtos.SubCategoryResponse updateCatalogSubCategory(
+            Long subId,
+            TaxonomyDtos.SubCategoryUpdateRequest request
+    ) {
+        return menuCategoryService.updateLibrarySub(securityUtils.getCurrentUserId(), subId, request);
+    }
+
+    @Transactional
+    public void deleteCatalogSubCategory(Long subId) {
+        menuCategoryService.deleteLibrarySub(securityUtils.getCurrentUserId(), subId);
+    }
+
+    @Transactional
+    public MenuDtos.MenuProductOptionGroupResponse assignCatalogOptionGroup(
+            Long groupId,
+            List<Long> productIds
+    ) {
+        if (productIds == null || productIds.isEmpty()) {
+            throw new BadRequestException("En az bir ürün seçin");
+        }
+        for (Long productId : productIds) {
+            if (productId == null || productId <= 0) {
+                continue;
+            }
+            requireOwnedCatalogProduct(productId);
+        }
+        return menuProductOptionService.assignLibrary(securityUtils.getCurrentUserId(), groupId, productIds);
     }
 
     @Transactional
@@ -951,6 +1054,9 @@ public class MenuService {
         if (request.getPhone() != null) menu.setPhone(trimToNull(request.getPhone()));
         if (request.getEmail() != null) menu.setEmail(trimToNull(request.getEmail()));
         if (request.getAddress() != null) menu.setAddress(trimToNull(request.getAddress()));
+        if (request.getGoogleReviewsUrl() != null) {
+            menu.setGoogleReviewsUrl(normalizeGoogleReviewsUrl(request.getGoogleReviewsUrl()));
+        }
         if (request.getActive() != null) {
             boolean nextActive = request.getActive();
             if (nextActive && !menu.isActive()) {
@@ -1381,6 +1487,7 @@ public class MenuService {
                 .phone(branch != null && branch.getPhone() != null ? branch.getPhone() : menu.getPhone())
                 .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
                 .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
+                .googleReviewsUrl(menu.getGoogleReviewsUrl())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
                 .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
@@ -1616,6 +1723,7 @@ public class MenuService {
                 .phone(branch != null && branch.getPhone() != null ? branch.getPhone() : menu.getPhone())
                 .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
                 .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
+                .googleReviewsUrl(menu.getGoogleReviewsUrl())
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
                 .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
@@ -1623,6 +1731,20 @@ public class MenuService {
                 .updatedAt(menu.getUpdatedAt())
                 .qr(qrBrief)
                 .build();
+    }
+
+    private String normalizeGoogleReviewsUrl(String raw) {
+        String normalized = trimToNull(raw);
+        if (normalized == null) {
+            return null;
+        }
+        if (!normalized.matches("(?i)https?://.+")) {
+            throw new BadRequestException("Google yorumlar linki http veya https ile başlamalıdır");
+        }
+        if (normalized.length() > 1024) {
+            throw new BadRequestException("Google yorumlar linki çok uzun");
+        }
+        return normalized;
     }
 
     private void applyLogoUrl(Menu menu, String logoUrl) {

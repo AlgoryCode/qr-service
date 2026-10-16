@@ -72,6 +72,24 @@ public final class RestaurantTableDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class AssignLayoutRequest {
+        private Long menuId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AssignLayoutResponse {
+        private Long menuId;
+        private int areas;
+        private int tables;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TableResponse {
         private Long id;
         private Long menuId;

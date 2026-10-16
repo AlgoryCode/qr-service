@@ -84,6 +84,14 @@ public final class MenuDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class AssignOptionGroupRequest {
+        private List<Long> productIds;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class MenuProductResponse {
         private Long productId;
         private Long menuId;
@@ -125,6 +133,7 @@ public final class MenuDtos {
         private int maxSelect;
         private int sortOrder;
         private List<MenuProductOptionResponse> options;
+        private List<Long> productIds;
     }
 
     @Data
@@ -392,6 +401,7 @@ public final class MenuDtos {
         private String phone;
         private String email;
         private String address;
+        private String googleReviewsUrl;
         private String publicUrl;
         private boolean active;
         private BigDecimal ratingAvg;
@@ -419,6 +429,7 @@ public final class MenuDtos {
         private String phone;
         private String email;
         private String address;
+        private String googleReviewsUrl;
         private String publicUrl;
         private boolean active;
         private BigDecimal ratingAvg;
@@ -521,6 +532,8 @@ public final class MenuDtos {
         private String phone;
         private String email;
         private String address;
+        @Size(max = 1024)
+        private String googleReviewsUrl;
         private Boolean active;
     }
 

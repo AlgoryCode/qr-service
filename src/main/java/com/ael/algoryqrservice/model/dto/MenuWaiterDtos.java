@@ -47,6 +47,14 @@ public final class MenuWaiterDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class AssignBranchRequest {
+        private Long branchId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class UpdateWaiterRequest {
         @Size(max = 120)
         private String displayName;
@@ -98,6 +106,14 @@ public final class MenuWaiterDtos {
     public static class UsersPageResponse {
         private OwnerSummary owner;
         private List<WaiterResponse> waiters;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StaffListResponse {
+        private List<WaiterResponse> staff;
     }
 
     @Data

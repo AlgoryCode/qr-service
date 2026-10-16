@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.service;
 
+import com.ael.algoryqrservice.client.AuthStaffClient;
 import com.ael.algoryqrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.model.Branch;
 import com.ael.algoryqrservice.model.MerchantStaff;
@@ -38,13 +39,15 @@ class MenuWaiterServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private AuthStaffClient authStaffClient;
 
     @InjectMocks
     private MenuWaiterService menuWaiterService;
 
     @Test
     void createWaiter_whenBranchOwned_thenPersistsBranchId() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
@@ -75,11 +78,12 @@ class MenuWaiterServiceTest {
         assertThat(captor.getValue().getStaffRole()).isEqualTo(com.ael.algoryqrservice.model.enums.StaffRole.WAITER);
         assertThat(response.getBranchId()).isEqualTo(4L);
         assertThat(response.getDisplayName()).isEqualTo("Ali Garson");
+        verify(authStaffClient).upsert(captor.getValue());
     }
 
     @Test
     void createWaiter_whenKitchenRole_thenPersistsKitchen() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
@@ -112,7 +116,7 @@ class MenuWaiterServiceTest {
 
     @Test
     void createWaiter_whenCourierRole_thenPersistsCourier() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
@@ -145,7 +149,7 @@ class MenuWaiterServiceTest {
 
     @Test
     void createWaiter_whenKitchenRoleWithoutKitchen_thenRejects() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
@@ -168,7 +172,7 @@ class MenuWaiterServiceTest {
 
     @Test
     void createWaiter_whenCourierRoleWithoutCourier_thenRejects() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
@@ -191,7 +195,7 @@ class MenuWaiterServiceTest {
 
     @Test
     void listWaiters_whenBranchOwned_thenReturnsWaiters() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
