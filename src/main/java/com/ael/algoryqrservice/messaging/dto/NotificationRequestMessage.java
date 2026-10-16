@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.messaging.dto;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,6 +19,19 @@ public record NotificationRequestMessage(
 
     public NotificationRequestMessage {
         channels = channels == null ? List.of() : List.copyOf(channels);
-        templateData = templateData == null ? Collections.emptyMap() : Map.copyOf(templateData);
+        templateData = copyTemplateData(templateData);
+    }
+
+    private static Map<String, Object> copyTemplateData(Map<String, Object> source) {
+        if (source == null || source.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> copy = HashMap.newHashMap(source.size());
+        source.forEach((key, value) -> {
+            if (key != null) {
+                copy.put(key, value == null ? "" : value);
+            }
+        });
+        return Map.copyOf(copy);
     }
 }
