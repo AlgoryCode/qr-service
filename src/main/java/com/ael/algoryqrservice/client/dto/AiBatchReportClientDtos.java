@@ -1,7 +1,6 @@
 package com.ael.algoryqrservice.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -66,7 +65,7 @@ public final class AiBatchReportClientDtos {
     public static class ResultItem {
         private String customId;
         private String status;
-        private JsonNode body;
-        private JsonNode error;
+        private Map<String, Object> body;
+        private Object error;
     }
 }

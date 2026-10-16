@@ -8,8 +8,8 @@ import com.ael.algoryqrservice.model.BatchReportItem;
 import com.ael.algoryqrservice.model.dto.BatchReportDtos;
 import com.ael.algoryqrservice.repository.BatchReportItemRepository;
 import com.ael.algoryqrservice.repository.BatchReportRepository;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.client.HttpStatusCodeException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -195,6 +195,18 @@ public class BatchReportService {
                         ex.getMessage(),
                         ex
                 );
+                if (isUnrecoverableBatchResultsError(ex)) {
+                    String message = "OpenAI batch output unavailable: " + summarizeExceptionMessage(ex);
+                    ReconcileOutcome failedOutcome = transactionTemplate.execute(status ->
+                            persistUnrecoverableResultsFailure(
+                                    snapshot.batchId(),
+                                    total,
+                                    completed,
+                                    failed,
+                                    message
+                            ));
+                    return failedOutcome == null ? ReconcileOutcome.empty() : failedOutcome;
+                }
                 throw ex;
             }
         }
@@ -277,6 +289,36 @@ public class BatchReportService {
         return new ReconcileOutcome(batch.getId(), remoteStatus, itemOutcomes);
     }
 
+    private ReconcileOutcome persistUnrecoverableResultsFailure(
+            UUID batchId,
+            int total,
+            int completed,
+            int failed,
+            String message
+    ) {
+        BatchReport batch = batchReportRepository.findById(batchId).orElse(null);
+        if (batch == null) {
+            return ReconcileOutcome.empty();
+        }
+        batch.setStatus(BatchReport.STATUS_FAILED);
+        batch.setRequestTotal(total);
+        batch.setRequestCompleted(completed);
+        batch.setRequestFailed(failed);
+        batch.setErrorMessage(message);
+        if (batch.getCompletedAt() == null) {
+            batch.setCompletedAt(LocalDateTime.now());
+        }
+        batchReportRepository.save(batch);
+        log.warn(
+                "Batch report marked failed (output unavailable). batchId={} openaiBatchId={} message={}",
+                batch.getId(),
+                batch.getOpenaiBatchId(),
+                message
+        );
+        List<ItemOutcome> itemOutcomes = markItemsFailed(batch, message);
+        return new ReconcileOutcome(batch.getId(), BatchReport.STATUS_FAILED, itemOutcomes);
+    }
+
     private List<ItemOutcome> applyResults(
             BatchReport batch,
             List<AiBatchReportClientDtos.ResultItem> results
@@ -304,7 +346,7 @@ public class BatchReportService {
             }
             String itemStatus = normalizeStatus(result.getStatus());
             if (BatchReportItem.STATUS_COMPLETED.equals(itemStatus)) {
-                Map<String, Object> body = jsonNodeToMap(result.getBody());
+                Map<String, Object> body = result.getBody() != null ? result.getBody() : Map.of();
                 item.setStatus(BatchReportItem.STATUS_COMPLETED);
                 item.setResultJson(body);
                 item.setErrorMessage(null);
@@ -395,14 +437,6 @@ public class BatchReportService {
         );
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> jsonNodeToMap(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return Map.of();
-        }
-        return objectMapper.convertValue(node, Map.class);
-    }
-
     private String extractResultText(Map<String, Object> body) {
         if (body == null || body.isEmpty()) {
             return null;
@@ -442,14 +476,35 @@ public class BatchReportService {
         }
     }
 
-    private String stringifyError(JsonNode error) {
-        if (error == null || error.isNull()) {
+    private String stringifyError(Object error) {
+        if (error == null) {
             return "Batch item failed";
         }
-        if (error.isTextual()) {
-            return error.asText();
+        if (error instanceof String text && !text.isBlank()) {
+            return text;
         }
-        return error.toString();
+        try {
+            return objectMapper.writeValueAsString(error);
+        } catch (Exception ex) {
+            return error.toString();
+        }
+    }
+
+    private static boolean isUnrecoverableBatchResultsError(Exception ex) {
+        String message = summarizeExceptionMessage(ex).toLowerCase(Locale.ROOT);
+        return message.contains("no such file object")
+                || message.contains("failed to retrieve batch results");
+    }
+
+    private static String summarizeExceptionMessage(Exception ex) {
+        if (ex instanceof HttpStatusCodeException httpEx) {
+            String body = httpEx.getResponseBodyAsString();
+            if (body != null && !body.isBlank()) {
+                return body;
+            }
+        }
+        String message = ex.getMessage();
+        return message == null ? ex.getClass().getSimpleName() : message;
     }
 
     private static String normalizeStatus(String status) {
