@@ -100,9 +100,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(deprecatedStaffPathCompatFilter, JwtAuthenticationFilter.class)
+                // Jwt must be registered first (Spring Security 7 requires anchor filters to have a known order).
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(deprecatedStaffPathCompatFilter, PrintDeviceAuthenticationFilter.class)
                 .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(emailVerificationGatewayFilter, ProductAccessGatewayFilter.class);
 

@@ -1,8 +1,8 @@
-package com.ael.algoryqrservice.qrservice.util;
+package com.ael.algoryqrservice.adminservice.application;
 
 import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
-import com.ael.algoryqrservice.qrservice.model.DashboardUser;
-import com.ael.algoryqrservice.qrservice.repository.DashboardUserRepository;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.DashboardUser;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.repository.DashboardUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;

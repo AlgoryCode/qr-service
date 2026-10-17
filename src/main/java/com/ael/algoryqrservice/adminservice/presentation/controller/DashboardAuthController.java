@@ -1,14 +1,14 @@
-package com.ael.algoryqrservice.qrservice.admin.controller;
+package com.ael.algoryqrservice.adminservice.presentation.controller;
 
-import com.ael.algoryqrservice.qrservice.model.DashboardUser;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.DashboardUser;
 import com.ael.algoryqrservice.qrservice.model.dto.AuthResponse;
-import com.ael.algoryqrservice.qrservice.model.dto.DashboardAuthDtos;
+import com.ael.algoryqrservice.adminservice.dto.DashboardAuthDtos;
 import com.ael.algoryqrservice.qrservice.model.dto.LoginRequest;
 import com.ael.algoryqrservice.qrservice.model.dto.LogoutRequest;
 import com.ael.algoryqrservice.qrservice.model.dto.RefreshTokenRequest;
-import com.ael.algoryqrservice.qrservice.service.DashboardAuthService;
+import com.ael.algoryqrservice.adminservice.application.DashboardAuthService;
 import com.ael.algoryqrservice.qrservice.util.ClientInfo;
-import com.ael.algoryqrservice.qrservice.util.DashboardSecurityUtils;
+import com.ael.algoryqrservice.adminservice.application.DashboardSecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -28,6 +28,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
                 "com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity",
         }
 )
 public class AlgoryqrServiceApplication {

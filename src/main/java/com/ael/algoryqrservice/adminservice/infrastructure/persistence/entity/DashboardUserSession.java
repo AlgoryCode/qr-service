@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.qrservice.model;
+package com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

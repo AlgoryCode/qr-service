@@ -1,10 +1,10 @@
-package com.ael.algoryqrservice.qrservice.admin.service;
+package com.ael.algoryqrservice.adminservice.application;
 
 import com.ael.algoryqrservice.qrservice.client.AuthCredentialClient;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.admin.dto.AdminUserDtos;
+import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

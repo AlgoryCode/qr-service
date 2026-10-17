@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.qrservice.admin.controller;
+package com.ael.algoryqrservice.adminservice.presentation.controller;
 
 import com.ael.algoryqrservice.qrservice.platform.dto.PlatformFeedbackDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.PlatformFeedbackStatus;

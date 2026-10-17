@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.security;
 
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
-import com.ael.algoryqrservice.qrservice.service.DashboardSessionService;
+import com.ael.algoryqrservice.adminservice.application.DashboardSessionService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

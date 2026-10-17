@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.account.service;
 
 import com.ael.algoryqrservice.qrservice.config.JwtProperties;
-import com.ael.algoryqrservice.qrservice.model.enums.DashboardRole;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.enums.DashboardRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;

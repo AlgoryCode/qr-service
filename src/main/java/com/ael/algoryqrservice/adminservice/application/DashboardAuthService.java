@@ -1,14 +1,14 @@
-package com.ael.algoryqrservice.qrservice.service;
+package com.ael.algoryqrservice.adminservice.application;
 
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
-import com.ael.algoryqrservice.qrservice.model.DashboardUser;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.DashboardUser;
 import com.ael.algoryqrservice.qrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.qrservice.model.dto.LoginRequest;
 import com.ael.algoryqrservice.qrservice.model.dto.LogoutRequest;
 import com.ael.algoryqrservice.qrservice.model.dto.RefreshTokenRequest;
-import com.ael.algoryqrservice.qrservice.repository.DashboardUserRepository;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.repository.DashboardUserRepository;
 import com.ael.algoryqrservice.qrservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

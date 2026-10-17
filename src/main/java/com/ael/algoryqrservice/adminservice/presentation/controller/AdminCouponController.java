@@ -1,9 +1,9 @@
-package com.ael.algoryqrservice.qrservice.admin.controller;
+package com.ael.algoryqrservice.adminservice.presentation.controller;
 
 import com.ael.algoryqrservice.qrservice.coupon.CouponUseCases;
 import com.ael.algoryqrservice.qrservice.billing.dto.CouponDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.CouponStatus;
-import com.ael.algoryqrservice.qrservice.util.DashboardSecurityUtils;
+import com.ael.algoryqrservice.adminservice.application.DashboardSecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

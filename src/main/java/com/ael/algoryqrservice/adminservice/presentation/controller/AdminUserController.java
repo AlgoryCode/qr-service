@@ -1,8 +1,8 @@
-package com.ael.algoryqrservice.qrservice.admin.controller;
+package com.ael.algoryqrservice.adminservice.presentation.controller;
 
-import com.ael.algoryqrservice.qrservice.admin.dto.AdminUserDtos;
-import com.ael.algoryqrservice.qrservice.admin.service.AdminUserCredentialService;
-import com.ael.algoryqrservice.qrservice.admin.service.AdminUserService;
+import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
+import com.ael.algoryqrservice.adminservice.application.AdminUserCredentialService;
+import com.ael.algoryqrservice.adminservice.application.AdminUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
