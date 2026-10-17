@@ -30,7 +30,30 @@ public class AuthMerchantClient {
         }
     }
 
+    public Optional<MerchantProfileView> findMerchantProfile(Long merchantId) {
+        return findMerchantUseCase.findProfile(merchantId)
+                .map(profile -> new MerchantProfileView(
+                        profile.id(),
+                        profile.firstName(),
+                        profile.lastName(),
+                        profile.email(),
+                        profile.phone(),
+                        profile.provider()
+                ));
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record MerchantView(Long id, String status) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record MerchantProfileView(
+            Long id,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String provider
+    ) {
     }
 }

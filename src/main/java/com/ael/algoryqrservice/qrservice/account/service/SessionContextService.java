@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.qrservice.account.service;
 
 import com.ael.algoryqrservice.qrservice.access.AccessSession;
+import com.ael.algoryqrservice.qrservice.client.AuthMerchantClient;
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.qrservice.client.PackageView;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
@@ -24,6 +25,7 @@ import java.util.Optional;
 public class SessionContextService {
 
     private final UserRepository userRepository;
+    private final AuthMerchantClient authMerchantClient;
     private final FulfillmentServiceClient fulfillmentServiceClient;
     private final SessionContextAssembler assembler;
 
@@ -40,6 +42,11 @@ public class SessionContextService {
     }
 
     private SessionUserResponse sessionUser(Long merchantId) {
+        Optional<SessionUserResponse> fromMerchant = authMerchantClient.findMerchantProfile(merchantId)
+                .map(profile -> fromMerchantProfile(profile, merchantId));
+        if (fromMerchant.isPresent()) {
+            return fromMerchant.get();
+        }
         Optional<User> user = userRepository.findById(merchantId);
         if (user.isPresent()) {
             return fromUser(user.get(), merchantId);
@@ -52,6 +59,29 @@ public class SessionContextService {
             }
         }
         return fromToken(merchantId);
+    }
+
+    private SessionUserResponse fromMerchantProfile(AuthMerchantClient.MerchantProfileView profile, Long merchantId) {
+        return new SessionUserResponse(
+                merchantId,
+                profile.firstName(),
+                profile.lastName(),
+                profile.email(),
+                profile.phone(),
+                authProvider(profile.provider()),
+                UserRole.USER
+        );
+    }
+
+    private static AuthProvider authProvider(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return AuthProvider.BASIC;
+        }
+        try {
+            return AuthProvider.valueOf(provider.trim().toUpperCase());
+        } catch (IllegalArgumentException ignored) {
+            return AuthProvider.BASIC;
+        }
     }
 
     private SessionUserResponse fromUser(User user, Long merchantId) {

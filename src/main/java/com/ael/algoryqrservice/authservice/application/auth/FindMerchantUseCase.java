@@ -34,6 +34,33 @@ public class FindMerchantUseCase {
                 .map(MerchantEntity::getId);
     }
 
+    @AuthTransactional(readOnly = true)
+    public Optional<MerchantProfileResponse> findProfile(Long merchantId) {
+        if (merchantId == null) {
+            return Optional.empty();
+        }
+        return merchantRepository.findWithRoleById(merchantId)
+                .filter(merchant -> merchant.getDeletedAt() == null)
+                .map(merchant -> new MerchantProfileResponse(
+                        merchant.getId(),
+                        merchant.getFirstName(),
+                        merchant.getLastName(),
+                        merchant.getEmail(),
+                        merchant.getPhone(),
+                        merchant.getProvider()
+                ));
+    }
+
     public record MerchantResponse(Long id, String status) {
+    }
+
+    public record MerchantProfileResponse(
+            Long id,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String provider
+    ) {
     }
 }
