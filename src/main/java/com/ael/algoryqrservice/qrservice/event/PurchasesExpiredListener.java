@@ -13,6 +13,6 @@ public class PurchasesExpiredListener {
 
     @EventListener
     public void onPurchasesExpired(PurchasesExpiredEvent event) {
-        menuPublicAccessService.syncForUsers(event.userIds());
+        menuPublicAccessService.syncForMerchants(event.merchantIds());
     }
 }

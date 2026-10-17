@@ -5,42 +5,31 @@ import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import java.util.List;
 
 public record JwtAccessPrincipal(
-        Long userId,
+        Long staffId,
+        Long merchantId,
+        Long customerId,
+        Long dashboardUserId,
         List<String> scopes,
         List<String> products,
         String activePackage,
         String principalType,
-        Long branchId,
-        Long merchantId
+        Long branchId
 ) {
     public JwtAccessPrincipal(
-            Long userId,
             List<String> scopes,
             List<String> products,
             String activePackage
     ) {
-        this(userId, scopes, products, activePackage, JwtService.PRINCIPAL_APP, null, null);
+        this(null, null, null, null, scopes, products, activePackage, JwtService.PRINCIPAL_APP, null);
     }
 
     public JwtAccessPrincipal(
-            Long userId,
             List<String> scopes,
             List<String> products,
             String activePackage,
             String principalType
     ) {
-        this(userId, scopes, products, activePackage, principalType, null, null);
-    }
-
-    public JwtAccessPrincipal(
-            Long userId,
-            List<String> scopes,
-            List<String> products,
-            String activePackage,
-            String principalType,
-            Long branchId
-    ) {
-        this(userId, scopes, products, activePackage, principalType, branchId, null);
+        this(null, null, null, null, scopes, products, activePackage, principalType, null);
     }
 
     public JwtAccessPrincipal {

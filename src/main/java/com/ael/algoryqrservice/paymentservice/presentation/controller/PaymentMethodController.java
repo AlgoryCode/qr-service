@@ -41,7 +41,7 @@ public class PaymentMethodController {
             @Valid @RequestBody CardVerificationInitRequest request
     ) {
         log.info(
-                "Card verification requested. userId={} paymentId={}",
+                "Card verification requested. merchantId={} paymentId={}",
                 accountId,
                 request.getConversationId()
         );
@@ -49,7 +49,7 @@ public class PaymentMethodController {
             var command = paymentPresentationMapper.toStoreCardCommand(accountId, request);
             var session = cardStorageService.initiate(command);
             log.info(
-                    "Card verification session created. userId={} paymentId={}",
+                    "Card verification session created. merchantId={} paymentId={}",
                     accountId,
                     session.conversationId()
             );
@@ -61,7 +61,7 @@ public class PaymentMethodController {
                     ));
         } catch (RuntimeException exception) {
             log.warn(
-                    "Card verification session failed. userId={} paymentId={} reason={}",
+                    "Card verification session failed. merchantId={} paymentId={} reason={}",
                     accountId,
                     request.getConversationId(),
                     exception.getMessage()

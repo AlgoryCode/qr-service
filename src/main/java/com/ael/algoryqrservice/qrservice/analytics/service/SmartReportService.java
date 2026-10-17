@@ -196,7 +196,7 @@ public class SmartReportService {
         );
 
         log.info(
-                "Smart report batch submitted. processId={} branchId={} menuId={} branchOnly={} userId={} from={} to={}",
+                "Smart report batch submitted. processId={} branchId={} menuId={} branchOnly={} merchantId={} from={} to={}",
                 processId,
                 resolvedBranchId,
                 resolvedMenuId,

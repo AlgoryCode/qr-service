@@ -78,7 +78,7 @@ public class FulfillmentPaymentBridge {
                 event.getSourceReferenceId(),
                 event.getSourceMetadata(),
                 event.getPurchaseId(),
-                event.getUserId(),
+                event.getMerchantId(),
                 event.getPackageId(),
                 event.getPackageCode(),
                 event.getPaymentStyle(),

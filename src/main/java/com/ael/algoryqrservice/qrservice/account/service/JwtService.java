@@ -91,14 +91,7 @@ public class JwtService {
     }
 
     public Long extractPackageOwnerId(Claims claims) {
-        String subjectType = extractSubjectType(claims);
-        if (SUBJECT_MERCHANT.equals(subjectType) || SUBJECT_STAFF.equals(subjectType)) {
-            Long merchantId = extractMerchantId(claims);
-            if (merchantId != null) {
-                return merchantId;
-            }
-        }
-        return extractUserId(claims);
+        return extractMerchantId(claims);
     }
 
     public boolean isDashboardPrincipal(Claims claims) {
@@ -162,15 +155,20 @@ public class JwtService {
         return claims.getSubject();
     }
 
-    public Long extractUserId(Claims claims) {
-        Long userId = extractLongClaim(claims, "userId");
-        if (userId != null) {
-            return userId;
-        }
-        if (SUBJECT_MERCHANT.equals(extractSubjectType(claims))) {
-            return extractMerchantId(claims);
-        }
-        return null;
+    public Long extractStaffId(Claims claims) {
+        return extractLongClaim(claims, "staffId");
+    }
+
+    public Long extractCustomerId(Claims claims) {
+        return extractLongClaim(claims, "customerId");
+    }
+
+    public Long extractDashboardUserId(Claims claims) {
+        return extractLongClaim(claims, "dashboardUserId");
+    }
+
+    public Long extractAuthSubjectId(Claims claims) {
+        return extractLongClaim(claims, "authSubjectId");
     }
 
     @SuppressWarnings("unchecked")
@@ -215,7 +213,7 @@ public class JwtService {
         return Jwts.builder()
                 .id(sessionId.toString())
                 .subject(email)
-                .claim("userId", dashboardUserId)
+                .claim("dashboardUserId", dashboardUserId)
                 .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_DASHBOARD)
                 .claim(ROLES_CLAIM, resolveDashboardRoles(role))
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)

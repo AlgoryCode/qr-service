@@ -9,7 +9,7 @@
 | `GOOGLE_CLIENT_SECRET` | `GOCSPX-...` | Google OAuth client secret |
 | `GOOGLE_CALLBACK_URL` | `https://prod.qrapi.algorycode.com/google-auth/callback` | API OAuth callback (Google authorized redirect URI). Must be `/google-auth/callback`, never `/auth/google/callback` or the Next.js URL. |
 | `GOOGLE_FRONTEND_CALLBACK_URL` | `https://qr.algorycode.com/api/auth/google/callback` | Next.js handoff callback after Google login. Must include `/api/auth/google/callback`. |
-| `CORS_ALLOWED_ORIGINS` | `https://prod.adminqr.algorycode.com,https://qr.algorycode.com` | Comma-separated browser origins allowed to call the API directly (admin dashboard, web app). Required when the frontend uses an absolute API URL instead of a same-origin `/api` proxy. |
+| `CORS_ALLOWED_ORIGINS` | `https://prod.adminqr.algorycode.com,https://qr.algorycode.com,https://staff.algorycode.com` | Comma-separated browser origins (admin dashboard, merchant dashboard, staff app). Required when the frontend uses an absolute API URL instead of a same-origin `/api` proxy. |
 | `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | PostgreSQL | Single database for auth, billing, payment, fulfillment runtime |
 | `JWT_SECRET` | (32+ chars) | Access/refresh token signing |
 | `RABBITMQ_HOST` | `rabbitmq` | RabbitMQ hostname |
@@ -203,4 +203,24 @@ docker build \
 ```
 
 Alternatif (mutlak API URL kullanılıyorsa): qr-service'e `CORS_ALLOWED_ORIGINS=https://prod.adminqr.algorycode.com` ekleyin ve redeploy edin.
+
+## Merchant dashboard (dashboard-site / qr.algorycode.com)
+
+Same-origin `/api` proxy to qr-service is preferred (`CORS_ALLOWED_ORIGINS` must include `https://qr.algorycode.com` if the browser calls the API host directly).
+
+Staff/panel API paths are **`/staff/*`**. Legacy **`/waiter-panel`** and **`/waiter/*`** aliases remain until **dashboard-site** and **staff-site** prod are verified; see [`docs/dashboard-site-api-migration.md`](docs/dashboard-site-api-migration.md) and [`docs/staff-site-api-migration.md`](docs/staff-site-api-migration.md).
+
+### Staff app (algoryqr-staff-site / staff.algorycode.com)
+
+BFF: `/api/staff/*` → qr-service `/staff/*`; auth `POST /api/v1/auth/staff/login`. Prod smoke (WAITER / KITCHEN / COURIER): [`docs/staff-site-api-migration.md`](docs/staff-site-api-migration.md).
+
+### Prod smoke (merchant JWT after login)
+
+1. `GET /access/context` → `200`
+2. `GET /staff/panel/staff` → `200` or expected `403` (package scope)
+3. Legacy alias: `GET /waiter-panel/staff` → same status as (2) while compat is enabled
+4. `GET /menu/...` — existing panel menu flow
+5. Internal workers: `GET /internal/merchant/{merchantId}` (not `/internal/merchants` in new code)
+
+Watch logs for `[compat] deprecated path` — should trend to zero after dashboard-site deploy.
 

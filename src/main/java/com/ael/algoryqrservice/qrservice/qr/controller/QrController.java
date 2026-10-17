@@ -20,7 +20,7 @@ import java.io.IOException;
 public class QrController {
     private final QrService qrService;
 
-    @GetMapping("/user/{userId}")
+    @GetMapping("/user/{merchantId}")
     public ResponseEntity<?> getUserQrs(
             @PathVariable Long merchantId,
             @RequestParam(defaultValue = "false") boolean includeImage,

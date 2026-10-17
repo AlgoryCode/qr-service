@@ -59,12 +59,12 @@ public class MemberPackageAccessRepairService {
 
     public int repairBatch(int batchSize) {
         int limit = batchSize > 0 ? batchSize : appProperties.getFulfillment().getRepairJobBatchSize();
-        List<Long> userIds = purchaseRepository.findUserIdsNeedingFulfillmentRepair(
+        List<Long> merchantIds = purchaseRepository.findUserIdsNeedingFulfillmentRepair(
                 LocalDateTime.now(),
                 PageRequest.of(0, limit)
         );
         int repaired = 0;
-        for (Long merchantId : userIds) {
+        for (Long merchantId : merchantIds) {
             if (repairIfMissingActivePackage(merchantId)) {
                 repaired++;
             }
@@ -143,7 +143,7 @@ public class MemberPackageAccessRepairService {
                         purchase.getCurrency() == null ? "TRY" : purchase.getCurrency(),
                         Map.of(
                                 "purchaseId", purchase.getId(),
-                                "userId", purchase.getMerchantId(),
+                                "merchantId", purchase.getMerchantId(),
                                 "packageCode", purchase.getPackageCode()
                         )
                 ));

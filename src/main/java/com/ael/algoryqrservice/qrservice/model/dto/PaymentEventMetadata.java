@@ -26,7 +26,7 @@ public record PaymentEventMetadata(
         }
         return new PaymentEventMetadata(
                 longValue(metadata, "purchaseId", first(event.getPurchaseId(), event.getSourceReferenceId())),
-                longValue(metadata, "userId", event.getUserId()),
+                merchantId(metadata, event.getMerchantId()),
                 longValue(metadata, "packageId", event.getPackageId()),
                 packageCodeValue(metadata, event.getPackageCode()),
                 value(metadata, "purchaseConversationId", event.getConversationId()),
@@ -108,6 +108,15 @@ public record PaymentEventMetadata(
                 throw new InvalidPaymentEventException("Payment event metadata is invalid: " + key);
             }
         }
+    }
+
+    private static Long merchantId(Map<String, Object> metadata, String eventMerchantId) {
+        Object legacy = metadata.get("userId");
+        String fallback = eventMerchantId;
+        if ((fallback == null || fallback.isBlank()) && legacy != null) {
+            fallback = String.valueOf(legacy);
+        }
+        return longValue(metadata, "merchantId", fallback);
     }
 
     private static String first(String first, String second) {

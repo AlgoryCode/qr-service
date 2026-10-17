@@ -68,7 +68,7 @@ public class AdminUserCredentialService {
             );
             return true;
         } catch (Exception exception) {
-            log.error("Temporary password notification failed. userId={}", user.getId(), exception);
+            log.error("Temporary password notification failed. merchantId={}", user.getId(), exception);
             return false;
         }
     }

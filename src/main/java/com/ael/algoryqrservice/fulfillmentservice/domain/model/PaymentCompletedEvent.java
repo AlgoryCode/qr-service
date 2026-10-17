@@ -13,7 +13,7 @@ public record PaymentCompletedEvent(
         String sourceReferenceId,
         Map<String, Object> sourceMetadata,
         String purchaseId,
-        String userId,
+        String merchantId,
         String packageId,
         String packageCode,
         String paymentStyle,

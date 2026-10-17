@@ -47,7 +47,7 @@ public class PaytrPaymentGatewayAdapter implements PaymentGatewayPort {
         Map<String, String> form = paytrRequestMapper.toStoredCardChargeForm(command);
         JsonNode response = paytrApiClient.chargeStoredCard(form);
         log.info(
-                "Stored-card charge submitted. userId={} paymentId={} status={}",
+                "Stored-card charge submitted. merchantId={} paymentId={} status={}",
                 command.getAccountId(),
                 merchantOid,
                 response.path("status").asText(null)
@@ -74,7 +74,7 @@ public class PaytrPaymentGatewayAdapter implements PaymentGatewayPort {
     public CardStorageSession prepareCardStorage(StoreCardCommand command) {
         CardStorageSession session = directCardStorageFormFactory.create(command);
         log.info(
-                "Card storage session ready. userId={} paymentId={}",
+                "Card storage session ready. merchantId={} paymentId={}",
                 command.getAccountId(),
                 session.conversationId()
         );

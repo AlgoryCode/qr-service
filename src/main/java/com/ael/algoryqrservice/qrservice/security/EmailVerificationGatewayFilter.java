@@ -27,6 +27,8 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
             "/auth/",
             "/account/email-verification",
             "/customer/",
+            "/staff/",
+            "/waiter-panel",
             "/waiter/",
             "/admin/",
             "/google-auth/",

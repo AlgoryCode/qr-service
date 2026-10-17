@@ -145,7 +145,7 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse createCategory(Long menuId, TaxonomyDtos.MainCategoryRequest request) {
-        Long merchantId = requireMenuUserId(menuId);
+        Long merchantId = requireMenuMerchantId(menuId);
         String name = requireName(request.getName());
         String slug = resolveSlug(menuId, request.getSlug(), name, true);
         MenuCategory saved = menuCategoryRepository.save(MenuCategory.builder()
@@ -441,7 +441,7 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyCloneResult cloneTaxonomyToMenu(Long sourceMenuId, Long targetMenuId) {
-        Long targetUserId = requireMenuUserId(targetMenuId);
+        Long targetMerchantId = requireMenuMerchantId(targetMenuId);
         Map<Long, Long> sourceSubToTargetSub = new HashMap<>();
         Map<Long, Long> sourceCategoryToTarget = new HashMap<>();
         List<MenuCategory> sourceCategories = menuCategoryRepository
@@ -449,7 +449,7 @@ public class MenuCategoryService {
         for (MenuCategory source : sourceCategories) {
             MenuCategory copied = menuCategoryRepository.save(MenuCategory.builder()
                     .menuId(targetMenuId)
-                    .merchantId(targetUserId)
+                    .merchantId(targetMerchantId)
                     .slug(source.getSlug())
                     .name(source.getName())
                     .sortOrder(source.getSortOrder())
@@ -517,7 +517,7 @@ public class MenuCategoryService {
         return base;
     }
 
-    private Long requireMenuUserId(Long menuId) {
+    private Long requireMenuMerchantId(Long menuId) {
         Menu menu = menuRepository.findById(menuId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));

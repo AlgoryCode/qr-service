@@ -1,6 +1,6 @@
 package com.ael.algoryqrservice.qrservice.order.service;
 
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.store.model.Merchant;
 import com.ael.algoryqrservice.qrservice.store.model.StoreCourier;
 import com.ael.algoryqrservice.qrservice.store.model.StoreDeliveryType;
@@ -26,7 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import com.ael.algoryqrservice.qrservice.branch.service.BranchScope;
-import com.ael.algoryqrservice.qrservice.waiter.service.WaiterAccessService;
+import com.ael.algoryqrservice.staffservice.application.StaffAccessService;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +46,7 @@ public class WaiterCourierOrderService {
             StoreOrderStatus.COURIER_DELIVERED_TO_CUSTOMER
     );
 
-    private final WaiterAccessService waiterAccessService;
+    private final StaffAccessService waiterAccessService;
     private final MerchantRepository merchantRepository;
     private final StoreOrderRepository storeOrderRepository;
     private final StoreCourierRepository storeCourierRepository;

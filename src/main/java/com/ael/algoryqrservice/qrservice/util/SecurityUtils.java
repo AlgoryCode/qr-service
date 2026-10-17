@@ -4,11 +4,11 @@ import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
 import com.ael.algoryqrservice.authservice.security.AuthPrincipal;
 import com.ael.algoryqrservice.qrservice.client.AuthMerchantClient;
 import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
-import com.ael.algoryqrservice.qrservice.model.Customer;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.Customer;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.repository.CustomerRepository;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository.CustomerRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.security.JwtAccessPrincipal;
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
@@ -66,8 +66,8 @@ public class SecurityUtils {
                 if (principal.merchantId() != null) {
                     return principal.merchantId();
                 }
-                if (principal.isWaiter() && principal.merchantId() != null) {
-                    return merchantStaffRepository.findById(principal.merchantId())
+                if (principal.isWaiter() && principal.staffId() != null) {
+                    return merchantStaffRepository.findById(principal.staffId())
                             .map(MerchantStaff::getMerchantId)
                             .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
                 }
@@ -80,20 +80,12 @@ public class SecurityUtils {
         return resolveMerchantAccountId(user.getId(), user.getEmail());
     }
 
-    /**
-     * @deprecated Use {@link #getCurrentMerchantId()} instead.
-     */
-    @Deprecated(forRemoval = false)
-    public Long getCurrentUserId() {
-        return getCurrentMerchantId();
-    }
-
-    public boolean matchesTokenUser(Long merchantId) {
+    public boolean matchesTokenMerchant(Long merchantId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (merchantId == null || authentication == null || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)) {
             return false;
         }
-        if (merchantId.equals(principal.merchantId()) || merchantId.equals(principal.merchantId())) {
+        if (merchantId.equals(principal.merchantId())) {
             return true;
         }
         String login = authentication.getName();
@@ -109,9 +101,12 @@ public class SecurityUtils {
                 .isPresent();
     }
 
-    /**
-     * Fulfillment and auth merchants are keyed by {@code tbl_user.id}; legacy panel rows may still use {@code tbl_user.id}.
-     */
+    /** @deprecated Use {@link #matchesTokenMerchant(Long)} */
+    @Deprecated(forRemoval = true)
+    public boolean matchesTokenUser(Long merchantId) {
+        return matchesTokenMerchant(merchantId);
+    }
+
     private Long resolveMerchantAccountId(Long fallbackId, String loginEmail) {
         if (loginEmail != null && !loginEmail.isBlank()) {
             Optional<Long> authMerchantId = authMerchantClient.findActiveMerchantIdByEmail(loginEmail);
@@ -143,9 +138,9 @@ public class SecurityUtils {
             return Optional.empty();
         }
         if (authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && principal.merchantId() != null
+                && principal.customerId() != null
                 && (principal.isCustomer() || hasRole(authentication, "ROLE_CUSTOMER"))) {
-            return Optional.of(principal.merchantId());
+            return Optional.of(principal.customerId());
         }
         if (!isCustomerAuthentication(authentication)) {
             return Optional.empty();
@@ -157,9 +152,17 @@ public class SecurityUtils {
         return customerRepository.findByEmail(email).map(Customer::getId);
     }
 
-    public Long getCurrentWaiterId() {
-        return findCurrentWaiterId()
+    public Long getCurrentStaffId() {
+        return findCurrentStaffId()
                 .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
+    }
+
+    public Long getCurrentWaiterId() {
+        return getCurrentStaffId();
+    }
+
+    public Optional<Long> findCurrentStaffId() {
+        return findCurrentWaiterId();
     }
 
     public Optional<Long> findCurrentWaiterId() {
@@ -168,21 +171,22 @@ public class SecurityUtils {
             return Optional.empty();
         }
         if (authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && principal.merchantId() != null
-                && (principal.isWaiter() || hasRole(authentication, "ROLE_WAITER"))) {
-            return Optional.of(principal.merchantId());
+                && principal.staffId() != null
+                && isStaffFulfillmentAuthentication(authentication, principal)) {
+            return Optional.of(principal.staffId());
         }
         return Optional.empty();
     }
 
     public Long getCurrentWaiterBranchId() {
         Authentication authentication = requireAuthentication("Garson bulunamadı");
-        if (authentication.getDetails() instanceof JwtAccessPrincipal principal && principal.isWaiter()) {
+        if (authentication.getDetails() instanceof JwtAccessPrincipal principal
+                && isStaffFulfillmentAuthentication(authentication, principal)) {
             if (principal.branchId() != null) {
                 return principal.branchId();
             }
-            if (principal.merchantId() != null) {
-                return merchantStaffRepository.findById(principal.merchantId())
+            if (principal.staffId() != null) {
+                return merchantStaffRepository.findById(principal.staffId())
                         .map(MerchantStaff::getBranchId)
                         .filter(id -> id != null)
                         .orElseThrow(() -> new UnauthorizedException("Garson şube bilgisi bulunamadı"));
@@ -205,6 +209,15 @@ public class SecurityUtils {
             return true;
         }
         return hasRole(authentication, "ROLE_CUSTOMER");
+    }
+
+    private boolean isStaffFulfillmentAuthentication(Authentication authentication, JwtAccessPrincipal principal) {
+        if (principal.isWaiter()) {
+            return true;
+        }
+        return hasRole(authentication, "ROLE_WAITER")
+                || hasRole(authentication, "ROLE_KITCHEN")
+                || hasRole(authentication, "ROLE_COURIER");
     }
 
     private boolean hasRole(Authentication authentication, String role) {

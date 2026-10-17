@@ -2,9 +2,9 @@ package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.exception.BadRequestException;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.DemoAccountEntity;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantEntity;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity.MerchantEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.DemoAccountJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantJpaRepository;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
 import com.ael.algoryqrservice.authservice.security.LoginAttemptGuard;
 import com.ael.algoryqrservice.authservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;

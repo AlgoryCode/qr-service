@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.client;
 
-import com.ael.algoryqrservice.authservice.application.auth.UpsertStaffUseCase;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.application.UpsertStaffUseCase;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

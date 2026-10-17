@@ -66,31 +66,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String principalType = jwtService.extractPrincipalType(claims);
         String subjectType = jwtService.extractSubjectType(claims);
-        Long merchantId = null;
-        Long userId;
-        if (JwtService.SUBJECT_STAFF.equals(subjectType)) {
+        Long merchantId = jwtService.extractMerchantId(claims);
+        Long staffId = jwtService.extractStaffId(claims);
+        Long customerId = jwtService.extractCustomerId(claims);
+        Long dashboardUserId = jwtService.extractDashboardUserId(claims);
+        Long branchId = null;
+
+        if (JwtService.SUBJECT_STAFF.equals(subjectType) || jwtService.isWaiterPrincipal(claims)) {
             principalType = JwtService.PRINCIPAL_WAITER;
-            merchantId = jwtService.extractMerchantId(claims);
-            userId = jwtService.extractUserId(claims);
+            branchId = jwtService.extractBranchId(claims);
         } else if (JwtService.SUBJECT_MERCHANT.equals(subjectType)) {
-            merchantId = jwtService.extractPackageOwnerId(claims);
-            userId = merchantId != null ? merchantId : jwtService.extractUserId(claims);
-        } else {
-            userId = jwtService.extractUserId(claims);
+            if (merchantId == null) {
+                merchantId = jwtService.extractPackageOwnerId(claims);
+            }
+        } else if (jwtService.isCustomerPrincipal(claims)) {
+            if (customerId == null) {
+                customerId = jwtService.extractCustomerId(claims);
+            }
+        } else if (jwtService.isDashboardPrincipal(claims)) {
+            if (dashboardUserId == null) {
+                dashboardUserId = jwtService.extractDashboardUserId(claims);
+            }
+        } else if (merchantId == null && staffId == null && customerId == null && dashboardUserId == null) {
+            merchantId = jwtService.extractMerchantId(claims);
         }
+
         List<String> roles = jwtService.extractRoles(claims);
         List<String> scopes;
         List<String> products;
         String activePackage;
-        Long branchId = null;
         if (JwtService.PRINCIPAL_CUSTOMER.equals(principalType)
                 || JwtService.PRINCIPAL_WAITER.equals(principalType)) {
             scopes = List.of();
             products = List.of();
             activePackage = null;
-            if (JwtService.PRINCIPAL_WAITER.equals(principalType)) {
-                branchId = jwtService.extractBranchId(claims);
-            }
         } else {
             scopes = jwtService.extractScopes(claims);
             products = jwtService.extractProducts(claims);
@@ -105,13 +114,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .toList()
         );
         authToken.setDetails(new JwtAccessPrincipal(
-                userId,
+                staffId,
+                merchantId,
+                customerId,
+                dashboardUserId,
                 scopes,
                 products,
                 activePackage,
                 principalType,
-                branchId,
-                merchantId
+                branchId
         ));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }

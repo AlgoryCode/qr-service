@@ -4,13 +4,18 @@
 
 | Kök | Açıklama |
 |-----|----------|
-| `authservice` | Eski algoryqr-authservice (kimlik, oturum, merchant) |
+| `authservice` | Kimlik, oturum, JWT (`/api/v1/auth`); merchant/staff **persistence yok** |
 | `fulfillmentservice` | Eski qr-fulfillment-service (paket, entitlement) |
 | `paymentservice` | Eski payment-service (PayTR, kart, abonelik, outbox) |
+| `merchantservice` | İşletme kimliği (`tbl_merchant`) |
+| `staffservice` | Personel (`tbl_merchant_staff`), `/staff` API |
+| `customerservice` | Müşteri (`tbl_customer`), `/customer` API |
 | `qrservice` | Ana QR domain (menü, sipariş, billing, entegrasyon, …) |
 | *(dosya)* `AlgoryqrServiceApplication` | Spring Boot giriş noktası |
 
 Modül içi alt paketler (`qrservice.menu`, `qrservice.billing`, …) domain sınırlarını korur; üst seviyede dağınık `billing`, `menu` vb. paket yoktur.
+
+REST özeti (merchant/staff/customer): [rest-domains-merchant-staff-customer.md](rest-domains-merchant-staff-customer.md).
 
 ## Entity tekilleştirme
 

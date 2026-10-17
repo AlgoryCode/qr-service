@@ -327,7 +327,7 @@ public class PaymentServiceClient {
     }
 
     private PaymentResultDto pay(PaymentThreeDsRequest request) {
-        Long merchantId = extractUserId(request);
+        Long merchantId = extractMerchantIdFromMetadata(request);
         return pay(merchantId, request);
     }
 
@@ -350,11 +350,14 @@ public class PaymentServiceClient {
         }
     }
 
-    private static Long extractUserId(PaymentThreeDsRequest request) {
+    private static Long extractMerchantIdFromMetadata(PaymentThreeDsRequest request) {
         if (request == null || request.getSourceMetadata() == null) {
             return null;
         }
-        Object raw = request.getSourceMetadata().get("userId");
+        Object raw = request.getSourceMetadata().get("merchantId");
+        if (raw == null) {
+            raw = request.getSourceMetadata().get("userId");
+        }
         if (raw instanceof Number number) {
             return number.longValue();
         }

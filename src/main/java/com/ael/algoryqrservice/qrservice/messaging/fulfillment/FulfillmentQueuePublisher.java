@@ -32,7 +32,7 @@ public class FulfillmentQueuePublisher {
                 event.getSourceReferenceId(),
                 event.getSourceMetadata(),
                 event.getPurchaseId(),
-                event.getUserId(),
+                event.getMerchantId(),
                 event.getPackageId(),
                 event.getPackageCode(),
                 event.getPaymentStyle(),
@@ -124,7 +124,7 @@ public class FulfillmentQueuePublisher {
 
     private void send(FulfillmentQueueMessage message) {
         log.info(
-                "fulfillment_payment_apply eventId={} eventType={} userId={} purchaseId={} packageCode={}",
+                "fulfillment_payment_apply eventId={} eventType={} merchantId={} purchaseId={} packageCode={}",
                 message.eventId(),
                 message.eventType(),
                 message.merchantId(),

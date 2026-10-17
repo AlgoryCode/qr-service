@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableJpaRepositories(
         basePackages = {
                 "com.ael.algoryqrservice.qrservice",
+                "com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository",
+                "com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository",
+                "com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository",
                 "com.ael.algoryqrservice.authservice.infrastructure.persistence.repository",
                 "com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.repository",
                 "com.ael.algoryqrservice.paymentservice.infrastructure.persistence.repository"
@@ -46,6 +49,9 @@ public class QrDatabaseConfiguration {
                 "com.ael.algoryqrservice.qrservice.integration.ubereats.model",
                 "com.ael.algoryqrservice.qrservice.integration.ubereatsmenu.model",
                 "com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model",
+                "com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.authservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.paymentservice.infrastructure.persistence.entity"

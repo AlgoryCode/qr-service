@@ -1,9 +1,9 @@
 package com.ael.algoryqrservice.qrservice.store.service;
 
 import com.ael.algoryqrservice.qrservice.branch.service.BranchScope;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.store.model.Merchant;
 import com.ael.algoryqrservice.qrservice.store.model.StoreDeliveryType;
 import com.ael.algoryqrservice.qrservice.store.model.StoreOrder;

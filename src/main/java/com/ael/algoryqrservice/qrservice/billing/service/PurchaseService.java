@@ -667,7 +667,7 @@ public class PurchaseService {
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("purchaseId", purchase.getId());
-        metadata.put("userId", purchase.getMerchantId());
+        metadata.put("merchantId", purchase.getMerchantId());
         metadata.put("packageId", purchase.getPackageId());
         metadata.put("packageCode", purchase.getPackageCode());
         metadata.put("purchaseConversationId", purchase.getPaymentConversationId());
@@ -686,7 +686,7 @@ public class PurchaseService {
         event.setSourceReferenceId(String.valueOf(purchase.getId()));
         event.setSourceMetadata(metadata);
         event.setPurchaseId(String.valueOf(purchase.getId()));
-        event.setUserId(String.valueOf(purchase.getMerchantId()));
+        event.setMerchantId(String.valueOf(purchase.getMerchantId()));
         event.setPackageId(String.valueOf(purchase.getPackageId()));
         event.setPackageCode(purchase.getPackageCode());
         event.setInstallmentId(installmentId);

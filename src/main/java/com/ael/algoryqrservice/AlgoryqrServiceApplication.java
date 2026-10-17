@@ -25,6 +25,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
                 "com.ael.algoryqrservice.qrservice.integration.ubereats.model",
                 "com.ael.algoryqrservice.qrservice.integration.ubereatsmenu.model",
                 "com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model",
+                "com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity",
         }
 )
 public class AlgoryqrServiceApplication {

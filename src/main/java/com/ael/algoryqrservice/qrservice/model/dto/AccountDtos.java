@@ -15,7 +15,6 @@ public final class AccountDtos {
     @Data
     @Builder
     public static class MyProfileResponse {
-        private Long userId;
         private Long merchantId;
         private String firstName;
         private String lastName;

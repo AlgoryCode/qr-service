@@ -41,7 +41,7 @@ IP guveni: `X-Forwarded-For`'un ilk degeri kullanilir (oturum kayitlariyla ayni 
 
 ### Katman 3 — `EmailVerificationGatewayFilter`
 
-- Allowlist prefiksleri (kapi disi): `/auth/`, `/account/email-verification`, `/customer/`, `/waiter/`, `/admin/`, `/google-auth/`, `/oauth2/`, `/actuator/`, `/healthcheck`, `/error`.
+- Allowlist prefiksleri (kapi disi): `/auth/`, `/account/email-verification`, `/customer/`, `/staff/`, `/waiter-panel`, `/waiter/` (geçici alias), `/admin/`, `/google-auth/`, `/oauth2/`, `/actuator/`, `/healthcheck`, `/error`.
 - Kimliksiz istek veya customer/waiter principal → kapi karismaz, normal authz calisir.
 - Owner principal icin `EmailVerificationGate.isVerificationPending(userId)` → true ise `403` + `{"code":"EMAIL_NOT_VERIFIED"}`.
 - `EmailVerificationGate` yalnizca **dogrulanmis** kullanicilari Caffeine'de 10 dk tutar; onaysiz kullanici her istekte DB'den okunur, boylece baska bir instance uzerinden yapilan onay aninda gecerli olur.

@@ -112,7 +112,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
         );
 
         log.info(
-                "Package fulfilled. fulfillmentId={} userId={} purchaseId={} packageCode={}",
+                "Package fulfilled. fulfillmentId={} merchantId={} purchaseId={} packageCode={}",
                 created.id(),
                 command.merchantId(),
                 command.purchaseId(),

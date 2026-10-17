@@ -64,7 +64,7 @@ public class CardStorageService {
         log.info("Card storage step=INITIATED_PERSISTED accountId={} conversationId={} status={}",
                 command.getAccountId(), command.getConversationId(), transaction.getStatus());
         log.info(
-                "Card verification initiated. userId={} paymentId={}",
+                "Card verification initiated. merchantId={} paymentId={}",
                 command.getAccountId(),
                 command.getConversationId()
         );

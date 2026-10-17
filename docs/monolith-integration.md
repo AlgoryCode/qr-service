@@ -4,7 +4,10 @@ Tek Spring Boot uygulaması (`AlgoryqrServiceApplication`) altında dört domain
 
 | Modül | Paket kökü | Dahili erişim (qrservice → modül) |
 |-------|------------|-----------------------------------|
-| Auth | `authservice` | `AuthMerchantClient`, `AuthCredentialClient`, `AuthStaffClient` → auth **use case** bean'leri |
+| Auth | `authservice` | Oturum/JWT; `AuthCredentialClient` → auth use case |
+| Merchant (in-process) | `merchantservice` | `AuthMerchantClient` → `FindMerchantUseCase`, … |
+| Staff (in-process) | `staffservice` | `AuthStaffClient` → `UpsertStaffUseCase` |
+| Customer (in-process) | `customerservice` | `CustomerAccountService`, entity/repo |
 | Fulfillment | `fulfillmentservice` | `FulfillmentServiceClient` → `FulfillmentService`, `EntitlementUsageService` |
 | Payment | `paymentservice` | `PaymentServiceClient` → `PaymentService`, `SubscriptionService`, `PaymentMethodService`, … |
 | QR domain | `qrservice` | Doğrudan servis/repository; harici entegrasyonlar (PayTR, Odeal, Uber Eats, AI servisi, Seaweed) kendi URL/env ile kalır |

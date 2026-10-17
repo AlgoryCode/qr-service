@@ -105,7 +105,7 @@ public class BatchReportService {
         }
 
         log.info(
-                "Batch report created. batchId={} openaiBatchId={} userId={} itemCount={}",
+                "Batch report created. batchId={} openaiBatchId={} merchantId={} itemCount={}",
                 batchId,
                 openaiBatchId,
                 merchantId,

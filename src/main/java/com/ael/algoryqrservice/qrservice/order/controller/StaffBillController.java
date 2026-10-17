@@ -1,0 +1,94 @@
+package com.ael.algoryqrservice.qrservice.order.controller;
+
+import com.ael.algoryqrservice.qrservice.order.dto.TableBillDtos;
+import com.ael.algoryqrservice.staffservice.application.MenuWaiterBillService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping({"/staff/bills", "/waiter/bills"})
+@RequiredArgsConstructor
+public class StaffBillController {
+
+    private final MenuWaiterBillService menuWaiterBillService;
+
+    @GetMapping("/tables/{tableId}/open")
+    public ResponseEntity<TableBillDtos.BillResponse> getOpenBillForTable(@PathVariable Long tableId) {
+        return ResponseEntity.ok(menuWaiterBillService.getOpenBillForTable(tableId));
+    }
+
+    @GetMapping("/{billId}")
+    public ResponseEntity<TableBillDtos.BillResponse> getBill(@PathVariable Long billId) {
+        return ResponseEntity.ok(menuWaiterBillService.getBill(billId));
+    }
+
+    @PutMapping("/{billId}/items")
+    public ResponseEntity<TableBillDtos.BillResponse> addItems(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.UpdateBillItemsRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.addItems(billId, request));
+    }
+
+    @PutMapping("/{billId}/items/{itemId}")
+    public ResponseEntity<TableBillDtos.BillResponse> updateItemQuantity(
+            @PathVariable Long billId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody TableBillDtos.UpdateBillItemQuantityRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.updateItemQuantity(
+                billId,
+                itemId,
+                request.getQuantity()
+        ));
+    }
+
+    @DeleteMapping("/{billId}/items/{itemId}")
+    public ResponseEntity<TableBillDtos.BillResponse> removeItem(
+            @PathVariable Long billId,
+            @PathVariable Long itemId
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.removeItem(billId, itemId));
+    }
+
+    @PostMapping("/{billId}/pay-items")
+    public ResponseEntity<TableBillDtos.BillResponse> payItems(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.PayBillItemsRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.payItems(billId, request));
+    }
+
+    @PostMapping("/{billId}/pay-share")
+    public ResponseEntity<TableBillDtos.BillResponse> payShare(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.PayBillShareRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.payShare(billId, request));
+    }
+
+    @GetMapping("/{billId}/split-preview")
+    public ResponseEntity<TableBillDtos.SplitPreviewResponse> getSplitPreview(
+            @PathVariable Long billId,
+            @org.springframework.web.bind.annotation.RequestParam int personCount
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.getSplitPreview(billId, personCount));
+    }
+
+    @PostMapping("/{billId}/close")
+    public ResponseEntity<TableBillDtos.BillResponse> closeBill(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.CloseBillRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterBillService.closeBill(billId, request));
+    }
+}

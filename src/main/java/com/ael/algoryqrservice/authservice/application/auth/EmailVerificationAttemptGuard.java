@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantEntity;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantJpaRepository;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity.MerchantEntity;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;

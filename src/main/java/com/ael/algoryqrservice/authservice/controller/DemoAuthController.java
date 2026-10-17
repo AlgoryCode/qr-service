@@ -38,7 +38,7 @@ public class DemoAuthController {
                 request.passwordConfirm()
         );
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("userId", subject.subjectId());
+        body.put("merchantId", subject.subjectId());
         body.put("username", DemoAccountSupport.normalizeUsername(request.username()));
         body.put("message", "Demo hesap olusturuldu. Giris yaparak devam edin.");
         return ResponseEntity.ok(body);

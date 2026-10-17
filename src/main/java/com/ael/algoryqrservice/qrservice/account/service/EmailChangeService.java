@@ -196,7 +196,7 @@ public class EmailChangeService {
                     codeValidityMinutes
             );
         } catch (Exception exception) {
-            log.error("Email change code notification failed. userId={}, purpose={}", user.getId(), purpose, exception);
+            log.error("Email change code notification failed. merchantId={}, purpose={}", user.getId(), purpose, exception);
             throw new BadRequestException("Doğrulama kodu gönderilemedi. Lütfen daha sonra tekrar deneyin.");
         }
     }

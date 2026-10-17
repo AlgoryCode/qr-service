@@ -4,16 +4,16 @@ import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.model.Campaign;
 import com.ael.algoryqrservice.qrservice.model.CampaignTemplate;
-import com.ael.algoryqrservice.qrservice.model.Customer;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.Customer;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.campaign.dto.CampaignDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.CampaignStatus;
 import com.ael.algoryqrservice.qrservice.repository.CampaignRepository;
 import com.ael.algoryqrservice.qrservice.repository.CampaignRewardRepository;
 import com.ael.algoryqrservice.qrservice.repository.CampaignTemplateRepository;
-import com.ael.algoryqrservice.qrservice.repository.CustomerRepository;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository.CustomerRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.waiter.service.WaiterAccessService;
+import com.ael.algoryqrservice.staffservice.application.StaffAccessService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +47,7 @@ public class CampaignService {
     private final MenuRepository menuRepository;
     private final CampaignConfigSupport configSupport;
     private final SecurityUtils securityUtils;
-    private final WaiterAccessService waiterAccessService;
+    private final StaffAccessService waiterAccessService;
 
     @Transactional(readOnly = true)
     public List<CampaignDtos.TemplateResponse> listTemplates() {

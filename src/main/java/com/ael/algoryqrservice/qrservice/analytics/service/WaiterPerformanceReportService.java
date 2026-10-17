@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.analytics.service;
 
 import com.ael.algoryqrservice.qrservice.model.BillPayment;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.TableBill;
 import com.ael.algoryqrservice.qrservice.model.TableBillItem;
 import com.ael.algoryqrservice.qrservice.model.WaiterCommissionRecord;

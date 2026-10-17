@@ -140,11 +140,15 @@ public class SessionIssuer {
         if (AuthSubject.TYPE_MERCHANT.equals(subject.subjectType())) {
             Long merchantId = subject.merchantId() != null ? subject.merchantId() : subject.subjectId();
             builder.claim("merchantId", merchantId);
-        } else {
-            builder.claim("userId", subject.subjectId());
+        } else if (AuthSubject.TYPE_STAFF.equals(subject.subjectType())) {
+            builder.claim("staffId", subject.subjectId());
             if (subject.merchantId() != null) {
                 builder.claim("merchantId", subject.merchantId());
             }
+        } else if (AuthSubject.TYPE_CUSTOMER.equals(subject.subjectType())) {
+            builder.claim("customerId", subject.subjectId());
+        } else if (AuthSubject.TYPE_ADMIN.equals(subject.subjectType())) {
+            builder.claim("authSubjectId", subject.subjectId());
         }
         if (subject.branchId() != null) {
             builder.claim("branchId", subject.branchId());

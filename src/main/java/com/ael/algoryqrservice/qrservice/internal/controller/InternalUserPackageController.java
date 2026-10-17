@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/internal/merchants", "/internal/users"})
+@RequestMapping({"/internal/merchant", "/internal/users"})
 @RequiredArgsConstructor
 public class InternalUserPackageController {
 

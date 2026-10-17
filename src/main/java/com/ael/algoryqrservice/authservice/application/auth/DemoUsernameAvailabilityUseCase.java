@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.DemoAccountJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantJpaRepository;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;

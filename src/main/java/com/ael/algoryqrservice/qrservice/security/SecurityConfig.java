@@ -40,6 +40,7 @@ public class SecurityConfig {
     private final PrintDeviceAuthenticationFilter printDeviceAuthenticationFilter;
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
+    private final DeprecatedStaffPathCompatFilter deprecatedStaffPathCompatFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -84,10 +85,11 @@ public class SecurityConfig {
                         .requestMatchers("/internal/auth/**").permitAll()
                         .requestMatchers("/internal/credentials/**").permitAll()
                         .requestMatchers("/internal/staff/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/internal/merchants/*").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/internal/merchants/*/soft-delete").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/internal/merchants/*/package", "/internal/users/*/package").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/internal/merchants/*/package", "/internal/users/*/package").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/internal/merchant/*", "/internal/merchants/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/merchant/*/soft-delete", "/internal/merchants/*/soft-delete")
+                            .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/internal/merchant/*/package", "/internal/users/*/package").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/merchant/*/package", "/internal/users/*/package").permitAll()
                         .requestMatchers("/internal/notifications/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
                         .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()
@@ -98,6 +100,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(deprecatedStaffPathCompatFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
@@ -120,6 +123,15 @@ public class SecurityConfig {
             EmailVerificationGatewayFilter filter
     ) {
         FilterRegistrationBean<EmailVerificationGatewayFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<DeprecatedStaffPathCompatFilter> deprecatedStaffPathCompatFilterRegistration(
+            DeprecatedStaffPathCompatFilter filter
+    ) {
+        FilterRegistrationBean<DeprecatedStaffPathCompatFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

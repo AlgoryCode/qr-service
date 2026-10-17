@@ -150,13 +150,13 @@ public class PlatformFeedbackService {
     }
 
     private Map<Long, User> loadUsers(Page<PlatformFeedback> result) {
-        Set<Long> userIds = result.getContent().stream()
+        Set<Long> merchantIds = result.getContent().stream()
                 .map(PlatformFeedback::getMerchantId)
                 .collect(Collectors.toSet());
-        if (userIds.isEmpty()) {
+        if (merchantIds.isEmpty()) {
             return Map.of();
         }
-        return userRepository.findAllById(userIds).stream()
+        return userRepository.findAllById(merchantIds).stream()
                 .collect(Collectors.toMap(User::getId, user -> user));
     }
 

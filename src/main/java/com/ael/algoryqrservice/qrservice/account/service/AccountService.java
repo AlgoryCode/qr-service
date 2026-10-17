@@ -112,7 +112,6 @@ public class AccountService {
         Long merchantId = securityUtils.getCurrentMerchantId();
         return AccountDtos.MyProfileResponse.builder()
                 .merchantId(merchantId)
-                .merchantId(merchantId)
                 .email(securityUtils.currentLogin())
                 .notifyEmailImportant(true)
                 .notifyScanAlerts(true)
@@ -124,7 +123,6 @@ public class AccountService {
 
     private AccountDtos.MyProfileResponse toProfileResponse(User user) {
         return AccountDtos.MyProfileResponse.builder()
-                .merchantId(user.getId())
                 .merchantId(securityUtils.getCurrentMerchantId())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())

@@ -57,15 +57,15 @@ public class PurchaseExpiryService {
     }
 
     private void expireAndAnnounce(List<Purchase> purchases) {
-        Set<Long> affectedUserIds = new LinkedHashSet<>();
+        Set<Long> affectedMerchantIds = new LinkedHashSet<>();
         for (Purchase purchase : purchases) {
             if (expireOne(purchase)) {
-                affectedUserIds.add(purchase.getMerchantId());
+                affectedMerchantIds.add(purchase.getMerchantId());
             }
         }
-        affectedUserIds.remove(null);
-        if (!affectedUserIds.isEmpty()) {
-            eventPublisher.publishEvent(new PurchasesExpiredEvent(new HashSet<>(affectedUserIds)));
+        affectedMerchantIds.remove(null);
+        if (!affectedMerchantIds.isEmpty()) {
+            eventPublisher.publishEvent(new PurchasesExpiredEvent(new HashSet<>(affectedMerchantIds)));
         }
     }
 

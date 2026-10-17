@@ -1,6 +1,6 @@
 package com.ael.algoryqrservice.qrservice.store.service;
 
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.store.model.StoreCourier;
 import com.ael.algoryqrservice.qrservice.store.model.StoreOrder;
 import com.ael.algoryqrservice.qrservice.store.model.StoreOrderItem;

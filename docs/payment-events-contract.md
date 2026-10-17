@@ -45,7 +45,7 @@ Schema-first: `PaymentEventConsumer` receives raw `Message`, then `JacksonPaymen
 | `serviceName` | string | |
 | `sourceReferenceId` | string | Usually purchase id |
 | `sourceMetadata` | object | Opaque map |
-| `purchaseId` / `userId` / `packageId` / `packageCode` | string | |
+| `purchaseId` / `merchantId` / `packageId` / `packageCode` | string | |
 | `paymentStyle` | string | |
 | `bankInstallmentCount` | number | nullable |
 | `subscriptionId` | string | nullable |
@@ -89,7 +89,7 @@ Published today by payment-service: `payment.success`, `payment.failed`, `paymen
   "serviceName": "qr-service",
   "sourceReferenceId": "46",
   "purchaseId": "46",
-  "userId": "10",
+  "merchantId": "10",
   "packageId": "3",
   "packageCode": "ULTIMATE_PACKAGE",
   "paymentStyle": "SUBSCRIPTION",

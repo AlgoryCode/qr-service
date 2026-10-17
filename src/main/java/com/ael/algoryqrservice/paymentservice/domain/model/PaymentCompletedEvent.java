@@ -23,7 +23,7 @@ public class PaymentCompletedEvent {
     private String sourceReferenceId;
     private Map<String, Object> sourceMetadata;
     private String purchaseId;
-    private String userId;
+    private String merchantId;
     private String packageId;
     private String packageCode;
     private PaymentStyle paymentStyle;

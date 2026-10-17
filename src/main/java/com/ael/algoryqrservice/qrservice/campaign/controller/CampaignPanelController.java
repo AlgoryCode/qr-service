@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/waiter-panel")
+@RequestMapping({"/staff/panel", "/waiter-panel"})
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.WAITER_PANEL_OWNER)
 public class CampaignPanelController {

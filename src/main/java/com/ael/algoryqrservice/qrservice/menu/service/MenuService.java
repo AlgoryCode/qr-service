@@ -586,7 +586,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.MenuProductResponse> listCatalogProducts() {
-        Long merchantId = securityUtils.getCurrentUserId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return menuProductRepository.findByMerchantIdAndDeletedFalseOrderByProductIdDesc(merchantId).stream()
                 .map(this::toProductResponse)
                 .toList();
@@ -597,7 +597,7 @@ public class MenuService {
         if (request == null || request.getName() == null || request.getName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
         }
-        Long merchantId = securityUtils.getCurrentUserId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         consumeProduct(merchantId, CatalogProducts.MENU_PRODUCT, 1);
         if (request.getNutrition() != null) {
             nutritionFactsService.validateForCreate(request.getNutrition());
@@ -643,14 +643,14 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.MenuProductOptionGroupResponse> listCatalogOptionGroups() {
-        return menuProductOptionService.listLibrary(securityUtils.getCurrentUserId());
+        return menuProductOptionService.listLibrary(securityUtils.getCurrentMerchantId());
     }
 
     @Transactional
     public MenuDtos.MenuProductOptionGroupResponse createCatalogOptionGroup(
             MenuDtos.MenuProductOptionGroupRequest request
     ) {
-        return menuProductOptionService.createLibrary(securityUtils.getCurrentUserId(), request);
+        return menuProductOptionService.createLibrary(securityUtils.getCurrentMerchantId(), request);
     }
 
     @Transactional
@@ -658,22 +658,22 @@ public class MenuService {
             Long groupId,
             MenuDtos.MenuProductOptionGroupRequest request
     ) {
-        return menuProductOptionService.updateLibrary(securityUtils.getCurrentUserId(), groupId, request);
+        return menuProductOptionService.updateLibrary(securityUtils.getCurrentMerchantId(), groupId, request);
     }
 
     @Transactional
     public void deleteCatalogOptionGroup(Long groupId) {
-        menuProductOptionService.deleteLibrary(securityUtils.getCurrentUserId(), groupId);
+        menuProductOptionService.deleteLibrary(securityUtils.getCurrentMerchantId(), groupId);
     }
 
     @Transactional(readOnly = true)
     public List<TaxonomyDtos.MainCategoryResponse> listCatalogCategories() {
-        return menuCategoryService.listLibrary(securityUtils.getCurrentUserId());
+        return menuCategoryService.listLibrary(securityUtils.getCurrentMerchantId());
     }
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse createCatalogCategory(TaxonomyDtos.MainCategoryRequest request) {
-        return menuCategoryService.createLibrary(securityUtils.getCurrentUserId(), request);
+        return menuCategoryService.createLibrary(securityUtils.getCurrentMerchantId(), request);
     }
 
     @Transactional
@@ -681,22 +681,22 @@ public class MenuService {
             Long categoryId,
             TaxonomyDtos.MainCategoryUpdateRequest request
     ) {
-        return menuCategoryService.updateLibrary(securityUtils.getCurrentUserId(), categoryId, request);
+        return menuCategoryService.updateLibrary(securityUtils.getCurrentMerchantId(), categoryId, request);
     }
 
     @Transactional
     public void deleteCatalogCategory(Long categoryId) {
-        menuCategoryService.deleteLibrary(securityUtils.getCurrentUserId(), categoryId);
+        menuCategoryService.deleteLibrary(securityUtils.getCurrentMerchantId(), categoryId);
     }
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse uploadCatalogCategoryCover(Long categoryId, org.springframework.web.multipart.MultipartFile file) {
-        return menuCategoryService.uploadLibraryCover(securityUtils.getCurrentUserId(), categoryId, file);
+        return menuCategoryService.uploadLibraryCover(securityUtils.getCurrentMerchantId(), categoryId, file);
     }
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse clearCatalogCategoryCover(Long categoryId) {
-        return menuCategoryService.clearLibraryCover(securityUtils.getCurrentUserId(), categoryId);
+        return menuCategoryService.clearLibraryCover(securityUtils.getCurrentMerchantId(), categoryId);
     }
 
     @Transactional
@@ -704,7 +704,7 @@ public class MenuService {
             Long categoryId,
             TaxonomyDtos.SubCategoryRequest request
     ) {
-        return menuCategoryService.createLibrarySub(securityUtils.getCurrentUserId(), categoryId, request);
+        return menuCategoryService.createLibrarySub(securityUtils.getCurrentMerchantId(), categoryId, request);
     }
 
     @Transactional
@@ -712,12 +712,12 @@ public class MenuService {
             Long subId,
             TaxonomyDtos.SubCategoryUpdateRequest request
     ) {
-        return menuCategoryService.updateLibrarySub(securityUtils.getCurrentUserId(), subId, request);
+        return menuCategoryService.updateLibrarySub(securityUtils.getCurrentMerchantId(), subId, request);
     }
 
     @Transactional
     public void deleteCatalogSubCategory(Long subId) {
-        menuCategoryService.deleteLibrarySub(securityUtils.getCurrentUserId(), subId);
+        menuCategoryService.deleteLibrarySub(securityUtils.getCurrentMerchantId(), subId);
     }
 
     @Transactional
@@ -734,7 +734,7 @@ public class MenuService {
             }
             requireOwnedCatalogProduct(productId);
         }
-        return menuProductOptionService.assignLibrary(securityUtils.getCurrentUserId(), groupId, productIds);
+        return menuProductOptionService.assignLibrary(securityUtils.getCurrentMerchantId(), groupId, productIds);
     }
 
     @Transactional
@@ -851,7 +851,7 @@ public class MenuService {
     private MenuProduct requireOwnedCatalogProduct(Long productId) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
-        Long merchantId = securityUtils.getCurrentUserId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         if (product.getMenuId() != null) {
             ensureOwnedMenu(product.getMenuId());
             return product;
@@ -1190,7 +1190,7 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.ActiveMenuSummary> listMenusForCurrentUser() {
-        Long merchantId = securityUtils.getCurrentUserId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return menuRepository.findMenusWithQrByMerchantId(merchantId).stream()
                 .map(this::toMenuSummary)
                 .toList();

@@ -4,7 +4,7 @@ import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.model.BillAdjustment;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.TableBill;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderAuditAction;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import com.ael.algoryqrservice.qrservice.waiter.service.WaiterAccessService;
+import com.ael.algoryqrservice.staffservice.application.StaffAccessService;
 import com.ael.algoryqrservice.qrservice.order.service.OrderAuditService;
 
 @Service
@@ -26,7 +26,7 @@ public class BillAdjustmentService {
     private final BillAdjustmentRepository billAdjustmentRepository;
     private final TableBillRepository tableBillRepository;
     private final MenuOrderRepository menuOrderRepository;
-    private final WaiterAccessService waiterAccessService;
+    private final StaffAccessService waiterAccessService;
     private final OrderAuditService orderAuditService;
 
     @Transactional

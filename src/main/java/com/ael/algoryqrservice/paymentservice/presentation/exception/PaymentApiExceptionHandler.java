@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.paymentservice.domain.exception.PaymentNotFoundEx
 import com.ael.algoryqrservice.paymentservice.domain.exception.PaymentMethodNotFoundException;
 import com.ael.algoryqrservice.paymentservice.domain.exception.PaymentProcessingException;
 import com.ael.algoryqrservice.paymentservice.domain.exception.SubscriptionNotFoundException;
+import com.ael.algoryqrservice.paymentservice.presentation.controller.PaymentController;
 import com.ael.algoryqrservice.paymentservice.presentation.dto.response.ApiErrorResponse;
 import com.ael.algoryqrservice.paymentservice.presentation.dto.response.FieldErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,7 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
-@RestControllerAdvice
+@RestControllerAdvice(basePackageClasses = PaymentController.class)
 public class PaymentApiExceptionHandler {
 
     @ExceptionHandler(PaymentNotFoundException.class)

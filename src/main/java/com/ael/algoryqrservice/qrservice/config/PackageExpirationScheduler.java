@@ -39,8 +39,8 @@ public class PackageExpirationScheduler {
 
         suspendExpiredGracePeriods();
 
-        List<Long> affectedUserIds = duePurchases.stream().map(Purchase::getMerchantId).distinct().toList();
-        menuPublicAccessService.syncForUsers(affectedUserIds);
+        List<Long> affectedMerchantIds = duePurchases.stream().map(Purchase::getMerchantId).distinct().toList();
+        menuPublicAccessService.syncForMerchants(affectedMerchantIds);
     }
 
     private void suspendExpiredGracePeriods() {

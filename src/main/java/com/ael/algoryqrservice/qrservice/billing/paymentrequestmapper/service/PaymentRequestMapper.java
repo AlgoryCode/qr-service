@@ -48,7 +48,7 @@ public class PaymentRequestMapper {
         int intervalMonths = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
 
         Map<String, Object> sourceMetadata = new HashMap<>();
-        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("merchantId", user.getId());
         sourceMetadata.put("packageId", planPackage.getId());
         sourceMetadata.put("packageCode", planPackage.getCode());
         sourceMetadata.put("purchaseConversationId", purchase.getPaymentConversationId());
@@ -148,7 +148,7 @@ public class PaymentRequestMapper {
         int intervalMonths = purchase.getBillingIntervalMonths() == null ? 1 : purchase.getBillingIntervalMonths();
 
         Map<String, Object> sourceMetadata = new HashMap<>();
-        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("merchantId", user.getId());
         sourceMetadata.put("packageId", planPackage.getId());
         sourceMetadata.put("packageCode", planPackage.getCode());
         sourceMetadata.put("purchaseConversationId", conversationId);
@@ -205,7 +205,7 @@ public class PaymentRequestMapper {
             throw new BadRequestException("Fatura bilgisi bulunamadı; önce fatura adresi tanımlayın");
         }
         Map<String, Object> sourceMetadata = new HashMap<>();
-        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("merchantId", user.getId());
         sourceMetadata.put("packageId", planPackage.getId());
         sourceMetadata.put("packageCode", planPackage.getCode());
         sourceMetadata.put("purchaseConversationId", conversationId);
@@ -259,7 +259,7 @@ public class PaymentRequestMapper {
         }
         BigDecimal chargeAmount = purchase.getPrice();
         Map<String, Object> sourceMetadata = new HashMap<>();
-        sourceMetadata.put("userId", user.getId());
+        sourceMetadata.put("merchantId", user.getId());
         sourceMetadata.put("packageId", purchase.getPackageId());
         sourceMetadata.put("packageCode", purchase.getPackageCode());
         sourceMetadata.put("productCode", primaryProductCode);

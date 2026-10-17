@@ -111,7 +111,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         log.info(
-                "Stored-card payment submitted. userId={} paymentId={} status={}",
+                "Stored-card payment submitted. merchantId={} paymentId={} status={}",
                 transaction.getAccountId(),
                 transaction.getConversationId(),
                 transaction.getStatus()
@@ -141,7 +141,7 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentProvider provider = resolveProvider(requestedProvider);
         command.setProvider(provider);
         log.info(
-                "Checkout form started. userId={} paymentId={} provider={}",
+                "Checkout form started. merchantId={} paymentId={} provider={}",
                 command.getAccountId(),
                 command.getConversationId(),
                 provider
@@ -155,7 +155,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepositoryPort.save(transaction);
 
         log.info(
-                "Checkout form created. userId={} paymentId={} style={}",
+                "Checkout form created. merchantId={} paymentId={} style={}",
                 command.getAccountId(),
                 command.getConversationId(),
                 command.getPaymentStyle()
@@ -223,7 +223,7 @@ public class PaymentServiceImpl implements PaymentService {
         );
         if (transaction.getStatus() != PaymentStatus.INITIATED) {
             log.info(
-                    "Payment notification ignored. userId={} paymentId={} reason=ALREADY_FINAL status={}",
+                    "Payment notification ignored. merchantId={} paymentId={} reason=ALREADY_FINAL status={}",
                     transaction.getAccountId(),
                     transaction.getConversationId(),
                     transaction.getStatus()
@@ -245,7 +245,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (transaction.getStatus() == PaymentStatus.INITIATED) {
             log.info(
-                    "Payment notification pending. userId={} paymentId={}",
+                    "Payment notification pending. merchantId={} paymentId={}",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
@@ -264,13 +264,13 @@ public class PaymentServiceImpl implements PaymentService {
                     transaction.setUpdatedAt(LocalDateTime.now());
                     paymentRepositoryPort.save(transaction);
                     log.warn(
-                            "Card verification payment succeeded but card was not saved. userId={} paymentId={} reason=CARD_TOKEN_MISSING",
+                            "Card verification payment succeeded but card was not saved. merchantId={} paymentId={} reason=CARD_TOKEN_MISSING",
                             transaction.getAccountId(),
                             transaction.getConversationId()
                     );
                 } else {
                     log.info(
-                            "Card verification payment succeeded and card saved. userId={} paymentId={}",
+                            "Card verification payment succeeded and card saved. merchantId={} paymentId={}",
                             transaction.getAccountId(),
                             transaction.getConversationId()
                     );
@@ -278,13 +278,13 @@ public class PaymentServiceImpl implements PaymentService {
                 return "OK";
             }
             log.info(
-                    "Payment succeeded. userId={} paymentId={}",
+                    "Payment succeeded. merchantId={} paymentId={}",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
         } else {
             log.warn(
-                    "Payment failed. userId={} paymentId={} reason={}",
+                    "Payment failed. merchantId={} paymentId={} reason={}",
                     transaction.getAccountId(),
                     transaction.getConversationId(),
                     firstNonBlank(transaction.getErrorCode(), transaction.getStatus().name())
@@ -349,7 +349,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (isCheckoutExpired(transaction)) {
             markFailure(transaction, PAYTR_TIMEOUT_ERROR, "PayTR odeme suresi doldu");
             publishPaymentEvent(transaction, false);
-            log.info("Payment expired. userId={} paymentId={} reason=TIMEOUT",
+            log.info("Payment expired. merchantId={} paymentId={} reason=TIMEOUT",
                     transaction.getAccountId(),
                     transaction.getConversationId());
         }
@@ -375,13 +375,13 @@ public class PaymentServiceImpl implements PaymentService {
             transaction.setUpdatedAt(LocalDateTime.now());
             paymentRepositoryPort.save(transaction);
             log.info(
-                    "Card verification refund succeeded. userId={} paymentId={}",
+                    "Card verification refund succeeded. merchantId={} paymentId={}",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
         } else {
             log.error(
-                    "Card verification refund failed. userId={} paymentId={} reason=MANUAL_REFUND_REQUIRED",
+                    "Card verification refund failed. merchantId={} paymentId={} reason=MANUAL_REFUND_REQUIRED",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
@@ -415,7 +415,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         } catch (Exception exception) {
             log.error(
-                    "Card verification refund failed. userId={} paymentId={} reason=GATEWAY_ERROR",
+                    "Card verification refund failed. merchantId={} paymentId={} reason=GATEWAY_ERROR",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
@@ -448,7 +448,7 @@ public class PaymentServiceImpl implements PaymentService {
         );
         if (gatewayResult.getCardUserKey() == null || gatewayResult.getCardToken() == null) {
             log.warn(
-                    "Card save skipped. userId={} paymentId={} reason=CARD_TOKEN_MISSING",
+                    "Card save skipped. merchantId={} paymentId={} reason=CARD_TOKEN_MISSING",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
@@ -463,14 +463,14 @@ public class PaymentServiceImpl implements PaymentService {
                     gatewayResult.getLastFourDigits()
             );
             log.info(
-                    "Card registration step=DB_SAVED userId={} paymentId={}",
+                    "Card registration step=DB_SAVED merchantId={} paymentId={}",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
             return true;
         } catch (Exception exception) {
             log.error(
-                    "Card registration step=DB_FAILED userId={} paymentId={} reason={} errorType={}",
+                    "Card registration step=DB_FAILED merchantId={} paymentId={} reason={} errorType={}",
                     transaction.getAccountId(),
                     transaction.getConversationId(),
                     exception.getMessage(),
@@ -532,7 +532,7 @@ public class PaymentServiceImpl implements PaymentService {
             gatewayResult = gateway.refundPayment(command);
         } catch (RuntimeException exception) {
             log.error(
-                    "Refund failed. userId={} paymentId={} reason=GATEWAY_ERROR",
+                    "Refund failed. merchantId={} paymentId={} reason=GATEWAY_ERROR",
                     transaction.getAccountId(),
                     command.getConversationId()
             );
@@ -541,7 +541,7 @@ public class PaymentServiceImpl implements PaymentService {
         validateGatewayResponse(gatewayResult);
         if (!gatewayResult.isSignatureValid()) {
             log.error(
-                    "Refund failed. userId={} paymentId={} reason=INVALID_SIGNATURE",
+                    "Refund failed. merchantId={} paymentId={} reason=INVALID_SIGNATURE",
                     transaction.getAccountId(),
                     command.getConversationId()
             );
@@ -564,7 +564,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         log.info(
-                "Payment refunded. userId={} paymentId={} fullyRefunded={} status={}",
+                "Payment refunded. merchantId={} paymentId={} fullyRefunded={} status={}",
                 transaction.getAccountId(),
                 command.getConversationId(),
                 fullyRefunded,
@@ -800,7 +800,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .listStoredCards(gatewayResult.getCardUserKey());
             if (listed.isEmpty()) {
                 log.warn(
-                        "Card token lookup empty. userId={} paymentId={}",
+                        "Card token lookup empty. merchantId={} paymentId={}",
                         transaction.getAccountId(),
                         transaction.getConversationId()
                 );
@@ -813,7 +813,7 @@ public class PaymentServiceImpl implements PaymentService {
             }
         } catch (Exception exception) {
             log.warn(
-                    "Card token lookup failed. userId={} paymentId={} reason=GATEWAY_ERROR",
+                    "Card token lookup failed. merchantId={} paymentId={} reason=GATEWAY_ERROR",
                     transaction.getAccountId(),
                     transaction.getConversationId()
             );
@@ -969,7 +969,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .sourceReferenceId(transaction.getSourceReferenceId())
                 .sourceMetadata(sourceMetadata)
                 .purchaseId(metadataValue(sourceMetadata, "purchaseId", transaction.getSourceReferenceId()))
-                .userId(metadataValue(sourceMetadata, "userId", null))
+                .merchantId(metadataMerchantId(sourceMetadata))
                 .packageId(metadataValue(sourceMetadata, "packageId", null))
                 .packageCode(metadataValue(sourceMetadata, "packageCode", null))
                 .paymentStyle(transaction.getPaymentStyle())
@@ -1012,6 +1012,14 @@ public class PaymentServiceImpl implements PaymentService {
     private String metadataValue(Map<String, Object> metadata, String key, String defaultValue) {
         Object value = metadata.get(key);
         return value == null ? defaultValue : value.toString();
+    }
+
+    private String metadataMerchantId(Map<String, Object> metadata) {
+        String merchantId = metadataValue(metadata, "merchantId", null);
+        if (merchantId != null && !merchantId.isBlank()) {
+            return merchantId;
+        }
+        return metadataValue(metadata, "userId", null);
     }
 
     private Map<String, Object> buildSourceMetadata(PaymentTransaction transaction) {

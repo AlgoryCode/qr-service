@@ -1,8 +1,9 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.AdminJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantStaffJpaRepository;
+import com.ael.algoryqrservice.merchantservice.application.FindMerchantUseCase;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import org.springframework.stereotype.Component;
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 
@@ -13,7 +14,7 @@ import java.util.function.Function;
 @Component
 public class SubjectLoader {
 
-    private final MerchantStaffJpaRepository staffRepository;
+    private final MerchantStaffRepository staffRepository;
     private final MerchantJpaRepository merchantRepository;
     private final AdminJpaRepository adminRepository;
     private final AuthSubjectMapper mapper;
@@ -21,7 +22,7 @@ public class SubjectLoader {
     private final Map<String, Function<Long, Optional<AuthSubject>>> loaders;
 
     public SubjectLoader(
-            MerchantStaffJpaRepository staffRepository,
+            MerchantStaffRepository staffRepository,
             MerchantJpaRepository merchantRepository,
             AdminJpaRepository adminRepository,
             AuthSubjectMapper mapper,

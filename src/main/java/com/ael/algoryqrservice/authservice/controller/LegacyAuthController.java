@@ -118,7 +118,7 @@ public class LegacyAuthController {
             @AuthenticationPrincipal AuthPrincipal principal,
             HttpServletRequest httpRequest
     ) {
-        AuthSubject subject = subjectLoader.load(principal.subjectType(), principal.merchantId())
+        AuthSubject subject = subjectLoader.load(principal.subjectType(), principal.resolveSubjectId())
                 .orElseThrow(() -> new UnauthorizedException("Subject not found"));
         merchantPackageGate.assertOpen(subject);
         return ResponseEntity.ok(tokenUseCase.create(subject, ClientInfo.from(httpRequest)));
@@ -126,7 +126,7 @@ public class LegacyAuthController {
 
     @GetMapping("/access-profile")
     public ResponseEntity<Map<String, Object>> accessProfile(@AuthenticationPrincipal AuthPrincipal principal) {
-        AuthSubject subject = subjectLoader.load(principal.subjectType(), principal.merchantId())
+        AuthSubject subject = subjectLoader.load(principal.subjectType(), principal.resolveSubjectId())
                 .orElseThrow(() -> new UnauthorizedException("Subject not found"));
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("role", subject.roleCode());

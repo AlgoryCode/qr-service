@@ -2,8 +2,9 @@ package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.AdminJpaRepository;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.DemoAccountJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantStaffJpaRepository;
+import com.ael.algoryqrservice.merchantservice.application.FindMerchantUseCase;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;
@@ -16,7 +17,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class IdentifierResolver {
 
-    private final MerchantStaffJpaRepository staffRepository;
+    private final MerchantStaffRepository staffRepository;
     private final AdminJpaRepository adminRepository;
     private final MerchantJpaRepository merchantRepository;
     private final DemoAccountJpaRepository demoAccountRepository;

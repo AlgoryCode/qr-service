@@ -249,7 +249,7 @@ public class FulfillmentServiceClient {
 
     private FulfillmentUnavailableException unavailable(Long merchantId, Exception exception) {
         log.warn(
-                "In-process fulfillment call failed. userId={} reason={}",
+                "In-process fulfillment call failed. merchantId={} reason={}",
                 merchantId,
                 exception.getMessage()
         );

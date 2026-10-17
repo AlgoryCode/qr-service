@@ -1,0 +1,367 @@
+package com.ael.algoryqrservice.staffservice.presentation.controller;
+
+import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
+import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantAreaDtos;
+import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantLayoutDtos;
+import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantTableDtos;
+import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.order.service.MenuOrderService;
+import com.ael.algoryqrservice.staffservice.application.MenuWaiterService;
+import com.ael.algoryqrservice.customerservice.application.MenuCustomerListService;
+import com.ael.algoryqrservice.qrservice.branch.service.RestaurantAreaService;
+import com.ael.algoryqrservice.qrservice.branch.service.RestaurantLayoutService;
+import com.ael.algoryqrservice.qrservice.branch.service.RestaurantTableService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping({"/staff/panel", "/waiter-panel"})
+@RequiredArgsConstructor
+@RequiresProductScope(CatalogScopes.WAITER_PANEL_OWNER)
+public class StaffPanelController {
+
+    private final MenuWaiterService menuWaiterService;
+    private final RestaurantTableService restaurantTableService;
+    private final RestaurantAreaService restaurantAreaService;
+    private final RestaurantLayoutService restaurantLayoutService;
+    private final MenuOrderService menuOrderService;
+    private final MenuCustomerListService merchantCustomerService;
+
+    @GetMapping("/customers/my")
+    public ResponseEntity<List<MenuWaiterDtos.CustomerListItem>> listMyCustomers() {
+        return ResponseEntity.ok(merchantCustomerService.listCustomersForCurrentBusiness());
+    }
+
+    @GetMapping("/staff")
+    public ResponseEntity<MenuWaiterDtos.StaffListResponse> listMerchantStaff() {
+        return ResponseEntity.ok(menuWaiterService.listMerchantStaff());
+    }
+
+    @PostMapping("/staff")
+    public ResponseEntity<MenuWaiterDtos.WaiterResponse> createMerchantStaff(
+            @Valid @RequestBody MenuWaiterDtos.CreateWaiterRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuWaiterService.createMerchantStaff(request));
+    }
+
+    @PatchMapping("/staff/{staffId}")
+    public ResponseEntity<MenuWaiterDtos.WaiterResponse> updateMerchantStaff(
+            @PathVariable Long staffId,
+            @RequestBody MenuWaiterDtos.UpdateWaiterRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterService.updateMerchantStaff(staffId, request));
+    }
+
+    @PatchMapping("/staff/{staffId}/branch")
+    public ResponseEntity<MenuWaiterDtos.WaiterResponse> assignStaffBranch(
+            @PathVariable Long staffId,
+            @RequestBody(required = false) MenuWaiterDtos.AssignBranchRequest request
+    ) {
+        Long branchId = request == null ? null : request.getBranchId();
+        return ResponseEntity.ok(menuWaiterService.assignBranch(staffId, branchId));
+    }
+
+    @GetMapping("/branch/{branchId}/staff")
+    public ResponseEntity<MenuWaiterDtos.UsersPageResponse> listWaiters(@PathVariable Long branchId) {
+        return ResponseEntity.ok(menuWaiterService.listWaiters(branchId));
+    }
+
+    @PostMapping("/branch/{branchId}/staff")
+    public ResponseEntity<MenuWaiterDtos.WaiterResponse> createWaiter(
+            @PathVariable Long branchId,
+            @Valid @RequestBody MenuWaiterDtos.CreateWaiterRequest request
+    ) {
+        return ResponseEntity.status(201).body(menuWaiterService.createWaiter(branchId, request));
+    }
+
+    @PatchMapping("/branch/{branchId}/staff/{staffId}")
+    public ResponseEntity<MenuWaiterDtos.WaiterResponse> updateWaiter(
+            @PathVariable Long branchId,
+            @PathVariable Long staffId,
+            @RequestBody MenuWaiterDtos.UpdateWaiterRequest request
+    ) {
+        return ResponseEntity.ok(menuWaiterService.updateWaiter(branchId, staffId, request));
+    }
+
+    @DeleteMapping("/branch/{branchId}/staff/{staffId}")
+    public ResponseEntity<Void> deleteWaiter(
+            @PathVariable Long branchId,
+            @PathVariable Long staffId
+    ) {
+        menuWaiterService.deleteWaiter(branchId, staffId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/catalog/layouts")
+    public ResponseEntity<List<RestaurantLayoutDtos.LayoutResponse>> listLayouts() {
+        return ResponseEntity.ok(restaurantLayoutService.listLayouts());
+    }
+
+    @PostMapping("/catalog/layouts")
+    public ResponseEntity<RestaurantLayoutDtos.LayoutResponse> createLayout(
+            @Valid @RequestBody RestaurantLayoutDtos.CreateLayoutRequest request
+    ) {
+        return ResponseEntity.status(201).body(restaurantLayoutService.createLayout(request));
+    }
+
+    @PatchMapping("/catalog/layouts/{layoutId}")
+    public ResponseEntity<RestaurantLayoutDtos.LayoutResponse> renameLayout(
+            @PathVariable Long layoutId,
+            @RequestBody RestaurantLayoutDtos.UpdateLayoutRequest request
+    ) {
+        return ResponseEntity.ok(restaurantLayoutService.renameLayout(layoutId, request));
+    }
+
+    @DeleteMapping("/catalog/layouts/{layoutId}")
+    public ResponseEntity<Void> deleteLayout(@PathVariable Long layoutId) {
+        restaurantLayoutService.deleteLayout(layoutId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/catalog/layouts/{layoutId}/assign")
+    public ResponseEntity<RestaurantLayoutDtos.LayoutResponse> assignLayoutBranch(
+            @PathVariable Long layoutId,
+            @RequestBody RestaurantLayoutDtos.AssignBranchRequest request
+    ) {
+        return ResponseEntity.ok(restaurantLayoutService.assignBranch(
+                layoutId,
+                request == null ? null : request.getBranchId()
+        ));
+    }
+
+    @GetMapping("/catalog/layouts/{layoutId}/areas")
+    public ResponseEntity<List<RestaurantAreaDtos.AreaResponse>> listOwnedAreas(@PathVariable Long layoutId) {
+        return ResponseEntity.ok(restaurantAreaService.listOwnedAreas(layoutId));
+    }
+
+    @PostMapping("/catalog/layouts/{layoutId}/areas")
+    public ResponseEntity<RestaurantAreaDtos.AreaResponse> createOwnedArea(
+            @PathVariable Long layoutId,
+            @Valid @RequestBody RestaurantAreaDtos.CreateAreaRequest request
+    ) {
+        return ResponseEntity.status(201).body(restaurantAreaService.createOwnedArea(layoutId, request));
+    }
+
+    @PatchMapping("/catalog/layouts/{layoutId}/areas/{areaId}")
+    public ResponseEntity<RestaurantAreaDtos.AreaResponse> updateOwnedArea(
+            @PathVariable Long layoutId,
+            @PathVariable Long areaId,
+            @RequestBody RestaurantAreaDtos.UpdateAreaRequest request
+    ) {
+        return ResponseEntity.ok(restaurantAreaService.updateOwnedArea(layoutId, areaId, request));
+    }
+
+    @DeleteMapping("/catalog/layouts/{layoutId}/areas/{areaId}")
+    public ResponseEntity<Void> deleteOwnedArea(
+            @PathVariable Long layoutId,
+            @PathVariable Long areaId
+    ) {
+        restaurantAreaService.deleteOwnedArea(layoutId, areaId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/catalog/layouts/{layoutId}/tables")
+    public ResponseEntity<List<RestaurantTableDtos.TableResponse>> listOwnedTables(@PathVariable Long layoutId) {
+        return ResponseEntity.ok(restaurantTableService.listOwnedTables(layoutId));
+    }
+
+    @PostMapping("/catalog/layouts/{layoutId}/tables")
+    public ResponseEntity<RestaurantTableDtos.TableResponse> createOwnedTable(
+            @PathVariable Long layoutId,
+            @Valid @RequestBody RestaurantTableDtos.CreateTableRequest request
+    ) {
+        return ResponseEntity.status(201).body(restaurantTableService.createOwnedTable(layoutId, request));
+    }
+
+    @PatchMapping("/catalog/layouts/{layoutId}/tables/{tableId}")
+    public ResponseEntity<RestaurantTableDtos.TableResponse> updateOwnedTable(
+            @PathVariable Long layoutId,
+            @PathVariable Long tableId,
+            @RequestBody RestaurantTableDtos.UpdateTableRequest request
+    ) {
+        return ResponseEntity.ok(restaurantTableService.updateOwnedTable(layoutId, tableId, request));
+    }
+
+    @PostMapping("/catalog/layouts/{layoutId}/tables/{tableId}/regenerate-qr")
+    public ResponseEntity<RestaurantTableDtos.TableResponse> regenerateOwnedQr(
+            @PathVariable Long layoutId,
+            @PathVariable Long tableId
+    ) {
+        return ResponseEntity.ok(restaurantTableService.regenerateOwnedQr(layoutId, tableId));
+    }
+
+    @DeleteMapping("/catalog/layouts/{layoutId}/tables/{tableId}")
+    public ResponseEntity<Void> deleteOwnedTable(
+            @PathVariable Long layoutId,
+            @PathVariable Long tableId
+    ) {
+        restaurantTableService.deleteOwnedTable(layoutId, tableId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/menu/{menuId}/areas")
+    public ResponseEntity<List<RestaurantAreaDtos.AreaResponse>> listAreas(@PathVariable Long menuId) {
+        return ResponseEntity.ok(restaurantAreaService.listAreas(menuId));
+    }
+
+    @PostMapping("/menu/{menuId}/areas")
+    public ResponseEntity<RestaurantAreaDtos.AreaResponse> createArea(
+            @PathVariable Long menuId,
+            @Valid @RequestBody RestaurantAreaDtos.CreateAreaRequest request
+    ) {
+        return ResponseEntity.status(201).body(restaurantAreaService.createArea(menuId, request));
+    }
+
+    @PatchMapping("/menu/{menuId}/areas/{areaId}")
+    public ResponseEntity<RestaurantAreaDtos.AreaResponse> updateArea(
+            @PathVariable Long menuId,
+            @PathVariable Long areaId,
+            @RequestBody RestaurantAreaDtos.UpdateAreaRequest request
+    ) {
+        return ResponseEntity.ok(restaurantAreaService.updateArea(menuId, areaId, request));
+    }
+
+    @DeleteMapping("/menu/{menuId}/areas/{areaId}")
+    public ResponseEntity<Void> deleteArea(
+            @PathVariable Long menuId,
+            @PathVariable Long areaId
+    ) {
+        restaurantAreaService.deleteArea(menuId, areaId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/menu/{menuId}/tables")
+    public ResponseEntity<List<RestaurantTableDtos.TableResponse>> listTables(@PathVariable Long menuId) {
+        return ResponseEntity.ok(restaurantTableService.listTables(menuId));
+    }
+
+    @PostMapping("/menu/{menuId}/tables")
+    public ResponseEntity<RestaurantTableDtos.TableResponse> createTable(
+            @PathVariable Long menuId,
+            @Valid @RequestBody RestaurantTableDtos.CreateTableRequest request
+    ) {
+        return ResponseEntity.status(201).body(restaurantTableService.createTable(menuId, request));
+    }
+
+    @PatchMapping("/menu/{menuId}/tables/{tableId}")
+    public ResponseEntity<RestaurantTableDtos.TableResponse> updateTable(
+            @PathVariable Long menuId,
+            @PathVariable Long tableId,
+            @RequestBody RestaurantTableDtos.UpdateTableRequest request
+    ) {
+        return ResponseEntity.ok(restaurantTableService.updateTable(menuId, tableId, request));
+    }
+
+    @PostMapping("/menu/{menuId}/tables/{tableId}/regenerate-qr")
+    public ResponseEntity<RestaurantTableDtos.TableResponse> regenerateQr(
+            @PathVariable Long menuId,
+            @PathVariable Long tableId
+    ) {
+        return ResponseEntity.ok(restaurantTableService.regenerateQr(menuId, tableId));
+    }
+
+    @DeleteMapping("/menu/{menuId}/tables/{tableId}")
+    public ResponseEntity<Void> deleteTable(
+            @PathVariable Long menuId,
+            @PathVariable Long tableId
+    ) {
+        restaurantTableService.deleteTable(menuId, tableId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/menu/{menuId}/orders")
+    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listOrders(
+            @PathVariable Long menuId,
+            @RequestParam(required = false, defaultValue = "ALL") String status
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantList(menuId, status));
+    }
+
+    @GetMapping("/menu/{menuId}/orders/{orderId}")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> getOrder(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantGet(menuId, orderId));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/cancel")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> cancelOrder(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestBody(required = false) MenuOrderDtos.CancelOrderRequest request
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantCancel(menuId, orderId, request));
+    }
+
+    @GetMapping("/menu/{menuId}/kitchen/orders")
+    public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listKitchenQueue(@PathVariable Long menuId) {
+        return ResponseEntity.ok(menuOrderService.merchantKitchenQueue(menuId));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/preparing")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markPreparing(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantMarkPreparing(menuId, orderId, source));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/ready")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markReady(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantMarkReady(menuId, orderId, source));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/kitchen-revert")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> revertKitchen(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @RequestParam MenuOrderStatus to,
+            @RequestParam(required = false) String source
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantRevertKitchen(menuId, orderId, to, source));
+    }
+
+    @PostMapping("/menu/{menuId}/orders/{orderId}/served")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> markServed(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(menuOrderService.merchantMarkServed(menuId, orderId));
+    }
+
+    @PatchMapping("/menu/{menuId}/orders/{orderId}/kitchen-note")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> updateKitchenNote(
+            @PathVariable Long menuId,
+            @PathVariable Long orderId,
+            @Valid @RequestBody MenuWaiterDtos.WaiterNoteRequest request
+    ) {
+        String note = request != null ? request.getNote() : null;
+        return ResponseEntity.ok(menuOrderService.merchantUpdateKitchenNote(menuId, orderId, note));
+    }
+
+    @GetMapping("/menu/{menuId}/customers")
+    public ResponseEntity<List<MenuWaiterDtos.CustomerListItem>> listCustomers(@PathVariable Long menuId) {
+        return ResponseEntity.ok(merchantCustomerService.listCustomers(menuId));
+    }
+}

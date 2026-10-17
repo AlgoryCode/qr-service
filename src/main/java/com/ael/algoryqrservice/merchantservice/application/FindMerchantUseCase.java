@@ -1,0 +1,68 @@
+package com.ael.algoryqrservice.merchantservice.application;
+
+import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity.MerchantEntity;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class FindMerchantUseCase {
+
+    public static final String ACTIVE = "ACTIVE";
+    public static final String INACTIVE = "INACTIVE";
+
+    private final MerchantJpaRepository merchantRepository;
+
+    @Transactional(readOnly = true)
+    public MerchantResponse findMerchant(Long merchantId) {
+        MerchantEntity merchant = merchantRepository.findWithRoleById(merchantId)
+                .orElseThrow(() -> new NotFoundException("Merchant bulunamadi"));
+        String status = merchant.isActive() && merchant.getDeletedAt() == null ? ACTIVE : INACTIVE;
+        return new MerchantResponse(merchant.getId(), status);
+    }
+
+    public Optional<Long> findActiveMerchantIdByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        return merchantRepository.findByEmailIgnoreCaseAndActiveTrueAndDeletedAtIsNull(email.trim())
+                .map(MerchantEntity::getId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<MerchantProfileResponse> findProfile(Long merchantId) {
+        if (merchantId == null) {
+            return Optional.empty();
+        }
+        return merchantRepository.findWithRoleById(merchantId)
+                .filter(merchant -> merchant.getDeletedAt() == null)
+                .map(merchant -> new MerchantProfileResponse(
+                        merchant.getId(),
+                        merchant.getFirstName(),
+                        merchant.getLastName(),
+                        merchant.getEmail(),
+                        merchant.getPhone(),
+                        merchant.getProvider()
+                ));
+    }
+
+    public record MerchantResponse(Long id, String status) {
+    }
+
+    public record MerchantProfileResponse(
+            Long id,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String provider
+    ) {
+    }
+}

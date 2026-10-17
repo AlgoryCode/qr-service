@@ -2,11 +2,11 @@ package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.exception.BadRequestException;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.AdminEntity;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantEntity;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.entity.MerchantEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.RoleEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.RoleJpaRepository;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.ScopeJpaRepository;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

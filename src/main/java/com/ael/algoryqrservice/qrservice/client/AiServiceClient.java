@@ -70,7 +70,7 @@ public class AiServiceClient {
 
     public AiMenuImportClientDtos.JobAccepted createMenuImportJob(AiMenuImportClientDtos.CreateRequest request) {
         log.info(
-                "ai_menu_import_proxy_create menuId={} userId={} imageCount={}",
+                "ai_menu_import_proxy_create menuId={} merchantId={} imageCount={}",
                 request.getMenuId(),
                 request.getMerchantId(),
                 request.getImageUrls() == null ? 0 : request.getImageUrls().size()

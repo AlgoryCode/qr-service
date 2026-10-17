@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.qrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.qrservice.model.TableBill;
 import com.ael.algoryqrservice.qrservice.model.TableBillItem;
@@ -24,7 +24,7 @@ import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
 import com.ael.algoryqrservice.qrservice.repository.TableBillItemRepository;
 import com.ael.algoryqrservice.qrservice.repository.TableBillRepository;
@@ -45,7 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.ael.algoryqrservice.qrservice.waiter.service.WaiterCommissionService;
+import com.ael.algoryqrservice.staffservice.application.StaffCommissionService;
 import com.ael.algoryqrservice.qrservice.order.service.OrderAuditService;
 import com.ael.algoryqrservice.qrservice.order.service.TableSessionService;
 
@@ -64,7 +64,7 @@ public class TableBillService {
     private final MenuRepository menuRepository;
     private final RestaurantTableRepository restaurantTableRepository;
     private final MerchantStaffRepository merchantStaffRepository;
-    private final WaiterCommissionService waiterCommissionService;
+    private final StaffCommissionService waiterCommissionService;
     private final MenuOrderRepository menuOrderRepository;
     private final BranchRepository branchRepository;
     private final OrderAuditService orderAuditService;
@@ -190,7 +190,7 @@ public class TableBillService {
             Long staffId
     ) {
         TableBill bill = requireOpenBill(menuId, billId);
-        List<WaiterCommissionService.CommissionLineItem> addedItems = appendCartItems(
+        List<StaffCommissionService.CommissionLineItem> addedItems = appendCartItems(
                 bill,
                 menuId,
                 items,
@@ -771,7 +771,7 @@ public class TableBillService {
                 .orElseThrow(() -> new NotFoundException("Açık adisyon bulunamadı"));
     }
 
-    private List<WaiterCommissionService.CommissionLineItem> appendCartItems(
+    private List<StaffCommissionService.CommissionLineItem> appendCartItems(
             TableBill bill,
             Long menuId,
             List<MenuOrderDtos.CartItemRequest> items,
@@ -784,7 +784,7 @@ public class TableBillService {
 
         Map<Long, MenuProduct> productsById = loadProductsForMenu(menuId, items);
         LocalDateTime now = LocalDateTime.now();
-        List<WaiterCommissionService.CommissionLineItem> addedItems = new ArrayList<>();
+        List<StaffCommissionService.CommissionLineItem> addedItems = new ArrayList<>();
 
         for (MenuOrderDtos.CartItemRequest itemRequest : items) {
             MenuProduct product = productsById.get(itemRequest.getProductId());
@@ -816,7 +816,7 @@ public class TableBillService {
                     .updatedAt(now)
                     .build();
             bill.addItem(billItem);
-            addedItems.add(new WaiterCommissionService.CommissionLineItem(product.getProductId(), quantity));
+            addedItems.add(new StaffCommissionService.CommissionLineItem(product.getProductId(), quantity));
         }
 
         return addedItems;
@@ -825,7 +825,7 @@ public class TableBillService {
     private void recordDirectAddCommissions(
             Long staffId,
             TableBill bill,
-            List<WaiterCommissionService.CommissionLineItem> addedItems
+            List<StaffCommissionService.CommissionLineItem> addedItems
     ) {
         if (addedItems == null || addedItems.isEmpty()) {
             return;

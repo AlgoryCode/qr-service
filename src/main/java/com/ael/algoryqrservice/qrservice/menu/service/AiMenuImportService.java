@@ -139,7 +139,7 @@ public class AiMenuImportService {
             productIds.add(created.getProductId());
         }
         log.info(
-                "menu_import_products_published menuId={} userId={} createdCount={}",
+                "menu_import_products_published menuId={} merchantId={} createdCount={}",
                 menuId, merchantId, productIds.size()
         );
         return AiMenuImportDtos.PublishResponse.builder()

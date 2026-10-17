@@ -31,7 +31,7 @@ public class FulfillmentCommandFactory {
                 event.eventId(),
                 event.eventType(),
                 requireLong(metadata, "purchaseId", first(event.purchaseId(), event.sourceReferenceId())),
-                requireLong(metadata, "userId", event.userId()),
+                requireMerchantId(metadata, event.merchantId()),
                 optionalLong(metadata, "packageId", event.packageId()),
                 optionalText(metadata, "packageCode", event.packageCode()),
                 optionalText(metadata, "purchaseConversationId", event.conversationId()),
@@ -65,6 +65,15 @@ public class FulfillmentCommandFactory {
             return primary;
         }
         return fallback;
+    }
+
+    private static Long requireMerchantId(Map<String, Object> metadata, String eventMerchantId) {
+        Object legacy = metadata.get("userId");
+        String fallback = eventMerchantId;
+        if (!StringUtils.hasText(fallback) && legacy != null) {
+            fallback = String.valueOf(legacy);
+        }
+        return requireLong(metadata, "merchantId", fallback);
     }
 
     private static Long requireLong(Map<String, Object> metadata, String key, String fallback) {

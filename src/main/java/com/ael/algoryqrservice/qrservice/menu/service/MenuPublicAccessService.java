@@ -71,11 +71,11 @@ public class MenuPublicAccessService {
     }
 
     @Transactional
-    public void syncForUsers(Iterable<Long> userIds) {
-        if (userIds == null) {
+    public void syncForMerchants(Iterable<Long> merchantIds) {
+        if (merchantIds == null) {
             return;
         }
-        for (Long merchantId : userIds) {
+        for (Long merchantId : merchantIds) {
             syncForUser(merchantId);
         }
     }

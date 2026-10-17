@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import com.ael.algoryqrservice.qrservice.model.Customer;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.Customer;
 
 public interface CampaignRewardRepository extends JpaRepository<CampaignReward, Long> {
     List<CampaignReward> findByCustomerIdAndCampaignIdAndStatus(

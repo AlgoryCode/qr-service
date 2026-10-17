@@ -1,6 +1,6 @@
 package com.ael.algoryqrservice.qrservice.client;
 
-import com.ael.algoryqrservice.authservice.application.auth.FindMerchantUseCase;
+import com.ael.algoryqrservice.merchantservice.application.FindMerchantUseCase;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;

@@ -6,18 +6,18 @@ import com.ael.algoryqrservice.qrservice.model.Campaign;
 import com.ael.algoryqrservice.qrservice.model.CampaignManualGrant;
 import com.ael.algoryqrservice.qrservice.model.CampaignProgress;
 import com.ael.algoryqrservice.qrservice.model.CampaignReward;
-import com.ael.algoryqrservice.qrservice.model.Customer;
-import com.ael.algoryqrservice.qrservice.model.CustomerMembership;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.Customer;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.CustomerMembership;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.campaign.dto.CampaignDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.CampaignManualGrantAction;
 import com.ael.algoryqrservice.qrservice.model.enums.CampaignProgressStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.MembershipStatus;
 import com.ael.algoryqrservice.qrservice.repository.CampaignManualGrantRepository;
 import com.ael.algoryqrservice.qrservice.repository.CampaignProgressRepository;
-import com.ael.algoryqrservice.qrservice.repository.CustomerMembershipRepository;
-import com.ael.algoryqrservice.qrservice.repository.CustomerRepository;
-import com.ael.algoryqrservice.qrservice.waiter.service.WaiterAccessService;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository.CustomerMembershipRepository;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository.CustomerRepository;
+import com.ael.algoryqrservice.staffservice.application.StaffAccessService;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,7 +42,7 @@ public class CampaignManualGrantService {
     private final CampaignEvaluationService campaignEvaluationService;
     private final CampaignRewardService campaignRewardService;
     private final CampaignConfigSupport configSupport;
-    private final WaiterAccessService waiterAccessService;
+    private final StaffAccessService waiterAccessService;
 
     @Transactional(readOnly = true)
     public CampaignDtos.WaiterCustomerLookupResponse lookupCustomer(Long menuId, String email) {

@@ -94,7 +94,7 @@ public class QrService {
         }
 
         if (req.getMerchantId() != null && !req.getMerchantId().equals(existingQr.getMerchantId())) {
-            throw new IllegalArgumentException("QR başka bir kullanıcıya ait, userId değiştirilemez");
+            throw new IllegalArgumentException("QR başka bir işletmeye ait, merchantId değiştirilemez");
         }
 
         req.setMerchantId(existingQr.getMerchantId());

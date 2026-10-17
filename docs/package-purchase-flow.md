@@ -119,9 +119,9 @@ Abonelik durumu (`PackageActivationService.ensureSubscriptionState`):
 | `DELETE` | `/qr/delete/{qrId}` | `QrService.deleteQrByQrId` | QR + ba?l? Menu soft-delete |
 | `GET` | `/menu/public/id/{qrId}` | `MenuController` ? `MenuService.getPublicMenuByQrId` | Public gate |
 | Owner menu CRUD | `/menu/**` | authenticated (product scope yok) | ownership checks in service |
-| Garson paneli (merchant) | `/waiter-panel/**` | `@RequiresProductScope(WAITER_PANEL_OWNER)` | Ultimate paket gerekir |
-| Garson mobil auth | `/waiter/auth/**` | `ROLE_WAITER` | owner'da `WAITER_PANEL_OWNER` olmali |
-| Garson mobil siparis | `/waiter/orders/**` | `ROLE_WAITER` | ayri controller |
+| Garson paneli (merchant) | `/staff/panel/**` (alias: `/waiter-panel/**`) | `@RequiresProductScope(WAITER_PANEL_OWNER)` | Ultimate paket gerekir |
+| Garson mobil auth | `/api/v1/auth/staff/login` | `ROLE_WAITER` | owner'da `WAITER_PANEL_OWNER` olmali |
+| Garson mobil siparis | `/staff/orders/**` (alias: `/waiter/orders/**`) | `ROLE_WAITER` | `StaffOrderController` |
 | Public siparis | `/menu/public/**/orders/**` | scope yok | musteri tarafi |
 
 ---

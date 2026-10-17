@@ -31,7 +31,7 @@ public class PaymentModuleQrEventBridge {
         dto.setSourceReferenceId(event.getSourceReferenceId());
         dto.setSourceMetadata(event.getSourceMetadata());
         dto.setPurchaseId(event.getPurchaseId());
-        dto.setUserId(event.getUserId());
+        dto.setMerchantId(event.getMerchantId());
         dto.setPackageId(event.getPackageId());
         dto.setPackageCode(event.getPackageCode());
         dto.setBillingCycleNumber(event.getBillingCycleNumber());
