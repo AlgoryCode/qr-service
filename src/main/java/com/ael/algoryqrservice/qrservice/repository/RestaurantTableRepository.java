@@ -1,0 +1,46 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface RestaurantTableRepository extends JpaRepository<RestaurantTable, Long> {
+
+    List<RestaurantTable> findByMenuIdOrderByTableNumberAscNameAsc(Long menuId);
+
+    List<RestaurantTable> findByMenuIdInOrderByTableNumberAscNameAsc(Collection<Long> menuIds);
+
+    Optional<RestaurantTable> findByPublicTokenAndActiveTrue(String publicToken);
+
+    Optional<RestaurantTable> findByPublicToken(String publicToken);
+
+    Optional<RestaurantTable> findByIdAndMenuId(Long id, Long menuId);
+
+    List<RestaurantTable> findByMenuIdAndAreaId(Long menuId, Long areaId);
+
+    Optional<RestaurantTable> findFirstByMenuIdAndNameIgnoreCaseAndActiveTrue(Long menuId, String name);
+
+    Optional<RestaurantTable> findFirstByMenuIdAndActiveTrueOrderByTableNumberAscNameAsc(Long menuId);
+
+    Optional<RestaurantTable> findFirstByMenuIdAndNameIgnoreCaseAndActiveTrueAndDeletedFalse(
+            Long menuId,
+            String name
+    );
+
+    Optional<RestaurantTable> findFirstByMenuIdAndActiveTrueAndDeletedFalseOrderByTableNumberAscNameAsc(Long menuId);
+
+    List<RestaurantTable> findByUserIdAndDeletedFalseOrderByTableNumberAscNameAsc(Long userId);
+
+    Optional<RestaurantTable> findByIdAndUserIdAndDeletedFalse(Long id, Long userId);
+
+    List<RestaurantTable> findByUserIdAndMenuIdIsNullAndDeletedFalseOrderByTableNumberAscNameAsc(Long userId);
+
+    List<RestaurantTable> findByUserIdAndAreaIdAndDeletedFalse(Long userId, Long areaId);
+
+    List<RestaurantTable> findByLayoutIdAndDeletedFalseOrderByTableNumberAscNameAsc(Long layoutId);
+}

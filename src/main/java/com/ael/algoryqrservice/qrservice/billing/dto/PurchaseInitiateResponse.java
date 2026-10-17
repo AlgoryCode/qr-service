@@ -1,0 +1,18 @@
+package com.ael.algoryqrservice.qrservice.billing.dto;
+
+import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class PurchaseInitiateResponse {
+
+    private Long purchaseId;
+    private PurchaseStatus status;
+    private String conversationId;
+    private String paymentHtml;
+    private String token;
+    private String paymentPageUrl;
+    private String checkoutFormContent;
+}

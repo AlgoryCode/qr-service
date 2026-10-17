@@ -23,7 +23,7 @@ Mirrored in payment-service: `docs/payment-events-contract.md`.
 | `eventType` | Business event type from body (when non-blank) |
 | `purchaseId` | `sourceReferenceId` when present |
 
-Constants: `com.ael.algoryqrservice.messaging.payment.PaymentEventWireContract` (same string values as payment-service).
+Constants: `com.ael.algoryqrservice.qrservice.messaging.payment.PaymentEventWireContract` (same string values as payment-service).
 
 ## Consumer deserialization (qr-service)
 

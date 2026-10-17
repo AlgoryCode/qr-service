@@ -1,0 +1,27 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.PurchaseFulfillment;
+import com.ael.algoryqrservice.qrservice.model.enums.FulfillmentStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface PurchaseFulfillmentRepository extends JpaRepository<PurchaseFulfillment, Long> {
+
+    Optional<PurchaseFulfillment> findByPurchaseIdAndInstallmentId(Long purchaseId, String installmentId);
+
+    Optional<PurchaseFulfillment> findByPurchaseIdAndInstallmentNumber(Long purchaseId, Integer installmentNumber);
+
+    List<PurchaseFulfillment> findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(
+            Long purchaseId,
+            FulfillmentStatus status
+    );
+
+    List<PurchaseFulfillment> findByPurchaseIdOrderByInstallmentNumberAsc(Long purchaseId);
+
+    boolean existsByPurchaseIdInAndStatus(Collection<Long> purchaseIds, FulfillmentStatus status);
+}

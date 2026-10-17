@@ -1,0 +1,128 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.MenuAnalyticsSession;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+public interface MenuAnalyticsSessionRepository extends JpaRepository<MenuAnalyticsSession, UUID> {
+
+    @Query("""
+            select count(s) from MenuAnalyticsSession s
+            where s.menuId = :menuId and s.startedAt between :from and :to
+            """)
+    long countByMenuIdAndPeriod(
+            @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select s.deviceType, count(s) from MenuAnalyticsSession s
+            where s.menuId = :menuId and s.startedAt between :from and :to
+            group by s.deviceType
+            """)
+    List<Object[]> countByDeviceTypeAndPeriod(
+            @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query(value = """
+            select cast(date_trunc('day', started_at) as date) as day, count(*)
+            from tbl_menu_analytics_session
+            where menu_id = :menuId and started_at between :from and :to
+            group by day
+            order by day
+            """, nativeQuery = true)
+    List<Object[]> countDailyByMenuIdAndPeriod(
+            @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select s from MenuAnalyticsSession s
+            where s.menuId = :menuId and s.startedAt between :from and :to
+            order by s.startedAt desc
+            """)
+    List<MenuAnalyticsSession> findRecentByMenuIdAndPeriod(
+            @Param("menuId") Long menuId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select count(s) from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+            """)
+    long countByMenuIdInAndPeriod(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select s.deviceType, count(s) from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+            group by s.deviceType
+            """)
+    List<Object[]> countByDeviceTypeAndPeriodForMenuIds(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query(value = """
+            select cast(date_trunc('day', started_at) as date) as day, count(*)
+            from tbl_menu_analytics_session
+            where menu_id in (:menuIds) and started_at between :from and :to
+            group by day
+            order by day
+            """, nativeQuery = true)
+    List<Object[]> countDailyByMenuIdInAndPeriod(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select s from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+            order by s.startedAt desc
+            """)
+    List<MenuAnalyticsSession> findRecentByMenuIdInAndPeriod(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select count(distinct s.ipHash) from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+              and s.ipHash is not null
+            """)
+    long countDistinctIpHashByMenuIdInAndPeriod(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select count(s.ipHash) from MenuAnalyticsSession s
+            where s.menuId in :menuIds and s.startedAt between :from and :to
+              and s.ipHash is not null
+            group by s.ipHash
+            having count(s) > 1
+            """)
+    List<Long> countRepeatSessionGroupsByIpHash(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+}

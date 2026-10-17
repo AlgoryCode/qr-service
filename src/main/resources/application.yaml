@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: algoryqr-service
   servlet:
@@ -44,6 +46,32 @@ spring:
     hibernate:
       ddl-auto: ${DDL_AUTO:validate}
     show-sql: ${JPA_SHOW_SQL:false}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:977637390906-8uhh6hohv1o71gasg27tq5i4rpad54ef.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET: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}
+            authorization-grant-type: authorization_code
+            redirect-uri: "${GOOGLE_CALLBACK_URL:http://localhost:${server.port:8080}/google-auth/callback}"
+            scope:
+              - openid
+              - profile
+              - email
+
+jwt:
+  secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
+  access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
+  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
+google:
+  oauth:
+    # After Google: browser hits dashboard Next route (3000), which POSTs redeem to qr-service. Prod: {APP_URL}/api/auth/google/callback
+    frontend-callback-url: ${GOOGLE_FRONTEND_CALLBACK_URL:http://localhost:3000/api/auth/google/callback}
+    handoff-ticket-ttl: ${GOOGLE_HANDOFF_TICKET_TTL:PT2M}
+    android-client-id: ${GOOGLE_ANDROID_CLIENT_ID:}
+    post-login-redirect-path: ${GOOGLE_POST_LOGIN_REDIRECT_PATH:/login}
 
 management:
   endpoints:
@@ -67,7 +95,7 @@ management:
 
 
 server:
-  port: ${SERVER_PORT:8055}
+  port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
 
 app:
@@ -94,8 +122,9 @@ app:
   menu:
     category-max-depth: ${MENU_CATEGORY_MAX_DEPTH:10}
   fulfillment:
-    gate-mode: ${APP_FULFILLMENT_GATE_MODE:FULFILLMENT_ONLY}
-    repair-job-enabled: ${APP_FULFILLMENT_REPAIR_JOB_ENABLED:false}
+    repair-job-enabled: ${APP_FULFILLMENT_REPAIR_JOB_ENABLED:true}
+    repair-job-batch-size: ${APP_FULFILLMENT_REPAIR_JOB_BATCH_SIZE:200}
+    repair-job-fixed-delay-ms: ${APP_FULFILLMENT_REPAIR_JOB_FIXED_DELAY_MS:900000}
   chef-avatars:
     items:
       - key: default
@@ -104,7 +133,6 @@ app:
         classpath-resource: chef-avatars/default.png
   seed:
     taxonomy: ${APP_SEED_TAXONOMY_ENABLED:false}
-    package-catalog: ${APP_SEED_PACKAGE_CATALOG_ENABLED:false}
     chef-avatars: ${APP_SEED_CHEF_AVATARS_ENABLED:false}
     menu-themes: ${APP_SEED_MENU_THEMES_ENABLED:false}
     menu-products:
@@ -117,11 +145,34 @@ app:
 
 payment:
   service:
-    url: ${PAYMENT_SERVICE_URL:http://localhost:8080}
     pending-timeout-minutes: ${PAYMENT_PENDING_TIMEOUT_MINUTES:30}
-    auth-token: ${PAYMENT_SERVICE_AUTH_TOKEN:6da7324f50e3d4dec722013510fd2c3ab5ce5c84ad7eb9af98bab23c2795db6e7761be271c480d41dd89c636305e027e}
-    auth-header: ${PAYMENT_SERVICE_AUTH_HEADER:X-Service-Token}
     gateway-provider: ${PAYMENT_GATEWAY_PROVIDER:}
+  gateway:
+    default-provider: ${PAYMENT_GATEWAY_PROVIDER:PAYTR}
+  token:
+    encryption-key: ${PAYMENT_TOKEN_ENCRYPTION_KEY:prod-development-payment-token-key}
+  events:
+    exchange: ${PAYMENT_EVENTS_EXCHANGE:payment.events}
+    allowed-service-names:
+      - qr-service
+      - algoryqr-web-site
+  outbox:
+    fixed-delay: ${PAYMENT_OUTBOX_FIXED_DELAY:5000}
+  installments:
+    fixed-delay: ${PAYMENT_INSTALLMENT_FIXED_DELAY:60000}
+  subscriptions:
+    fixed-delay: ${PAYMENT_SUBSCRIPTION_FIXED_DELAY:60000}
+  reconciliation:
+    fixed-delay: ${PAYMENT_RECONCILIATION_FIXED_DELAY:900000}
+    stale-after-minutes: ${PAYMENT_RECONCILIATION_STALE_AFTER_MINUTES:10}
+    batch-size: ${PAYMENT_RECONCILIATION_BATCH_SIZE:50}
+  verification-refund:
+    fixed-delay: ${PAYMENT_VERIFICATION_REFUND_FIXED_DELAY:30000}
+  callback:
+    public-url: ${PAYMENT_CALLBACK_PUBLIC_URL:http://127.0.0.1:${SERVER_PORT:8080}}
+    checkout-form-public-url: ${PAYMENT_CHECKOUT_FORM_CALLBACK_PUBLIC_URL:http://127.0.0.1:${SERVER_PORT:8080}/payments/paytr/notification}
+    frontend-redirect-url: ${PAYMENT_FRONTEND_REDIRECT_URL:http://localhost:3000/payment/result}
+    card-verification-frontend-redirect-url: ${PAYMENT_CARD_VERIFICATION_FRONTEND_REDIRECT_URL:http://localhost:3000/dashboard/hesabim/kayitli-kartlarim}
   rabbitmq:
     exchange: ${PAYMENT_EVENTS_EXCHANGE:payment.events}
     service-name: ${APP_SERVICE_NAME:qr-service}
@@ -136,7 +187,6 @@ menu:
 
 ai-service:
   url: ${AI_SERVICE_URL:http://localhost:8000}
-  api-key: ${AI_SERVICE_API_KEY:dev-ai-service-key}
   connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:3s}
   read-timeout: ${AI_SERVICE_READ_TIMEOUT:60s}
   reindex-batch-size: ${AI_SERVICE_REINDEX_BATCH_SIZE:100}
@@ -211,25 +261,19 @@ odeal:
   default-vat-ratio: ${ODEAL_DEFAULT_VAT_RATIO:10}
   test-api-key: ${ODEAL_TEST_API_KEY:odeal-test-local}
 
-jwt:
-  secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
-  access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
-  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+paytr:
+  merchant-id: ${PAYTR_MERCHANT_ID:}
+  merchant-key: ${PAYTR_MERCHANT_KEY:}
+  merchant-salt: ${PAYTR_MERCHANT_SALT:}
+  base-url: ${PAYTR_BASE_URL:https://www.paytr.com}
+  test-mode: ${PAYTR_TEST_MODE:true}
+  debug-on: ${PAYTR_DEBUG_ON:true}
+  timeout-limit-minutes: ${PAYTR_TIMEOUT_LIMIT_MINUTES:30}
 
-fulfillment:
-  external:
-    enabled: ${FULFILLMENT_EXTERNAL_ENABLED:true}
-    base-url: ${FULFILLMENT_SERVICE_URL:http://localhost:8086}
-    auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
-    auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}
-  rabbitmq:
-    exchange: ${FULFILLMENT_EVENTS_EXCHANGE:payment.events}
-    routing-key: ${FULFILLMENT_EVENTS_ROUTING_KEY:qr-fulfillment-service.payment.events}
+push-notification:
+  messaging:
+    exchange: ${PUSH_NOTIFICATION_EXCHANGE:push-notification-exchange}
+    routing-key: ${PUSH_NOTIFICATION_ROUTING_KEY:push-notification.request}
+  channels: mail,telegram
+  payment-subject: ${PUSH_NOTIFICATION_PAYMENT_SUBJECT:Ödeme Onayı}
 
-auth:
-  service:
-    enabled: ${AUTH_SERVICE_INTERNAL_AUTH_ENABLED:true}
-    token: ${AUTH_SERVICE_INTERNAL_TOKEN:}
-    header-name: ${AUTH_SERVICE_INTERNAL_HEADER:X-Service-Token}
-    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:http://localhost:8080}
-    base-url: ${AUTH_SERVICE_BASE_URL:http://localhost:8080}

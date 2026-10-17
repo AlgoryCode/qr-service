@@ -1,0 +1,134 @@
+package com.ael.algoryqrservice.qrservice.branch.dto;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+public final class RestaurantTableDtos {
+
+    private RestaurantTableDtos() {
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CreateTableRequest {
+        @NotBlank
+        @Size(max = 120)
+        private String name;
+
+        private Integer tableNumber;
+
+        @Min(1)
+        private Integer capacity;
+
+        private Long areaId;
+
+        private Double layoutX;
+
+        private Double layoutY;
+
+        private Integer layoutRotation;
+
+        @Size(max = 20)
+        private String layoutShape;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateTableRequest {
+        @Size(max = 120)
+        private String name;
+
+        private Integer tableNumber;
+
+        @Min(1)
+        private Integer capacity;
+
+        private Boolean active;
+
+        private Long areaId;
+
+        private Double layoutX;
+
+        private Double layoutY;
+
+        private Integer layoutRotation;
+
+        @Size(max = 20)
+        private String layoutShape;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AssignLayoutRequest {
+        private Long menuId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AssignLayoutResponse {
+        private Long menuId;
+        private int areas;
+        private int tables;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TableResponse {
+        private Long id;
+        private Long menuId;
+        private Long areaId;
+        private String areaName;
+        private String name;
+        private Integer tableNumber;
+        private Integer capacity;
+        private Double layoutX;
+        private Double layoutY;
+        private Integer layoutRotation;
+        private String layoutShape;
+        private String publicToken;
+        private String publicUrl;
+        private String qrImageBase64;
+        private boolean active;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OpenTableSessionRequest {
+        /** Masa QR token; boşsa misafir (walk-in) oturumu açılır. */
+        @Size(max = 64)
+        private String tableToken;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TableSessionResponse {
+        private String sessionToken;
+        private Long tableId;
+        private Long menuId;
+        private String tableName;
+        private LocalDateTime expiresAt;
+    }
+}

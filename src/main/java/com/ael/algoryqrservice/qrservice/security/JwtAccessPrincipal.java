@@ -1,0 +1,69 @@
+package com.ael.algoryqrservice.qrservice.security;
+
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
+
+import java.util.List;
+
+public record JwtAccessPrincipal(
+        Long userId,
+        List<String> scopes,
+        List<String> products,
+        String activePackage,
+        String principalType,
+        Long branchId,
+        Long merchantId
+) {
+    public JwtAccessPrincipal(
+            Long userId,
+            List<String> scopes,
+            List<String> products,
+            String activePackage
+    ) {
+        this(userId, scopes, products, activePackage, JwtService.PRINCIPAL_APP, null, null);
+    }
+
+    public JwtAccessPrincipal(
+            Long userId,
+            List<String> scopes,
+            List<String> products,
+            String activePackage,
+            String principalType
+    ) {
+        this(userId, scopes, products, activePackage, principalType, null, null);
+    }
+
+    public JwtAccessPrincipal(
+            Long userId,
+            List<String> scopes,
+            List<String> products,
+            String activePackage,
+            String principalType,
+            Long branchId
+    ) {
+        this(userId, scopes, products, activePackage, principalType, branchId, null);
+    }
+
+    public JwtAccessPrincipal {
+        if (principalType == null || principalType.isBlank()) {
+            principalType = JwtService.PRINCIPAL_APP;
+        }
+        if (scopes == null) {
+            scopes = List.of();
+        }
+        if (products == null) {
+            products = List.of();
+        }
+    }
+
+    public boolean hasScope(String scopeCode) {
+        return scopes != null && scopes.stream().anyMatch(scope -> scope.equals(scopeCode));
+    }
+
+    public boolean isCustomer() {
+        return JwtService.PRINCIPAL_CUSTOMER.equals(principalType);
+    }
+
+    public boolean isWaiter() {
+        return JwtService.PRINCIPAL_WAITER.equals(principalType);
+    }
+}

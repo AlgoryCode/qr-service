@@ -1,0 +1,34 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface MerchantStaffRepository extends JpaRepository<MerchantStaff, Long> {
+
+    Optional<MerchantStaff> findByUsernameIgnoreCase(String username);
+
+    Optional<MerchantStaff> findByMerchantIdAndUsernameIgnoreCase(Long merchantId, String username);
+
+    boolean existsByMerchantIdAndUsernameIgnoreCase(Long merchantId, String username);
+
+    List<MerchantStaff> findByMerchantIdOrderByDisplayNameAsc(Long merchantId);
+
+    Optional<MerchantStaff> findByIdAndMerchantId(Long id, Long merchantId);
+
+    List<MerchantStaff> findByBranchIdOrderByDisplayNameAsc(Long branchId);
+
+    List<MerchantStaff> findByBranchIdInOrderByDisplayNameAsc(Collection<Long> branchIds);
+
+    Optional<MerchantStaff> findByIdAndBranchId(Long id, Long branchId);
+
+    List<MerchantStaff> findByMerchantIdAndStaffRoleAndActiveTrueOrderByDisplayNameAsc(Long merchantId, StaffRole staffRole);
+
+    boolean existsByUsernameIgnoreCase(String username);
+}

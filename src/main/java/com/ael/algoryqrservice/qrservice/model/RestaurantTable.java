@@ -1,0 +1,98 @@
+package com.ael.algoryqrservice.qrservice.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "tbl_restaurant_table", indexes = {
+        @Index(name = "idx_restaurant_table_menu_id", columnList = "menu_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(columnNames = "public_token")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class RestaurantTable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "layout_id")
+    private Long layoutId;
+
+    @Column(name = "menu_id")
+    private Long menuId;
+
+    @Column(name = "area_id")
+    private Long areaId;
+
+    @Column(nullable = false, length = 120)
+    private String name;
+
+    @Column(name = "table_number")
+    private Integer tableNumber;
+
+    @Column
+    private Integer capacity;
+
+    @Column(name = "layout_x")
+    private Double layoutX;
+
+    @Column(name = "layout_y")
+    private Double layoutY;
+
+    @Column(name = "layout_rotation")
+    private Integer layoutRotation;
+
+    @Column(name = "layout_shape", length = 20)
+    private String layoutShape;
+
+    @Column(name = "public_token", nullable = false, unique = true, length = 64)
+    private String publicToken;
+
+    @Column(name = "qr_image_base64", columnDefinition = "text")
+    private String qrImageBase64;
+
+    @Column(nullable = false)
+    @ColumnDefault("true")
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean deleted = false;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}

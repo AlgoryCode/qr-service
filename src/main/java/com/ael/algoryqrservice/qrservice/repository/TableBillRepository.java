@@ -1,0 +1,58 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.TableBill;
+import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface TableBillRepository extends JpaRepository<TableBill, Long>, JpaSpecificationExecutor<TableBill> {
+
+    @EntityGraph(attributePaths = "items")
+    Optional<TableBill> findByMenuIdAndTableIdAndStatus(Long menuId, Long tableId, TableBillStatus status);
+
+    @EntityGraph(attributePaths = "items")
+    Optional<TableBill> findWithItemsById(Long id);
+
+    @EntityGraph(attributePaths = "items")
+    Optional<TableBill> findByIdAndMenuId(Long id, Long menuId);
+
+    List<TableBill> findByMenuIdAndStatus(Long menuId, TableBillStatus status);
+
+    List<TableBill> findByMenuIdInAndStatus(Collection<Long> menuIds, TableBillStatus status);
+
+    @EntityGraph(attributePaths = "items")
+    Optional<TableBill> findByIdAndMenuIdAndStatus(Long id, Long menuId, TableBillStatus status);
+
+    List<TableBill> findByMenuIdAndStatusAndClosedAtBetween(
+            Long menuId,
+            TableBillStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    @EntityGraph(attributePaths = "items")
+    List<TableBill> findByMenuIdInAndStatusAndClosedAtBetween(
+            Collection<Long> menuIds,
+            TableBillStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    long countByMenuIdInAndStatus(Collection<Long> menuIds, TableBillStatus status);
+
+    @EntityGraph(attributePaths = "items")
+    List<TableBill> findByMenuIdInAndStatusAndClosedAtBetweenOrderByClosedAtAsc(
+            Collection<Long> menuIds,
+            TableBillStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+}

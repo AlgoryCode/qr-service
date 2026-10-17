@@ -1,0 +1,195 @@
+package com.ael.algoryqrservice.qrservice.model.dto;
+
+import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public final class MenuOrderDtos {
+
+    private MenuOrderDtos() {
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CartItemRequest {
+        @NotNull
+        private Long productId;
+
+        @NotNull
+        @Min(1)
+        private Integer quantity;
+
+        @Size(max = 500)
+        private String note;
+
+        private List<Long> selectedOptionIds;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateCartRequest {
+        @NotNull
+        @Valid
+        private List<CartItemRequest> items;
+
+        @Size(max = 1000)
+        private String note;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SubmitOrderRequest {
+        private UUID analyticsSessionId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CancelOrderRequest {
+        private com.ael.algoryqrservice.qrservice.model.enums.CancelReason reason;
+
+        @Size(max = 1000)
+        private String reasonNote;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BillAdjustmentRequest {
+        @NotNull
+        private Long billId;
+
+        private Long orderId;
+
+        @NotNull
+        private com.ael.algoryqrservice.qrservice.model.enums.BillAdjustmentType adjustmentType;
+
+        @NotNull
+        @Min(0)
+        private BigDecimal amount;
+
+        @Size(max = 64)
+        private String reason;
+
+        @Size(max = 1000)
+        private String reasonNote;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WaiterCreateOrderRequest {
+        @NotNull
+        private Long tableId;
+
+        @NotNull
+        @Valid
+        @Size(min = 1)
+        private List<CartItemRequest> items;
+
+        @Size(max = 1000)
+        private String note;
+
+        @Size(max = 2000)
+        private String waiterNote;
+
+        @Min(1)
+        private Integer coverCount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OrderItemResponse {
+        private Long id;
+        private Long productId;
+        private String productName;
+        private BigDecimal unitPrice;
+        private int quantity;
+        private String note;
+        private BigDecimal lineTotal;
+        private List<SelectedOptionResponse> selectedOptions;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SelectedOptionResponse {
+        private Long groupId;
+        private String groupName;
+        private Long optionId;
+        private String optionName;
+        private BigDecimal priceDelta;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OrderResponse {
+        private Long id;
+        private Long menuId;
+        private Long tableId;
+        private String tableName;
+        private UUID tableSessionId;
+        private Long customerId;
+        private String customerName;
+        private String customerEmail;
+        private MenuOrderStatus status;
+        private com.ael.algoryqrservice.qrservice.model.enums.OrderSource orderSource;
+        private BigDecimal totalAmount;
+        private String currency;
+        private String note;
+        private Long staffId;
+        private Long createdByStaffId;
+
+        /** Frontend hâlâ waiterId okuyor; kaynak staffId. */
+        @JsonProperty("waiterId")
+        public Long getWaiterId() {
+            return staffId;
+        }
+        private Long cancelledByStaffId;
+        private String waiterName;
+        private String waiterNote;
+        private String kitchenNote;
+        private Long billId;
+        private BigDecimal commissionAmount;
+        private UUID analyticsSessionId;
+        private List<OrderItemResponse> items;
+        private LocalDateTime submittedAt;
+        private LocalDateTime confirmedAt;
+        private LocalDateTime preparedAt;
+        private LocalDateTime readyAt;
+        private LocalDateTime servedAt;
+        private LocalDateTime rejectedAt;
+        private LocalDateTime cancelledAt;
+        private com.ael.algoryqrservice.qrservice.model.enums.CancelReason cancelReason;
+        private String cancelReasonNote;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private CampaignDtos.OrderCampaignSummary campaignSummary;
+    }
+}

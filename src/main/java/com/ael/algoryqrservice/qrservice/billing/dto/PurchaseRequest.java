@@ -1,0 +1,96 @@
+package com.ael.algoryqrservice.qrservice.billing.dto;
+
+import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
+import com.ael.algoryqrservice.qrservice.model.enums.PaymentMode;
+import com.ael.algoryqrservice.qrservice.model.enums.PaymentStyle;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+import java.util.ArrayList;
+import java.util.List;
+import com.ael.algoryqrservice.qrservice.qr.dto.AddressDto;
+
+@Data
+public class PurchaseRequest {
+
+    @NotNull(message = "Paket id zorunludur")
+    private Long packageId;
+
+    @NotNull(message = "Ödeme tipi zorunludur")
+    private PaymentMode paymentMode = PaymentMode.CHECKOUT_FORM;
+
+    @NotNull(message = "Faturalama periyodu zorunludur")
+    private BillingPeriod billingPeriod;
+
+    private String identityNumber;
+
+    private PaymentStyle paymentStyle;
+
+    private Long billingAddressId;
+
+    private Long paymentMethodId;
+
+    /** Kullanıcının düzenli ödeme için kayıtlı kart kullanma onayı. */
+    private Boolean recurringConsent = false;
+
+    @Size(max = 32)
+    private String couponCode;
+
+    @Valid
+    private BillingAddressDtos.Request inlineBillingAddress;
+
+    @Valid
+    private PaymentCardDto paymentCard;
+
+    @Valid
+    private AddressDto billingAddress;
+
+    @Valid
+    private AddressDto shippingAddress;
+
+    /** Pakete sepetten eklenen opsiyonel modüller; aynı ödemede tahsil edilir. */
+    @Valid
+    @Size(max = 20, message = "En fazla 20 modül eklenebilir")
+    private List<PurchaseModuleLineRequest> modules = new ArrayList<>();
+
+    public List<PurchaseModuleLineRequest> resolvedModules() {
+        return modules == null ? List.of() : modules;
+    }
+
+    @AssertTrue(message = "Kart veya kayıtlı ödeme yöntemi zorunludur")
+    public boolean isPaymentInstrumentValid() {
+        if (paymentMode == PaymentMode.CHECKOUT_FORM) {
+            return paymentCard == null;
+        }
+        return paymentMethodId != null || paymentCard != null;
+    }
+
+    @AssertTrue(message = "Ödeme planı geçersiz")
+    public boolean isPaymentPlanValid() {
+        if (billingPeriod == null) {
+            return false;
+        }
+        PaymentStyle style = resolvedPaymentStyle();
+        return style == PaymentStyle.SUBSCRIPTION
+                && (billingPeriod == BillingPeriod.MONTHLY || billingPeriod == BillingPeriod.YEARLY);
+    }
+
+    @AssertTrue(message = "Fatura adresi seçimi geçersiz; billingAddressId gönderilmelidir")
+    public boolean isBillingSelectionValid() {
+        int selections = billingAddressId != null ? 1 : 0;
+        selections += inlineBillingAddress != null ? 1 : 0;
+        selections += billingAddress != null ? 1 : 0;
+        return selections == 1;
+    }
+
+    public PaymentStyle resolvedPaymentStyle() {
+        return PaymentStyle.SUBSCRIPTION;
+    }
+
+    public BillingPeriod resolvedBillingPeriod() {
+        return billingPeriod;
+    }
+}

@@ -1,0 +1,17 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.TableSession;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface TableSessionRepository extends JpaRepository<TableSession, UUID> {
+
+    Optional<TableSession> findBySessionTokenAndRevokedFalse(String sessionToken);
+
+    List<TableSession> findByTableIdAndRevokedFalse(Long tableId);
+}

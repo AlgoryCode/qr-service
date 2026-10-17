@@ -2,9 +2,9 @@ spring:
   application:
     name: algoryqr-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://185.184.210.52:5432/algoryqrdb}
+    url: ${DB_URL:jdbc:postgresql://185.184.210.52:5433/algoryqrdb-stage}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:AdHqvxNc8MLBsMjOi82TjDzSMSuUDptBNjFVwpsvtVoaf6YOciJxqT84KgmBgc39}
+    password: ${DB_PASSWORD:postgres_stage}
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 30000
@@ -49,7 +49,7 @@ management:
 
 
 server:
-  port: ${SERVER_PORT:8055}
+  port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
 
 app:
@@ -64,14 +64,3 @@ jwt:
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
 
-auth:
-  service:
-    public-base-url: ${AUTH_SERVICE_PUBLIC_BASE_URL:http://localhost:8080}
-    base-url: ${AUTH_SERVICE_BASE_URL:http://localhost:8080}
-
-fulfillment:
-  external:
-    enabled: ${FULFILLMENT_EXTERNAL_ENABLED:true}
-    base-url: ${FULFILLMENT_SERVICE_URL:http://localhost:8086}
-    auth-token: ${FULFILLMENT_SERVICE_AUTH_TOKEN:}
-    auth-header: ${FULFILLMENT_SERVICE_AUTH_HEADER:X-Service-Token}

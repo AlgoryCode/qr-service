@@ -10,17 +10,17 @@
 | `GOOGLE_CALLBACK_URL` | `https://prod.qrapi.algorycode.com/google-auth/callback` | API OAuth callback (Google authorized redirect URI). Must be `/google-auth/callback`, never `/auth/google/callback` or the Next.js URL. |
 | `GOOGLE_FRONTEND_CALLBACK_URL` | `https://qr.algorycode.com/api/auth/google/callback` | Next.js handoff callback after Google login. Must include `/api/auth/google/callback`. |
 | `CORS_ALLOWED_ORIGINS` | `https://prod.adminqr.algorycode.com,https://qr.algorycode.com` | Comma-separated browser origins allowed to call the API directly (admin dashboard, web app). Required when the frontend uses an absolute API URL instead of a same-origin `/api` proxy. |
-| `PAYMENT_SERVICE_URL` | `http://payment-service:8080` | Internal payment-service URL |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | PostgreSQL | Single database for auth, billing, payment, fulfillment runtime |
+| `JWT_SECRET` | (32+ chars) | Access/refresh token signing |
 | `RABBITMQ_HOST` | `rabbitmq` | RabbitMQ hostname |
 | `RABBITMQ_PORT` | `5672` | RabbitMQ port |
 | `RABBITMQ_USERNAME` | `guest` | RabbitMQ user |
 | `RABBITMQ_PASSWORD` | `guest` | RabbitMQ password |
 | `PAYMENT_EVENTS_EXCHANGE` | `payment.events` | Topic exchange name |
 | `PAYMENT_EVENTS_QUEUE` | `qr-service.payment.events` | Payment event consumer queue |
-| `PAYMENT_EVENTS_ROUTING_KEY` | `qr-service.payment.events` | Binding routing key |
-| `FULFILLMENT_EXTERNAL_ENABLED` | `true` (stage) / `false` (prod) | Stage'te qr-fulfillment-service client açılır |
-| `FULFILLMENT_SERVICE_URL` | `https://stage.fulfillment.algorycode.com` | Stage fulfillment HTTP base URL |
-| `FULFILLMENT_SERVICE_AUTH_TOKEN` | (shared service token) | X-Service-Token değeri |
+| `PAYMENT_EVENTS_ROUTING_KEY` | `qr-service.payment.events` | Binding routing key (legacy mirror; payment outbox dispatches in-process) |
+| `PAYMENT_GATEWAY_PROVIDER` | `PAYTR` | Active payment gateway in monolith |
+| `APP_FULFILLMENT_REPAIR_JOB_ENABLED` | `true` | Backfill `active_package` from active purchases when missing |
 | `SMART_REPORT_QUEUE` | `smart_report.generate` | Outbound queue for AI report generation |
 | `SMART_REPORT_EVENTS_EXCHANGE` | `smart_report.events` | Topic exchange for AI status events |
 | `SMART_REPORT_EVENTS_QUEUE` | `qr-service.smart_report.events` | Inbound smart report status queue |
@@ -98,26 +98,25 @@ STORAGE_PUBLIC_BASE_URL=http://localhost:8888/buckets/qr-product-images
 
 See [`docs/product-image-upload.md`](docs/product-image-upload.md) for API and frontend integration.
 
-## payment-service
+## Payment (monolith module)
+
+Payment runs inside **algoryqr-service** (`paymentservice` package). Configure callbacks and gateway on the same container:
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `PAYMENT_EVENTS_EXCHANGE` | `payment.events` | Topic exchange name |
-| `PAYMENT_CALLBACK_PUBLIC_URL` | `https://pay-api.example.com/payments/iyzico/callback` | iyzico callback URL |
-| `PAYMENT_FRONTEND_REDIRECT_URL` | `https://app.example.com/payment/result` | User redirect after 3DS |
-| `RABBITMQ_HOST` | `rabbitmq` | RabbitMQ hostname |
-| `IYZICO_API_KEY` | `sandbox-...` | iyzico API key |
-| `IYZICO_SECRET_KEY` | `sandbox-...` | iyzico secret |
+| `PAYMENT_CALLBACK_PUBLIC_URL` | `https://prod.qrapi.algorycode.com` | Public base for provider callbacks |
+| `PAYMENT_CHECKOUT_FORM_CALLBACK_PUBLIC_URL` | `.../payments/paytr/notification` | PayTR notification URL |
+| `PAYMENT_FRONTEND_REDIRECT_URL` | `https://dashboard.../payment/result` | Browser redirect after checkout |
+| `PAYTR_MERCHANT_ID` / `PAYTR_MERCHANT_KEY` / `PAYTR_MERCHANT_SALT` | (PayTR panel) | When `PAYMENT_GATEWAY_PROVIDER=PAYTR` |
+
+Removed (microservice era): `PAYMENT_SERVICE_URL`, `FULFILLMENT_EXTERNAL_ENABLED`, `FULFILLMENT_SERVICE_URL`, `FULFILLMENT_SERVICE_AUTH_TOKEN`, `AUTH_SERVICE_REMOTE_ENABLED`, `PAYMENT_DEFAULT_PROVIDER`.
 
 ## Networking
 
-- qr-service calls payment-service via internal DNS: `http://payment-service:8080`
-- iyzico calls payment-service via public URL only
-- payment-service publishes to `payment.events` with routing key `{serviceName}.payment.events`
-- qr-service binds `qr-service.payment.events` and branches on `eventType`
-- **Stage only:** `qr-fulfillment-service` also binds its own queue to routing key `qr-service.payment.events` (fan-out mirror). Prod'da bu servis yok.
-- Wire contract (JSON body + required headers): [`docs/payment-events-contract.md`](docs/payment-events-contract.md)
-- Failed payment events → `qr-service.payment.events.dlq`; after consumer fix, republish DLQ or reconcile purchase (e.g. purchase `46`)
+- Payment completion: outbox → in-process `PaymentModuleQrEventBridge` → purchase/fulfillment handlers (no HTTP loopback).
+- Optional Rabbit queue `qr-service.payment.events` remains for external mirrors; monolith does not require a separate payment-service pod.
+- Wire contract (JSON body + headers): [`docs/payment-events-contract.md`](docs/payment-events-contract.md)
+- Failed payment events → `qr-service.payment.events.dlq`; reconcile via admin or `PurchaseService.reconcilePaidPendingPurchase`
 - qr-service publishes smart report jobs to `smart_report.generate`; AI consumes
 - AI publishes status to `smart_report.events` with routing key `smart_report.status`; qr-service consumes `qr-service.smart_report.events`
 - Scale payment-service replicas: Docker internal LB handles HTTP; shared DB required

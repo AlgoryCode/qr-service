@@ -1,0 +1,60 @@
+package com.ael.algoryqrservice.qrservice.admin.controller;
+
+import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.qrservice.billing.dto.AdminSubscriptionDtos;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseResponse;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseSummaryResponse;
+import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/admin/purchases")
+@RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
+public class AdminPurchaseController {
+
+    private final PurchaseService purchaseService;
+
+    @GetMapping("/{purchaseId}")
+    public ResponseEntity<PurchaseSummaryResponse> getPurchase(@PathVariable Long purchaseId) {
+        return ResponseEntity.ok(purchaseService.getPurchaseSummaryAdmin(purchaseId));
+    }
+
+    @PatchMapping("/{purchaseId}")
+    public ResponseEntity<PurchaseResponse> updatePurchase(
+            @PathVariable Long purchaseId,
+            @Valid @RequestBody AdminSubscriptionDtos.PurchaseUpdateRequest request
+    ) {
+        if (request.getStatus() != PurchaseStatus.EXPIRED) {
+            throw new BadRequestException("Yalnızca EXPIRED durumuna geçiş desteklenir");
+        }
+        return ResponseEntity.ok(purchaseService.expirePurchase(purchaseId));
+    }
+
+    @PatchMapping("/{purchaseId}/subscription")
+    public ResponseEntity<PurchaseResponse> updateSubscription(
+            @PathVariable Long purchaseId,
+            @Valid @RequestBody AdminSubscriptionDtos.SubscriptionUpdateRequest request
+    ) {
+        if (request.getDays() != null) {
+            return ResponseEntity.ok(purchaseService.extendSubscriptionForAdmin(purchaseId, request.getDays()));
+        }
+        if (request.getStatus() != null && "INACTIVE".equals(request.getStatus().toUpperCase(Locale.ROOT))) {
+            return ResponseEntity.ok(purchaseService.deactivateSubscriptionForAdmin(purchaseId));
+        }
+        throw new BadRequestException("days veya status=INACTIVE gerekli");
+    }
+
+}

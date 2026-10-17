@@ -1,0 +1,349 @@
+package com.ael.algoryqrservice.qrservice.integration.ubereats.mapper;
+
+import com.ael.algoryqrservice.qrservice.integration.ubereats.model.dto.UberEatsDtos;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class UberEatsPayloadMapperTest {
+
+    private final UberEatsPayloadMapper mapper = new UberEatsPayloadMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void toRestaurants_whenStoresArray_thenMapIdAndName() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "stores": [
+                    { "id": "r-1", "name": "Kadıköy", "address": "Moda Cd." }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.RestaurantResponse> restaurants = mapper.toRestaurants(root);
+
+        assertThat(restaurants).hasSize(1);
+        assertThat(restaurants.getFirst().getId()).isEqualTo("r-1");
+        assertThat(restaurants.getFirst().getName()).isEqualTo("Kadıköy");
+    }
+
+    @Test
+    void toProducts_whenCategories_thenFlatten() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "categories": [
+                    {
+                      "name": "Burger",
+                      "products": [
+                        { "id": "p-1", "name": "Cheeseburger", "price": 220, "selling": true }
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.ProductResponse> products = mapper.toProducts(root);
+
+        assertThat(products).hasSize(1);
+        assertThat(products.getFirst().getName()).isEqualTo("Cheeseburger");
+        assertThat(products.getFirst().getCategoryName()).isEqualTo("Burger");
+        assertThat(products.getFirst().getPrice()).isEqualByComparingTo("220");
+        assertThat(products.getFirst().isAvailable()).isTrue();
+        assertThat(products.getFirst().getModifierGroups()).isEmpty();
+    }
+
+    @Test
+    void toProducts_whenCategoryStubAndCatalog_thenEnrichNameFromCatalog() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "categories": [
+                    {
+                      "name": "İçecekler",
+                      "products": [
+                        { "id": "8722497" }
+                      ]
+                    }
+                  ],
+                  "products": [
+                    {
+                      "id": "8722497",
+                      "name": "Ayran",
+                      "description": "Ev yapımı",
+                      "price": 40,
+                      "selling": true
+                    }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.ProductResponse> products = mapper.toProducts(root);
+
+        assertThat(products).hasSize(1);
+        assertThat(products.getFirst().getId()).isEqualTo("8722497");
+        assertThat(products.getFirst().getName()).isEqualTo("Ayran");
+        assertThat(products.getFirst().getDescription()).isEqualTo("Ev yapımı");
+        assertThat(products.getFirst().getCategoryName()).isEqualTo("İçecekler");
+        assertThat(products.getFirst().getPrice()).isEqualByComparingTo("40");
+        assertThat(products.getFirst().getModifierGroups()).isEmpty();
+    }
+
+    @Test
+    void toProducts_whenModifierProducts_thenMapGroupsAndOptions() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "categories": [
+                    {
+                      "name": "Burger",
+                      "products": [
+                        {
+                          "id": "p-1",
+                          "name": "Cheeseburger",
+                          "price": 220,
+                          "selling": true,
+                          "modifierProducts": [
+                            {
+                              "name": "Sos seçimi",
+                              "required": true,
+                              "minSelect": 1,
+                              "maxSelect": 1,
+                              "modifierOptions": [
+                                { "name": "Cheddar", "price": 8 }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.ProductResponse> products = mapper.toProducts(root);
+
+        assertThat(products.getFirst().getModifierGroups()).hasSize(1);
+        UberEatsDtos.ModifierGroupRequest group = products.getFirst().getModifierGroups().getFirst();
+        assertThat(group.getName()).isEqualTo("Sos seçimi");
+        assertThat(group.isRequired()).isTrue();
+        assertThat(group.getMinSelect()).isEqualTo(1);
+        assertThat(group.getOptions()).hasSize(1);
+        assertThat(group.getOptions().getFirst().getName()).isEqualTo("Cheddar");
+        assertThat(group.getOptions().getFirst().getPrice()).isEqualByComparingTo("8");
+    }
+
+    @Test
+    void toProducts_whenOnlyExtraIngredients_thenWrapAsOptionalGroup() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "products": [
+                    {
+                      "id": "p-2",
+                      "name": "Pizza",
+                      "categoryName": "Pizzalar",
+                      "extraIngredients": [
+                        { "name": "Mantar", "price": 12 }
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.ProductResponse> products = mapper.toProducts(root);
+
+        assertThat(products.getFirst().getModifierGroups()).hasSize(1);
+        UberEatsDtos.ModifierGroupRequest group = products.getFirst().getModifierGroups().getFirst();
+        assertThat(group.getName()).isEqualTo("Ekstralar");
+        assertThat(group.isRequired()).isFalse();
+        assertThat(group.getOptions().getFirst().getName()).isEqualTo("Mantar");
+    }
+
+    @Test
+    void toProducts_whenCategoryStubAndCatalogModifiers_thenMapGroupsFromCatalog() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "categories": [
+                    {
+                      "name": "Burger",
+                      "products": [
+                        { "id": "p-1" }
+                      ]
+                    }
+                  ],
+                  "products": [
+                    {
+                      "id": "p-1",
+                      "name": "Cheeseburger",
+                      "price": 220,
+                      "modifierProducts": [
+                        {
+                          "name": "Boyut",
+                          "required": true,
+                          "minSelect": 1,
+                          "maxSelect": 1,
+                          "modifierOptions": [
+                            { "name": "Büyük", "price": 15 }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        List<UberEatsDtos.ProductResponse> products = mapper.toProducts(root);
+
+        assertThat(products.getFirst().getName()).isEqualTo("Cheeseburger");
+        assertThat(products.getFirst().getCategoryName()).isEqualTo("Burger");
+        assertThat(products.getFirst().getModifierGroups()).hasSize(1);
+        assertThat(products.getFirst().getModifierGroups().getFirst().getName()).isEqualTo("Boyut");
+        assertThat(products.getFirst().getModifierGroups().getFirst().getOptions().getFirst().getName())
+                .isEqualTo("Büyük");
+    }
+
+    @Test
+    void toUpdateBody_whenProductId_thenWriteIdAndEmptyModifierArrays() {
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Cheeseburger")
+                .categoryName("Burger")
+                .available(true)
+                .build();
+
+        var body = mapper.toUpdateBody("p-1", request);
+
+        assertThat(body.get("id")).isEqualTo("p-1");
+        assertThat(body.get("categoryName")).isEqualTo("Burger");
+        assertThat(body.get("modifierProducts")).isEqualTo(List.of());
+        assertThat(body.get("extraIngredients")).isEqualTo(List.of());
+    }
+
+    @Test
+    void toOrderNodes_whenWebhookPackage_thenExtractFields() throws Exception {
+        JsonNode root = objectMapper.readTree("""
+                {
+                  "id": "ord-9",
+                  "orderCode": "TGO-12345",
+                  "restaurantId": "r-1",
+                  "packageStatus": "Created",
+                  "deliveryType": "STORE",
+                  "paymentMethodText": "Online Ödeme",
+                  "totalPrice": 150.50,
+                  "customer": { "firstName": "Ayşe", "lastName": "Yılmaz", "phone": "0555" },
+                  "address": {
+                    "neighborhood": "Kadıköy",
+                    "address1": "Bağdat Cd.",
+                    "phone": "05551234567"
+                  },
+                  "customerNote": "Acısız",
+                  "lines": [
+                    {
+                      "productId": "p-1",
+                      "name": "Ayran",
+                      "price": 20,
+                      "unitSellingPrice": 25,
+                      "items": [{}, {}],
+                      "extraIngredients": [{ "name": "Limon" }],
+                      "removedIngredients": [{ "name": "Soğan" }]
+                    }
+                  ]
+                }
+                """);
+
+        assertThat(mapper.externalOrderId(root)).isEqualTo("ord-9");
+        assertThat(mapper.orderNumber(root)).isEqualTo("TGO-12345");
+        assertThat(mapper.deliveryType(root)).isEqualTo("STORE");
+        assertThat(mapper.paymentMethod(root)).isEqualTo("Online Ödeme");
+        assertThat(mapper.restaurantId(root)).isEqualTo("r-1");
+        assertThat(mapper.packageStatus(root)).isEqualTo("Created");
+        assertThat(mapper.totalAmount(root)).isEqualByComparingTo(new BigDecimal("150.50"));
+        assertThat(mapper.customerName(root)).isEqualTo("Ayşe Yılmaz");
+        assertThat(mapper.customerPhone(root)).isEqualTo("0555");
+        assertThat(mapper.deliveryAddress(root)).contains("Bağdat Cd.");
+        assertThat(mapper.note(root)).isEqualTo("Acısız");
+        assertThat(mapper.toOrderItems(root)).hasSize(1);
+        assertThat(mapper.toOrderItems(root).getFirst().getProductName()).isEqualTo("Ayran");
+        assertThat(mapper.toOrderItems(root).getFirst().getQuantity()).isEqualTo(2);
+        assertThat(mapper.toOrderItems(root).getFirst().getDetail()).contains("Limon");
+        assertThat(mapper.toOrderNodes(root)).hasSize(1);
+    }
+
+    @Test
+    void toUpsertBody_whenRequiredModifierGroup_thenMapOptionsAndMinSelect() {
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Cheeseburger")
+                .description("Dana köfte")
+                .price(new BigDecimal("220"))
+                .categoryName("Burger")
+                .available(true)
+                .modifierGroups(List.of(
+                        UberEatsDtos.ModifierGroupRequest.builder()
+                                .name("Sos seçimi")
+                                .required(true)
+                                .minSelect(1)
+                                .maxSelect(1)
+                                .options(List.of(
+                                        UberEatsDtos.ModifierOptionRequest.builder()
+                                                .name("Cheddar")
+                                                .price(new BigDecimal("8"))
+                                                .build()
+                                ))
+                                .build()
+                ))
+                .build();
+
+        var body = mapper.toUpsertBody(request);
+
+        assertThat(body.get("name")).isEqualTo("Cheeseburger");
+        assertThat(body.get("categoryName")).isEqualTo("Burger");
+        assertThat(body.get("selling")).isEqualTo(true);
+        assertThat(body.get("status")).isEqualTo("ACTIVE");
+        assertThat(body).containsKey("modifierProducts");
+        assertThat(body).doesNotContainKey("extraIngredients");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> groups = (List<Map<String, Object>>) body.get("modifierProducts");
+        assertThat(groups).hasSize(1);
+        assertThat(groups.getFirst().get("name")).isEqualTo("Sos seçimi");
+        assertThat(groups.getFirst().get("required")).isEqualTo(true);
+        assertThat(groups.getFirst().get("minSelect")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> options = (List<Map<String, Object>>) groups.getFirst().get("modifierOptions");
+        assertThat(options.getFirst().get("name")).isEqualTo("Cheddar");
+        assertThat((BigDecimal) options.getFirst().get("price")).isEqualByComparingTo("8");
+    }
+
+    @Test
+    void toUpsertBody_whenOptionalGroup_thenAlsoWriteExtraIngredients() {
+        UberEatsDtos.CreateProductRequest request = UberEatsDtos.CreateProductRequest.builder()
+                .name("Pizza")
+                .categoryName("Pizzalar")
+                .available(false)
+                .modifierGroups(List.of(
+                        UberEatsDtos.ModifierGroupRequest.builder()
+                                .name("Ekstralar")
+                                .required(false)
+                                .minSelect(0)
+                                .maxSelect(3)
+                                .options(List.of(
+                                        UberEatsDtos.ModifierOptionRequest.builder()
+                                                .name("Mantar")
+                                                .price(new BigDecimal("12"))
+                                                .build()
+                                ))
+                                .build()
+                ))
+                .build();
+
+        var body = mapper.toUpsertBody(request);
+
+        assertThat(body.get("selling")).isEqualTo(false);
+        assertThat(body.get("status")).isEqualTo("PASSIVE");
+        assertThat(body).containsKey("extraIngredients");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> extras = (List<Map<String, Object>>) body.get("extraIngredients");
+        assertThat(extras.getFirst().get("name")).isEqualTo("Mantar");
+    }
+}

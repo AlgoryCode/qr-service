@@ -1,0 +1,56 @@
+package com.ael.algoryqrservice.qrservice.model.dto;
+
+import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
+import com.ael.algoryqrservice.qrservice.model.enums.PaymentMode;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class PurchaseRequestTest {
+
+    private Validator validator;
+
+    @BeforeEach
+    void setUp() {
+        validator = Validation.buildDefaultValidatorFactory().getValidator();
+    }
+
+    @Test
+    void isPaymentPlanValid_whenBillingPeriodMissing_thenReject() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+
+        assertThat(request.isPaymentPlanValid()).isFalse();
+    }
+
+    @Test
+    void isPaymentPlanValid_whenMonthly_thenAccept() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setBillingPeriod(BillingPeriod.MONTHLY);
+
+        assertThat(request.isPaymentPlanValid()).isTrue();
+        assertThat(request.resolvedPaymentStyle().name()).isEqualTo("SUBSCRIPTION");
+    }
+
+    @Test
+    void isPaymentPlanValid_whenYearly_thenAccept() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setBillingPeriod(BillingPeriod.YEARLY);
+
+        assertThat(request.isPaymentPlanValid()).isTrue();
+    }
+
+    @Test
+    void isPaymentInstrumentValid_whenCheckoutFormWithSavedCard_thenAccept() {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setPaymentMode(PaymentMode.CHECKOUT_FORM);
+        request.setPaymentMethodId(55L);
+
+        assertThat(request.isPaymentInstrumentValid()).isTrue();
+    }
+}

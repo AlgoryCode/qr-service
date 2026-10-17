@@ -1,0 +1,50 @@
+package com.ael.algoryqrservice.qrservice.repository;
+
+import com.ael.algoryqrservice.qrservice.model.UserAccountingEntry;
+import com.ael.algoryqrservice.qrservice.model.enums.AccountingEntryType;
+import com.ael.algoryqrservice.qrservice.model.enums.AccountingSourceType;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class UserAccountingEntrySpecifications {
+
+    private UserAccountingEntrySpecifications() {
+    }
+
+    public static Specification<UserAccountingEntry> forUserListedSources(
+            Long userId,
+            AccountingEntryType entryType,
+            LocalDateTime from,
+            LocalDateTime to,
+            String pattern
+    ) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("userId"), userId));
+            predicates.add(root.get("sourceType").in(
+                    AccountingSourceType.MANUAL,
+                    AccountingSourceType.BILL_SALE
+            ));
+            if (entryType != null) {
+                predicates.add(cb.equal(root.get("entryType"), entryType));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("occurredAt"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("occurredAt"), to));
+            }
+            if (pattern != null) {
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("title")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("note"), cb.literal(""))), pattern)
+                ));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+}

@@ -274,7 +274,7 @@ Wire format, headers ve alan semasi: [`docs/payment-events-contract.md`](payment
 
 ### Consumer
 
-- Sinif: `com.ael.algoryqrservice.messaging.payment.PaymentEventConsumer`
+- Sinif: `com.ael.algoryqrservice.qrservice.messaging.payment.PaymentEventConsumer`
 - Metot: `onPaymentEvent(Message)` → schema-first JSON → `PaymentCompletedEventDto` → handler registry
 - Queue: `payment.rabbitmq.events-queue` (`PaymentRabbitMqProperties.eventsQueue`)
 

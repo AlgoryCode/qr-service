@@ -1,0 +1,257 @@
+package com.ael.algoryqrservice.qrservice.service;
+
+import com.ael.algoryqrservice.qrservice.model.PlanPackage;
+import com.ael.algoryqrservice.qrservice.model.Purchase;
+import com.ael.algoryqrservice.qrservice.model.PurchaseFulfillment;
+import com.ael.algoryqrservice.qrservice.model.dto.PaymentCompletedEventDto;
+import com.ael.algoryqrservice.qrservice.model.dto.PaymentEventMetadata;
+import com.ael.algoryqrservice.qrservice.model.enums.FulfillmentStatus;
+import com.ael.algoryqrservice.qrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.qrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.qrservice.repository.PlanPackageRepository;
+import com.ael.algoryqrservice.qrservice.repository.ProductRepository;
+import com.ael.algoryqrservice.qrservice.repository.PurchaseFulfillmentRepository;
+import com.ael.algoryqrservice.qrservice.repository.PurchaseRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.qrservice.service.entitlement.PackageEntitlementWriter;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class PurchaseFulfillmentServiceTest {
+
+    @Mock
+    private PurchaseFulfillmentRepository fulfillmentRepository;
+    @Mock
+    private PurchaseRepository purchaseRepository;
+    @Mock
+    private PlanPackageRepository planPackageRepository;
+    @Mock
+    private ProductRepository productRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.PurchaseItemRepository purchaseItemRepository;
+    @Mock
+    private PackageEntitlementWriter entitlementWriter;
+    @Mock
+    private PackageActivationService packageActivationService;
+    @Mock
+    private MenuPublicAccessService menuPublicAccessService;
+    @Mock
+    private FulfillmentGrantService fulfillmentGrantService;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.access.TrialLogCloser trialLogCloser;
+
+    @InjectMocks
+    private PurchaseFulfillmentService fulfillmentService;
+
+    private Purchase purchase;
+    private PlanPackage planPackage;
+    private PaymentCompletedEventDto event;
+    private PaymentEventMetadata metadata;
+
+    @BeforeEach
+    void setUp() {
+        purchase = Purchase.builder()
+                .id(1L)
+                .userId(2L)
+                .packageId(3L)
+                .packageCode(CatalogPackages.PRO_PACKAGE)
+                .packageName("PRO")
+                .status(PurchaseStatus.PENDING)
+                .build();
+        planPackage = PlanPackage.builder()
+                .id(3L)
+                .code(CatalogPackages.PRO_PACKAGE)
+                .name("PRO")
+                .items(List.of())
+                .build();
+        event = new PaymentCompletedEventDto();
+        event.setEventId("event-1");
+        event.setPaymentId("payment-1");
+        metadata = new PaymentEventMetadata(
+                1L,
+                2L,
+                3L,
+                CatalogPackages.PRO_PACKAGE,
+                "conversation-1",
+                "installment-1",
+                1,
+                2,
+                LocalDateTime.of(2026, 7, 1, 0, 0),
+                LocalDateTime.of(2026, 8, 1, 0, 0)
+        );
+    }
+
+    @Test
+    void initializeSchedule_whenSubscription_thenCreatesFirstPendingRowOnly() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setPrice(new BigDecimal("100.00"));
+        purchase.setCurrency("TRY");
+        purchase.setInstallmentCount(1);
+        purchase.setPaymentConversationId("conv-sub");
+        purchase.setPurchasedAt(LocalDateTime.of(2026, 7, 20, 10, 0));
+        when(fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(1L)).thenReturn(List.of());
+
+        fulfillmentService.initializeSchedule(purchase, "qr-service");
+
+        ArgumentCaptor<PurchaseFulfillment> captor = ArgumentCaptor.forClass(PurchaseFulfillment.class);
+        verify(fulfillmentRepository, atLeastOnce()).save(captor.capture());
+        assertThat(captor.getAllValues()).hasSize(1);
+        assertThat(captor.getAllValues().get(0).getDueAt()).isEqualTo(LocalDateTime.of(2026, 7, 20, 10, 0));
+        assertThat(captor.getAllValues().get(0).getAmount()).isEqualByComparingTo("100.00");
+        assertThat(captor.getAllValues().get(0).getStatus()).isEqualTo(FulfillmentStatus.PENDING);
+        assertThat(captor.getAllValues().get(0).getInstallmentNumber()).isEqualTo(1);
+        assertThat(captor.getAllValues().get(0).getInstallmentId()).isEqualTo("conv-sub:1");
+        assertThat(captor.getAllValues().get(0).getEventId()).isEqualTo("pending:conv-sub");
+    }
+
+    @Test
+    void initializeSchedule_whenConversationIdPresent_thenUsesUuidAsAttemptKey() {
+        purchase.setId(42L);
+        purchase.setPaymentConversationId("a1b2c3d4e5f64789a1b2c3d4e5f64789");
+        purchase.setPrice(new BigDecimal("50.00"));
+        purchase.setCurrency("TRY");
+        purchase.setInstallmentCount(1);
+        when(fulfillmentRepository.findByPurchaseIdOrderByInstallmentNumberAsc(42L)).thenReturn(List.of());
+
+        fulfillmentService.initializeSchedule(purchase, "qr-service");
+
+        ArgumentCaptor<PurchaseFulfillment> captor = ArgumentCaptor.forClass(PurchaseFulfillment.class);
+        verify(fulfillmentRepository).save(captor.capture());
+        assertThat(captor.getValue().getEventId()).isEqualTo("pending:a1b2c3d4e5f64789a1b2c3d4e5f64789");
+        assertThat(captor.getValue().getInstallmentId()).isEqualTo("a1b2c3d4e5f64789a1b2c3d4e5f64789:1");
+    }
+
+    @Test
+    void fulfillPaidInstallment_whenSubscriptionCycle_thenResolvesByInstallmentNumber() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setPaymentConversationId("conv-sub");
+        event.setConversationId("sub-1-cycle-2");
+        PurchaseFulfillment cycleTwo = PurchaseFulfillment.builder()
+                .purchaseId(1L)
+                .installmentId("plan:2")
+                .installmentNumber(2)
+                .installmentCount(12)
+                .status(FulfillmentStatus.PENDING)
+                .dueAt(LocalDateTime.of(2026, 8, 20, 10, 0))
+                .amount(new BigDecimal("100.00"))
+                .currency("TRY")
+                .build();
+        PaymentEventMetadata cycleMeta = new PaymentEventMetadata(
+                1L, 2L, 3L, CatalogPackages.PRO_PACKAGE, "conv-sub",
+                "payment-cycle-2", 2, 12,
+                LocalDateTime.of(2026, 8, 20, 0, 0),
+                LocalDateTime.of(2026, 9, 20, 0, 0)
+        );
+        when(fulfillmentRepository.findByPurchaseIdAndInstallmentNumber(1L, 2))
+                .thenReturn(Optional.of(cycleTwo));
+        when(fulfillmentRepository.findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(1L, FulfillmentStatus.PAID))
+                .thenReturn(List.of(PurchaseFulfillment.builder().status(FulfillmentStatus.PAID).build()));
+        when(purchaseRepository.save(purchase)).thenReturn(purchase);
+
+        fulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, cycleMeta);
+
+        assertThat(cycleTwo.getStatus()).isEqualTo(FulfillmentStatus.PAID);
+        assertThat(purchase.getPaymentConversationId()).isEqualTo("conv-sub");
+        assertThat(purchase.getCurrentPeriodConversationId()).isEqualTo("sub-1-cycle-2");
+        verify(fulfillmentRepository).save(cycleTwo);
+    }
+
+    @Test
+    void fulfillPaidInstallment_whenAlreadyPaid_thenRemainIdempotent() {
+        PurchaseFulfillment existing = PurchaseFulfillment.builder()
+                .purchaseId(1L)
+                .installmentId("installment-1")
+                .status(FulfillmentStatus.PAID)
+                .build();
+        when(fulfillmentRepository.findByPurchaseIdAndInstallmentId(1L, "installment-1"))
+                .thenReturn(Optional.of(existing));
+
+        fulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
+
+        verify(fulfillmentRepository, never()).save(any());
+        verify(purchaseRepository, never()).save(any());
+        verify(entitlementWriter, never()).synchronizePeriod(any());
+    }
+
+    @Test
+    void fulfillPaidInstallment_whenFirstPayment_thenActivateOnePeriod() {
+        when(fulfillmentRepository.findByPurchaseIdAndInstallmentId(1L, "installment-1"))
+                .thenReturn(Optional.empty());
+        when(fulfillmentRepository.findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(
+                1L,
+                FulfillmentStatus.PAID
+        )).thenReturn(List.of());
+        when(planPackageRepository.findByIdWithItems(3L)).thenReturn(Optional.of(planPackage));
+        LocalDateTime before = LocalDateTime.now();
+
+        fulfillmentService.fulfillPaidInstallment(purchase, planPackage, event, metadata);
+
+        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+        assertThat(purchase.getStartsAt()).isAfterOrEqualTo(before);
+        assertThat(purchase.getExpiresAt()).isEqualTo(purchase.getStartsAt().plusDays(31));
+        verify(packageActivationService).activatePurchasedPackage(purchase);
+        verify(entitlementWriter).synchronizePeriod(purchase);
+        verify(menuPublicAccessService).syncForUser(2L);
+    }
+
+    @Test
+    void recordUnpaidInstallment_whenOverdue_thenKeepPaidPurchasePeriod() {
+        purchase.setStatus(PurchaseStatus.ACTIVE);
+        purchase.setExpiresAt(LocalDateTime.now().plusDays(20));
+        when(fulfillmentRepository.findByPurchaseIdAndInstallmentId(1L, "installment-1"))
+                .thenReturn(Optional.empty());
+
+        fulfillmentService.recordUnpaidInstallment(
+                purchase,
+                event,
+                metadata,
+                FulfillmentStatus.OVERDUE
+        );
+
+        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+        verify(purchaseRepository, never()).save(any());
+        verify(menuPublicAccessService).syncForUser(2L);
+    }
+
+    @Test
+    void revokeInstallment_whenNoPaidPeriodRemains_thenExpireAndRestoreFree() {
+        PurchaseFulfillment existing = PurchaseFulfillment.builder()
+                .purchaseId(1L)
+                .installmentId("installment-1")
+                .status(FulfillmentStatus.PAID)
+                .eventId("paid-event")
+                .build();
+        when(fulfillmentRepository.findByPurchaseIdAndInstallmentId(1L, "installment-1"))
+                .thenReturn(Optional.of(existing));
+        when(fulfillmentRepository.findByPurchaseIdAndStatusOrderByInstallmentNumberAsc(
+                1L,
+                FulfillmentStatus.PAID
+        )).thenReturn(List.of());
+
+        fulfillmentService.revokeInstallment(purchase, event, metadata);
+
+        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
+        verify(entitlementWriter).synchronizePeriod(purchase);
+        verify(packageActivationService).ensureSubscriptionState(2L);
+        verify(menuPublicAccessService).syncForUser(2L);
+    }
+}

@@ -1,0 +1,167 @@
+package com.ael.algoryqrservice.qrservice.service;
+
+import com.ael.algoryqrservice.qrservice.account.service.JwtPropertiesHelper;
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
+import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
+import com.ael.algoryqrservice.qrservice.model.DashboardUser;
+import com.ael.algoryqrservice.qrservice.model.DashboardUserSession;
+import com.ael.algoryqrservice.qrservice.model.dto.AuthResponse;
+import com.ael.algoryqrservice.qrservice.repository.DashboardUserRepository;
+import com.ael.algoryqrservice.qrservice.repository.DashboardUserSessionRepository;
+import com.ael.algoryqrservice.qrservice.util.ClientInfo;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class DashboardSessionService {
+
+    private final DashboardUserSessionRepository sessionRepository;
+    private final DashboardUserRepository dashboardUserRepository;
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtPropertiesHelper jwtPropertiesHelper;
+
+    @Transactional
+    public AuthResponse createSession(DashboardUser user, ClientInfo clientInfo) {
+        UUID sessionId = UUID.randomUUID();
+        String rawRefreshToken = UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
+
+        DashboardUserSession session = DashboardUserSession.builder()
+                .id(sessionId)
+                .dashboardUserId(user.getId())
+                .refreshTokenHash(passwordEncoder.encode(rawRefreshToken))
+                .loggedInAt(now)
+                .accessExpiresAt(now.plus(jwtPropertiesHelper.getAccessDuration()))
+                .refreshExpiresAt(now.plus(jwtPropertiesHelper.getRefreshDuration()))
+                .lastActivityAt(now)
+                .revoked(false)
+                .ipAddress(clientInfo.ipAddress())
+                .userAgent(clientInfo.userAgent())
+                .device(clientInfo.device())
+                .deviceType(clientInfo.deviceType())
+                .build();
+
+        sessionRepository.save(session);
+
+        String accessToken = jwtService.generateDashboardAccessToken(
+                user.getEmail(),
+                sessionId,
+                user.getId(),
+                user.getRole()
+        );
+        return buildAuthResponse(accessToken, formatRefreshToken(sessionId, rawRefreshToken));
+    }
+
+    @Transactional
+    public AuthResponse refresh(String refreshToken) {
+        RefreshTokenParts parts = parseRefreshToken(refreshToken);
+        DashboardUserSession session = sessionRepository.findById(parts.sessionId())
+                .orElseThrow(() -> new UnauthorizedException("Geçersiz refresh token"));
+        validateSessionActive(session);
+        if (!passwordEncoder.matches(parts.rawToken(), session.getRefreshTokenHash())) {
+            throw new UnauthorizedException("Geçersiz refresh token");
+        }
+
+        DashboardUser user = dashboardUserRepository.findById(session.getDashboardUserId())
+                .orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Hesap pasif");
+        }
+
+        String newRawRefreshToken = UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
+        session.setRefreshTokenHash(passwordEncoder.encode(newRawRefreshToken));
+        session.setAccessExpiresAt(now.plus(jwtPropertiesHelper.getAccessDuration()));
+        session.setLastActivityAt(now);
+        sessionRepository.save(session);
+
+        String accessToken = jwtService.generateDashboardAccessToken(
+                user.getEmail(),
+                session.getId(),
+                user.getId(),
+                user.getRole()
+        );
+        return buildAuthResponse(accessToken, formatRefreshToken(session.getId(), newRawRefreshToken));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isSessionActive(UUID sessionId) {
+        return sessionRepository.findById(sessionId)
+                .map(DashboardUserSession::isActive)
+                .orElse(false);
+    }
+
+    @Transactional
+    public void revokeByAccessSessionId(UUID sessionId) {
+        DashboardUserSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BadRequestException("Oturum bulunamadı"));
+        revoke(session);
+    }
+
+    @Transactional
+    public void revokeByRefreshToken(String refreshToken) {
+        RefreshTokenParts parts = parseRefreshToken(refreshToken);
+        DashboardUserSession session = sessionRepository.findById(parts.sessionId())
+                .orElseThrow(() -> new UnauthorizedException("Geçersiz refresh token"));
+        if (!passwordEncoder.matches(parts.rawToken(), session.getRefreshTokenHash())) {
+            throw new UnauthorizedException("Geçersiz refresh token");
+        }
+        revoke(session);
+    }
+
+    private void validateSessionActive(DashboardUserSession session) {
+        if (session.isRevoked()) {
+            throw new UnauthorizedException("Oturum iptal edilmiş");
+        }
+        if (session.isRefreshExpired()) {
+            throw new UnauthorizedException("Oturum süresi dolmuş");
+        }
+    }
+
+    private void revoke(DashboardUserSession session) {
+        if (!session.isRevoked()) {
+            session.setRevoked(true);
+            session.setRevokedAt(LocalDateTime.now());
+            sessionRepository.save(session);
+        }
+    }
+
+    private RefreshTokenParts parseRefreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BadRequestException("Refresh token zorunludur");
+        }
+        int separatorIndex = refreshToken.indexOf('.');
+        if (separatorIndex <= 0 || separatorIndex == refreshToken.length() - 1) {
+            throw new UnauthorizedException("Geçersiz refresh token formatı");
+        }
+        try {
+            UUID sessionId = UUID.fromString(refreshToken.substring(0, separatorIndex));
+            String rawToken = refreshToken.substring(separatorIndex + 1);
+            return new RefreshTokenParts(sessionId, rawToken);
+        } catch (IllegalArgumentException e) {
+            throw new UnauthorizedException("Geçersiz refresh token formatı");
+        }
+    }
+
+    private String formatRefreshToken(UUID sessionId, String rawToken) {
+        return sessionId + "." + rawToken;
+    }
+
+    private AuthResponse buildAuthResponse(String accessToken, String refreshToken) {
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+    private record RefreshTokenParts(UUID sessionId, String rawToken) {
+    }
+}

@@ -24,9 +24,6 @@ spring:
 
 app:
   url: http://localhost:3000
-  seed:
-    package-catalog: false
-
 ubereats:
   poll-enabled: false
   encrypt-key: dGVzdC10Z28tZW5jcnlwdC1rZXktMzItYnl0ZXMh

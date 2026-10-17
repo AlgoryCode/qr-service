@@ -1,0 +1,299 @@
+package com.ael.algoryqrservice.qrservice.service;
+
+import com.ael.algoryqrservice.qrservice.catalog.CatalogPackages;
+import com.ael.algoryqrservice.qrservice.client.PaymentServiceClient;
+import com.ael.algoryqrservice.qrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.qrservice.config.AppProperties;
+import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.qrservice.exception.PaymentServiceException;
+import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
+import com.ael.algoryqrservice.qrservice.model.Purchase;
+import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
+import com.ael.algoryqrservice.qrservice.model.enums.PaymentStyle;
+import com.ael.algoryqrservice.qrservice.model.enums.PurchaseCancellationReason;
+import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
+import com.ael.algoryqrservice.qrservice.model.enums.PurchaseType;
+import com.ael.algoryqrservice.qrservice.model.enums.SubscriptionStatus;
+import com.ael.algoryqrservice.qrservice.coupon.CouponRedemptionService;
+import com.ael.algoryqrservice.qrservice.purchase.lifecycle.PackagePeriodExtender;
+import com.ael.algoryqrservice.qrservice.repository.PaymentEventInboxRepository;
+import com.ael.algoryqrservice.qrservice.repository.PurchaseRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.ael.algoryqrservice.qrservice.service.entitlement.PackageEntitlementWriter;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class PurchaseServiceCancelTest {
+
+    @Mock
+    private PlanPackageService planPackageService;
+    @Mock
+    private PurchaseRepository purchaseRepository;
+    @Mock
+    private PurchaseLogService purchaseLogService;
+    @Mock
+    private PackageEntitlementWriter entitlementWriter;
+    @Mock
+    private PaymentServiceClient paymentServiceClient;
+    @Mock
+    private PaymentRequestMapper paymentRequestMapper;
+    @Mock
+    private AppProperties appProperties;
+    @Mock
+    private PaymentEventInboxRepository paymentEventInboxRepository;
+    @Mock
+    private PackageActivationService packageActivationService;
+    @Mock
+    private PurchaseFulfillmentService purchaseFulfillmentService;
+    @Mock
+    private PlanChangeService planChangeService;
+    @Mock
+    private BillingAddressService billingAddressService;
+    @Mock
+    private MenuPublicAccessService menuPublicAccessService;
+    @Mock
+    private SubscriptionRefundPolicy subscriptionRefundPolicy;
+    @Mock
+    private PackagePeriodExtender packagePeriodExtender;
+    @Mock
+    private CouponRedemptionService couponRedemptionService;
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @InjectMocks
+    private PurchaseService purchaseService;
+
+    private Purchase purchase;
+
+    @BeforeEach
+    void setUp() {
+        purchase = Purchase.builder()
+                .id(10L)
+                .userId(20L)
+                .packageId(30L)
+                .packageCode(CatalogPackages.PRO_PACKAGE)
+                .packageName("PRO")
+                .price(new BigDecimal("100.00"))
+                .currency("TRY")
+                .purchaseType(PurchaseType.PAID)
+                .paymentStyle(PaymentStyle.ONE_TIME)
+                .status(PurchaseStatus.ACTIVE)
+                .startsAt(LocalDateTime.now().minusDays(1))
+                .expiresAt(LocalDateTime.now().plusDays(30))
+                .build();
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(mock(TransactionStatus.class));
+    }
+
+    @Test
+    void cancelMyPurchase_whenActiveOwned_thenCancelAndRevoke() {
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = purchaseService.cancelMyPurchase(10L, 20L);
+
+        assertThat(response.getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
+        assertThat(purchase.getCancellationReason()).isEqualTo(PurchaseCancellationReason.MANUAL);
+        assertThat(purchase.getExpiresAt()).isBeforeOrEqualTo(LocalDateTime.now().plusSeconds(1));
+        verify(entitlementWriter).revokeForCancelledPurchase(purchase);
+        verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
+        verify(purchaseFulfillmentService).cancelOpenFulfillments(10L);
+        verify(packageActivationService).ensureSubscriptionState(20L);
+        verify(menuPublicAccessService).syncForUser(20L);
+        verify(paymentServiceClient, never()).cancelSubscription(any(), any());
+    }
+
+    @Test
+    void cancelMyPurchase_whenActivePaidSubscription_thenReject() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 20L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("donem sonu");
+
+        verify(paymentServiceClient, never()).cancelSubscription(any(), any());
+        verify(purchaseRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelAtPeriodEnd_whenActiveSubscription_thenFlagAndRemote() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = purchaseService.cancelAtPeriodEnd(10L, 20L);
+
+        assertThat(response.isCancelAtPeriodEnd()).isTrue();
+        assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
+        verify(paymentServiceClient).cancelSubscriptionAtPeriodEnd(20L, "sub-1");
+        verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
+    }
+
+    @Test
+    void resumeRenewal_whenCancelAtPeriodEnd_thenClearFlag() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        purchase.setCancelAtPeriodEnd(true);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = purchaseService.resumeRenewal(10L, 20L);
+
+        assertThat(response.isCancelAtPeriodEnd()).isFalse();
+        verify(paymentServiceClient).resumeSubscription(20L, "sub-1");
+    }
+
+    @Test
+    void cancelWithRefund_whenWithinWindow_thenRefundAndCancel() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        purchase.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        purchase.setBillingPeriod(BillingPeriod.MONTHLY);
+        purchase.setPaymentConversationId("anchor-conv");
+        purchase.setCurrentPeriodConversationId("conv-1");
+        purchase.setCurrentPeriodPaidAt(LocalDateTime.now().minusDays(2));
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(subscriptionRefundPolicy.isRefundEligible(eq(purchase), any())).thenReturn(true);
+        when(paymentServiceClient.getRefundablePayment(20L, "conv-1"))
+                .thenReturn(new BillingPaymentDtos.RefundablePayment(
+                        "conv-1", "pay-1", "tx-1", "SUCCESS",
+                        new BigDecimal("100.00"), BigDecimal.ZERO, new BigDecimal("100.00")
+                ));
+
+        var response = purchaseService.cancelWithRefund(10L, 20L, "127.0.0.1");
+
+        assertThat(response.getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
+        assertThat(purchase.getRefundedAt()).isNotNull();
+        verify(paymentServiceClient).refundPayment(20L, "conv-1", new BigDecimal("100.00"), "127.0.0.1");
+        verify(paymentServiceClient).cancelSubscription(20L, "sub-1");
+        verify(entitlementWriter).revokeForCancelledPurchase(purchase);
+    }
+
+    @Test
+    void cancelWithRefund_whenOutsideWindow_thenReject() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        purchase.setPaymentConversationId("conv-1");
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(subscriptionRefundPolicy.isRefundEligible(eq(purchase), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> purchaseService.cancelWithRefund(10L, 20L, "127.0.0.1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Iade penceresi");
+
+        verify(paymentServiceClient, never()).refundPayment(any(), any(), any(), any());
+        verify(paymentServiceClient, never()).cancelSubscription(any(), any());
+    }
+
+    @Test
+    void cancelWithRefund_whenAlreadyRefunded_thenReject() {
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        purchase.setRefundedAt(LocalDateTime.now().minusHours(1));
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.cancelWithRefund(10L, 20L, "127.0.0.1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("zaten yapildi");
+
+        verify(paymentServiceClient, never()).refundPayment(any(), any(), any(), any());
+    }
+
+    @Test
+    void cancelMyPurchase_whenPaidSubscription_thenRejectImmediateCancel() {
+        purchase.setPurchaseType(PurchaseType.PAID);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId("sub-1");
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 20L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("donem sonu");
+
+        verify(paymentServiceClient, never()).cancelSubscription(any(), any());
+        verify(purchaseRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelMyPurchase_whenPaidSubscriptionWithoutId_thenRejectImmediateCancel() {
+        purchase.setPurchaseType(PurchaseType.PAID);
+        purchase.setPaymentStyle(PaymentStyle.SUBSCRIPTION);
+        purchase.setSubscriptionId(null);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 20L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("donem sonu");
+
+        verify(paymentServiceClient, never()).cancelSubscription(any(), any());
+        verify(purchaseRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelMyPurchase_whenFreePackage_thenReject() {
+        purchase.setPackageCode(CatalogPackages.FREE_PACKAGE);
+        purchase.setPurchaseType(PurchaseType.FREE);
+        purchase.setPrice(BigDecimal.ZERO);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 20L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("iptal edilemez");
+
+        verify(purchaseRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelMyPurchase_whenOtherUser_thenUnauthorized() {
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> purchaseService.cancelMyPurchase(10L, 99L))
+                .isInstanceOf(UnauthorizedException.class);
+
+        verify(purchaseRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelMyPurchase_whenPending_thenCancelWithoutMenuDeactivate() {
+        purchase.setStatus(PurchaseStatus.PENDING);
+        when(purchaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(purchase));
+        when(purchaseRepository.save(any(Purchase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        purchaseService.cancelMyPurchase(10L, 20L);
+
+        ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
+        assertThat(captor.getValue().getCancellationReason()).isEqualTo(PurchaseCancellationReason.MANUAL);
+        verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
+        verify(menuPublicAccessService, never()).deactivateActiveMenusForUser(any());
+        verify(purchaseFulfillmentService).cancelOpenFulfillments(eq(10L));
+        verify(packageActivationService).ensureSubscriptionState(20L);
+    }
+}

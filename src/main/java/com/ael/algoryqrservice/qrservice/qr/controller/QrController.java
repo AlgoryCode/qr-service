@@ -1,0 +1,67 @@
+package com.ael.algoryqrservice.qrservice.qr.controller;
+
+import com.ael.algoryqrservice.qrservice.qr.dto.QrActiveRequest;
+import com.ael.algoryqrservice.qrservice.qr.dto.QrActiveResponse;
+import com.ael.algoryqrservice.qrservice.qr.dto.QrNameRequest;
+import com.ael.algoryqrservice.qrservice.qr.dto.QrNameResponse;
+import com.ael.algoryqrservice.qrservice.qr.dto.QrRequest;
+import com.ael.algoryqrservice.qrservice.model.enums.QrListScope;
+import com.ael.algoryqrservice.qrservice.qr.service.QrService;
+import com.google.zxing.WriterException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
+
+@RestController
+@RequestMapping("/qr")
+@RequiredArgsConstructor
+public class QrController {
+    private final QrService qrService;
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getUserQrs(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "false") boolean includeImage,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "ALL") String scope
+    ) {
+        return ResponseEntity.ok(
+                qrService.getUserQrs(userId, includeImage, page, size, QrListScope.from(scope))
+        );
+    }
+
+    @PutMapping("/update/{qrId}")
+    public ResponseEntity<?> updateQr(@PathVariable Long qrId, @RequestBody QrRequest req) throws IOException, WriterException {
+        return ResponseEntity.ok(qrService.updateQr(qrId, req));
+    }
+
+    @PatchMapping("/update-name/{qrId}")
+    public ResponseEntity<QrNameResponse> updateQrName(@PathVariable Long qrId, @RequestBody QrNameRequest req) {
+        return ResponseEntity.ok(qrService.updateQrName(qrId, req));
+    }
+
+    @PatchMapping("/update-active/{qrId}")
+    public ResponseEntity<QrActiveResponse> updateMenuQrActive(
+            @PathVariable Long qrId,
+            @RequestBody QrActiveRequest req
+    ) {
+        return ResponseEntity.ok(qrService.updateMenuQrActive(qrId, req));
+    }
+
+    @DeleteMapping("/delete/{qrId}")
+    public ResponseEntity<String> deleteQr(@PathVariable Long qrId){
+        qrService.deleteQrByQrId(qrId);
+        return ResponseEntity.ok("Deleted Success");
+    }
+
+    @DeleteMapping("/delete-menu/{qrId}")
+    public ResponseEntity<String> deleteMenuQr(@PathVariable Long qrId) {
+        qrService.softDeleteMenuQr(qrId);
+        return ResponseEntity.ok("Deleted Success");
+    }
+
+
+}
