@@ -1,6 +1,6 @@
-package com.ael.algoryqrservice.qrservice.model;
+package com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity;
 
-import com.ael.algoryqrservice.qrservice.model.enums.DashboardRole;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.enums.DashboardRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;

@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.qrservice.admin.dto;
+package com.ael.algoryqrservice.adminservice.dto;
 
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;

@@ -1,6 +1,6 @@
-package com.ael.algoryqrservice.qrservice.model.dto;
+package com.ael.algoryqrservice.adminservice.dto;
 
-import com.ael.algoryqrservice.qrservice.model.enums.DashboardRole;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.enums.DashboardRole;
 
 public final class DashboardAuthDtos {
 

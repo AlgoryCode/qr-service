@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.qrservice.admin.controller;
+package com.ael.algoryqrservice.adminservice.presentation.controller;
 
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.billing.dto.AdminSubscriptionDtos;

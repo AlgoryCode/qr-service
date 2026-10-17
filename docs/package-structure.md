@@ -10,6 +10,7 @@
 | `merchantservice` | İşletme kimliği (`tbl_merchant`) |
 | `staffservice` | Personel (`tbl_merchant_staff`), `/staff` API |
 | `customerservice` | Müşteri (`tbl_customer`), `/customer` API |
+| `adminservice` | Yönetim paneli (`tbl_dashboard_user`), `/dashboard/auth/*`, `/admin/**` |
 | `qrservice` | Ana QR domain (menü, sipariş, billing, entegrasyon, …) |
 | *(dosya)* `AlgoryqrServiceApplication` | Spring Boot giriş noktası |
 

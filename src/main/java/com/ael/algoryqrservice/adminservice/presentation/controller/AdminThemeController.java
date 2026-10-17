@@ -1,8 +1,8 @@
-package com.ael.algoryqrservice.qrservice.admin.controller;
+package com.ael.algoryqrservice.adminservice.presentation.controller;
 
 import com.ael.algoryqrservice.qrservice.menu.dto.ThemeDtos;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuThemeService;
-import com.ael.algoryqrservice.qrservice.util.DashboardSecurityUtils;
+import com.ael.algoryqrservice.adminservice.application.DashboardSecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
