@@ -49,7 +49,7 @@ public class BatchReportService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
 
-    public BatchReport createSubmittedBatch(Long userId, List<BatchReportItemDraft> drafts) {
+    public BatchReport createSubmittedBatch(Long merchantId, List<BatchReportItemDraft> drafts) {
         if (drafts == null || drafts.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "items are required");
         }
@@ -68,18 +68,18 @@ public class BatchReportService {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "ai-service did not return openaiBatchId");
         }
 
-        return transactionTemplate.execute(status -> persistCreatedBatch(userId, drafts, created.getOpenaiBatchId()));
+        return transactionTemplate.execute(status -> persistCreatedBatch(merchantId, drafts, created.getOpenaiBatchId()));
     }
 
     private BatchReport persistCreatedBatch(
-            Long userId,
+            Long merchantId,
             List<BatchReportItemDraft> drafts,
             String openaiBatchId
     ) {
         UUID batchId = UUID.randomUUID();
         BatchReport batch = BatchReport.builder()
                 .id(batchId)
-                .userId(userId)
+                .merchantId(merchantId)
                 .openaiBatchId(openaiBatchId)
                 .status(BatchReport.STATUS_PENDING)
                 .requestTotal(drafts.size())
@@ -108,21 +108,21 @@ public class BatchReportService {
                 "Batch report created. batchId={} openaiBatchId={} userId={} itemCount={}",
                 batchId,
                 openaiBatchId,
-                userId,
+                merchantId,
                 drafts.size()
         );
         return batch;
     }
 
     @Transactional(readOnly = true)
-    public Page<BatchReportDtos.BatchReportListItem> listReports(Long userId, Pageable pageable) {
-        return batchReportRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+    public Page<BatchReportDtos.BatchReportListItem> listReports(Long merchantId, Pageable pageable) {
+        return batchReportRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, pageable)
                 .map(this::toListItem);
     }
 
     @Transactional(readOnly = true)
-    public BatchReportDtos.BatchReportDetail getReport(Long userId, UUID batchId) {
-        BatchReport batch = batchReportRepository.findByIdAndUserId(batchId, userId)
+    public BatchReportDtos.BatchReportDetail getReport(Long merchantId, UUID batchId) {
+        BatchReport batch = batchReportRepository.findByIdAndUserId(batchId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Rapor bulunamadi: " + batchId));
         List<BatchReportItem> items = batchReportItemRepository.findByBatchIdOrderByCreatedAtAsc(batchId);
         return toDetail(batch, items);

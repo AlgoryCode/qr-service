@@ -11,7 +11,7 @@ import java.util.Optional;
 
 public interface MerchantRepository extends JpaRepository<Merchant, Long> {
 
-    Optional<Merchant> findByUserIdAndDeletedFalse(Long userId);
+    Optional<Merchant> findByOwnerMerchantIdAndDeletedFalse(Long ownerMerchantId);
 
     Optional<Merchant> findByIdAndDeletedFalse(Long id);
 
@@ -19,7 +19,7 @@ public interface MerchantRepository extends JpaRepository<Merchant, Long> {
 
     Optional<Merchant> findByCatalogMenuIdAndDeletedFalse(Long catalogMenuId);
 
-    boolean existsByUserIdAndDeletedFalse(Long userId);
+    boolean existsByOwnerMerchantIdAndDeletedFalse(Long ownerMerchantId);
 
     boolean existsByPublicToken(String publicToken);
 

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_billing_address", indexes = {
-        @Index(name = "idx_billing_address_user", columnList = "user_id")
+        @Index(name = "idx_billing_address_user", columnList = "merchant_id")
 })
 @Getter
 @Setter
@@ -21,8 +21,8 @@ public class BillingAddress {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private BillingAddressType type;

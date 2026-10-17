@@ -33,15 +33,15 @@ public class AccountFacadeService {
     }
 
     public BillingAddressPageResponse listBillingAddresses(int page, int size) {
-        return billingAddressService.list(userId(), page, size);
+        return billingAddressService.list(merchantId(), page, size);
     }
 
     public List<PurchaseResponse> listPurchases() {
-        return purchaseService.getUserPurchases(userId());
+        return purchaseService.getUserPurchases(merchantId());
     }
 
     public SubscriptionOverviewResponse subscriptionOverview() {
-        return purchaseService.getMySubscriptionOverview(userId());
+        return purchaseService.getMySubscriptionOverview(merchantId());
     }
 
     public AccountOverviewDtos.OverviewResponse getOverview() {
@@ -49,7 +49,7 @@ public class AccountFacadeService {
                 .profile(sectionFromCall(() -> accountService.getMyProfile()))
                 .subscription(subscriptionOverviewSection())
                 .purchases(purchasesSection())
-                .billingAddresses(sectionFromCall(() -> billingAddressService.list(userId(), 0, 50)))
+                .billingAddresses(sectionFromCall(() -> billingAddressService.list(merchantId(), 0, 50)))
                 .build();
     }
 
@@ -81,7 +81,7 @@ public class AccountFacadeService {
         return AccountOverviewDtos.Section.failure(500, message);
     }
 
-    private Long userId() {
+    private Long merchantId() {
         return securityUtils.getCurrentMerchantId();
     }
 

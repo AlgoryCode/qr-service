@@ -20,7 +20,7 @@ import com.ael.algoryqrservice.qrservice.model.enums.RefundStatus;
 public class PurchaseSummaryResponse {
 
     private Long purchaseId;
-    private Long userId;
+    private Long merchantId;
     private Long packageId;
     private String packageCode;
     private String packageName;

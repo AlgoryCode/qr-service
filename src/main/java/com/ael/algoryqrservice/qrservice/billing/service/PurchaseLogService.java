@@ -17,18 +17,18 @@ public class PurchaseLogService {
     private final PurchaseLogRepository purchaseLogRepository;
 
     @Transactional
-    public void log(Long purchaseId, Long userId, PurchaseLogAction action, String message) {
+    public void log(Long purchaseId, Long merchantId, PurchaseLogAction action, String message) {
         purchaseLogRepository.save(PurchaseLog.builder()
                 .purchaseId(purchaseId)
-                .userId(userId)
+                .merchantId(merchantId)
                 .action(action)
                 .message(message)
                 .build());
     }
 
     @Transactional(readOnly = true)
-    public List<PurchaseLogResponse> getUserLogs(Long userId) {
-        return purchaseLogRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+    public List<PurchaseLogResponse> getUserLogs(Long merchantId) {
+        return purchaseLogRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -44,7 +44,7 @@ public class PurchaseLogService {
         return PurchaseLogResponse.builder()
                 .id(log.getId())
                 .purchaseId(log.getPurchaseId())
-                .userId(log.getUserId())
+                .merchantId(log.getMerchantId())
                 .action(log.getAction())
                 .message(log.getMessage())
                 .createdAt(log.getCreatedAt())

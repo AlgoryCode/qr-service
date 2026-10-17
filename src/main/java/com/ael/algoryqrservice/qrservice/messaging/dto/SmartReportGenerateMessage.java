@@ -8,7 +8,7 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SmartReportGenerateMessage(
         UUID jobId,
-        Long userId,
+        Long merchantId,
         Long menuId,
         Long branchId,
         SmartReportModelDtos.SmartReportModelInput input,

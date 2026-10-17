@@ -20,7 +20,7 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "tbl_stock_ingredient", indexes = {
-        @Index(name = "idx_stock_ingredient_branch", columnList = "branch_id, user_id")
+        @Index(name = "idx_stock_ingredient_branch", columnList = "branch_id, merchant_id")
 })
 @Data
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -34,8 +34,8 @@ public class StockIngredient extends QrBaseModel {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "branch_id", nullable = false)
     private Long branchId;

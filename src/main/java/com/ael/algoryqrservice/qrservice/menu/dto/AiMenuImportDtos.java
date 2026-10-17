@@ -44,7 +44,7 @@ public final class AiMenuImportDtos {
     public static class JobResponse {
         private UUID jobId;
         private Long menuId;
-        private Long userId;
+        private Long merchantId;
         private String status;
         private List<String> imageUrls;
         private Integer publishedCount;
@@ -62,7 +62,7 @@ public final class AiMenuImportDtos {
         @NotNull
         private Long menuId;
         @NotNull
-        private Long userId;
+        private Long merchantId;
         @NotEmpty
         private List<@NotNull PublishProduct> products;
     }

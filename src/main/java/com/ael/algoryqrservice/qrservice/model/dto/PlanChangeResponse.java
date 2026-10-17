@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 public class PlanChangeResponse {
     private Long id;
-    private Long userId;
+    private Long merchantId;
     private Long fromPurchaseId;
     private Long fromPackageId;
     private Long toPackageId;

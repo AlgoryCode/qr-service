@@ -60,7 +60,7 @@ public final class CouponDtos {
         private CouponStatus status;
         private Long reservedPurchaseId;
         private Long usedPurchaseId;
-        private Long usedByUserId;
+        private Long usedByMerchantId;
         private LocalDateTime usedAt;
         private Long createdByAdminId;
         private LocalDateTime createdAt;
@@ -98,7 +98,7 @@ public final class CouponDtos {
     public static class LogResponse {
         private Long id;
         private Long couponId;
-        private Long userId;
+        private Long merchantId;
         private Long purchaseId;
         private CouponLogAction action;
         private BigDecimal listPrice;

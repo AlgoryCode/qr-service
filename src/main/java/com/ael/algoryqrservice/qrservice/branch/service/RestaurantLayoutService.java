@@ -42,19 +42,19 @@ public class RestaurantLayoutService {
 
     @Transactional(readOnly = true)
     public List<RestaurantLayoutDtos.LayoutResponse> listLayouts() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        List<RestaurantLayout> layouts = restaurantLayoutRepository.findByUserIdOrderByIdAsc(userId);
-        Map<Long, String> branchNames = branchNames(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        List<RestaurantLayout> layouts = restaurantLayoutRepository.findByMerchantIdOrderByIdAsc(merchantId);
+        Map<Long, String> branchNames = branchNames(merchantId);
         Set<Long> menuBranches = menuBranches(branchNames.keySet());
         Map<Long, Integer> areaCounts = new HashMap<>();
-        for (RestaurantArea area : restaurantAreaRepository.findByUserIdOrderBySortOrderAscIdAsc(userId)) {
+        for (RestaurantArea area : restaurantAreaRepository.findByMerchantIdOrderBySortOrderAscIdAsc(merchantId)) {
             if (area.getLayoutId() == null) {
                 continue;
             }
             areaCounts.merge(area.getLayoutId(), 1, Integer::sum);
         }
         Map<Long, Integer> tableCounts = new HashMap<>();
-        for (RestaurantTable table : restaurantTableRepository.findByUserIdAndDeletedFalseOrderByTableNumberAscNameAsc(userId)) {
+        for (RestaurantTable table : restaurantTableRepository.findByMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(merchantId)) {
             if (table.getLayoutId() == null) {
                 continue;
             }
@@ -73,18 +73,18 @@ public class RestaurantLayoutService {
 
     @Transactional
     public RestaurantLayoutDtos.LayoutResponse createLayout(RestaurantLayoutDtos.CreateLayoutRequest request) {
-        Long userId = securityUtils.getCurrentMerchantId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         String name = requireName(request == null ? null : request.getName());
-        requireUniqueName(userId, name, null);
+        requireUniqueName(merchantId, name, null);
         LocalDateTime now = LocalDateTime.now();
         RestaurantLayout layout = restaurantLayoutRepository.save(RestaurantLayout.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .name(name)
                 .branchId(null)
                 .createdAt(now)
                 .updatedAt(now)
                 .build());
-        return toResponse(layout, branchNames(userId), menuBranches(Set.of()), 0, 0);
+        return toResponse(layout, branchNames(merchantId), menuBranches(Set.of()), 0, 0);
     }
 
     @Transactional
@@ -92,22 +92,22 @@ public class RestaurantLayoutService {
             Long layoutId,
             RestaurantLayoutDtos.UpdateLayoutRequest request
     ) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
         if (request != null && request.getName() != null) {
             String name = requireName(request.getName());
-            requireUniqueName(userId, name, layout.getId());
+            requireUniqueName(merchantId, name, layout.getId());
             layout.setName(name);
             layout.setUpdatedAt(LocalDateTime.now());
             restaurantLayoutRepository.save(layout);
         }
-        return toCountedResponse(userId, layout);
+        return toCountedResponse(merchantId, layout);
     }
 
     @Transactional
     public void deleteLayout(Long layoutId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
         LocalDateTime now = LocalDateTime.now();
         List<RestaurantTable> tables = restaurantTableRepository
                 .findByLayoutIdAndDeletedFalseOrderByTableNumberAscNameAsc(layout.getId());
@@ -124,20 +124,20 @@ public class RestaurantLayoutService {
 
     @Transactional
     public RestaurantLayoutDtos.LayoutResponse assignBranch(Long layoutId, Long branchId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
         if (branchId == null) {
             layout.setBranchId(null);
             layout.setUpdatedAt(LocalDateTime.now());
             restaurantLayoutRepository.save(layout);
             restaurantTableService.rebindLayoutMenu(layout.getId(), null);
-            return toCountedResponse(userId, layout);
+            return toCountedResponse(merchantId, layout);
         }
 
-        Branch branch = branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, userId)
+        Branch branch = branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new BadRequestException("Şube bulunamadı"));
         LocalDateTime now = LocalDateTime.now();
-        for (RestaurantLayout other : restaurantLayoutRepository.findByUserIdAndBranchId(userId, branch.getId())) {
+        for (RestaurantLayout other : restaurantLayoutRepository.findByMerchantIdAndBranchId(merchantId, branch.getId())) {
             if (other.getId().equals(layout.getId())) {
                 continue;
             }
@@ -156,29 +156,29 @@ public class RestaurantLayoutService {
                 .findFirst()
                 .orElse(null);
         restaurantTableService.rebindLayoutMenu(layout.getId(), menu);
-        return toCountedResponse(userId, layout);
+        return toCountedResponse(merchantId, layout);
     }
 
-    public RestaurantLayout requireOwnedLayout(Long userId, Long layoutId) {
+    public RestaurantLayout requireOwnedLayout(Long merchantId, Long layoutId) {
         if (layoutId == null) {
             throw new NotFoundException("Düzen bulunamadı");
         }
-        return restaurantLayoutRepository.findByIdAndUserId(layoutId, userId)
+        return restaurantLayoutRepository.findByIdAndUserId(layoutId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
     }
 
-    private RestaurantLayoutDtos.LayoutResponse toCountedResponse(Long userId, RestaurantLayout layout) {
+    private RestaurantLayoutDtos.LayoutResponse toCountedResponse(Long merchantId, RestaurantLayout layout) {
         int areaCount = restaurantAreaRepository.findByLayoutIdOrderBySortOrderAscIdAsc(layout.getId()).size();
         int tableCount = restaurantTableRepository
                 .findByLayoutIdAndDeletedFalseOrderByTableNumberAscNameAsc(layout.getId())
                 .size();
-        Map<Long, String> branchNames = branchNames(userId);
+        Map<Long, String> branchNames = branchNames(merchantId);
         return toResponse(layout, branchNames, menuBranches(branchNames.keySet()), areaCount, tableCount);
     }
 
-    private Map<Long, String> branchNames(Long userId) {
+    private Map<Long, String> branchNames(Long merchantId) {
         Map<Long, String> names = new HashMap<>();
-        for (Branch branch : branchRepository.findByUserIdAndDeletedFalse(userId)) {
+        for (Branch branch : branchRepository.findByMerchantIdAndDeletedFalse(merchantId)) {
             names.put(branch.getId(), branch.getName());
         }
         return names;
@@ -213,8 +213,8 @@ public class RestaurantLayoutService {
                 .build();
     }
 
-    private void requireUniqueName(Long userId, String name, Long excludeId) {
-        boolean taken = restaurantLayoutRepository.findByUserIdOrderByIdAsc(userId).stream()
+    private void requireUniqueName(Long merchantId, String name, Long excludeId) {
+        boolean taken = restaurantLayoutRepository.findByMerchantIdOrderByIdAsc(merchantId).stream()
                 .filter(layout -> excludeId == null || !excludeId.equals(layout.getId()))
                 .anyMatch(layout -> normalizeName(layout.getName()).equals(normalizeName(name)));
         if (taken) {

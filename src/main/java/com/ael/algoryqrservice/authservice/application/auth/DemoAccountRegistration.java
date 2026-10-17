@@ -64,7 +64,7 @@ public class DemoAccountRegistration {
         DemoAccountEntity demoAccount = new DemoAccountEntity();
         demoAccount.setUsername(normalizedUsername);
         demoAccount.setPassword(passwordEncoder.encode(password));
-        demoAccount.setUserId(merchant.getId());
+        demoAccount.setMerchantId(merchant.getId());
         demoAccount.setTrialPackageCode(DemoAccountSupport.DEMO_PACKAGE_CODE);
         demoAccount.setExpiresAt(expiresAt);
         try {

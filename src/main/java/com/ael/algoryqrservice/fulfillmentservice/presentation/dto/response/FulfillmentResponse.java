@@ -11,7 +11,7 @@ public record FulfillmentResponse(
         String eventId,
         String eventType,
         Long purchaseId,
-        Long userId,
+        Long merchantId,
         Long packageId,
         String packageCode,
         String conversationId,

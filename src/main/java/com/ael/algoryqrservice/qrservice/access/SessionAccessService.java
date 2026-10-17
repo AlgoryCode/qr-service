@@ -14,11 +14,11 @@ public class SessionAccessService {
     private final FulfillmentServiceClient fulfillmentServiceClient;
     private final ExternalPackageResponseMapper externalPackageResponseMapper;
 
-    public AccessSession resolve(Long userId) {
-        if (userId == null) {
+    public AccessSession resolve(Long merchantId) {
+        if (merchantId == null) {
             return requirePurchase();
         }
-        PackageView view = fulfillmentServiceClient.findPackage(userId);
+        PackageView view = fulfillmentServiceClient.findPackage(merchantId);
         if (!"ACTIVE".equals(view.status()) || view.body() == null) {
             return requirePurchase();
         }

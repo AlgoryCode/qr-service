@@ -22,8 +22,8 @@ public class AccessSessionController {
 
     @GetMapping("/session")
     public AccessSessionResponse session() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return AccessSessionMapper.toResponse(sessionAccessService.resolve(userId));
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return AccessSessionMapper.toResponse(sessionAccessService.resolve(merchantId));
     }
 
     @GetMapping("/context")

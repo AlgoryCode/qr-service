@@ -26,8 +26,8 @@ public class YemekSepetiConnectionService {
 
     @Transactional(readOnly = true)
     public List<YemekSepetiDtos.ConnectionResponse> listMine() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return connectionRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(merchantId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -39,11 +39,11 @@ public class YemekSepetiConnectionService {
 
     @Transactional
     public YemekSepetiDtos.ConnectionResponse upsert(YemekSepetiDtos.UpsertConnectionRequest request) {
-        Long userId = securityUtils.getCurrentMerchantId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         YemekSepetiConnection connection = connectionRepository
-                .findByUserId(userId)
+                .findByMerchantId(merchantId)
                 .orElseGet(() -> YemekSepetiConnection.builder()
-                        .userId(userId)
+                        .merchantId(merchantId)
                         .status(YemekSepetiConnectionStatus.DISCONNECTED)
                         .build());
         connection.setChainId(request.getChainId().trim());
@@ -85,7 +85,7 @@ public class YemekSepetiConnectionService {
     public YemekSepetiDtos.ConnectionResponse assignBranch(Long branchId) {
         YemekSepetiConnection connection = requireOwnedConnection();
         if (branchId != null) {
-            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getUserId())
+            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getMerchantId())
                     .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
         }
         connection.setBranchId(branchId);
@@ -94,8 +94,8 @@ public class YemekSepetiConnectionService {
 
     @Transactional(readOnly = true)
     public YemekSepetiConnection requireOwnedConnection() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return connectionRepository.findByUserId(userId)
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return connectionRepository.findByMerchantId(merchantId)
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti bağlantısı bulunamadı"));
     }
 
@@ -110,8 +110,8 @@ public class YemekSepetiConnectionService {
     }
 
     @Transactional(readOnly = true)
-    public YemekSepetiConnection requireConnectedForUser(Long userId) {
-        YemekSepetiConnection connection = connectionRepository.findByUserId(userId)
+    public YemekSepetiConnection requireConnectedForUser(Long merchantId) {
+        YemekSepetiConnection connection = connectionRepository.findByMerchantId(merchantId)
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti bağlantısı bulunamadı"));
         if (connection.getStatus() != YemekSepetiConnectionStatus.CONNECTED
                 || !hasText(connection.getVendorId())) {
@@ -121,8 +121,8 @@ public class YemekSepetiConnectionService {
     }
 
     @Transactional(readOnly = true)
-    public YemekSepetiConnection findByUserId(Long userId) {
-        return connectionRepository.findByUserId(userId).orElse(null);
+    public YemekSepetiConnection findByMerchantId(Long merchantId) {
+        return connectionRepository.findByMerchantId(merchantId).orElse(null);
     }
 
     public YemekSepetiDtos.Credentials decrypt(YemekSepetiConnection connection) {

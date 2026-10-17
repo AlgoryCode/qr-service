@@ -614,7 +614,7 @@ public class AnalyticsService {
         if (ownerId == null) {
             return new UberEatsChannelStats(false, BigDecimal.ZERO, 0L, Map.of(), Map.of());
         }
-        return uberEatsConnectionRepository.findByUserId(ownerId)
+        return uberEatsConnectionRepository.findByMerchantId(ownerId)
                 .map(connection -> {
                     List<com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsOrder> orders =
                             uberEatsOrderRepository.findByConnectionAndStatuses(
@@ -1184,7 +1184,7 @@ public class AnalyticsService {
         Menu menu = menuRepository.findById(menuId)
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        if (!menu.getUserId().equals(ownerId)) {
+        if (!menu.getMerchantId().equals(ownerId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

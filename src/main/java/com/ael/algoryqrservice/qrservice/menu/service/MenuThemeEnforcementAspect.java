@@ -39,8 +39,8 @@ public class MenuThemeEnforcementAspect {
             return;
         }
         // Teması hiç atanmamış eski deneme hesapları için varsayılan temayı verir.
-        menuThemeService.ensureDefaultThemeAssigned(qr.getUserId());
-        menuThemeService.requireAssignedTheme(qr.getUserId(), themeId);
+        menuThemeService.ensureDefaultThemeAssigned(qr.getMerchantId());
+        menuThemeService.requireAssignedTheme(qr.getMerchantId(), themeId);
     }
 
     @Before("execution(* com.ael.algoryqrservice.qrservice.menu.service.MenuService.updateMenu(..)) && args(menuId, request)")
@@ -54,6 +54,6 @@ public class MenuThemeEnforcementAspect {
         }
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        menuThemeService.requireAssignedTheme(menu.getUserId(), themeId);
+        menuThemeService.requireAssignedTheme(menu.getMerchantId(), themeId);
     }
 }

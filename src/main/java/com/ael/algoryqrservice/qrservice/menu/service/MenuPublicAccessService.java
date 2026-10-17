@@ -31,43 +31,43 @@ public class MenuPublicAccessService {
     private final MenuRepository menuRepository;
 
     @Transactional
-    public AccessDecision evaluate(Long userId) {
-        if (userId == null) {
+    public AccessDecision evaluate(Long merchantId) {
+        if (merchantId == null) {
             return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
         }
-        AccessSession session = sessionAccessService.resolve(userId);
+        AccessSession session = sessionAccessService.resolve(merchantId);
         if (!session.isAllow()) {
             return AccessDecision.deny(disabledReason(session.decision()));
         }
-        if (menuAccessAllowed(userId)) {
+        if (menuAccessAllowed(merchantId)) {
             return AccessDecision.allow();
         }
         return AccessDecision.deny(MenuPublicAccessDisabledReason.PACKAGE_INACTIVE);
     }
 
-    private boolean menuAccessAllowed(Long userId) {
+    private boolean menuAccessAllowed(Long merchantId) {
         try {
-            return fulfillmentClient.findProductAccess(userId, CatalogProducts.QR_MENU).allowed();
+            return fulfillmentClient.findProductAccess(merchantId, CatalogProducts.QR_MENU).allowed();
         } catch (FulfillmentUnavailableException exception) {
             return false;
         }
     }
 
     @Transactional
-    public void deactivateActiveMenusForUser(Long userId) {
-        if (userId == null) {
+    public void deactivateActiveMenusForUser(Long merchantId) {
+        if (merchantId == null) {
             return;
         }
-        menuRepository.deactivateActiveMenusByUserId(userId);
+        menuRepository.deactivateActiveMenusByUserId(merchantId);
     }
 
     @Transactional
-    public void syncForUser(Long userId) {
-        if (userId == null) {
+    public void syncForUser(Long merchantId) {
+        if (merchantId == null) {
             return;
         }
-        AccessDecision decision = evaluate(userId);
-        menuRepository.updatePublicAccessByUserId(userId, decision.allowed(), decision.reason());
+        AccessDecision decision = evaluate(merchantId);
+        menuRepository.updatePublicAccessByUserId(merchantId, decision.allowed(), decision.reason());
     }
 
     @Transactional
@@ -75,8 +75,8 @@ public class MenuPublicAccessService {
         if (userIds == null) {
             return;
         }
-        for (Long userId : userIds) {
-            syncForUser(userId);
+        for (Long merchantId : userIds) {
+            syncForUser(merchantId);
         }
     }
 

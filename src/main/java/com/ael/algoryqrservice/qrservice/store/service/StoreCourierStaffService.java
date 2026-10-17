@@ -47,7 +47,7 @@ public class StoreCourierStaffService {
     @Transactional(readOnly = true)
     public List<StoreOrderDtos.KitchenCourierOption> listKitchenCouriers(Merchant merchant, Long branchId) {
         List<MerchantStaff> couriers = merchantStaffRepository
-                .findByMerchantIdAndStaffRoleAndActiveTrueOrderByDisplayNameAsc(merchant.getUserId(), StaffRole.COURIER)
+                .findByMerchantIdAndStaffRoleAndActiveTrueOrderByDisplayNameAsc(merchant.getMerchantId(), StaffRole.COURIER)
                 .stream()
                 .filter(staff -> branchId == null || branchId.equals(staff.getBranchId()))
                 .toList();
@@ -109,7 +109,7 @@ public class StoreCourierStaffService {
 
     private MerchantStaff requireAvailableCourier(Merchant merchant, Long courierStaffId) {
         MerchantStaff courier = merchantStaffRepository.findById(courierStaffId)
-                .filter(staff -> merchant.getUserId().equals(staff.getMerchantId()))
+                .filter(staff -> merchant.getMerchantId().equals(staff.getMerchantId()))
                 .filter(MerchantStaff::isCourier)
                 .filter(MerchantStaff::isActive)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Kurye bulunamadı"));

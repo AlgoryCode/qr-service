@@ -18,7 +18,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "tbl_batch_reports", indexes = {
-        @Index(name = "idx_batch_reports_user_created", columnList = "user_id, created_at"),
+        @Index(name = "idx_batch_reports_user_created", columnList = "merchant_id, created_at"),
         @Index(name = "idx_batch_reports_status_updated", columnList = "status, updated_at")
 })
 @Getter
@@ -42,8 +42,8 @@ public class BatchReport {
     @Column(nullable = false)
     private UUID id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "openai_batch_id", nullable = false, length = 128, unique = true)
     private String openaiBatchId;

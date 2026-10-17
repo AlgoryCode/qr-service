@@ -44,10 +44,10 @@ public class BranchService {
 
     @Transactional(readOnly = true)
     public BranchDtos.ListResponse listMine() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        List<Branch> branches = branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        List<Branch> branches = branchRepository.findByMerchantIdAndDeletedFalseOrderByIdDesc(merchantId);
         Map<Long, List<Menu>> menusByBranch = menuRepository
-                .findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(userId, MenuChannel.QR)
+                .findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(merchantId, MenuChannel.QR)
                 .stream()
                 .filter(menu -> menu.getBranchId() != null)
                 .collect(Collectors.groupingBy(Menu::getBranchId));
@@ -56,8 +56,8 @@ public class BranchService {
                 .toList();
         return BranchDtos.ListResponse.builder()
                 .content(content)
-                .quota(branchQuota(userId))
-                .menuQuota(menuQuota(userId))
+                .quota(branchQuota(merchantId))
+                .menuQuota(menuQuota(merchantId))
                 .build();
     }
 
@@ -69,10 +69,10 @@ public class BranchService {
 
     @Transactional
     public BranchDtos.Response create(BranchDtos.CreateRequest request) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        consumeBranch(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        consumeBranch(merchantId);
         Branch branch = branchRepository.save(Branch.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .name(request.getName().trim())
                 .address(trimToNull(request.getAddress()))
                 .phone(trimToNull(request.getPhone()))
@@ -162,8 +162,8 @@ public class BranchService {
         if (source.getPhotoUrl() == null || source.getPhotoUrl().isBlank()) {
             throw new BadRequestException("Önce şube fotoğrafı yükleyin");
         }
-        Long userId = source.getUserId();
-        for (Branch branch : branchRepository.findByUserIdAndDeletedFalse(userId)) {
+        Long merchantId = source.getMerchantId();
+        for (Branch branch : branchRepository.findByMerchantIdAndDeletedFalse(merchantId)) {
             if (branch.getId().equals(source.getId())) {
                 continue;
             }
@@ -181,7 +181,7 @@ public class BranchService {
             throw new BadRequestException("Önce şube fotoğrafı yükleyin");
         }
         for (Menu menu : menuRepository
-                .findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(source.getUserId(), MenuChannel.QR)) {
+                .findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(source.getMerchantId(), MenuChannel.QR)) {
             menu.setLogoUrl(source.getPhotoUrl());
             menu.setLogoKey(source.getPhotoKey());
             menuRepository.save(menu);
@@ -203,21 +203,21 @@ public class BranchService {
 
     @Transactional
     public Branch requireOwned(Long branchId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, userId)
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şube bulunamadı"));
     }
 
     @Transactional(readOnly = true)
-    public Branch requireOwnedForUser(Long branchId, Long userId) {
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, userId)
+    public Branch requireOwnedForUser(Long branchId, Long merchantId) {
+        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçerli bir şube seçin"));
     }
 
     private BranchDtos.Response toResponse(Branch branch, List<Menu> menus) {
         return BranchDtos.Response.builder()
                 .id(branch.getId())
-                .userId(branch.getUserId())
+                .merchantId(branch.getMerchantId())
                 .name(branch.getName())
                 .address(branch.getAddress())
                 .phone(branch.getPhone())
@@ -240,13 +240,13 @@ public class BranchService {
                 .build();
     }
 
-    private void consumeBranch(Long userId) {
-        productUsageGateway.use(userId, CatalogProducts.QR_BRANCH, 1);
+    private void consumeBranch(Long merchantId) {
+        productUsageGateway.use(merchantId, CatalogProducts.QR_BRANCH, 1);
     }
 
-    private BranchDtos.Quota branchQuota(Long userId) {
-        int used = (int) branchRepository.countByUserIdAndDeletedFalse(userId);
-        int remaining = fulfillmentClient.remaining(userId, CatalogProducts.QR_BRANCH);
+    private BranchDtos.Quota branchQuota(Long merchantId) {
+        int used = (int) branchRepository.countByUserIdAndDeletedFalse(merchantId);
+        int remaining = fulfillmentClient.remaining(merchantId, CatalogProducts.QR_BRANCH);
         return BranchDtos.Quota.builder()
                 .used(used)
                 .allowed(used + remaining)
@@ -257,8 +257,8 @@ public class BranchService {
                 .build();
     }
 
-    private BranchDtos.MenuQuota menuQuota(Long userId) {
-        int remaining = fulfillmentClient.remaining(userId, CatalogProducts.QR_MENU);
+    private BranchDtos.MenuQuota menuQuota(Long merchantId) {
+        int remaining = fulfillmentClient.remaining(merchantId, CatalogProducts.QR_MENU);
         return BranchDtos.MenuQuota.builder()
                 .extraUsed(0)
                 .extraAllowed(remaining)

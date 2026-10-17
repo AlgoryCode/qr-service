@@ -17,7 +17,7 @@ public class InternalAuthSupportController {
     private final UserAccessProfileService userAccessProfileService;
 
     @GetMapping("/users/{userId}/access-profile")
-    public ResponseEntity<UserAccessProfile> accessProfile(@PathVariable Long userId) {
-        return ResponseEntity.ok(userAccessProfileService.resolve(userId));
+    public ResponseEntity<UserAccessProfile> accessProfile(@PathVariable Long merchantId) {
+        return ResponseEntity.ok(userAccessProfileService.resolve(merchantId));
     }
 }

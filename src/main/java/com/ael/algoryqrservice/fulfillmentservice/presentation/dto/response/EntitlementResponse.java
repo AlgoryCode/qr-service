@@ -8,7 +8,7 @@ import java.time.Instant;
 
 public record EntitlementResponse(
         Long id,
-        Long userId,
+        Long merchantId,
         Long fulfillmentId,
         Long purchaseId,
         Long productId,

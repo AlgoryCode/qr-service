@@ -162,7 +162,7 @@ public class IntegrationExportService {
         LocalDateTime now = LocalDateTime.now();
         IntegrationJob job = IntegrationJob.builder()
                 .id(UUID.randomUUID())
-                .tenantId(menu.getUserId())
+                .tenantId(menu.getMerchantId())
                 .menuId(menu.getMenuId())
                 .provider(PROVIDER_UBEREATS)
                 .direction(direction)
@@ -196,7 +196,7 @@ public class IntegrationExportService {
     private ObjectNode buildInternalSnapshot(Menu menu) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("menuId", menu.getMenuId());
-        root.put("tenantId", menu.getUserId());
+        root.put("tenantId", menu.getMerchantId());
         root.put("businessName", menu.getBusinessName());
         ArrayNode productNodes = root.putArray("products");
 
@@ -252,7 +252,7 @@ public class IntegrationExportService {
     private ObjectNode buildPartnerSnapshot(Menu menu, JsonNode partnerMenu) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("menuId", menu.getMenuId());
-        root.put("tenantId", menu.getUserId());
+        root.put("tenantId", menu.getMerchantId());
         root.put("businessName", menu.getBusinessName());
         ArrayNode productNodes = root.putArray("products");
         for (UberEatsDtos.ProductResponse product : payloadMapper.toProducts(partnerMenu)) {
@@ -287,7 +287,7 @@ public class IntegrationExportService {
                 .filter(existing -> !existing.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
         Long currentUserId = securityUtils.getCurrentMerchantId();
-        if (!currentUserId.equals(menu.getUserId())) {
+        if (!currentUserId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

@@ -60,7 +60,7 @@ public class PlatformFeedbackService {
 
         LocalDateTime now = LocalDateTime.now();
         PlatformFeedback feedback = PlatformFeedback.builder()
-                .userId(user.getId())
+                .merchantId(user.getId())
                 .title(title)
                 .subject(subject)
                 .description(description)
@@ -76,8 +76,8 @@ public class PlatformFeedbackService {
 
     @Transactional(readOnly = true)
     public PlatformFeedbackDtos.FeedbackPageResponse listMine(int page, int size) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return list(userId, null, null, page, size);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return list(merchantId, null, null, page, size);
     }
 
     @Transactional(readOnly = true)
@@ -119,7 +119,7 @@ public class PlatformFeedbackService {
     }
 
     private PlatformFeedbackDtos.FeedbackPageResponse list(
-            Long userId,
+            Long merchantId,
             PlatformFeedbackStatus status,
             String q,
             int page,
@@ -130,7 +130,7 @@ public class PlatformFeedbackService {
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Specification<PlatformFeedback> spec = Specification
-                .where(PlatformFeedbackSpecifications.hasUserId(userId))
+                .where(PlatformFeedbackSpecifications.hasUserId(merchantId))
                 .and(PlatformFeedbackSpecifications.hasStatus(status))
                 .and(PlatformFeedbackSpecifications.matchesQuery(q));
 
@@ -139,7 +139,7 @@ public class PlatformFeedbackService {
 
         return new PlatformFeedbackDtos.FeedbackPageResponse(
                 result.getContent().stream()
-                        .map(item -> toItemResponse(item, usersById.get(item.getUserId())))
+                        .map(item -> toItemResponse(item, usersById.get(item.getMerchantId())))
                         .toList(),
                 result.getNumber(),
                 result.getSize(),
@@ -151,7 +151,7 @@ public class PlatformFeedbackService {
 
     private Map<Long, User> loadUsers(Page<PlatformFeedback> result) {
         Set<Long> userIds = result.getContent().stream()
-                .map(PlatformFeedback::getUserId)
+                .map(PlatformFeedback::getMerchantId)
                 .collect(Collectors.toSet());
         if (userIds.isEmpty()) {
             return Map.of();
@@ -161,7 +161,7 @@ public class PlatformFeedbackService {
     }
 
     private PlatformFeedbackDtos.FeedbackItemResponse toItemResponse(PlatformFeedback feedback) {
-        User user = userRepository.findById(feedback.getUserId()).orElse(null);
+        User user = userRepository.findById(feedback.getMerchantId()).orElse(null);
         return toItemResponse(feedback, user);
     }
 
@@ -174,7 +174,7 @@ public class PlatformFeedbackService {
 
         return new PlatformFeedbackDtos.FeedbackItemResponse(
                 feedback.getId(),
-                feedback.getUserId(),
+                feedback.getMerchantId(),
                 user != null ? user.getEmail() : null,
                 fullName.isBlank() ? (user != null ? user.getEmail() : null) : fullName,
                 feedback.getTitle(),
@@ -188,11 +188,11 @@ public class PlatformFeedbackService {
         );
     }
 
-    private void validateScreenshotOwnership(Long userId, String screenshotKey) {
+    private void validateScreenshotOwnership(Long merchantId, String screenshotKey) {
         if (screenshotKey == null || screenshotKey.isBlank()) {
             return;
         }
-        String expectedPrefix = "platform-feedback/" + userId + "/";
+        String expectedPrefix = "platform-feedback/" + merchantId + "/";
         if (!screenshotKey.startsWith(expectedPrefix)) {
             throw new BadRequestException("Ekran görüntüsü bu kullanıcıya ait değil");
         }

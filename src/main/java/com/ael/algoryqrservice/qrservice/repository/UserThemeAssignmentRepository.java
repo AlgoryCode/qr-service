@@ -9,17 +9,17 @@ import java.util.Optional;
 
 public interface UserThemeAssignmentRepository extends JpaRepository<UserThemeAssignment, Long> {
 
-    List<UserThemeAssignment> findByUserId(Long userId);
+    List<UserThemeAssignment> findByMerchantId(Long merchantId);
 
-    Optional<UserThemeAssignment> findByUserIdAndThemeId(Long userId, Long themeId);
+    Optional<UserThemeAssignment> findByMerchantIdAndThemeId(Long merchantId, Long themeId);
 
-    boolean existsByUserIdAndThemeId(Long userId, Long themeId);
+    boolean existsByMerchantIdAndThemeId(Long merchantId, Long themeId);
 
-    void deleteByUserIdAndThemeId(Long userId, Long themeId);
+    void deleteByUserIdAndThemeId(Long merchantId, Long themeId);
 
-    void deleteByUserId(Long userId);
+    void deleteByUserId(Long merchantId);
 
-    long countByUserId(Long userId);
+    long countByUserId(Long merchantId);
 
-    List<UserThemeAssignment> findByUserIdAndThemeIdIn(Long userId, Collection<Long> themeIds);
+    List<UserThemeAssignment> findByMerchantIdAndThemeIdIn(Long merchantId, Collection<Long> themeIds);
 }

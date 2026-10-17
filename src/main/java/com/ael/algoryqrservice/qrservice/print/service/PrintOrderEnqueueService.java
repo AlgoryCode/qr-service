@@ -49,7 +49,7 @@ public class PrintOrderEnqueueService {
             ((ObjectNode) payload).put("branchId", menu.getBranchId());
         }
         printJobService.enqueueKitchenTicket(
-                menu.getUserId(),
+                menu.getMerchantId(),
                 menu.getBranchId(),
                 PrintSourceType.MENU_ORDER,
                 String.valueOf(order.getId()),
@@ -171,7 +171,7 @@ public class PrintOrderEnqueueService {
             }
         }
         printJobService.enqueueKitchenTicket(
-                merchant.getUserId(),
+                merchant.getMerchantId(),
                 merchant.getBranchId(),
                 PrintSourceType.STORE_ORDER,
                 String.valueOf(order.getId()),

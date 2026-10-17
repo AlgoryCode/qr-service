@@ -31,14 +31,14 @@ public class AdminUserCredentialService {
     private final AuthCredentialClient authCredentialClient;
 
     @Transactional
-    public void sendEmailVerification(Long userId) {
-        loadUser(userId);
-        authCredentialClient.sendEmailCode(userId);
+    public void sendEmailVerification(Long merchantId) {
+        loadUser(merchantId);
+        authCredentialClient.sendEmailCode(merchantId);
     }
 
     @Transactional
-    public AdminUserDtos.PasswordResetResponse resetPassword(Long userId) {
-        User user = loadUser(userId);
+    public AdminUserDtos.PasswordResetResponse resetPassword(Long merchantId) {
+        User user = loadUser(merchantId);
         if (user.getProvider() != AuthProvider.BASIC) {
             throw new BadRequestException("Google hesabı için parola işlemi yapılamaz");
         }
@@ -73,8 +73,8 @@ public class AdminUserCredentialService {
         }
     }
 
-    private User loadUser(Long userId) {
-        return userRepository.findById(userId)
+    private User loadUser(Long merchantId) {
+        return userRepository.findById(merchantId)
                 .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı"));
     }
 

@@ -129,7 +129,7 @@ public final class AdminUserDtos {
     public static class ImpersonateResponse {
         private String accessToken;
         private String refreshToken;
-        private Long userId;
+        private Long merchantId;
         private String email;
         private String firstName;
         private String lastName;

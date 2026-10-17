@@ -96,7 +96,7 @@ public class KitchenUberEatsService {
         if (merchantId == null) {
             return null;
         }
-        UberEatsConnection connection = connectionService.findByUserId(merchantId);
+        UberEatsConnection connection = connectionService.findByMerchantId(merchantId);
         if (connection == null
                 || connection.getStatus() != UberEatsConnectionStatus.CONNECTED
                 || connection.getRestaurantId() == null

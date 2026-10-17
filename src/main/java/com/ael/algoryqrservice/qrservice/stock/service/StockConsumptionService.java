@@ -231,7 +231,7 @@ public class StockConsumptionService {
     ) {
         movementRepository.save(StockMovement.builder()
                 .ingredientId(ingredient.getId())
-                .userId(ingredient.getUserId())
+                .merchantId(ingredient.getMerchantId())
                 .branchId(ingredient.getBranchId())
                 .kind(kind)
                 .quantityDelta(StockQuantities.scale(delta))

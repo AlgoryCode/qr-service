@@ -72,7 +72,7 @@ public class AiServiceClient {
         log.info(
                 "ai_menu_import_proxy_create menuId={} userId={} imageCount={}",
                 request.getMenuId(),
-                request.getUserId(),
+                request.getMerchantId(),
                 request.getImageUrls() == null ? 0 : request.getImageUrls().size()
         );
         return restClient.post()

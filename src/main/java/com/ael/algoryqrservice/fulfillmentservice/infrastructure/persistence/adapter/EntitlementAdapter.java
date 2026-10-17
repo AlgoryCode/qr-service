@@ -33,8 +33,8 @@ public class EntitlementAdapter implements EntitlementPort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserEntitlement> findActiveByUserId(Long userId) {
-        return userEntitlementJpaRepository.findActiveByUserId(userId, PackageStatus.ACTIVE, Instant.now())
+    public List<UserEntitlement> findActiveByUserId(Long merchantId) {
+        return userEntitlementJpaRepository.findActiveByUserId(merchantId, PackageStatus.ACTIVE, Instant.now())
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -42,9 +42,9 @@ public class EntitlementAdapter implements EntitlementPort {
 
     @Override
     @Transactional
-    public void supersedeOtherEntitlements(Long userId, Long keepFulfillmentId) {
+    public void supersedeOtherEntitlements(Long merchantId, Long keepFulfillmentId) {
         userEntitlementJpaRepository.supersedeOthers(
-                userId,
+                merchantId,
                 keepFulfillmentId,
                 PackageStatus.ACTIVE,
                 PackageStatus.SUPERSEDED,
@@ -55,7 +55,7 @@ public class EntitlementAdapter implements EntitlementPort {
     private UserEntitlement toDomain(UserEntitlementEntity entity) {
         return new UserEntitlement(
                 entity.getId(),
-                entity.getUserId(),
+                entity.getMerchantId(),
                 entity.getFulfillmentId(),
                 entity.getPurchaseId(),
                 entity.getProductId(),
@@ -77,7 +77,7 @@ public class EntitlementAdapter implements EntitlementPort {
     private UserEntitlementEntity toEntity(UserEntitlement entitlement) {
         UserEntitlementEntity entity = new UserEntitlementEntity();
         entity.setId(entitlement.id());
-        entity.setUserId(entitlement.userId());
+        entity.setMerchantId(entitlement.merchantId());
         entity.setFulfillmentId(entitlement.fulfillmentId());
         entity.setPurchaseId(entitlement.purchaseId());
         entity.setProductId(entitlement.productId());

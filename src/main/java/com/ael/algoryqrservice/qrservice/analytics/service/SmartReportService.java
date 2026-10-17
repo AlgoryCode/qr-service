@@ -148,7 +148,7 @@ public class SmartReportService {
 
         smartReportEventRepository.save(SmartReportEvent.builder()
                 .processId(processId)
-                .userId(ownerId)
+                .merchantId(ownerId)
                 .menuId(resolvedMenuId)
                 .menuName(menuName)
                 .branchId(resolvedBranchId)
@@ -364,14 +364,14 @@ public class SmartReportService {
     }
 
     @Transactional(readOnly = true)
-    public SmartReportDtos.SmartReportQuotaResponse getQuota(Long userId) {
+    public SmartReportDtos.SmartReportQuotaResponse getQuota(Long merchantId) {
         ZoneId zone = zoneId();
         LocalDateTime periodStart = periodStart(zone);
         Instant resetsAt = periodEnd(zone).atZone(zone).toInstant();
-        long used = smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(userId, periodStart);
+        long used = smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(merchantId, periodStart);
         int limit = Math.max(quotaProperties.getQuotaLimit(), 0);
         long remaining = Math.max(limit - used, 0);
-        int paidCredits = paidCredits(userId);
+        int paidCredits = paidCredits(merchantId);
         BigDecimal addonUnitPrice = productRepository.findByCode(CatalogProducts.SMART_REPORTING_ADDON)
                 .map(com.ael.algoryqrservice.qrservice.model.Product::getUnitPrice)
                 .orElse(new BigDecimal("200.00"));
@@ -381,7 +381,7 @@ public class SmartReportService {
                 used,
                 remaining,
                 resetsAt,
-                resolveLastUsage(userId),
+                resolveLastUsage(merchantId),
                 paidCredits,
                 CatalogProducts.SMART_REPORTING_ADDON,
                 addonUnitPrice
@@ -389,13 +389,13 @@ public class SmartReportService {
     }
 
     @Transactional(readOnly = true)
-    public Page<SmartReportDtos.SmartReportListItem> listJobs(Long userId, String status, Pageable pageable) {
+    public Page<SmartReportDtos.SmartReportListItem> listJobs(Long merchantId, String status, Pageable pageable) {
         String normalized = status != null && "all".equalsIgnoreCase(status.trim())
                 ? null
                 : normalizeStatus(status);
         Page<SmartReportEvent> page = normalized == null
-                ? smartReportEventRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
-                : smartReportEventRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, normalized, pageable);
+                ? smartReportEventRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, pageable)
+                : smartReportEventRepository.findByMerchantIdAndStatusOrderByCreatedAtDesc(merchantId, normalized, pageable);
         return page.map(event -> new SmartReportDtos.SmartReportListItem(
                 event.getProcessId(),
                 event.getMenuId(),
@@ -411,8 +411,8 @@ public class SmartReportService {
     }
 
     @Transactional(readOnly = true)
-    public SmartReportDtos.SmartReportDetailResponse getJobDetail(Long userId, UUID jobId) {
-        SmartReportEvent event = smartReportEventRepository.findByProcessIdAndUserId(jobId, userId)
+    public SmartReportDtos.SmartReportDetailResponse getJobDetail(Long merchantId, UUID jobId) {
+        SmartReportEvent event = smartReportEventRepository.findByProcessIdAndUserId(jobId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Akilli rapor bulunamadi: " + jobId));
         String storedResult = smartReportResultRepository.findByProcessId(event.getProcessId())
                 .map(SmartReportResult::getResultText)
@@ -463,8 +463,8 @@ public class SmartReportService {
         smartReportResultRepository.save(existing);
     }
 
-    private Instant resolveLastUsage(Long userId) {
-        return smartReportEventRepository.findByUserIdOrderByCreatedAtDesc(userId, Pageable.ofSize(1))
+    private Instant resolveLastUsage(Long merchantId) {
+        return smartReportEventRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, Pageable.ofSize(1))
                 .getContent()
                 .stream()
                 .findFirst()
@@ -531,17 +531,17 @@ public class SmartReportService {
         );
     }
 
-    private int paidCredits(Long userId) {
-        return Math.max(fulfillmentClient.openQuantity(userId, CatalogProducts.SMART_REPORTING, "ADDON_PURCHASE"), 0);
+    private int paidCredits(Long merchantId) {
+        return Math.max(fulfillmentClient.openQuantity(merchantId, CatalogProducts.SMART_REPORTING, "ADDON_PURCHASE"), 0);
     }
 
-    private void assertQuotaAvailable(Long userId) {
-        SmartReportDtos.SmartReportQuotaResponse quota = getQuota(userId);
+    private void assertQuotaAvailable(Long merchantId) {
+        SmartReportDtos.SmartReportQuotaResponse quota = getQuota(merchantId);
         if (quota.remaining() > 0) {
             return;
         }
         if (quota.paidCredits() > 0) {
-            productUsageGateway.use(userId, CatalogProducts.SMART_REPORTING_ADDON, 1);
+            productUsageGateway.use(merchantId, CatalogProducts.SMART_REPORTING_ADDON, 1);
             return;
         }
         String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK

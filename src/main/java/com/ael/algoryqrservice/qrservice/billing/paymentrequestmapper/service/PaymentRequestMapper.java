@@ -330,8 +330,8 @@ public class PaymentRequestMapper {
 
     private static final DateTimeFormatter PAYMENT_ATTEMPT_TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    public String newPaymentAttemptId(Long userId) {
-        long safeUserId = userId == null ? 0L : userId;
+    public String newPaymentAttemptId(Long merchantId) {
+        long safeUserId = merchantId == null ? 0L : merchantId;
         String timestamp = AppTime.nowLocal().format(PAYMENT_ATTEMPT_TS);
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4);
         return "qr" + safeUserId + timestamp + suffix;

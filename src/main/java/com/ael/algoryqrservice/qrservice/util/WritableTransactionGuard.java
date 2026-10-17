@@ -18,11 +18,11 @@ public class WritableTransactionGuard {
     /**
      * @return {@code true} when the caller may perform writes in the current transaction.
      */
-    public boolean allowsWrites(String operation, Long userId) {
+    public boolean allowsWrites(String operation, Long merchantId) {
         if (!TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
             return true;
         }
-        log.warn("Skipping {} for userId={}: current transaction is read-only.", operation, userId);
+        log.warn("Skipping {} for merchantId={}: current transaction is read-only.", operation, merchantId);
         return false;
     }
 }

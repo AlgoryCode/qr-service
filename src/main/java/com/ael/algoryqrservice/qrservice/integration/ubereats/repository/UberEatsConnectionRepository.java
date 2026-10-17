@@ -9,9 +9,9 @@ import java.util.Optional;
 
 public interface UberEatsConnectionRepository extends JpaRepository<UberEatsConnection, Long> {
 
-    Optional<UberEatsConnection> findByUserId(Long userId);
+    Optional<UberEatsConnection> findByMerchantId(Long merchantId);
 
-    List<UberEatsConnection> findByUserIdOrderByUpdatedAtDesc(Long userId);
+    List<UberEatsConnection> findByMerchantIdOrderByUpdatedAtDesc(Long merchantId);
 
     List<UberEatsConnection> findByStatus(UberEatsConnectionStatus status);
 

@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BillingAddressRepository extends JpaRepository<BillingAddress, Long> {
-    List<BillingAddress> findByUserIdOrderByDefaultAddressDescCreatedAtDesc(Long userId);
+    List<BillingAddress> findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(Long merchantId);
 
-    Page<BillingAddress> findByUserIdOrderByDefaultAddressDescCreatedAtDesc(Long userId, Pageable pageable);
+    Page<BillingAddress> findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(Long merchantId, Pageable pageable);
 
-    Optional<BillingAddress> findByIdAndUserId(Long id, Long userId);
+    Optional<BillingAddress> findByIdAndUserId(Long id, Long merchantId);
 
-    Optional<BillingAddress> findByUserIdAndDefaultAddressTrue(Long userId);
+    Optional<BillingAddress> findByMerchantIdAndDefaultAddressTrue(Long merchantId);
 }

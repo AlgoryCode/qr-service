@@ -39,57 +39,57 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     @Query("""
             select menu, qr
             from Menu menu, Qr qr
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.qrId = qr.qrId
               and menu.active = true
               and menu.deleted = false
               and qr.deleted = false
             order by menu.menuId desc
             """)
-    List<Object[]> findActiveMenusWithQrByUserId(@Param("userId") Long userId);
+    List<Object[]> findActiveMenusWithQrByUserId(@Param("userId") Long merchantId);
 
     @Query("""
             select menu, qr
             from Menu menu, Qr qr
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.qrId = qr.qrId
               and menu.deleted = false
               and qr.deleted = false
             order by menu.menuId desc
             """)
-    List<Object[]> findMenusWithQrByUserId(@Param("userId") Long userId);
+    List<Object[]> findMenusWithQrByUserId(@Param("userId") Long merchantId);
 
     @Query("""
             select menu.qrId
             from Menu menu
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.qrId in :qrIds
               and menu.active = true
               and menu.deleted = false
             """)
-    Set<Long> findActiveQrIdsByUserIdAndQrIdIn(@Param("userId") Long userId, @Param("qrIds") Collection<Long> qrIds);
+    Set<Long> findActiveQrIdsByUserIdAndQrIdIn(@Param("userId") Long merchantId, @Param("qrIds") Collection<Long> qrIds);
 
     @Query("""
             select case when count(menu) > 0 then true else false end
             from Menu menu, Qr qr
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.qrId = qr.qrId
               and menu.active = true
               and menu.deleted = false
               and qr.deleted = false
             """)
-    boolean existsActiveLiveMenuQrForUser(@Param("userId") Long userId);
+    boolean existsActiveLiveMenuQrForUser(@Param("userId") Long merchantId);
 
     @Query("""
             select count(menu)
             from Menu menu, Qr qr
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.qrId = qr.qrId
               and menu.active = true
               and menu.deleted = false
               and qr.deleted = false
             """)
-    long countActiveLiveMenusForUser(@Param("userId") Long userId);
+    long countActiveLiveMenusForUser(@Param("userId") Long merchantId);
 
     @Query("""
             select count(menu)
@@ -105,7 +105,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     @Query("""
             select menu.branchId, count(menu)
             from Menu menu, Qr qr
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.qrId = qr.qrId
               and menu.active = true
               and menu.deleted = false
@@ -113,31 +113,31 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.branchId is not null
             group by menu.branchId
             """)
-    List<Object[]> countActiveLiveMenusGroupedByBranch(@Param("userId") Long userId);
+    List<Object[]> countActiveLiveMenusGroupedByBranch(@Param("userId") Long merchantId);
 
-    List<Menu> findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(Long userId, MenuChannel channel);
+    List<Menu> findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(Long merchantId, MenuChannel channel);
 
     List<Menu> findByBranchIdAndChannelAndDeletedFalse(Long branchId, MenuChannel channel);
 
     @Query("""
             select menu.menuId
             from Menu menu
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.deleted = false
               and menu.channel = :channel
             """)
-    List<Long> findMenuIdsByUserIdAndChannel(@Param("userId") Long userId, @Param("channel") MenuChannel channel);
+    List<Long> findMenuIdsByUserIdAndChannel(@Param("userId") Long merchantId, @Param("channel") MenuChannel channel);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Menu menu
             set menu.publicAccessEnabled = :enabled,
                 menu.publicAccessDisabledReason = :reason
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.deleted = false
             """)
     int updatePublicAccessByUserId(
-            @Param("userId") Long userId,
+            @Param("userId") Long merchantId,
             @Param("enabled") boolean enabled,
             @Param("reason") MenuPublicAccessDisabledReason reason
     );
@@ -146,9 +146,9 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     @Query("""
             update Menu menu
             set menu.active = false
-            where menu.userId = :userId
+            where menu.merchantId = :merchantId
               and menu.deleted = false
               and menu.active = true
             """)
-    int deactivateActiveMenusByUserId(@Param("userId") Long userId);
+    int deactivateActiveMenusByUserId(@Param("userId") Long merchantId);
 }

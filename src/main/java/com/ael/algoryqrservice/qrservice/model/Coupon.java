@@ -67,8 +67,8 @@ public class Coupon {
     @Column(name = "used_purchase_id")
     private Long usedPurchaseId;
 
-    @Column(name = "used_by_user_id")
-    private Long usedByUserId;
+    @Column(name = "used_by_merchant_id")
+    private Long usedByMerchantId;
 
     @Column(name = "used_at")
     private LocalDateTime usedAt;

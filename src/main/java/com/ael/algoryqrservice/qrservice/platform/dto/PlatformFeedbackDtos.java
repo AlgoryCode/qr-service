@@ -47,7 +47,7 @@ public final class PlatformFeedbackDtos {
 
     public record FeedbackItemResponse(
             Long id,
-            Long userId,
+            Long merchantId,
             String userEmail,
             String userFullName,
             String title,

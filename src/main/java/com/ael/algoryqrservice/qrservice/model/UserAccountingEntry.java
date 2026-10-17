@@ -24,8 +24,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_user_accounting_entry", indexes = {
-        @Index(name = "idx_user_accounting_entry_user_occurred", columnList = "user_id, occurred_at"),
-        @Index(name = "idx_user_accounting_entry_user_type_occurred", columnList = "user_id, entry_type, occurred_at"),
+        @Index(name = "idx_user_accounting_entry_user_occurred", columnList = "merchant_id, occurred_at"),
+        @Index(name = "idx_user_accounting_entry_user_type_occurred", columnList = "merchant_id, entry_type, occurred_at"),
         @Index(name = "idx_user_accounting_entry_menu", columnList = "menu_id")
 })
 @Getter
@@ -41,8 +41,8 @@ public class UserAccountingEntry {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "entry_type", nullable = false, length = 10)

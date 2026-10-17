@@ -41,12 +41,12 @@ public class PurchaseExpiryService {
     }
 
     @Transactional
-    public void expireDueForUser(Long userId) {
-        if (userId == null || !writableTransactionGuard.allowsWrites("purchase expiry", userId)) {
+    public void expireDueForUser(Long merchantId) {
+        if (merchantId == null || !writableTransactionGuard.allowsWrites("purchase expiry", merchantId)) {
             return;
         }
-        List<Purchase> duePurchases = purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(
-                userId, PurchaseStatus.ACTIVE, LocalDateTime.now()
+        List<Purchase> duePurchases = purchaseRepository.findByMerchantIdAndStatusAndExpiresAtBefore(
+                merchantId, PurchaseStatus.ACTIVE, LocalDateTime.now()
         );
         expireAndAnnounce(duePurchases);
     }
@@ -60,7 +60,7 @@ public class PurchaseExpiryService {
         Set<Long> affectedUserIds = new LinkedHashSet<>();
         for (Purchase purchase : purchases) {
             if (expireOne(purchase)) {
-                affectedUserIds.add(purchase.getUserId());
+                affectedUserIds.add(purchase.getMerchantId());
             }
         }
         affectedUserIds.remove(null);
@@ -78,7 +78,7 @@ public class PurchaseExpiryService {
 
         purchaseLogService.log(
                 purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 PurchaseLogAction.PURCHASE_EXPIRED,
                 purchase.getPackageName() + " paketi süresi doldu (" + purchase.getExpiresAt() + ")"
         );

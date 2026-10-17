@@ -105,7 +105,7 @@ public class FulfillmentPaymentBridge {
                 message.sourceReferenceId(),
                 message.sourceMetadata(),
                 message.purchaseId(),
-                message.userId(),
+                message.merchantId(),
                 message.packageId(),
                 message.packageCode(),
                 message.paymentStyle(),

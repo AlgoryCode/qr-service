@@ -37,33 +37,33 @@ public class FulfillmentServiceClient {
     private final EntitlementUsageService entitlementUsageService;
     private final FulfillmentPresentationMapper mapper;
 
-    public void createPackage(Long userId, String packageCode, int periodDays) {
+    public void createPackage(Long merchantId, String packageCode, int periodDays) {
         try {
-            fulfillmentService.assignPackage(userId, packageCode, periodDays);
+            fulfillmentService.assignPackage(merchantId, packageCode, periodDays);
         } catch (PackageAlreadyAssignedException exception) {
-            log.debug("Package already assigned for userId={}", userId);
+            log.debug("Package already assigned for merchantId={}", merchantId);
         } catch (RuntimeException exception) {
-            throw unavailable(userId, exception);
+            throw unavailable(merchantId, exception);
         }
     }
 
-    public PackageView findPackage(Long userId) {
+    public PackageView findPackage(Long merchantId) {
         try {
             ActivePackageResponse response = mapper.toActivePackageResponse(
-                    fulfillmentService.requireActivePackageView(userId)
+                    fulfillmentService.requireActivePackageView(merchantId)
             );
             ExternalActivePackageResponse external = toExternal(response);
             return new PackageView(statusOf(external), external);
         } catch (ResourceNotFoundException exception) {
             return new PackageView("INACTIVE", null);
         } catch (RuntimeException exception) {
-            throw unavailable(userId, exception);
+            throw unavailable(merchantId, exception);
         }
     }
 
-    public Optional<ExternalActivePackageResponse> findActivePackage(Long userId) {
+    public Optional<ExternalActivePackageResponse> findActivePackage(Long merchantId) {
         try {
-            PackageView view = findPackage(userId);
+            PackageView view = findPackage(merchantId);
             if (!"ACTIVE".equals(view.status()) || view.body() == null) {
                 return Optional.empty();
             }
@@ -73,20 +73,20 @@ public class FulfillmentServiceClient {
         }
     }
 
-    public List<ExternalEntitlementResponse> listEntitlements(Long userId) {
+    public List<ExternalEntitlementResponse> listEntitlements(Long merchantId) {
         try {
-            return entitlementUsageService.listActive(userId).stream()
+            return entitlementUsageService.listActive(merchantId).stream()
                     .map(this::toExternal)
                     .toList();
         } catch (RuntimeException exception) {
-            throw unavailable(userId, exception);
+            throw unavailable(merchantId, exception);
         }
     }
 
-    public ExternalProductAccessResponse findProductAccess(Long userId, String productCode) {
+    public ExternalProductAccessResponse findProductAccess(Long merchantId, String productCode) {
         try {
             ProductAccessResponse response = mapper.toProductAccess(
-                    entitlementUsageService.productAccess(userId, productCode)
+                    entitlementUsageService.productAccess(merchantId, productCode)
             );
             return new ExternalProductAccessResponse(
                     response.allowed(),
@@ -95,40 +95,40 @@ public class FulfillmentServiceClient {
                     response.scopeCode()
             );
         } catch (RuntimeException exception) {
-            throw unavailable(userId, exception);
+            throw unavailable(merchantId, exception);
         }
     }
 
-    public ExternalConsumeResponse consume(Long userId, String productCode, int quantity) {
+    public ExternalConsumeResponse consume(Long merchantId, String productCode, int quantity) {
         try {
-            return toExternal(mapper.toConsume(entitlementUsageService.consume(userId, productCode, quantity)));
+            return toExternal(mapper.toConsume(entitlementUsageService.consume(merchantId, productCode, quantity)));
         } catch (QuotaExceededException exception) {
             throw new FulfillmentQuotaExceededException();
         } catch (RuntimeException exception) {
-            throw unavailable(userId, exception);
+            throw unavailable(merchantId, exception);
         }
     }
 
-    public ExternalConsumeResponse release(Long userId, String productCode, int quantity) {
+    public ExternalConsumeResponse release(Long merchantId, String productCode, int quantity) {
         try {
-            return entitlementUsageService.release(userId, productCode, quantity)
+            return entitlementUsageService.release(merchantId, productCode, quantity)
                     .map(mapper::toConsume)
                     .map(this::toExternal)
                     .orElseGet(() -> toExternal(mapper.emptyConsume()));
         } catch (RuntimeException exception) {
-            throw unavailable(userId, exception);
+            throw unavailable(merchantId, exception);
         }
     }
 
-    public void requireAllowed(Long userId, String productCode) {
-        if (!findProductAccess(userId, productCode).allowed()) {
+    public void requireAllowed(Long merchantId, String productCode) {
+        if (!findProductAccess(merchantId, productCode).allowed()) {
             throw new ForbiddenException(productCode + " yetkisi için uygun paket gerekli");
         }
     }
 
-    public ExternalConsumeResponse consumeRequired(Long userId, String productCode, int quantity) {
+    public ExternalConsumeResponse consumeRequired(Long merchantId, String productCode, int quantity) {
         try {
-            return consume(userId, productCode, quantity);
+            return consume(merchantId, productCode, quantity);
         } catch (FulfillmentQuotaExceededException exception) {
             throw new ForbiddenException(
                     "Yetersiz veya süresi dolmuş " + productCode + " hakkı. Lütfen paket satın alın."
@@ -136,8 +136,8 @@ public class FulfillmentServiceClient {
         }
     }
 
-    public int remaining(Long userId, String productCode) {
-        return listEntitlements(userId).stream()
+    public int remaining(Long merchantId, String productCode) {
+        return listEntitlements(merchantId).stream()
                 .filter(item -> matches(item, productCode))
                 .filter(this::open)
                 .mapToInt(this::remainingOf)
@@ -145,8 +145,8 @@ public class FulfillmentServiceClient {
                 .orElse(0);
     }
 
-    public int openQuantity(Long userId, String productCode, String source) {
-        return listEntitlements(userId).stream()
+    public int openQuantity(Long merchantId, String productCode, String source) {
+        return listEntitlements(merchantId).stream()
                 .filter(item -> matches(item, productCode))
                 .filter(item -> source == null || source.equals(item.source()))
                 .filter(this::open)
@@ -184,7 +184,7 @@ public class FulfillmentServiceClient {
     private ExternalActivePackageResponse toExternal(ActivePackageResponse response) {
         return new ExternalActivePackageResponse(
                 response.id(),
-                response.userId(),
+                response.merchantId(),
                 response.fulfillmentId(),
                 response.purchaseId(),
                 response.packageId(),
@@ -204,7 +204,7 @@ public class FulfillmentServiceClient {
         EntitlementResponse response = mapper.toEntitlementResponse(listed.entitlement(), listed.productCode());
         return new ExternalEntitlementResponse(
                 response.id(),
-                response.userId(),
+                response.merchantId(),
                 response.fulfillmentId(),
                 response.purchaseId(),
                 response.productId(),
@@ -247,10 +247,10 @@ public class FulfillmentServiceClient {
         return "ACTIVE";
     }
 
-    private FulfillmentUnavailableException unavailable(Long userId, Exception exception) {
+    private FulfillmentUnavailableException unavailable(Long merchantId, Exception exception) {
         log.warn(
                 "In-process fulfillment call failed. userId={} reason={}",
-                userId,
+                merchantId,
                 exception.getMessage()
         );
         return new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor");

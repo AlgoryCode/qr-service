@@ -8,9 +8,9 @@ import java.util.Optional;
 
 public interface UberEatsMenuConnectionRepository extends JpaRepository<UberEatsMenuConnection, Long> {
 
-    List<UberEatsMenuConnection> findByUserIdOrderByUpdatedAtDesc(Long userId);
+    List<UberEatsMenuConnection> findByMerchantIdOrderByUpdatedAtDesc(Long merchantId);
 
-    Optional<UberEatsMenuConnection> findByUserIdAndMenuId(Long userId, Long menuId);
+    Optional<UberEatsMenuConnection> findByMerchantIdAndMenuId(Long merchantId, Long menuId);
 
     Optional<UberEatsMenuConnection> findByMenuId(Long menuId);
 }

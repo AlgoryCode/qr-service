@@ -58,7 +58,7 @@ public final class PrintAgentDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PairDeviceResponse {
-        private Long userId;
+        private Long merchantId;
         private Long deviceId;
         private Long branchId;
         private String deviceToken;
@@ -83,7 +83,7 @@ public final class PrintAgentDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ApiKeyResponse {
-        private Long userId;
+        private Long merchantId;
         private Long deviceId;
         private Long branchId;
         private String apiKey;
@@ -96,7 +96,7 @@ public final class PrintAgentDtos {
     @AllArgsConstructor
     public static class ConnectRequest {
         @NotNull
-        private Long userId;
+        private Long merchantId;
 
         @NotNull
         private Long branchId;
@@ -111,7 +111,7 @@ public final class PrintAgentDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ConnectResponse {
-        private Long userId;
+        private Long merchantId;
         private Long deviceId;
         private Long branchId;
         private String deviceName;
@@ -195,7 +195,7 @@ public final class PrintAgentDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SettingsResponse {
-        private Long userId;
+        private Long merchantId;
         private Long branchId;
         private boolean printKitchenEnabled;
         private List<DeviceResponse> devices;

@@ -40,7 +40,7 @@ public class IdentifierResolver {
         }
         if (!identifier.contains("@")) {
             var demoMerchant = demoAccountRepository.findByUsernameIgnoreCase(identifier)
-                    .flatMap(demo -> merchantRepository.findById(demo.getUserId()))
+                    .flatMap(demo -> merchantRepository.findById(demo.getMerchantId()))
                     .filter(merchant -> FindMerchantUseCase.ACTIVE.equals(findMerchantUseCase.findMerchant(merchant.getId()).status()))
                     .map(mapper::fromMerchant);
             if (demoMerchant.isPresent()) {

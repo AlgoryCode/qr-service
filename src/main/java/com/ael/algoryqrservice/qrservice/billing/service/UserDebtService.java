@@ -7,10 +7,10 @@ import java.util.Optional;
 @Service
 public class UserDebtService {
 
-    public Optional<DebtView> findDebt(Long userId) {
+    public Optional<DebtView> findDebt(Long merchantId) {
         return Optional.empty();
     }
 
-    public record DebtView(Long userId, String status) {
+    public record DebtView(Long merchantId, String status) {
     }
 }

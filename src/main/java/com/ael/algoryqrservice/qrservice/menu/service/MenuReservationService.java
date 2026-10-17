@@ -234,7 +234,7 @@ public class MenuReservationService {
         Menu menu = menuRepository.findById(menuId)
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        if (!menu.getUserId().equals(ownerId)) {
+        if (!menu.getMerchantId().equals(ownerId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

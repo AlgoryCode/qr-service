@@ -4,7 +4,7 @@ import java.time.Instant;
 
 public record ExternalEntitlementResponse(
         Long id,
-        Long userId,
+        Long merchantId,
         Long fulfillmentId,
         Long purchaseId,
         Long productId,

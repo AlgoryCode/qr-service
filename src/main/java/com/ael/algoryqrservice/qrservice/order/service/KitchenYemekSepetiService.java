@@ -111,7 +111,7 @@ public class KitchenYemekSepetiService {
         if (merchantId == null) {
             return null;
         }
-        YemekSepetiConnection connection = connectionService.findByUserId(merchantId);
+        YemekSepetiConnection connection = connectionService.findByMerchantId(merchantId);
         if (connection == null
                 || connection.getStatus() != YemekSepetiConnectionStatus.CONNECTED
                 || connection.getVendorId() == null

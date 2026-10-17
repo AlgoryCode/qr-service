@@ -19,7 +19,7 @@ import java.util.List;
 public class PurchaseSummaryResponse {
 
     private Long purchaseId;
-    private Long userId;
+    private Long merchantId;
     private Long packageId;
     private String packageCode;
     private String packageName;

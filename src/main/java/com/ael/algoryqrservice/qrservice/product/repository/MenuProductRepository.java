@@ -61,7 +61,7 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
 
     Optional<MenuProduct> findByProductIdAndDeletedFalse(Long productId);
 
-    List<MenuProduct> findByUserIdAndDeletedFalseOrderByProductIdDesc(Long userId);
+    List<MenuProduct> findByMerchantIdAndDeletedFalseOrderByProductIdDesc(Long merchantId);
 
     List<MenuProduct> findByProductIdInAndDeletedFalse(Collection<Long> productIds);
 
@@ -72,10 +72,10 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
     @Query("""
             select count(p)
             from MenuProduct p
-            where p.userId = :userId
+            where p.merchantId = :merchantId
               and p.deleted = false
             """)
-    long countActiveProductsForUser(@Param("userId") Long userId);
+    long countActiveProductsForUser(@Param("userId") Long merchantId);
 
     boolean existsByMenuIdAndNameIgnoreCaseAndDeletedFalse(Long menuId, String name);
 
@@ -87,13 +87,13 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
             left join MenuProduct product
               on product.menuId = menu.menuId and product.deleted = false
             where menu.qrId = :qrId
-              and menu.userId = :userId
+              and menu.merchantId = :merchantId
               and menu.active = true
               and menu.deleted = false
             order by product.sortOrder asc, product.productId asc
             """)
     List<Object[]> findMenuWithProductsByQrIdAndUserId(
             @Param("qrId") Long qrId,
-            @Param("userId") Long userId
+            @Param("userId") Long merchantId
     );
 }

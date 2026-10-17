@@ -39,7 +39,7 @@ public class DemoLoginUseCase {
                     loginAttemptGuard.registerFailure(normalized);
                     return new BadCredentialsException("Invalid credentials");
                 });
-        MerchantEntity merchant = merchantRepository.findActiveByIdWithRole(demo.getUserId())
+        MerchantEntity merchant = merchantRepository.findActiveByIdWithRole(demo.getMerchantId())
                 .orElseThrow(() -> {
                     loginAttemptGuard.registerFailure(normalized);
                     return new BadCredentialsException("Invalid credentials");

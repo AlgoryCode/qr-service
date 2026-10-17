@@ -33,7 +33,7 @@ public class ExternalPackageResponseMapper {
         boolean usable = isOpen(active.status(), active.periodEnd());
         return PurchaseResponse.builder()
                 .id(purchaseKey(active))
-                .userId(active.userId())
+                .merchantId(active.merchantId())
                 .packageId(active.packageId())
                 .packageCode(active.packageCode())
                 .packageName(active.packageName())
@@ -53,7 +53,7 @@ public class ExternalPackageResponseMapper {
         PurchaseResponse purchase = toPurchase(active);
         return PurchaseSummaryResponse.builder()
                 .purchaseId(purchase.getId())
-                .userId(purchase.getUserId())
+                .merchantId(purchase.getMerchantId())
                 .packageId(purchase.getPackageId())
                 .packageCode(purchase.getPackageCode())
                 .packageName(purchase.getPackageName())

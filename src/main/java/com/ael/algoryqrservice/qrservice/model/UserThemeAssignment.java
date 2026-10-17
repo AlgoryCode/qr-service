@@ -8,9 +8,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_user_theme_assignment", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_theme_assignment", columnNames = {"user_id", "theme_id"})
+        @UniqueConstraint(name = "uk_user_theme_assignment", columnNames = {"merchant_id", "theme_id"})
 }, indexes = {
-        @Index(name = "idx_user_theme_assignment_user_id", columnList = "user_id"),
+        @Index(name = "idx_user_theme_assignment_user_id", columnList = "merchant_id"),
         @Index(name = "idx_user_theme_assignment_theme_id", columnList = "theme_id")
 })
 @Getter
@@ -27,8 +27,8 @@ public class UserThemeAssignment {
     private Long id;
 
     /** Member account ({@code tbl_user.id}). */
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "theme_id", nullable = false)
     private Long themeId;

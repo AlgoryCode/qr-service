@@ -27,7 +27,7 @@ import java.util.UUID;
         name = "tbl_email_change_code",
         indexes = {
                 @Index(name = "idx_email_change_code_challenge", columnList = "challenge_id"),
-                @Index(name = "idx_email_change_code_user", columnList = "user_id"),
+                @Index(name = "idx_email_change_code_user", columnList = "merchant_id"),
                 @Index(name = "idx_email_change_code_status", columnList = "status")
         }
 )
@@ -45,8 +45,8 @@ public class EmailChangeCode {
     @Column(name = "challenge_id", nullable = false, length = 36)
     private UUID challengeId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(nullable = false, length = 320)
     private String email;

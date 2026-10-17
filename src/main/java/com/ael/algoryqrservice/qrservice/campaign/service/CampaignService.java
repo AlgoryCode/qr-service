@@ -155,7 +155,7 @@ public class CampaignService {
         LocalDateTime now = LocalDateTime.now();
         Campaign saved = campaignRepository.save(Campaign.builder()
                 .menuId(menuId)
-                .businessId(menu.getUserId())
+                .businessId(menu.getMerchantId())
                 .templateCode(template.getCode())
                 .name(request.getName().trim())
                 .slogan(trim(request.getSlogan()))
@@ -235,7 +235,7 @@ public class CampaignService {
     private Menu requireOwnedMenu(Long menuId) {
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        if (!menu.getUserId().equals(securityUtils.getCurrentMerchantId())) {
+        if (!menu.getMerchantId().equals(securityUtils.getCurrentMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

@@ -34,11 +34,11 @@ public class PurchaseSelectionPolicy {
      * @return every purchase that is active today, regardless of type.
      */
     @Transactional(readOnly = true)
-    public List<Purchase> usablePurchases(Long userId) {
-        if (userId == null) {
+    public List<Purchase> usablePurchases(Long merchantId) {
+        if (merchantId == null) {
             return List.of();
         }
-        return purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+        return purchaseRepository.findByMerchantIdAndStatus(merchantId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
                 .toList();
     }
@@ -47,8 +47,8 @@ public class PurchaseSelectionPolicy {
      * @return active subscription-like purchases: paid or granted, but never add-ons or free plans.
      */
     @Transactional(readOnly = true)
-    public List<Purchase> usableSubscriptions(Long userId) {
-        return usablePurchases(userId).stream()
+    public List<Purchase> usableSubscriptions(Long merchantId) {
+        return usablePurchases(merchantId).stream()
                 .filter(this::isSubscriptionLike)
                 .toList();
     }
@@ -57,8 +57,8 @@ public class PurchaseSelectionPolicy {
      * @return active add-on purchases.
      */
     @Transactional(readOnly = true)
-    public List<Purchase> usableAddons(Long userId) {
-        return usablePurchases(userId).stream()
+    public List<Purchase> usableAddons(Long merchantId) {
+        return usablePurchases(merchantId).stream()
                 .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
                 .toList();
     }
@@ -67,13 +67,13 @@ public class PurchaseSelectionPolicy {
      * @return id of the subscription that currently governs the user, or {@code null} when there is none.
      */
     @Transactional(readOnly = true)
-    public Long activePurchaseId(Long userId) {
-        return highestPriority(usableSubscriptions(userId)).map(Purchase::getId).orElse(null);
+    public Long activePurchaseId(Long merchantId) {
+        return highestPriority(usableSubscriptions(merchantId)).map(Purchase::getId).orElse(null);
     }
 
     @Transactional(readOnly = true)
-    public boolean isActivePurchase(Long userId, Long purchaseId) {
-        return purchaseId != null && Objects.equals(activePurchaseId(userId), purchaseId);
+    public boolean isActivePurchase(Long merchantId, Long purchaseId) {
+        return purchaseId != null && Objects.equals(activePurchaseId(merchantId), purchaseId);
     }
 
     public boolean isSubscriptionLike(Purchase purchase) {

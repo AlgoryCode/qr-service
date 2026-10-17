@@ -38,61 +38,61 @@ public class FulfillmentController {
     private final EntitlementUsageService entitlementUsageService;
     private final FulfillmentPresentationMapper mapper;
 
-    @GetMapping("/users/{userId}/package")    public ResponseEntity<ActivePackageResponse> getAssignedPackage(@PathVariable Long userId) {
-        return ResponseEntity.ok(mapper.toActivePackageResponse(fulfillmentService.requireActivePackageView(userId)));
+    @GetMapping("/users/{userId}/package")    public ResponseEntity<ActivePackageResponse> getAssignedPackage(@PathVariable Long merchantId) {
+        return ResponseEntity.ok(mapper.toActivePackageResponse(fulfillmentService.requireActivePackageView(merchantId)));
     }
 
     @PostMapping("/users/{userId}/package")    public ResponseEntity<Void> assignPackage(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @Valid @RequestBody AssignPackageRequest request
     ) {
-        fulfillmentService.assignPackage(userId, request.packageCode(), request.periodDays());
+        fulfillmentService.assignPackage(merchantId, request.packageCode(), request.periodDays());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
-    @GetMapping("/users/{userId}/active-package")    public ResponseEntity<ActivePackageResponse> getActivePackage(@PathVariable Long userId) {
-        return ResponseEntity.ok(mapper.toActivePackageResponse(fulfillmentService.requireActivePackageView(userId)));
+    @GetMapping("/users/{userId}/active-package")    public ResponseEntity<ActivePackageResponse> getActivePackage(@PathVariable Long merchantId) {
+        return ResponseEntity.ok(mapper.toActivePackageResponse(fulfillmentService.requireActivePackageView(merchantId)));
     }
 
-    @GetMapping("/users/{userId}/entitlements")    public ResponseEntity<List<EntitlementResponse>> listEntitlements(@PathVariable Long userId) {
+    @GetMapping("/users/{userId}/entitlements")    public ResponseEntity<List<EntitlementResponse>> listEntitlements(@PathVariable Long merchantId) {
         return ResponseEntity.ok(
-                entitlementUsageService.listActive(userId).stream()
+                entitlementUsageService.listActive(merchantId).stream()
                         .map(item -> mapper.toEntitlementResponse(item.entitlement(), item.productCode()))
                         .toList()
         );
     }
 
     @GetMapping("/users/{userId}/products/{productCode}")    public ResponseEntity<ProductAccessResponse> productAccess(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @PathVariable String productCode
     ) {
-        return ResponseEntity.ok(mapper.toProductAccess(entitlementUsageService.productAccess(userId, productCode)));
+        return ResponseEntity.ok(mapper.toProductAccess(entitlementUsageService.productAccess(merchantId, productCode)));
     }
 
     @PostMapping("/users/{userId}/entitlements/consume")    public ResponseEntity<ConsumeEntitlementResponse> consume(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @Valid @RequestBody EntitlementQuantityRequest request
     ) {
         return ResponseEntity.ok(mapper.toConsume(
-                entitlementUsageService.consume(userId, request.productCode(), request.quantity())
+                entitlementUsageService.consume(merchantId, request.productCode(), request.quantity())
         ));
     }
 
     @PostMapping("/users/{userId}/entitlements/release")    public ResponseEntity<ConsumeEntitlementResponse> release(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @Valid @RequestBody EntitlementQuantityRequest request
     ) {
-        return ResponseEntity.ok(entitlementUsageService.release(userId, request.productCode(), request.quantity())
+        return ResponseEntity.ok(entitlementUsageService.release(merchantId, request.productCode(), request.quantity())
                 .map(mapper::toConsume)
                 .orElseGet(mapper::emptyConsume));
     }
 
     @GetMapping("/users/{userId}/fulfillments")    public ResponseEntity<Page<FulfillmentResponse>> listFulfillments(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(
-                fulfillmentService.listFulfillments(userId, pageable).map(mapper::toFulfillmentResponse)
+                fulfillmentService.listFulfillments(merchantId, pageable).map(mapper::toFulfillmentResponse)
         );
     }
 

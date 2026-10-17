@@ -36,14 +36,14 @@ public class MenuThemeService {
 
     @Transactional(readOnly = true)
     public List<ThemeDtos.ThemeResponse> listAllowedThemesForCurrentUser() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return listAssignedThemes(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return listAssignedThemes(merchantId);
     }
 
     @Transactional(readOnly = true)
-    public List<ThemeDtos.ThemeResponse> listAssignedThemes(Long userId) {
-        requireExistingUser(userId);
-        List<UserThemeAssignment> assignments = userThemeAssignmentRepository.findByUserId(userId);
+    public List<ThemeDtos.ThemeResponse> listAssignedThemes(Long merchantId) {
+        requireExistingUser(merchantId);
+        List<UserThemeAssignment> assignments = userThemeAssignmentRepository.findByMerchantId(merchantId);
         if (assignments.isEmpty()) {
             return List.of();
         }
@@ -69,7 +69,7 @@ public class MenuThemeService {
      * {@link MenuService} via {@code CUSTOM_DESIGN_OWNER}.
      */
     @Transactional(readOnly = true)
-    public void requireAssignedTheme(Long userId, String themeId) {
+    public void requireAssignedTheme(Long merchantId, String themeId) {
         String code = normalizeCode(themeId);
         if (code == null) {
             throw new BadRequestException("themeId zorunludur");
@@ -82,7 +82,7 @@ public class MenuThemeService {
         if (!theme.isActive()) {
             throw new BadRequestException("Bu tema kullanılamıyor: " + code);
         }
-        if (!userThemeAssignmentRepository.existsByUserIdAndThemeId(userId, theme.getId())) {
+        if (!userThemeAssignmentRepository.existsByMerchantIdAndThemeId(merchantId, theme.getId())) {
             throw new ForbiddenException("Bu temayı kullanma yetkiniz yok");
         }
     }
@@ -92,58 +92,58 @@ public class MenuThemeService {
      * Deneme / paket başlangıcında ve menü oluşturma güvenlik ağında kullanılır.
      */
     @Transactional
-    public List<ThemeDtos.ThemeResponse> ensureDefaultThemeAssigned(Long userId) {
-        requireExistingUser(userId);
-        if (!userThemeAssignmentRepository.findByUserId(userId).isEmpty()) {
-            return listAssignedThemes(userId);
+    public List<ThemeDtos.ThemeResponse> ensureDefaultThemeAssigned(Long merchantId) {
+        requireExistingUser(merchantId);
+        if (!userThemeAssignmentRepository.findByMerchantId(merchantId).isEmpty()) {
+            return listAssignedThemes(merchantId);
         }
-        return assignThemes(userId, List.of(CatalogThemes.DEFAULT_THEME_CODE), null);
+        return assignThemes(merchantId, List.of(CatalogThemes.DEFAULT_THEME_CODE), null);
     }
 
     @Transactional
-    public List<ThemeDtos.ThemeResponse> assignThemes(Long userId, List<String> themeCodes, Long assignedBy) {
-        requireExistingUser(userId);
+    public List<ThemeDtos.ThemeResponse> assignThemes(Long merchantId, List<String> themeCodes, Long assignedBy) {
+        requireExistingUser(merchantId);
         List<MenuTheme> themes = resolveActiveThemes(themeCodes);
         for (MenuTheme theme : themes) {
-            if (!userThemeAssignmentRepository.existsByUserIdAndThemeId(userId, theme.getId())) {
+            if (!userThemeAssignmentRepository.existsByMerchantIdAndThemeId(merchantId, theme.getId())) {
                 userThemeAssignmentRepository.save(UserThemeAssignment.builder()
-                        .userId(userId)
+                        .merchantId(merchantId)
                         .themeId(theme.getId())
                         .assignedBy(assignedBy)
                         .build());
             }
         }
-        return listAssignedThemes(userId);
+        return listAssignedThemes(merchantId);
     }
 
     @Transactional
-    public List<ThemeDtos.ThemeResponse> replaceThemes(Long userId, List<String> themeCodes, Long assignedBy) {
-        requireExistingUser(userId);
+    public List<ThemeDtos.ThemeResponse> replaceThemes(Long merchantId, List<String> themeCodes, Long assignedBy) {
+        requireExistingUser(merchantId);
         List<String> codes = themeCodes == null ? List.of() : themeCodes;
         List<MenuTheme> themes = codes.isEmpty() ? List.of() : resolveActiveThemes(codes);
-        userThemeAssignmentRepository.deleteByUserId(userId);
+        userThemeAssignmentRepository.deleteByUserId(merchantId);
         userThemeAssignmentRepository.flush();
         for (MenuTheme theme : themes) {
             userThemeAssignmentRepository.save(UserThemeAssignment.builder()
-                    .userId(userId)
+                    .merchantId(merchantId)
                     .themeId(theme.getId())
                     .assignedBy(assignedBy)
                     .build());
         }
-        return listAssignedThemes(userId);
+        return listAssignedThemes(merchantId);
     }
 
     @Transactional
-    public List<ThemeDtos.ThemeResponse> revokeTheme(Long userId, String themeCode) {
-        requireExistingUser(userId);
+    public List<ThemeDtos.ThemeResponse> revokeTheme(Long merchantId, String themeCode) {
+        requireExistingUser(merchantId);
         String code = normalizeCode(themeCode);
         if (code == null) {
             throw new BadRequestException("Tema kodu zorunludur");
         }
         MenuTheme theme = menuThemeRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new NotFoundException("Tema bulunamadı: " + code));
-        userThemeAssignmentRepository.deleteByUserIdAndThemeId(userId, theme.getId());
-        return listAssignedThemes(userId);
+        userThemeAssignmentRepository.deleteByUserIdAndThemeId(merchantId, theme.getId());
+        return listAssignedThemes(merchantId);
     }
 
     private List<MenuTheme> resolveActiveThemes(List<String> themeCodes) {
@@ -183,8 +183,8 @@ public class MenuThemeService {
         return resolved;
     }
 
-    private void requireExistingUser(Long userId) {
-        if (userId == null || !userRepository.existsById(userId)) {
+    private void requireExistingUser(Long merchantId) {
+        if (merchantId == null || !userRepository.existsById(merchantId)) {
             throw new NotFoundException("Kullanıcı bulunamadı");
         }
     }

@@ -114,7 +114,7 @@ public class WaiterCourierOrderService {
         if (staff.getMerchantId() == null) {
             return null;
         }
-        return merchantRepository.findByUserIdAndDeletedFalse(staff.getMerchantId()).orElse(null);
+        return merchantRepository.findByOwnerMerchantIdAndDeletedFalse(staff.getMerchantId()).orElse(null);
     }
 
     private Merchant requireStore(MerchantStaff staff) {

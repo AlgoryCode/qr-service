@@ -388,7 +388,7 @@ public final class MenuDtos {
         private Long qrId;
         private String publicId;
         private Long branchId;
-        private Long userId;
+        private Long merchantId;
         private String themeId;
         private String businessName;
         private String slogan;

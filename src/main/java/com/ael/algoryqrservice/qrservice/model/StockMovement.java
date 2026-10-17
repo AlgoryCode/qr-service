@@ -42,8 +42,8 @@ public class StockMovement {
     @Column(name = "ingredient_id", nullable = false)
     private Long ingredientId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "branch_id", nullable = false)
     private Long branchId;

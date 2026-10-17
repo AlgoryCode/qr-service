@@ -37,35 +37,35 @@ public class AdminThemeController {
     }
 
     @GetMapping("/users/{userId}/themes")
-    public ResponseEntity<List<ThemeDtos.ThemeResponse>> listUserThemes(@PathVariable Long userId) {
-        return ResponseEntity.ok(menuThemeService.listAssignedThemes(userId));
+    public ResponseEntity<List<ThemeDtos.ThemeResponse>> listUserThemes(@PathVariable Long merchantId) {
+        return ResponseEntity.ok(menuThemeService.listAssignedThemes(merchantId));
     }
 
     /** Adds themes to the member's allowed set (idempotent). */
     @PostMapping("/users/{userId}/themes")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> assignThemes(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @Valid @RequestBody ThemeDtos.AssignThemesRequest request
     ) {
         Long adminId = dashboardSecurityUtils.getCurrentDashboardUser().getId();
-        return ResponseEntity.ok(menuThemeService.assignThemes(userId, request.getThemeCodes(), adminId));
+        return ResponseEntity.ok(menuThemeService.assignThemes(merchantId, request.getThemeCodes(), adminId));
     }
 
     /** Replaces the member's allowed theme set. Empty list clears all assignments. */
     @PutMapping("/users/{userId}/themes")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> replaceThemes(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @Valid @RequestBody ThemeDtos.ReplaceThemesRequest request
     ) {
         Long adminId = dashboardSecurityUtils.getCurrentDashboardUser().getId();
-        return ResponseEntity.ok(menuThemeService.replaceThemes(userId, request.getThemeCodes(), adminId));
+        return ResponseEntity.ok(menuThemeService.replaceThemes(merchantId, request.getThemeCodes(), adminId));
     }
 
     @DeleteMapping("/users/{userId}/themes/{themeCode}")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> revokeTheme(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @PathVariable String themeCode
     ) {
-        return ResponseEntity.ok(menuThemeService.revokeTheme(userId, themeCode));
+        return ResponseEntity.ok(menuThemeService.revokeTheme(merchantId, themeCode));
     }
 }

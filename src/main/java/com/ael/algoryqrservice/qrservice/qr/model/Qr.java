@@ -23,7 +23,7 @@ public class Qr extends QrBaseModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long qrId; // 1
 
-    private Long userId;
+    private Long merchantId;
 
     @Column(name = "purchase_id")
     private Long purchaseId;

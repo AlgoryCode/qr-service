@@ -40,9 +40,9 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
     }
 
     @Override
-    public void supersedeOtherFulfillments(Long userId, Long keepFulfillmentId) {
+    public void supersedeOtherFulfillments(Long merchantId, Long keepFulfillmentId) {
         packageFulfillmentJpaRepository.supersedeOthers(
-                userId,
+                merchantId,
                 keepFulfillmentId,
                 FulfillmentStatus.SUPERSEDED,
                 FulfillmentStatus.ACTIVE
@@ -50,16 +50,16 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
     }
 
     @Override
-    public Optional<ActivePackage> findActiveByUserId(Long userId) {
-        return activePackageJpaRepository.findByUserId(userId).map(this::toDomain);
+    public Optional<ActivePackage> findActiveByUserId(Long merchantId) {
+        return activePackageJpaRepository.findByMerchantId(merchantId).map(this::toDomain);
     }
 
     @Override
     public ActivePackage upsertActivePackage(ActivePackage activePackage) {
-        ActivePackageEntity entity = activePackageJpaRepository.findByUserId(activePackage.userId())
+        ActivePackageEntity entity = activePackageJpaRepository.findByMerchantId(activePackage.merchantId())
                 .orElseGet(ActivePackageEntity::new);
         Instant now = Instant.now();
-        entity.setUserId(activePackage.userId());
+        entity.setMerchantId(activePackage.merchantId());
         entity.setFulfillmentId(activePackage.fulfillmentId());
         entity.setPurchaseId(activePackage.purchaseId());
         entity.setPackageId(activePackage.packageId());
@@ -73,8 +73,8 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
     }
 
     @Override
-    public Page<PackageFulfillment> findByUserId(Long userId, Pageable pageable) {
-        return packageFulfillmentJpaRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+    public Page<PackageFulfillment> findByMerchantId(Long merchantId, Pageable pageable) {
+        return packageFulfillmentJpaRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, pageable)
                 .map(this::toDomain);
     }
 
@@ -84,7 +84,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
                 entity.getEventId(),
                 entity.getEventType(),
                 entity.getPurchaseId(),
-                entity.getUserId(),
+                entity.getMerchantId(),
                 entity.getPackageId(),
                 entity.getPackageCode(),
                 entity.getConversationId(),
@@ -107,7 +107,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
         entity.setEventId(fulfillment.eventId());
         entity.setEventType(fulfillment.eventType());
         entity.setPurchaseId(fulfillment.purchaseId());
-        entity.setUserId(fulfillment.userId());
+        entity.setMerchantId(fulfillment.merchantId());
         entity.setPackageId(fulfillment.packageId());
         entity.setPackageCode(fulfillment.packageCode());
         entity.setConversationId(fulfillment.conversationId());
@@ -127,7 +127,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
     private ActivePackage toDomain(ActivePackageEntity entity) {
         return new ActivePackage(
                 entity.getId(),
-                entity.getUserId(),
+                entity.getMerchantId(),
                 entity.getFulfillmentId(),
                 entity.getPurchaseId(),
                 entity.getPackageId(),

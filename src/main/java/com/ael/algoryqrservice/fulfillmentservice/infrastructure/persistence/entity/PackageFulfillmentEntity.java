@@ -38,8 +38,8 @@ public class PackageFulfillmentEntity {
     @Column(name = "purchase_id", nullable = false)
     private Long purchaseId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "package_id")
     private Long packageId;

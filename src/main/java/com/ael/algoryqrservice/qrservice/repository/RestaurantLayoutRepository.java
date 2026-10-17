@@ -10,11 +10,11 @@ import java.util.Optional;
 @Repository
 public interface RestaurantLayoutRepository extends JpaRepository<RestaurantLayout, Long> {
 
-    List<RestaurantLayout> findByUserIdOrderByIdAsc(Long userId);
+    List<RestaurantLayout> findByMerchantIdOrderByIdAsc(Long merchantId);
 
-    Optional<RestaurantLayout> findByIdAndUserId(Long id, Long userId);
+    Optional<RestaurantLayout> findByIdAndUserId(Long id, Long merchantId);
 
-    List<RestaurantLayout> findByUserIdAndBranchId(Long userId, Long branchId);
+    List<RestaurantLayout> findByMerchantIdAndBranchId(Long merchantId, Long branchId);
 
     List<RestaurantLayout> findByBranchId(Long branchId);
 }

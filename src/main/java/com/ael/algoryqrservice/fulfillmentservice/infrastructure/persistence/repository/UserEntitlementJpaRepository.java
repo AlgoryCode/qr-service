@@ -14,12 +14,12 @@ public interface UserEntitlementJpaRepository extends JpaRepository<UserEntitlem
 
     @Query("""
             select e from UserEntitlementEntity e
-            where e.userId = :userId
+            where e.merchantId = :merchantId
               and e.status = :status
               and (e.expiresAt is null or e.expiresAt > :now)
             """)
     List<UserEntitlementEntity> findActiveByUserId(
-            @Param("userId") Long userId,
+            @Param("userId") Long merchantId,
             @Param("status") PackageStatus status,
             @Param("now") Instant now
     );
@@ -28,12 +28,12 @@ public interface UserEntitlementJpaRepository extends JpaRepository<UserEntitlem
     @Query("""
             update UserEntitlementEntity e
             set e.status = :newStatus, e.updatedAt = :updatedAt
-            where e.userId = :userId
+            where e.merchantId = :merchantId
               and e.status = :currentStatus
               and e.fulfillmentId <> :keepFulfillmentId
             """)
     int supersedeOthers(
-            @Param("userId") Long userId,
+            @Param("userId") Long merchantId,
             @Param("keepFulfillmentId") Long keepFulfillmentId,
             @Param("currentStatus") PackageStatus currentStatus,
             @Param("newStatus") PackageStatus newStatus,

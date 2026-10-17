@@ -31,8 +31,8 @@ public class MenuCategory extends QrBaseModel {
     @Column(name = "menu_id")
     private Long menuId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(nullable = false, length = 64)
     private String slug;

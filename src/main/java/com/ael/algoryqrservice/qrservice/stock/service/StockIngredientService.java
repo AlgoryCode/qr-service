@@ -36,10 +36,10 @@ public class StockIngredientService {
     @Transactional(readOnly = true)
     public StockDtos.IngredientPageResponse list(Long branchId, boolean lowOnly, int page, int size) {
         branchService.requireOwned(branchId);
-        Long userId = securityUtils.getCurrentMerchantId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         Page<StockIngredient> result = ingredientRepository.search(
                 branchId,
-                userId,
+                merchantId,
                 lowOnly,
                 PageRequest.of(safePage(page), safeSize(size), Sort.by("name").ascending())
         );
@@ -58,7 +58,7 @@ public class StockIngredientService {
         var branch = branchService.requireOwned(branchId);
         BigDecimal opening = StockQuantities.scale(request.quantity());
         StockIngredient saved = ingredientRepository.save(StockIngredient.builder()
-                .userId(branch.getUserId())
+                .merchantId(branch.getMerchantId())
                 .branchId(branch.getId())
                 .name(request.name().trim())
                 .unit(request.unit())
@@ -155,7 +155,7 @@ public class StockIngredientService {
     ) {
         return movementRepository.save(StockMovement.builder()
                 .ingredientId(ingredient.getId())
-                .userId(ingredient.getUserId())
+                .merchantId(ingredient.getMerchantId())
                 .branchId(ingredient.getBranchId())
                 .kind(kind)
                 .quantityDelta(StockQuantities.scale(delta))
@@ -167,8 +167,8 @@ public class StockIngredientService {
     }
 
     private StockIngredient requireOwned(Long ingredientId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return ingredientRepository.findByIdAndUserIdAndDeletedFalse(ingredientId, userId)
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return ingredientRepository.findByIdAndUserIdAndDeletedFalse(ingredientId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hammadde bulunamadı"));
     }
 

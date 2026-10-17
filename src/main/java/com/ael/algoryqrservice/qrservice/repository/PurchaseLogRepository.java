@@ -9,7 +9,7 @@ import java.util.List;
 @Repository
 public interface PurchaseLogRepository extends JpaRepository<PurchaseLog, Long> {
 
-    List<PurchaseLog> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<PurchaseLog> findByMerchantIdOrderByCreatedAtDesc(Long merchantId);
 
     List<PurchaseLog> findByPurchaseIdOrderByCreatedAtDesc(Long purchaseId);
 }

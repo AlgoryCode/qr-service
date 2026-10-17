@@ -58,7 +58,7 @@ public class SecurityUtils {
                     return authPrincipal.merchantId();
                 }
                 if (AuthSubject.TYPE_MERCHANT.equals(authPrincipal.subjectType())) {
-                    return authPrincipal.userId();
+                    return authPrincipal.merchantId();
                 }
             }
             if (authentication.getDetails() instanceof JwtAccessPrincipal principal
@@ -66,13 +66,13 @@ public class SecurityUtils {
                 if (principal.merchantId() != null) {
                     return principal.merchantId();
                 }
-                if (principal.isWaiter() && principal.userId() != null) {
-                    return merchantStaffRepository.findById(principal.userId())
+                if (principal.isWaiter() && principal.merchantId() != null) {
+                    return merchantStaffRepository.findById(principal.merchantId())
                             .map(MerchantStaff::getMerchantId)
                             .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
                 }
-                if (!principal.isWaiter() && principal.userId() != null) {
-                    return resolveMerchantAccountId(principal.userId(), authentication.getName());
+                if (!principal.isWaiter() && principal.merchantId() != null) {
+                    return resolveMerchantAccountId(principal.merchantId(), authentication.getName());
                 }
             }
         }
@@ -80,6 +80,10 @@ public class SecurityUtils {
         return resolveMerchantAccountId(user.getId(), user.getEmail());
     }
 
+    /**
+     * @deprecated Use {@link #getCurrentMerchantId()} instead.
+     */
+    @Deprecated(forRemoval = false)
     public Long getCurrentUserId() {
         return getCurrentMerchantId();
     }
@@ -89,7 +93,7 @@ public class SecurityUtils {
         if (merchantId == null || authentication == null || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)) {
             return false;
         }
-        if (merchantId.equals(principal.merchantId()) || merchantId.equals(principal.userId())) {
+        if (merchantId.equals(principal.merchantId()) || merchantId.equals(principal.merchantId())) {
             return true;
         }
         String login = authentication.getName();
@@ -106,7 +110,7 @@ public class SecurityUtils {
     }
 
     /**
-     * Fulfillment and auth merchants are keyed by {@code tbl_merchant.id}; legacy panel rows may still use {@code tbl_user.id}.
+     * Fulfillment and auth merchants are keyed by {@code tbl_user.id}; legacy panel rows may still use {@code tbl_user.id}.
      */
     private Long resolveMerchantAccountId(Long fallbackId, String loginEmail) {
         if (loginEmail != null && !loginEmail.isBlank()) {
@@ -139,9 +143,9 @@ public class SecurityUtils {
             return Optional.empty();
         }
         if (authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && principal.userId() != null
+                && principal.merchantId() != null
                 && (principal.isCustomer() || hasRole(authentication, "ROLE_CUSTOMER"))) {
-            return Optional.of(principal.userId());
+            return Optional.of(principal.merchantId());
         }
         if (!isCustomerAuthentication(authentication)) {
             return Optional.empty();
@@ -164,9 +168,9 @@ public class SecurityUtils {
             return Optional.empty();
         }
         if (authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && principal.userId() != null
+                && principal.merchantId() != null
                 && (principal.isWaiter() || hasRole(authentication, "ROLE_WAITER"))) {
-            return Optional.of(principal.userId());
+            return Optional.of(principal.merchantId());
         }
         return Optional.empty();
     }
@@ -177,8 +181,8 @@ public class SecurityUtils {
             if (principal.branchId() != null) {
                 return principal.branchId();
             }
-            if (principal.userId() != null) {
-                return merchantStaffRepository.findById(principal.userId())
+            if (principal.merchantId() != null) {
+                return merchantStaffRepository.findById(principal.merchantId())
                         .map(MerchantStaff::getBranchId)
                         .filter(id -> id != null)
                         .orElseThrow(() -> new UnauthorizedException("Garson şube bilgisi bulunamadı"));

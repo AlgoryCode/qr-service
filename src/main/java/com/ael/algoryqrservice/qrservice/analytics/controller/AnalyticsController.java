@@ -246,11 +246,11 @@ public class AnalyticsController {
         return ResponseEntity.ok(analyticsService.getProductAnalytics(menuId, productId, ownerId, effectiveFrom, effectiveTo));
     }
 
-    private void requireOrderAnalyticsScope(Long userId) {
+    private void requireOrderAnalyticsScope(Long merchantId) {
         try {
-            productUsageGateway.allow(userId, CatalogProducts.SMART_REPORTING);
+            productUsageGateway.allow(merchantId, CatalogProducts.SMART_REPORTING);
         } catch (ForbiddenException reportingDenied) {
-            productUsageGateway.allow(userId, CatalogProducts.WAITER_PANEL);
+            productUsageGateway.allow(merchantId, CatalogProducts.WAITER_PANEL);
         }
     }
 }

@@ -29,8 +29,8 @@ public class EntitlementUsageService {
     private final ProductPort productPort;
 
     @Transactional(readOnly = true)
-    public List<ListedEntitlement> listActive(Long userId) {
-        List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(userId);
+    public List<ListedEntitlement> listActive(Long merchantId) {
+        List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(merchantId);
         Map<Long, CatalogProduct> products = productPort.findByIds(productIds(entitlements));
         return entitlements.stream()
                 .map(entitlement -> new ListedEntitlement(entitlement, productCode(entitlement, products)))
@@ -38,20 +38,20 @@ public class EntitlementUsageService {
     }
 
     @Transactional(readOnly = true)
-    public ProductAccessView productAccess(Long userId, String productCode) {
-        Optional<ActivePackage> active = fulfillmentRepository.findActiveByUserId(userId);
+    public ProductAccessView productAccess(Long merchantId, String productCode) {
+        Optional<ActivePackage> active = fulfillmentRepository.findActiveByUserId(merchantId);
         if (active.isEmpty()) {
             return ProductAccessView.denied(null);
         }
-        return match(userId, productCode)
+        return match(merchantId, productCode)
                 .map(entitlement -> allowed(active.get(), entitlement))
                 .orElseGet(() -> ProductAccessView.denied(active.get().packageCode()));
     }
 
     @Transactional
-    public UserEntitlement consume(Long userId, String productCode, int quantity) {
+    public UserEntitlement consume(Long merchantId, String productCode, int quantity) {
         requireQuantity(quantity);
-        UserEntitlement entitlement = requireMatch(userId, productCode);
+        UserEntitlement entitlement = requireMatch(merchantId, productCode);
         if (entitlement.unlimited()) {
             return entitlement;
         }
@@ -63,9 +63,9 @@ public class EntitlementUsageService {
     }
 
     @Transactional
-    public Optional<UserEntitlement> release(Long userId, String productCode, int quantity) {
+    public Optional<UserEntitlement> release(Long merchantId, String productCode, int quantity) {
         requireQuantity(quantity);
-        Optional<UserEntitlement> match = match(userId, productCode);
+        Optional<UserEntitlement> match = match(merchantId, productCode);
         if (match.isEmpty() || match.get().unlimited()) {
             return match;
         }
@@ -80,17 +80,17 @@ public class EntitlementUsageService {
         return new ProductAccessView(true, active.packageCode(), entitlement.featureCode(), entitlement.scopeCode());
     }
 
-    private UserEntitlement requireMatch(Long userId, String productCode) {
-        return match(userId, productCode)
+    private UserEntitlement requireMatch(Long merchantId, String productCode) {
+        return match(merchantId, productCode)
                 .orElseThrow(() -> new QuotaExceededException("Product is not in the active package"));
     }
 
-    private Optional<UserEntitlement> match(Long userId, String productCode) {
-        if (fulfillmentRepository.findActiveByUserId(userId).isEmpty()) {
+    private Optional<UserEntitlement> match(Long merchantId, String productCode) {
+        if (fulfillmentRepository.findActiveByUserId(merchantId).isEmpty()) {
             return Optional.empty();
         }
         Optional<CatalogProduct> product = productPort.findByCode(productCode);
-        return entitlementPort.findActiveByUserId(userId).stream()
+        return entitlementPort.findActiveByUserId(merchantId).stream()
                 .filter(entitlement -> matches(entitlement, productCode, product))
                 .findFirst();
     }
@@ -145,7 +145,7 @@ public class EntitlementUsageService {
     private UserEntitlement copyUsed(UserEntitlement entitlement, int usedQuantity) {
         return new UserEntitlement(
                 entitlement.id(),
-                entitlement.userId(),
+                entitlement.merchantId(),
                 entitlement.fulfillmentId(),
                 entitlement.purchaseId(),
                 entitlement.productId(),

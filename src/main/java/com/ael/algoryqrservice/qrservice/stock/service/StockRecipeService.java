@@ -77,7 +77,7 @@ public class StockRecipeService {
         List<Long> ids = lines.stream().map(StockDtos.RecipeLineRequest::ingredientId).toList();
         Map<Long, StockIngredient> found = ingredientRepository.lockByIds(ids).stream()
                 .filter(item -> !item.isDeleted())
-                .filter(item -> menu.getUserId().equals(item.getUserId()))
+                .filter(item -> menu.getMerchantId().equals(item.getMerchantId()))
                 .filter(item -> menu.getBranchId().equals(item.getBranchId()))
                 .collect(Collectors.toMap(StockIngredient::getId, Function.identity()));
         if (found.size() != ids.size()) {
@@ -136,8 +136,8 @@ public class StockRecipeService {
         Menu menu = menuRepository.findById(product.getMenuId())
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        Long userId = securityUtils.getCurrentMerchantId();
-        if (!userId.equals(menu.getUserId())) {
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        if (!merchantId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return new OwnedProduct(product, menu);

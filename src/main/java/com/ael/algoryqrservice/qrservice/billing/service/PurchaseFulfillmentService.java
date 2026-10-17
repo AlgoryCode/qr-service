@@ -135,7 +135,7 @@ public class PurchaseFulfillmentService {
         purchase.setCancellationReason(null);
         purchaseRepository.save(purchase);
         fulfillmentQueuePublisher.publishPayment(event);
-        menuPublicAccessService.syncForUser(purchase.getUserId());
+        menuPublicAccessService.syncForUser(purchase.getMerchantId());
     }
 
     @Transactional
@@ -154,7 +154,7 @@ public class PurchaseFulfillmentService {
         fulfillment.setFailureReason(event.getFailureReason());
         fulfillmentRepository.save(fulfillment);
         if (status == FulfillmentStatus.OVERDUE) {
-            menuPublicAccessService.syncForUser(purchase.getUserId());
+            menuPublicAccessService.syncForUser(purchase.getMerchantId());
         }
     }
 
@@ -266,7 +266,7 @@ public class PurchaseFulfillmentService {
             purchase.setExpiresAt(LocalDateTime.now());
             purchaseRepository.save(purchase);
             fulfillmentQueuePublisher.publishRevoked(purchase);
-            menuPublicAccessService.syncForUser(purchase.getUserId());
+            menuPublicAccessService.syncForUser(purchase.getMerchantId());
             return;
         }
 
@@ -283,7 +283,7 @@ public class PurchaseFulfillmentService {
                 : PurchaseStatus.EXPIRED);
         purchaseRepository.save(purchase);
         fulfillmentQueuePublisher.publishGranted(purchase);
-        menuPublicAccessService.syncForUser(purchase.getUserId());
+        menuPublicAccessService.syncForUser(purchase.getMerchantId());
     }
 
     private void applyCardSnapshotFromEvent(Purchase purchase, PaymentCompletedEventDto event) {

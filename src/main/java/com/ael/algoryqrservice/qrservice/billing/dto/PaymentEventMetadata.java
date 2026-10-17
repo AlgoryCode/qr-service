@@ -8,7 +8,7 @@ import java.util.Map;
 
 public record PaymentEventMetadata(
         Long purchaseId,
-        Long userId,
+        Long merchantId,
         Long packageId,
         String packageCode,
         String purchaseConversationId,

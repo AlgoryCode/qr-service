@@ -65,11 +65,11 @@ public class MenuFixedExpenseController {
     }
 
     private void requireOrderAnalyticsScope() {
-        Long userId = securityUtils.getCurrentMerchantId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         try {
-            productUsageGateway.allow(userId, CatalogProducts.SMART_REPORTING);
+            productUsageGateway.allow(merchantId, CatalogProducts.SMART_REPORTING);
         } catch (ForbiddenException reportingDenied) {
-            productUsageGateway.allow(userId, CatalogProducts.WAITER_PANEL);
+            productUsageGateway.allow(merchantId, CatalogProducts.WAITER_PANEL);
         }
     }
 }

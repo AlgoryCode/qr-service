@@ -32,8 +32,8 @@ public class MenuProduct extends QrBaseModel {
     @Column(name = "menu_id")
     private Long menuId;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name = "merchant_id")
+    private Long merchantId;
 
     @Column(nullable = false)
     private String name;

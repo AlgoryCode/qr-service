@@ -64,7 +64,7 @@ public class LoginUseCase {
 
         loginAttemptGuard.reset(key);
         if (AuthSubject.TYPE_MERCHANT.equals(subject.subjectType())
-                && demoAccountRepository.findByUserId(subject.subjectId()).isPresent()) {
+                && demoAccountRepository.findByMerchantId(subject.subjectId()).isPresent()) {
             throw new BadRequestException("Demo girisi ayri ekrandan yapilir");
         }
         requireMerchantEmailVerified(subject);

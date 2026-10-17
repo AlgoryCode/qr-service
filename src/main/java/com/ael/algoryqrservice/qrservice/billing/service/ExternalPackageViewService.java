@@ -23,23 +23,23 @@ public class ExternalPackageViewService {
     private final FulfillmentServiceClient fulfillmentClient;
     private final ExternalPackageResponseMapper mapper;
 
-    public Optional<List<PurchaseResponse>> purchases(Long userId) {
-        return Optional.of(active(userId).map(mapper::toPurchase).map(List::of).orElseGet(List::of));
+    public Optional<List<PurchaseResponse>> purchases(Long merchantId) {
+        return Optional.of(active(merchantId).map(mapper::toPurchase).map(List::of).orElseGet(List::of));
     }
 
-    public Optional<List<UserEntitlementResponse>> entitlements(Long userId) {
-        LoadedPackage loaded = load(userId);
+    public Optional<List<UserEntitlementResponse>> entitlements(Long merchantId) {
+        LoadedPackage loaded = load(merchantId);
         return Optional.of(mapper.toEntitlements(loaded.entitlements(), loaded.purchaseId()));
     }
 
-    public Optional<AccessSession> session(Long userId) {
-        return Optional.of(active(userId)
+    public Optional<AccessSession> session(Long merchantId) {
+        return Optional.of(active(merchantId)
                 .map(mapper::toAllowSession)
                 .orElseGet(() -> AccessSession.of(AccessDecision.REQUIRE_PURCHASE, null, null, null)));
     }
 
-    public Optional<SubscriptionOverviewResponse> overview(Long userId) {
-        LoadedPackage loaded = load(userId);
+    public Optional<SubscriptionOverviewResponse> overview(Long merchantId) {
+        LoadedPackage loaded = load(merchantId);
         List<UserEntitlementResponse> entitlements = mapper.toEntitlements(loaded.entitlements(), loaded.purchaseId());
         return Optional.of(SubscriptionOverviewResponse.builder()
                 .activePackage(loaded.active().map(mapper::toSummary).orElse(null))
@@ -50,15 +50,15 @@ public class ExternalPackageViewService {
                 .build());
     }
 
-    private LoadedPackage load(Long userId) {
-        Optional<ExternalActivePackageResponse> active = active(userId);
-        List<ExternalEntitlementResponse> entitlements = fulfillmentClient.listEntitlements(userId);
+    private LoadedPackage load(Long merchantId) {
+        Optional<ExternalActivePackageResponse> active = active(merchantId);
+        List<ExternalEntitlementResponse> entitlements = fulfillmentClient.listEntitlements(merchantId);
         Long purchaseId = active.map(mapper::purchaseKey).orElse(null);
         return new LoadedPackage(active, entitlements, purchaseId);
     }
 
-    private Optional<ExternalActivePackageResponse> active(Long userId) {
-        PackageView view = fulfillmentClient.findPackage(userId);
+    private Optional<ExternalActivePackageResponse> active(Long merchantId) {
+        PackageView view = fulfillmentClient.findPackage(merchantId);
         if (!"ACTIVE".equals(view.status()) || view.body() == null) {
             return Optional.empty();
         }

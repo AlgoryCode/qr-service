@@ -39,8 +39,8 @@ public class CouponLog {
     @Column(name = "coupon_id", nullable = false)
     private Long couponId;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name = "merchant_id")
+    private Long merchantId;
 
     @Column(name = "purchase_id")
     private Long purchaseId;

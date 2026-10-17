@@ -53,7 +53,7 @@ public class AiMenuImportService {
             AiMenuImportClientDtos.JobAccepted remote = aiServiceClient.createMenuImportJob(
                     AiMenuImportClientDtos.CreateRequest.builder()
                             .menuId(menuId)
-                            .userId(menu.getUserId())
+                            .merchantId(menu.getMerchantId())
                             .imageUrls(imageUrls)
                             .build()
             );
@@ -86,7 +86,7 @@ public class AiMenuImportService {
             return AiMenuImportDtos.JobResponse.builder()
                     .jobId(remote.getJobId())
                     .menuId(remote.getMenuId())
-                    .userId(remote.getUserId())
+                    .merchantId(remote.getMerchantId())
                     .status(remote.getStatus())
                     .imageUrls(remote.getImageUrls())
                     .publishedCount(remote.getPublishedCount())
@@ -103,11 +103,11 @@ public class AiMenuImportService {
     @Transactional
     public AiMenuImportDtos.PublishResponse publishProducts(AiMenuImportDtos.PublishRequest request) {
         Long menuId = request.getMenuId();
-        Long userId = request.getUserId();
+        Long merchantId = request.getMerchantId();
         Menu menu = menuRepository.findById(menuId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        if (!userId.equals(menu.getUserId())) {
+        if (!merchantId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
 
@@ -135,12 +135,12 @@ public class AiMenuImportService {
                     .servesPeopleMax(1)
                     .nutrition(normalizeNutrition(product.getNutrition()))
                     .build();
-            MenuDtos.MenuProductResponse created = menuService.createProductForOwner(menuId, userId, createRequest);
+            MenuDtos.MenuProductResponse created = menuService.createProductForOwner(menuId, merchantId, createRequest);
             productIds.add(created.getProductId());
         }
         log.info(
                 "menu_import_products_published menuId={} userId={} createdCount={}",
-                menuId, userId, productIds.size()
+                menuId, merchantId, productIds.size()
         );
         return AiMenuImportDtos.PublishResponse.builder()
                 .menuId(menuId)
@@ -212,11 +212,11 @@ public class AiMenuImportService {
     }
 
     private Menu requireOwnedMenuEntity(Long menuId) {
-        Long userId = securityUtils.getCurrentMerchantId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         Menu menu = menuRepository.findById(menuId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        if (!userId.equals(menu.getUserId())) {
+        if (!merchantId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

@@ -11,5 +11,5 @@ public interface DemoAccountJpaRepository extends JpaRepository<DemoAccountEntit
 
     Optional<DemoAccountEntity> findByUsernameIgnoreCase(String username);
 
-    Optional<DemoAccountEntity> findByUserId(Long userId);
+    Optional<DemoAccountEntity> findByMerchantId(Long merchantId);
 }

@@ -93,12 +93,12 @@ public class MenuProductOptionService {
     }
 
     @Transactional(readOnly = true)
-    public List<MenuDtos.MenuProductOptionGroupResponse> listLibrary(Long userId) {
-        if (userId == null) {
+    public List<MenuDtos.MenuProductOptionGroupResponse> listLibrary(Long merchantId) {
+        if (merchantId == null) {
             return List.of();
         }
         List<MenuProductOptionGroup> groups =
-                optionGroupRepository.findByUserIdAndProductIdIsNullOrderBySortOrderAscIdAsc(userId);
+                optionGroupRepository.findByMerchantIdAndProductIdIsNullOrderBySortOrderAscIdAsc(merchantId);
         Map<Long, List<Long>> productIdsByGroup = new LinkedHashMap<>();
         List<Long> groupIds = groups.stream().map(MenuProductOptionGroup::getId).toList();
         if (!groupIds.isEmpty()) {
@@ -122,17 +122,17 @@ public class MenuProductOptionService {
 
     @Transactional
     public MenuDtos.MenuProductOptionGroupResponse createLibrary(
-            Long userId,
+            Long merchantId,
             MenuDtos.MenuProductOptionGroupRequest request
     ) {
-        if (userId == null) {
+        if (merchantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Oturum gerekli");
         }
         if (request == null) {
             throw new BadRequestException("Opsiyon grubu zorunludur");
         }
         MenuProductOptionGroup group = buildGroup(null, request, 0);
-        group.setUserId(userId);
+        group.setMerchantId(merchantId);
         group.setProductId(null);
         MenuProductOptionGroup saved = optionGroupRepository.save(group);
         MenuDtos.MenuProductOptionGroupResponse response = toResponses(List.of(saved)).get(0);
@@ -142,14 +142,14 @@ public class MenuProductOptionService {
 
     @Transactional
     public MenuDtos.MenuProductOptionGroupResponse updateLibrary(
-            Long userId,
+            Long merchantId,
             Long groupId,
             MenuDtos.MenuProductOptionGroupRequest request
     ) {
         if (request == null) {
             throw new BadRequestException("Opsiyon grubu zorunludur");
         }
-        MenuProductOptionGroup group = requireLibrary(userId, groupId);
+        MenuProductOptionGroup group = requireLibrary(merchantId, groupId);
         MenuProductOptionGroup rebuilt = buildGroup(null, request, group.getSortOrder());
         group.setName(rebuilt.getName());
         group.setKind(rebuilt.getKind());
@@ -170,17 +170,17 @@ public class MenuProductOptionService {
     }
 
     @Transactional
-    public void deleteLibrary(Long userId, Long groupId) {
-        optionGroupRepository.delete(requireLibrary(userId, groupId));
+    public void deleteLibrary(Long merchantId, Long groupId) {
+        optionGroupRepository.delete(requireLibrary(merchantId, groupId));
     }
 
     @Transactional
     public MenuDtos.MenuProductOptionGroupResponse assignLibrary(
-            Long userId,
+            Long merchantId,
             Long groupId,
             List<Long> productIds
     ) {
-        MenuProductOptionGroup source = requireLibrary(userId, groupId);
+        MenuProductOptionGroup source = requireLibrary(merchantId, groupId);
         LinkedHashSet<Long> ids = uniqueIds(productIds);
         if (ids.isEmpty()) {
             throw new BadRequestException("En az bir ürün seçin");
@@ -195,7 +195,7 @@ public class MenuProductOptionService {
             }
             MenuProductOptionGroup copy = copyGroup(source, productId);
             copy.setLibraryGroupId(source.getId());
-            copy.setUserId(null);
+            copy.setMerchantId(null);
             optionGroupRepository.save(copy);
         }
         MenuDtos.MenuProductOptionGroupResponse response = toResponses(List.of(source)).get(0);
@@ -337,11 +337,11 @@ public class MenuProductOptionService {
         return productId + ":" + optionPart;
     }
 
-    private MenuProductOptionGroup requireLibrary(Long userId, Long groupId) {
-        if (userId == null || groupId == null) {
+    private MenuProductOptionGroup requireLibrary(Long merchantId, Long groupId) {
+        if (merchantId == null || groupId == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Opsiyon grubu bulunamadı");
         }
-        return optionGroupRepository.findByIdAndUserIdAndProductIdIsNull(groupId, userId)
+        return optionGroupRepository.findByIdAndUserIdAndProductIdIsNull(groupId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Opsiyon grubu bulunamadı"));
     }
 

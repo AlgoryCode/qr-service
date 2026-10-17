@@ -29,7 +29,7 @@ public class RemoteSubscriptionCanceller {
             return;
         }
         try {
-            paymentServiceClient.cancelSubscription(purchase.getUserId(), purchase.getSubscriptionId());
+            paymentServiceClient.cancelSubscription(purchase.getMerchantId(), purchase.getSubscriptionId());
             purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
             purchaseRepository.save(purchase);
         } catch (PaymentServiceException exception) {

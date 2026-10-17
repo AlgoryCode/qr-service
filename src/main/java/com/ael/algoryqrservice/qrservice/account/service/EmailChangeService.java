@@ -59,7 +59,7 @@ public class EmailChangeService {
 
         EmailChangeChallenge challenge = EmailChangeChallenge.builder()
                 .id(UUID.randomUUID())
-                .userId(user.getId())
+                .merchantId(user.getId())
                 .currentEmail(user.getEmail())
                 .status(EmailChangeChallengeStatus.AWAITING_CURRENT_CODE)
                 .createdAt(now)
@@ -176,7 +176,7 @@ public class EmailChangeService {
         String code = generateSixDigitCode();
         EmailChangeCode entity = EmailChangeCode.builder()
                 .challengeId(challengeId)
-                .userId(user.getId())
+                .merchantId(user.getId())
                 .email(email)
                 .code(code)
                 .purpose(purpose)
@@ -229,14 +229,14 @@ public class EmailChangeService {
         codeRepository.revokePendingByChallengeAndPurpose(challengeId, purpose, now);
     }
 
-    private EmailChangeChallenge loadOwnedChallenge(String challengeId, Long userId) {
+    private EmailChangeChallenge loadOwnedChallenge(String challengeId, Long merchantId) {
         UUID id;
         try {
             id = UUID.fromString(challengeId.trim());
         } catch (IllegalArgumentException exception) {
             throw new BadRequestException("Geçersiz işlem kimliği");
         }
-        return challengeRepository.findByIdAndUserId(id, userId)
+        return challengeRepository.findByIdAndUserId(id, merchantId)
                 .orElseThrow(() -> new BadRequestException("İşlem bulunamadı. Sürece yeniden başlayın."));
     }
 

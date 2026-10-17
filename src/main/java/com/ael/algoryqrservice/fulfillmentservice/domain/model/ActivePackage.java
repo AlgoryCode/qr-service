@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 public record ActivePackage(
         Long id,
-        Long userId,
+        Long merchantId,
         Long fulfillmentId,
         Long purchaseId,
         Long packageId,

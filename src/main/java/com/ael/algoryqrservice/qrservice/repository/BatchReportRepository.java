@@ -12,9 +12,9 @@ import java.util.UUID;
 
 public interface BatchReportRepository extends JpaRepository<BatchReport, UUID> {
 
-    Page<BatchReport> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+    Page<BatchReport> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
 
-    Optional<BatchReport> findByIdAndUserId(UUID id, Long userId);
+    Optional<BatchReport> findByIdAndUserId(UUID id, Long merchantId);
 
     List<BatchReport> findByStatusInOrderByUpdatedAtAsc(Collection<String> statuses);
 }

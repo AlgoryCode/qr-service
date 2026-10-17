@@ -21,7 +21,7 @@ public class PurchaseSchemaCompatibilityFixer implements ApplicationRunner {
     private static final String[] PURCHASE_LOG_NULLABLE_COLUMNS = {
             "customer_id",
             "purchase_id",
-            "user_id"
+            "merchant_id"
     };
 
     private static final String[] USER_ENTITLEMENT_NULLABLE_COLUMNS = {

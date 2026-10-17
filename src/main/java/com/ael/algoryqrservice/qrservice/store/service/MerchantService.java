@@ -24,13 +24,13 @@ public class MerchantService {
 
     @Transactional(readOnly = true)
     public Merchant requireCurrentMerchant() {
-        return merchantRepository.findByUserIdAndDeletedFalse(securityUtils.getCurrentMerchantId())
+        return merchantRepository.findByOwnerMerchantIdAndDeletedFalse(securityUtils.getCurrentMerchantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mağaza kurulumu yapılmamış"));
     }
 
     @Transactional(readOnly = true)
     public Optional<StoreDtos.MerchantResponse> findMine() {
-        return merchantRepository.findByUserIdAndDeletedFalse(securityUtils.getCurrentMerchantId())
+        return merchantRepository.findByOwnerMerchantIdAndDeletedFalse(securityUtils.getCurrentMerchantId())
                 .map(merchantMapper::toResponse);
     }
 

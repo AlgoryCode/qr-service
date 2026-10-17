@@ -58,7 +58,7 @@ public class SmartReportCompletionNotifier {
         event.setNotificationSentAt(LocalDateTime.now());
         smartReportEventRepository.save(event);
 
-        User user = userRepository.findById(event.getUserId()).orElse(null);
+        User user = userRepository.findById(event.getMerchantId()).orElse(null);
         if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
             log.warn("Smart report ready email skipped; user missing. processId={}", processId);
             return;

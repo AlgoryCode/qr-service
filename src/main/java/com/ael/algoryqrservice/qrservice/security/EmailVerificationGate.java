@@ -25,26 +25,26 @@ public class EmailVerificationGate {
                 .build();
     }
 
-    public boolean isVerificationPending(Long userId) {
-        if (userId == null) {
+    public boolean isVerificationPending(Long merchantId) {
+        if (merchantId == null) {
             return false;
         }
-        if (Boolean.TRUE.equals(verifiedUsers.getIfPresent(userId))) {
+        if (Boolean.TRUE.equals(verifiedUsers.getIfPresent(merchantId))) {
             return false;
         }
-        boolean verified = userRepository.findById(userId)
+        boolean verified = userRepository.findById(merchantId)
                 .map(user -> user.getProvider() != AuthProvider.BASIC || user.isEmailVerified())
                 .orElse(true);
         if (verified) {
-            verifiedUsers.put(userId, true);
+            verifiedUsers.put(merchantId, true);
         }
         return !verified;
     }
 
-    public void markVerified(Long userId) {
-        if (userId == null) {
+    public void markVerified(Long merchantId) {
+        if (merchantId == null) {
             return;
         }
-        verifiedUsers.put(userId, true);
+        verifiedUsers.put(merchantId, true);
     }
 }

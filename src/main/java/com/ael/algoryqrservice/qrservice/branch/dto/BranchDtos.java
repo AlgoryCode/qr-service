@@ -70,7 +70,7 @@ public final class BranchDtos {
     @AllArgsConstructor
     public static class Response {
         private Long id;
-        private Long userId;
+        private Long merchantId;
         private String name;
         private String address;
         private String phone;

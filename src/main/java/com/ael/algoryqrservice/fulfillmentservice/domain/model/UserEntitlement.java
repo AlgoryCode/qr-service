@@ -4,7 +4,7 @@ import java.time.Instant;
 
 public record UserEntitlement(
         Long id,
-        Long userId,
+        Long merchantId,
         Long fulfillmentId,
         Long purchaseId,
         Long productId,

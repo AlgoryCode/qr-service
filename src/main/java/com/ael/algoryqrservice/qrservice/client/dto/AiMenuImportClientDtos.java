@@ -20,7 +20,7 @@ public final class AiMenuImportClientDtos {
     @AllArgsConstructor
     public static class CreateRequest {
         private Long menuId;
-        private Long userId;
+        private Long merchantId;
         private List<String> imageUrls;
     }
 
@@ -41,7 +41,7 @@ public final class AiMenuImportClientDtos {
     public static class JobResponse {
         private UUID jobId;
         private Long menuId;
-        private Long userId;
+        private Long merchantId;
         private String status;
         private List<String> imageUrls;
         private Integer publishedCount;

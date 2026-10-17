@@ -45,13 +45,13 @@ public class MerchantSetupService {
 
     @Transactional(readOnly = true)
     public StoreDtos.SetupPrefillResponse prefill() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        List<Branch> branches = branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(userId);
-        List<Menu> menus = cloneableMenus(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        List<Branch> branches = branchRepository.findByMerchantIdAndDeletedFalseOrderByIdDesc(merchantId);
+        List<Menu> menus = cloneableMenus(merchantId);
         Map<Long, String> branchNames = branches.stream()
                 .collect(Collectors.toMap(Branch::getId, Branch::getName, (left, right) -> left));
         return StoreDtos.SetupPrefillResponse.builder()
-                .alreadySetUp(merchantRepository.existsByUserIdAndDeletedFalse(userId))
+                .alreadySetUp(merchantRepository.existsByOwnerMerchantIdAndDeletedFalse(merchantId))
                 .suggested(suggestBusinessInfo(branches, menus))
                 .branches(branches.stream().map(this::toBranchOption).toList())
                 .menus(menus.stream().map(menu -> toMenuOption(menu, branchNames)).toList())
@@ -60,16 +60,16 @@ public class MerchantSetupService {
 
     @Transactional
     public StoreDtos.MerchantResponse setup(StoreDtos.SetupRequest request) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        if (merchantRepository.existsByUserIdAndDeletedFalse(userId)) {
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        if (merchantRepository.existsByOwnerMerchantIdAndDeletedFalse(merchantId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Mağaza kurulumu zaten tamamlanmış");
         }
-        Long branchId = resolveBranchId(request.branchId(), userId);
+        Long branchId = resolveBranchId(request.branchId(), merchantId);
 
         Menu catalogMenu = menuRepository.save(Menu.builder()
                 .publicId(menuPublicIdGenerator.generateUnique())
                 .channel(MenuChannel.STORE)
-                .userId(userId)
+                .merchantId(merchantId)
                 .branchId(branchId)
                 .themeId(STORE_THEME_ID)
                 .businessName(request.business().businessName().trim())
@@ -80,7 +80,7 @@ public class MerchantSetupService {
                 .build());
 
         Merchant merchant = Merchant.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .branchId(branchId)
                 .catalogMenuId(catalogMenu.getMenuId())
                 .storeNo(merchantRepository.nextStoreNo())
@@ -93,16 +93,16 @@ public class MerchantSetupService {
         merchantMapper.applyDeliverySettings(merchant, request.delivery());
 
         if (request.sourceMenuId() != null) {
-            menuCatalogCloneService.cloneInto(catalogMenu, request.sourceMenuId(), userId);
+            menuCatalogCloneService.cloneInto(catalogMenu, request.sourceMenuId(), merchantId);
         }
         return merchantMapper.toResponse(merchantRepository.save(merchant));
     }
 
-    private Long resolveBranchId(Long branchId, Long userId) {
+    private Long resolveBranchId(Long branchId, Long merchantId) {
         if (branchId == null) {
             return null;
         }
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, userId)
+        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
                 .map(Branch::getId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şube bulunamadı"));
     }
@@ -133,8 +133,8 @@ public class MerchantSetupService {
                 .build();
     }
 
-    private List<Menu> cloneableMenus(Long userId) {
-        return menuRepository.findActiveMenusWithQrByUserId(userId).stream()
+    private List<Menu> cloneableMenus(Long merchantId) {
+        return menuRepository.findActiveMenusWithQrByUserId(merchantId).stream()
                 .map(row -> (Menu) row[0])
                 .filter(menu -> menu.getChannel() != MenuChannel.STORE)
                 .toList();

@@ -24,7 +24,7 @@ public class QrGenerationService {
         String base64 = qrCodeGeneratorUtil.generateBase64Png(content);
 
         Qr qr = Qr.builder()
-                .userId(request.getUserId())
+                .merchantId(request.getMerchantId())
                 .purchaseId(request.getPurchaseId())
                 .qrName(request.getQrName())
                 .details(objectMapper.valueToTree(request.getDetails()))

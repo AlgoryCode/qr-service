@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_platform_feedback", indexes = {
-        @Index(name = "idx_platform_feedback_user_created", columnList = "user_id, created_at"),
+        @Index(name = "idx_platform_feedback_user_created", columnList = "merchant_id, created_at"),
         @Index(name = "idx_platform_feedback_status_created", columnList = "status, created_at")
 })
 @Getter
@@ -37,8 +37,8 @@ public class PlatformFeedback {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(nullable = false, length = 120)
     private String title;

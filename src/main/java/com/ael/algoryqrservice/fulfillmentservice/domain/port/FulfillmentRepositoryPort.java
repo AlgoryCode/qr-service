@@ -15,11 +15,11 @@ public interface FulfillmentRepositoryPort {
 
     PackageFulfillment saveFulfillment(PackageFulfillment fulfillment);
 
-    void supersedeOtherFulfillments(Long userId, Long keepFulfillmentId);
+    void supersedeOtherFulfillments(Long merchantId, Long keepFulfillmentId);
 
-    Optional<ActivePackage> findActiveByUserId(Long userId);
+    Optional<ActivePackage> findActiveByUserId(Long merchantId);
 
     ActivePackage upsertActivePackage(ActivePackage activePackage);
 
-    Page<PackageFulfillment> findByUserId(Long userId, Pageable pageable);
+    Page<PackageFulfillment> findByMerchantId(Long merchantId, Pageable pageable);
 }

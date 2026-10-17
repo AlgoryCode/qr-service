@@ -16,7 +16,7 @@ public final class UserAccountingEntrySpecifications {
     }
 
     public static Specification<UserAccountingEntry> forUserListedSources(
-            Long userId,
+            Long merchantId,
             AccountingEntryType entryType,
             LocalDateTime from,
             LocalDateTime to,
@@ -24,7 +24,7 @@ public final class UserAccountingEntrySpecifications {
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("userId"), userId));
+            predicates.add(cb.equal(root.get("userId"), merchantId));
             predicates.add(root.get("sourceType").in(
                     AccountingSourceType.MANUAL,
                     AccountingSourceType.BILL_SALE

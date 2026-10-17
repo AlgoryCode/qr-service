@@ -35,8 +35,8 @@ public class RestaurantArea {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name = "merchant_id")
+    private Long merchantId;
 
     @Column(name = "layout_id")
     private Long layoutId;

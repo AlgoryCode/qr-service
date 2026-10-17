@@ -93,7 +93,7 @@ public class PasswordChangeUseCase {
         }
         expireTimedOut(merchantId, now);
         PasswordChangeCodeEntity changeCode = matchPending(merchantId, code, now);
-        DemoAccountEntity demoAccount = demoAccountRepository.findByUserId(merchant.getId()).orElse(null);
+        DemoAccountEntity demoAccount = demoAccountRepository.findByMerchantId(merchant.getId()).orElse(null);
         String currentPassword = demoAccount != null ? demoAccount.getPassword() : merchant.getPassword();
         if (currentPassword != null && passwordEncoder.matches(newPassword, currentPassword)) {
             throw new BadRequestException("Yeni şifre mevcut şifre ile aynı olamaz");

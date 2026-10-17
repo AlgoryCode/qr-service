@@ -8,13 +8,13 @@ import java.util.Optional;
 
 public interface BranchRepository extends JpaRepository<Branch, Long> {
 
-    List<Branch> findByUserIdAndDeletedFalseOrderByIdDesc(Long userId);
+    List<Branch> findByMerchantIdAndDeletedFalseOrderByIdDesc(Long merchantId);
 
-    Optional<Branch> findByIdAndUserIdAndDeletedFalse(Long id, Long userId);
+    Optional<Branch> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
 
-    long countByUserIdAndDeletedFalse(Long userId);
+    long countByUserIdAndDeletedFalse(Long merchantId);
 
-    long countByUserIdAndGrandfatheredTrueAndDeletedFalse(Long userId);
+    long countByUserIdAndGrandfatheredTrueAndDeletedFalse(Long merchantId);
 
-    List<Branch> findByUserIdAndDeletedFalse(Long userId);
+    List<Branch> findByMerchantIdAndDeletedFalse(Long merchantId);
 }

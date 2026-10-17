@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_restaurant_layout", indexes = {
-        @Index(name = "idx_restaurant_layout_user", columnList = "user_id")
+        @Index(name = "idx_restaurant_layout_user", columnList = "merchant_id")
 })
 @Getter
 @Setter
@@ -35,8 +35,8 @@ public class RestaurantLayout {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(nullable = false, length = 120)
     private String name;

@@ -49,13 +49,13 @@ public class FulfillmentQueuePublisher {
     }
 
     public void publishGranted(Purchase purchase) {
-        if (purchase == null || purchase.getUserId() == null) {
+        if (purchase == null || purchase.getMerchantId() == null) {
             return;
         }
         send(lifecycle(
                 PaymentEventTypes.PAYMENT_SUCCESS,
                 "purchase:" + purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 purchase.getId(),
                 purchase.getPackageId(),
                 purchase.getPackageCode(),
@@ -67,13 +67,13 @@ public class FulfillmentQueuePublisher {
     }
 
     public void publishRevoked(Purchase purchase) {
-        if (purchase == null || purchase.getUserId() == null) {
+        if (purchase == null || purchase.getMerchantId() == null) {
             return;
         }
         send(lifecycle(
                 PaymentEventTypes.PAYMENT_REFUNDED,
                 "purchase-revoked:" + purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 purchase.getId(),
                 purchase.getPackageId(),
                 purchase.getPackageCode(),
@@ -87,7 +87,7 @@ public class FulfillmentQueuePublisher {
     private FulfillmentQueueMessage lifecycle(
             String eventType,
             String eventId,
-            Long userId,
+            Long merchantId,
             Long purchaseId,
             Long packageId,
             String packageCode,
@@ -106,7 +106,7 @@ public class FulfillmentQueuePublisher {
                 String.valueOf(purchaseId),
                 null,
                 purchaseId == null ? null : String.valueOf(purchaseId),
-                userId == null ? null : String.valueOf(userId),
+                merchantId == null ? null : String.valueOf(merchantId),
                 packageId == null ? null : String.valueOf(packageId),
                 packageCode,
                 null,
@@ -127,7 +127,7 @@ public class FulfillmentQueuePublisher {
                 "fulfillment_payment_apply eventId={} eventType={} userId={} purchaseId={} packageCode={}",
                 message.eventId(),
                 message.eventType(),
-                message.userId(),
+                message.merchantId(),
                 message.purchaseId(),
                 message.packageCode()
         );

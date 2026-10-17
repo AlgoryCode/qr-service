@@ -22,14 +22,14 @@ public class QrController {
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserQrs(
-            @PathVariable Long userId,
+            @PathVariable Long merchantId,
             @RequestParam(defaultValue = "false") boolean includeImage,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(defaultValue = "ALL") String scope
     ) {
         return ResponseEntity.ok(
-                qrService.getUserQrs(userId, includeImage, page, size, QrListScope.from(scope))
+                qrService.getUserQrs(merchantId, includeImage, page, size, QrListScope.from(scope))
         );
     }
 

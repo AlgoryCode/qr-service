@@ -22,18 +22,18 @@ public class BillingAddressController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size
     ) {
-        return service.list(userId(), page, size);
+        return service.list(merchantId(), page, size);
     }
 
     @GetMapping("/{id}")
     public BillingAddressDtos.Response get(@PathVariable Long id) {
-        return service.get(userId(), id);
+        return service.get(merchantId(), id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public BillingAddressDtos.Response create(@Valid @RequestBody BillingAddressDtos.Request request) {
-        return service.create(userId(), request);
+        return service.create(merchantId(), request);
     }
 
     @PutMapping("/{id}")
@@ -41,21 +41,21 @@ public class BillingAddressController {
             @PathVariable Long id,
             @Valid @RequestBody BillingAddressDtos.Request request
     ) {
-        return service.update(userId(), id, request);
+        return service.update(merchantId(), id, request);
     }
 
     @PutMapping("/{id}/default")
     public BillingAddressDtos.Response makeDefault(@PathVariable Long id) {
-        return service.makeDefault(userId(), id);
+        return service.makeDefault(merchantId(), id);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(userId(), id);
+        service.delete(merchantId(), id);
         return ResponseEntity.noContent().build();
     }
 
-    private Long userId() {
-        return securityUtils.getCurrentUser().getId();
+    private Long merchantId() {
+        return securityUtils.getCurrentMerchantId();
     }
 }

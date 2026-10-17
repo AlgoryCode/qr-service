@@ -63,7 +63,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
                             command.eventId(),
                             command.eventType(),
                             command.purchaseId(),
-                            command.userId(),
+                            command.merchantId(),
                             command.packageId(),
                             command.packageCode(),
                             command.conversationId(),
@@ -92,13 +92,13 @@ public class FulfillmentServiceImpl implements FulfillmentService {
             throw exception;
         }
 
-        fulfillmentRepository.supersedeOtherFulfillments(command.userId(), created.id());
-        entitlementPort.supersedeOtherEntitlements(command.userId(), created.id());
+        fulfillmentRepository.supersedeOtherFulfillments(command.merchantId(), created.id());
+        entitlementPort.supersedeOtherEntitlements(command.merchantId(), created.id());
         grantPackageEntitlements(created, command.periodStart(), command.periodEnd(), now);
         fulfillmentRepository.upsertActivePackage(
                 new ActivePackage(
                         null,
-                        command.userId(),
+                        command.merchantId(),
                         created.id(),
                         command.purchaseId(),
                         command.packageId(),
@@ -114,7 +114,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
         log.info(
                 "Package fulfilled. fulfillmentId={} userId={} purchaseId={} packageCode={}",
                 created.id(),
-                command.userId(),
+                command.merchantId(),
                 command.purchaseId(),
                 command.packageCode()
         );
@@ -123,8 +123,8 @@ public class FulfillmentServiceImpl implements FulfillmentService {
 
     @Override
     @Transactional
-    public void assignPackage(Long userId, String packageCode, int periodDays) {
-        if (findActivePackage(userId).isPresent()) {
+    public void assignPackage(Long merchantId, String packageCode, int periodDays) {
+        if (findActivePackage(merchantId).isPresent()) {
             throw new PackageAlreadyAssignedException();
         }
         PlanPackage plan = packageCatalogPort.findByCode(packageCode)
@@ -136,10 +136,10 @@ public class FulfillmentServiceImpl implements FulfillmentService {
         int effectivePeriodDays = resolvePeriodDays(plan, periodDays);
         LocalDate periodStart = LocalDate.now(ZoneOffset.UTC);
         fulfillPaidPackage(new FulfillmentCommand(
-                "assign:" + userId + ":" + plan.code(),
+                "assign:" + merchantId + ":" + plan.code(),
                 "package.assigned",
                 0L,
-                userId,
+                merchantId,
                 plan.id(),
                 plan.code(),
                 null,
@@ -156,27 +156,27 @@ public class FulfillmentServiceImpl implements FulfillmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<ActivePackage> findActivePackage(Long userId) {
-        return fulfillmentRepository.findActiveByUserId(userId)
+    public Optional<ActivePackage> findActivePackage(Long merchantId) {
+        return fulfillmentRepository.findActiveByUserId(merchantId)
                 .filter(active -> active.status() == PackageStatus.ACTIVE);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ActivePackage requireActivePackage(Long userId) {
-        return findActivePackage(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Active package not found for user " + userId));
+    public ActivePackage requireActivePackage(Long merchantId) {
+        return findActivePackage(merchantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Active package not found for user " + merchantId));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ActivePackageView requireActivePackageView(Long userId) {
-        ActivePackage active = requireActivePackage(userId);
-        List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(userId);
+    public ActivePackageView requireActivePackageView(Long merchantId) {
+        ActivePackage active = requireActivePackage(merchantId);
+        List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(merchantId);
         String packageName = resolvePackageName(active);
         return new ActivePackageView(
                 active.id(),
-                active.userId(),
+                active.merchantId(),
                 active.fulfillmentId(),
                 active.purchaseId(),
                 active.packageId(),
@@ -202,14 +202,14 @@ public class FulfillmentServiceImpl implements FulfillmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PackageFulfillment> listFulfillments(Long userId, Pageable pageable) {
-        return fulfillmentRepository.findByUserId(userId, pageable);
+    public Page<PackageFulfillment> listFulfillments(Long merchantId, Pageable pageable) {
+        return fulfillmentRepository.findByMerchantId(merchantId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserEntitlement> listActiveEntitlements(Long userId) {
-        return entitlementPort.findActiveByUserId(userId);
+    public List<UserEntitlement> listActiveEntitlements(Long merchantId) {
+        return entitlementPort.findActiveByUserId(merchantId);
     }
 
     private void grantPackageEntitlements(
@@ -246,7 +246,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
         String featureCode = item.featureCode() != null ? item.featureCode() : item.productCode();
         return new UserEntitlement(
                 null,
-                fulfillment.userId(),
+                fulfillment.merchantId(),
                 fulfillment.id(),
                 fulfillment.purchaseId(),
                 item.productId(),

@@ -54,8 +54,8 @@ public class UserAccountingService {
     private final SecurityUtils securityUtils;
     private final SessionAccessService sessionAccessService;
 
-    private void requireAllowAccess(Long userId) {
-        if (!sessionAccessService.resolve(userId).isAllow()) {
+    private void requireAllowAccess(Long merchantId) {
+        if (!sessionAccessService.resolve(merchantId).isAllow()) {
             throw new ForbiddenException("Muhasebe icin aktif paket veya deneme gereklidir");
         }
     }
@@ -69,8 +69,8 @@ public class UserAccountingService {
             throw new BadRequestException("Kayıt türü zorunludur");
         }
 
-        Long userId = securityUtils.getCurrentMerchantId();
-        requireAllowAccess(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        requireAllowAccess(merchantId);
         String title = requireText(request.getTitle(), "Başlık zorunludur", 200);
         BigDecimal amount = requirePositiveAmount(request.getAmount());
         LocalDateTime occurredAt = request.getOccurredAt();
@@ -80,12 +80,12 @@ public class UserAccountingService {
 
         Long menuId = request.getMenuId();
         if (menuId != null) {
-            requireOwnedMenu(menuId, userId);
+            requireOwnedMenu(menuId, merchantId);
         }
 
         LocalDateTime now = LocalDateTime.now();
         UserAccountingEntry entry = UserAccountingEntry.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .entryType(request.getEntryType())
                 .title(title)
                 .amount(amount)
@@ -98,7 +98,7 @@ public class UserAccountingService {
                 .updatedAt(now)
                 .build();
 
-        return toEntryResponse(userAccountingEntryRepository.save(entry), resolveMenuNames(userId));
+        return toEntryResponse(userAccountingEntryRepository.save(entry), resolveMenuNames(merchantId));
     }
 
     @Transactional
@@ -122,7 +122,7 @@ public class UserAccountingService {
         }
 
         Menu menu = menuRepository.findById(bill.getMenuId()).orElse(null);
-        if (menu == null || menu.getUserId() == null) {
+        if (menu == null || menu.getMerchantId() == null) {
             return;
         }
 
@@ -140,7 +140,7 @@ public class UserAccountingService {
         LocalDateTime occurredAt = bill.getClosedAt() != null ? bill.getClosedAt() : now;
 
         UserAccountingEntry entry = UserAccountingEntry.builder()
-                .userId(menu.getUserId())
+                .merchantId(menu.getMerchantId())
                 .entryType(AccountingEntryType.GELIR)
                 .title("Adisyon - " + tableName)
                 .amount(amount)
@@ -175,8 +175,8 @@ public class UserAccountingService {
             int page,
             int size
     ) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        requireAllowAccess(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        requireAllowAccess(merchantId);
         AccountingEntryType typeFilter = parseTypeFilter(type);
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
         LocalDateTime toDt = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
@@ -186,10 +186,10 @@ public class UserAccountingService {
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? 20 : Math.min(size, 100);
 
-        Map<Long, String> menuNames = resolveMenuNames(userId);
+        Map<Long, String> menuNames = resolveMenuNames(merchantId);
         List<UserAccountingEntry> entries = userAccountingEntryRepository.findAll(
                 UserAccountingEntrySpecifications.forUserListedSources(
-                        userId,
+                        merchantId,
                         typeFilter,
                         fromDt,
                         toDt,
@@ -224,10 +224,10 @@ public class UserAccountingService {
 
     @Transactional(readOnly = true)
     public UserAccountingDtos.EntryDetailResponse getDetailForCurrentUser(Long entryId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        requireAllowAccess(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        requireAllowAccess(merchantId);
         UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
-                .filter(e -> e.getUserId().equals(userId))
+                .filter(e -> e.getMerchantId().equals(merchantId))
                 .orElseThrow(() -> new NotFoundException("Kayıt bulunamadı"));
 
         if (entry.getSourceType() == AccountingSourceType.BILL_TIP) {
@@ -239,7 +239,7 @@ public class UserAccountingService {
         if (entry.getSourceOrderId() != null) {
             MenuOrder order = menuOrderRepository.findById(entry.getSourceOrderId()).orElse(null);
             if (order != null) {
-                requireOwnedMenu(order.getMenuId(), userId);
+                requireOwnedMenu(order.getMenuId(), merchantId);
                 List<MenuOrderItem> orderItems = menuOrderItemRepository.findByOrderId(order.getId());
                 for (MenuOrderItem item : orderItems) {
                     items.add(new UserAccountingDtos.DetailLineItem(
@@ -256,7 +256,7 @@ public class UserAccountingService {
         } else if (entry.getSourceBillId() != null) {
             TableBill bill = tableBillRepository.findWithItemsById(entry.getSourceBillId()).orElse(null);
             if (bill != null) {
-                requireOwnedMenu(bill.getMenuId(), userId);
+                requireOwnedMenu(bill.getMenuId(), merchantId);
                 List<TableBillItem> billItems = bill.getItems();
                 if (billItems == null || billItems.isEmpty()) {
                     billItems = tableBillItemRepository.findByBillId(bill.getId());
@@ -289,10 +289,10 @@ public class UserAccountingService {
 
     @Transactional
     public void deleteManual(Long entryId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        requireAllowAccess(userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        requireAllowAccess(merchantId);
         UserAccountingEntry entry = userAccountingEntryRepository.findById(entryId)
-                .filter(e -> e.getUserId().equals(userId))
+                .filter(e -> e.getMerchantId().equals(merchantId))
                 .orElseThrow(() -> new NotFoundException("Kayıt bulunamadı"));
         if (entry.getSourceType() != AccountingSourceType.MANUAL) {
             throw new BadRequestException("Otomatik oluşturulan kayıtlar silinemez");
@@ -352,8 +352,8 @@ public class UserAccountingService {
         return new UserAccountingDtos.SummaryTotals(gelir, gider, borc, "TRY");
     }
 
-    private Map<Long, String> resolveMenuNames(Long userId) {
-        List<Long> menuIds = menuRepository.findMenuIdsByUserIdAndChannel(userId, MenuChannel.QR);
+    private Map<Long, String> resolveMenuNames(Long merchantId) {
+        List<Long> menuIds = menuRepository.findMenuIdsByUserIdAndChannel(merchantId, MenuChannel.QR);
         Map<Long, String> menuNames = new HashMap<>();
         for (Long menuId : menuIds) {
             menuRepository.findById(menuId)
@@ -378,10 +378,10 @@ public class UserAccountingService {
         }
     }
 
-    private void requireOwnedMenu(Long menuId, Long userId) {
+    private void requireOwnedMenu(Long menuId, Long merchantId) {
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
-        if (!userId.equals(menu.getUserId())) {
+        if (!merchantId.equals(menu.getMerchantId())) {
             throw new NotFoundException("Menü bulunamadı");
         }
     }

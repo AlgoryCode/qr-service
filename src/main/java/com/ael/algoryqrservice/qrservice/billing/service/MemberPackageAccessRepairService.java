@@ -64,8 +64,8 @@ public class MemberPackageAccessRepairService {
                 PageRequest.of(0, limit)
         );
         int repaired = 0;
-        for (Long userId : userIds) {
-            if (repairIfMissingActivePackage(userId)) {
+        for (Long merchantId : userIds) {
+            if (repairIfMissingActivePackage(merchantId)) {
                 repaired++;
             }
         }
@@ -96,10 +96,10 @@ public class MemberPackageAccessRepairService {
             if (!self.applyFulfillmentRepair(selected)) {
                 return false;
             }
-            self.syncMenuPublicAccessAfterRepair(selected.getUserId());
+            self.syncMenuPublicAccessAfterRepair(selected.getMerchantId());
             log.info(
                     "Repaired fulfillment from active purchase. merchantId={} purchaseId={} packageCode={}",
-                    selected.getUserId(),
+                    selected.getMerchantId(),
                     selected.getId(),
                     selected.getPackageCode()
             );
@@ -108,14 +108,14 @@ public class MemberPackageAccessRepairService {
 
         @Transactional(readOnly = true)
         Optional<Purchase> loadLatestUsablePurchase(Long merchantId) {
-            return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(merchantId).stream()
+            return purchaseRepository.findByMerchantIdOrderByPurchasedAtDesc(merchantId).stream()
                     .filter(Purchase::isUsable)
                     .findFirst();
         }
 
         @Transactional
         public boolean applyFulfillmentRepair(Purchase purchase) {
-            if (purchase.getUserId() == null
+            if (purchase.getMerchantId() == null
                     || purchase.getPackageCode() == null
                     || purchase.getPackageCode().isBlank()) {
                 return false;
@@ -130,7 +130,7 @@ public class MemberPackageAccessRepairService {
                         REPAIR_EVENT_PREFIX + purchase.getId(),
                         "package.repaired",
                         purchase.getId(),
-                        purchase.getUserId(),
+                        purchase.getMerchantId(),
                         purchase.getPackageId(),
                         purchase.getPackageCode(),
                         purchase.getPaymentConversationId(),
@@ -143,7 +143,7 @@ public class MemberPackageAccessRepairService {
                         purchase.getCurrency() == null ? "TRY" : purchase.getCurrency(),
                         Map.of(
                                 "purchaseId", purchase.getId(),
-                                "userId", purchase.getUserId(),
+                                "userId", purchase.getMerchantId(),
                                 "packageCode", purchase.getPackageCode()
                         )
                 ));
@@ -151,7 +151,7 @@ public class MemberPackageAccessRepairService {
             } catch (RuntimeException exception) {
                 log.warn(
                         "Fulfillment repair skipped. merchantId={} purchaseId={} reason={}",
-                        purchase.getUserId(),
+                        purchase.getMerchantId(),
                         purchase.getId(),
                         exception.getMessage()
                 );
@@ -160,8 +160,8 @@ public class MemberPackageAccessRepairService {
         }
 
         @Transactional
-        void syncMenuPublicAccessAfterRepair(Long userId) {
-            menuPublicAccessService.syncForUser(userId);
+        void syncMenuPublicAccessAfterRepair(Long merchantId) {
+            menuPublicAccessService.syncForUser(merchantId);
         }
 
         private static LocalDate resolvePeriodStart(Purchase purchase) {

@@ -34,13 +34,13 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
 
     Optional<RestaurantTable> findFirstByMenuIdAndActiveTrueAndDeletedFalseOrderByTableNumberAscNameAsc(Long menuId);
 
-    List<RestaurantTable> findByUserIdAndDeletedFalseOrderByTableNumberAscNameAsc(Long userId);
+    List<RestaurantTable> findByMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(Long merchantId);
 
-    Optional<RestaurantTable> findByIdAndUserIdAndDeletedFalse(Long id, Long userId);
+    Optional<RestaurantTable> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
 
-    List<RestaurantTable> findByUserIdAndMenuIdIsNullAndDeletedFalseOrderByTableNumberAscNameAsc(Long userId);
+    List<RestaurantTable> findByMerchantIdAndMenuIdIsNullAndDeletedFalseOrderByTableNumberAscNameAsc(Long merchantId);
 
-    List<RestaurantTable> findByUserIdAndAreaIdAndDeletedFalse(Long userId, Long areaId);
+    List<RestaurantTable> findByMerchantIdAndAreaIdAndDeletedFalse(Long merchantId, Long areaId);
 
     List<RestaurantTable> findByLayoutIdAndDeletedFalseOrderByTableNumberAscNameAsc(Long layoutId);
 }

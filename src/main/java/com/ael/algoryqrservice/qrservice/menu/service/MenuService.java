@@ -107,17 +107,17 @@ public class MenuService {
     public Menu createMenuForQr(Qr qr, QrRequest request) {
         Map<String, Object> details = request.getDetails();
         String themeId = requireNonBlank(stringValue(details.get("themeId")), "themeId zorunludur");
-        requireAllowedTheme(qr.getUserId(), themeId);
+        requireAllowedTheme(qr.getMerchantId(), themeId);
         String businessName = requireNonBlank(stringValue(details.get("businessName")), "businessName zorunludur");
         Long branchId = longValue(details.get("branchId"));
         if (branchId != null) {
-            branchService.requireOwnedForUser(branchId, qr.getUserId());
+            branchService.requireOwnedForUser(branchId, qr.getMerchantId());
         }
 
         Menu menu = Menu.builder()
                 .qrId(qr.getQrId())
                 .publicId(menuPublicIdGenerator.generateUnique())
-                .userId(qr.getUserId())
+                .merchantId(qr.getMerchantId())
                 .branchId(branchId)
                 .themeId(themeId)
                 .businessName(businessName)
@@ -133,11 +133,11 @@ public class MenuService {
         menu = menuRepository.save(menu);
         Long sourceMenuId = longValue(details.get("sourceMenuId"));
         if (sourceMenuId != null) {
-            menuCatalogCloneService.cloneInto(menu, sourceMenuId, qr.getUserId());
+            menuCatalogCloneService.cloneInto(menu, sourceMenuId, qr.getMerchantId());
         } else {
             createProductsFromDetails(menu, details.get("products"));
         }
-        menuPublicAccessService.syncForUser(menu.getUserId());
+        menuPublicAccessService.syncForUser(menu.getMerchantId());
         return menu;
     }
 
@@ -155,7 +155,7 @@ public class MenuService {
             }
         }
         if (validProductCount > 0) {
-            consumeProduct(menu.getUserId(), CatalogProducts.MENU_PRODUCT, validProductCount);
+            consumeProduct(menu.getMerchantId(), CatalogProducts.MENU_PRODUCT, validProductCount);
         }
         int index = 0;
         for (Object item : products) {
@@ -186,7 +186,7 @@ public class MenuService {
             ServesPeopleSupport.Range serves = servesPeopleSupport.resolveFromSeed(servesMin, servesMax, name);
             MenuProduct product = MenuProduct.builder()
                     .menuId(menu.getMenuId())
-                    .userId(menu.getUserId())
+                    .merchantId(menu.getMerchantId())
                     .name(name.trim())
                     .description(trimToNull(stringValue(map.get("description"))))
                     .price(decimalValue(map.get("price")))
@@ -586,8 +586,8 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.MenuProductResponse> listCatalogProducts() {
-        Long userId = securityUtils.getCurrentUserId();
-        return menuProductRepository.findByUserIdAndDeletedFalseOrderByProductIdDesc(userId).stream()
+        Long merchantId = securityUtils.getCurrentUserId();
+        return menuProductRepository.findByMerchantIdAndDeletedFalseOrderByProductIdDesc(merchantId).stream()
                 .map(this::toProductResponse)
                 .toList();
     }
@@ -597,8 +597,8 @@ public class MenuService {
         if (request == null || request.getName() == null || request.getName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ürün adı zorunludur");
         }
-        Long userId = securityUtils.getCurrentUserId();
-        consumeProduct(userId, CatalogProducts.MENU_PRODUCT, 1);
+        Long merchantId = securityUtils.getCurrentUserId();
+        consumeProduct(merchantId, CatalogProducts.MENU_PRODUCT, 1);
         if (request.getNutrition() != null) {
             nutritionFactsService.validateForCreate(request.getNutrition());
         }
@@ -613,12 +613,12 @@ public class MenuService {
         );
         Long subCategoryId = request.getSubCategoryId();
         if (subCategoryId != null && subCategoryId > 0) {
-            menuCategoryService.requireLibrarySubCategory(userId, subCategoryId);
+            menuCategoryService.requireLibrarySubCategory(merchantId, subCategoryId);
         } else {
             subCategoryId = null;
         }
         MenuProduct product = MenuProduct.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .subCategoryId(subCategoryId)
                 .name(request.getName().trim())
                 .description(trimToNull(request.getDescription()))
@@ -756,8 +756,8 @@ public class MenuService {
         if (source.getMenuId() == null) {
             source.setMenuId(menuId);
             source.setSubCategoryId(subCategory.getId());
-            if (source.getUserId() == null) {
-                source.setUserId(menu.getUserId());
+            if (source.getMerchantId() == null) {
+                source.setMerchantId(menu.getMerchantId());
             }
             MenuProduct saved = menuProductRepository.save(source);
             menuProductIndexNotifier.productChanged(saved);
@@ -765,7 +765,7 @@ public class MenuService {
         }
         MenuProduct copy = MenuProduct.builder()
                 .menuId(menuId)
-                .userId(menu.getUserId())
+                .merchantId(menu.getMerchantId())
                 .name(source.getName())
                 .description(source.getDescription())
                 .price(source.getPrice())
@@ -781,7 +781,7 @@ public class MenuService {
                 .servesPeopleMax(source.getServesPeopleMax())
                 .nutrition(source.getNutrition())
                 .build();
-        consumeProduct(menu.getUserId(), CatalogProducts.MENU_PRODUCT, 1);
+        consumeProduct(menu.getMerchantId(), CatalogProducts.MENU_PRODUCT, 1);
         MenuProduct saved = menuProductRepository.save(copy);
         menuProductIndexNotifier.productChanged(saved);
         return toProductResponse(saved);
@@ -795,7 +795,7 @@ public class MenuService {
             return toMenuProfile(menu, buildPublicUrl(menu), null);
         }
         if (branchId != null) {
-            branchService.requireOwnedForUser(branchId, menu.getUserId());
+            branchService.requireOwnedForUser(branchId, menu.getMerchantId());
         }
         menu.setBranchId(branchId);
         menuRepository.save(menu);
@@ -851,12 +851,12 @@ public class MenuService {
     private MenuProduct requireOwnedCatalogProduct(Long productId) {
         MenuProduct product = menuProductRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
-        Long userId = securityUtils.getCurrentUserId();
+        Long merchantId = securityUtils.getCurrentUserId();
         if (product.getMenuId() != null) {
             ensureOwnedMenu(product.getMenuId());
             return product;
         }
-        if (product.getUserId() == null || !product.getUserId().equals(userId)) {
+        if (product.getMerchantId() == null || !product.getMerchantId().equals(merchantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu ürüne erişim yetkiniz yok");
         }
         return product;
@@ -865,11 +865,11 @@ public class MenuService {
     @Transactional
     public MenuDtos.MenuProductResponse createProductForOwner(
             Long menuId,
-            Long userId,
+            Long merchantId,
             MenuDtos.MenuProductRequest request
     ) {
         Menu menu = ensureMenuExists(menuId);
-        if (userId == null || !userId.equals(menu.getUserId())) {
+        if (merchantId == null || !merchantId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return createProductOnMenu(menu, request);
@@ -878,7 +878,7 @@ public class MenuService {
     private MenuDtos.MenuProductResponse createProductOnMenu(Menu menu, MenuDtos.MenuProductRequest request) {
         Long menuId = menu.getMenuId();
         validateProductRequest(request);
-        consumeProduct(menu.getUserId(), CatalogProducts.MENU_PRODUCT, 1);
+        consumeProduct(menu.getMerchantId(), CatalogProducts.MENU_PRODUCT, 1);
         nutritionFactsService.validateForCreate(request.getNutrition());
         MenuSubCategory subCategory = menuCategoryService.requireSubCategory(menuId, request.getSubCategoryId());
         Set<Long> tagIds = normalizeTagIds(request.getTagIds());
@@ -894,7 +894,7 @@ public class MenuService {
 
         MenuProduct product = MenuProduct.builder()
                 .menuId(menu.getMenuId())
-                .userId(menu.getUserId())
+                .merchantId(menu.getMerchantId())
                 .name(request.getName().trim())
                 .description(trimToNull(request.getDescription()))
                 .price(request.getPrice())
@@ -919,7 +919,7 @@ public class MenuService {
         response.setOptionGroups(menuProductOptionService.load(response.getProductId()));
         if (menu.getChannel() == MenuChannel.QR) {
             menuCatalogCloneService.mirrorOptionsToStoreCatalog(
-                    menu.getUserId(),
+                    menu.getMerchantId(),
                     menu.getMenuId(),
                     response.getProductId(),
                     response.getName()
@@ -990,7 +990,7 @@ public class MenuService {
             response.setOptionGroups(menuProductOptionService.load(product.getProductId()));
             if (menu.getChannel() == MenuChannel.QR) {
                 menuCatalogCloneService.mirrorOptionsToStoreCatalog(
-                        menu.getUserId(),
+                        menu.getMerchantId(),
                         menu.getMenuId(),
                         product.getProductId(),
                         product.getName()
@@ -1039,7 +1039,7 @@ public class MenuService {
 
         if (request.getThemeId() != null && !request.getThemeId().isBlank()) {
             String themeId = request.getThemeId().trim();
-            requireAllowedTheme(menu.getUserId(), themeId);
+            requireAllowedTheme(menu.getMerchantId(), themeId);
             menu.setThemeId(themeId);
         }
         if (request.getBusinessName() != null && !request.getBusinessName().isBlank()) {
@@ -1073,7 +1073,7 @@ public class MenuService {
         if (request.getActive() != null) {
             boolean nextActive = request.getActive();
             if (nextActive && !menu.isActive()) {
-                requireProduct(menu.getUserId(), CatalogProducts.QR_MENU);
+                requireProduct(menu.getMerchantId(), CatalogProducts.QR_MENU);
             }
             menu.setActive(nextActive);
             qr.setActive(nextActive);
@@ -1182,16 +1182,16 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<MenuDtos.ActiveMenuSummary> listActiveMenusForCurrentUser() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return menuRepository.findActiveMenusWithQrByUserId(userId).stream()
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return menuRepository.findActiveMenusWithQrByUserId(merchantId).stream()
                 .map(this::toMenuSummary)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MenuDtos.ActiveMenuSummary> listMenusForCurrentUser() {
-        Long userId = securityUtils.getCurrentUserId();
-        return menuRepository.findMenusWithQrByUserId(userId).stream()
+        Long merchantId = securityUtils.getCurrentUserId();
+        return menuRepository.findMenusWithQrByUserId(merchantId).stream()
                 .map(this::toMenuSummary)
                 .toList();
     }
@@ -1217,8 +1217,8 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public MenuDtos.MenuProductsByQrResponse listProductsByQrId(Long qrId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        List<Object[]> rows = menuProductRepository.findMenuWithProductsByQrIdAndUserId(qrId, userId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        List<Object[]> rows = menuProductRepository.findMenuWithProductsByQrIdAndUserId(qrId, merchantId);
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
         }
@@ -1285,7 +1285,7 @@ public class MenuService {
 
     private void requireOwnership(Menu menu) {
         Long currentUserId = securityUtils.getCurrentMerchantId();
-        if (!currentUserId.equals(menu.getUserId())) {
+        if (!currentUserId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
     }
@@ -1299,7 +1299,7 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü yayında değil");
         }
         if (!menu.isPublicAccessEnabled()) {
-            menuPublicAccessService.syncForUser(menu.getUserId());
+            menuPublicAccessService.syncForUser(menu.getMerchantId());
             Menu latest = menuRepository.findById(menu.getMenuId()).orElse(menu);
             if (!latest.isPublicAccessEnabled()) {
                 throw new ForbiddenException(
@@ -1723,7 +1723,7 @@ public class MenuService {
                 .qrId(menu.getQrId())
                 .publicId(menu.getPublicId())
                 .branchId(menu.getBranchId())
-                .userId(menu.getUserId())
+                .merchantId(menu.getMerchantId())
                 .themeId(menu.getThemeId())
                 .businessName(menu.getBusinessName())
                 .slogan(menu.getSlogan())
@@ -1838,23 +1838,23 @@ public class MenuService {
         }
     }
 
-    private void consumeProduct(Long userId, String productCode, int amount) {
-        if (userId == null || amount <= 0) {
+    private void consumeProduct(Long merchantId, String productCode, int amount) {
+        if (merchantId == null || amount <= 0) {
             return;
         }
-        productUsageGateway.use(userId, productCode, amount);
+        productUsageGateway.use(merchantId, productCode, amount);
     }
 
-    private void requireProduct(Long userId, String productCode) {
-        if (userId == null) {
+    private void requireProduct(Long merchantId, String productCode) {
+        if (merchantId == null) {
             return;
         }
-        productUsageGateway.allow(userId, productCode);
+        productUsageGateway.allow(merchantId, productCode);
     }
 
-    private void requireAllowedTheme(Long userId, String themeId) {
+    private void requireAllowedTheme(Long merchantId, String themeId) {
         if (CatalogThemes.isCustomTheme(themeId)) {
-            requireProduct(userId, CatalogProducts.CUSTOM_DESIGN);
+            requireProduct(merchantId, CatalogProducts.CUSTOM_DESIGN);
         }
     }
 

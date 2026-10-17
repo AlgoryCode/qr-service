@@ -64,7 +64,7 @@ public class MenuWaiterService {
     @Transactional
     public MenuWaiterDtos.WaiterResponse createWaiter(Long branchId, MenuWaiterDtos.CreateWaiterRequest request) {
         Branch branch = requireOwnedBranch(branchId);
-        return persistStaff(branch.getUserId(), branch, request);
+        return persistStaff(branch.getMerchantId(), branch, request);
     }
 
     @Transactional

@@ -8,11 +8,11 @@ import java.util.List;
 
 @Repository
 public interface QrRepository extends JpaRepository<Qr,Long> {
-    List<Qr> findByUserIdAndDeletedFalseOrderByCreatedAtDesc(Long userId);
+    List<Qr> findByMerchantIdAndDeletedFalseOrderByCreatedAtDesc(Long merchantId);
 
-    long countByUserIdAndDeletedFalse(Long userId);
+    long countByUserIdAndDeletedFalse(Long merchantId);
 
-    long countByUserIdAndDeletedFalseAndQrType_TypeNameNotIgnoreCase(Long userId, String typeName);
+    long countByUserIdAndDeletedFalseAndQrType_TypeNameNotIgnoreCase(Long merchantId, String typeName);
 
-    long countByUserIdAndPurchaseIdAndDeletedFalse(Long userId, Long purchaseId);
+    long countByUserIdAndPurchaseIdAndDeletedFalse(Long merchantId, Long purchaseId);
 }

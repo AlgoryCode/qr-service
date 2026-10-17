@@ -28,8 +28,8 @@ public class DemoAccountEntity {
     @Column(nullable = false, length = 255)
     private String password;
 
-    @Column(name = "user_id", nullable = false, unique = true)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false, unique = true)
+    private Long merchantId;
 
     @Column(name = "trial_package_code", nullable = false, length = 64)
     private String trialPackageCode = "ULTIMATE_TRIAL_PACKAGE";

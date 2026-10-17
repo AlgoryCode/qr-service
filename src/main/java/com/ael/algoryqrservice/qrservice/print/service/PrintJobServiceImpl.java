@@ -193,7 +193,7 @@ public class PrintJobServiceImpl implements PrintJobService {
     }
 
     private Optional<Long> resolvePrintBranch(Long merchantId) {
-        return branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(merchantId).stream()
+        return branchRepository.findByMerchantIdAndDeletedFalseOrderByIdDesc(merchantId).stream()
                 .filter(branch -> branch.isPrintKitchenEnabled())
                 .map(branch -> branch.getId())
                 .findFirst();

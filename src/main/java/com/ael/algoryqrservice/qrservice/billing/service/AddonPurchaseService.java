@@ -117,7 +117,7 @@ public class AddonPurchaseService {
                 : "Modul sepeti (" + lines.size() + " urun)";
 
         Purchase purchase = purchaseRepository.save(Purchase.builder()
-                .userId(user.getId())
+                .merchantId(user.getId())
                 .packageId(host.getPackageId())
                 .productId(primary.product().getId())
                 .packageCode(primary.product().getCode())
@@ -266,8 +266,8 @@ public class AddonPurchaseService {
         return resolved;
     }
 
-    private Purchase findHostPurchase(Long userId) {
-        return purchaseRepository.findByUserIdAndStatus(userId, PurchaseStatus.ACTIVE).stream()
+    private Purchase findHostPurchase(Long merchantId) {
+        return purchaseRepository.findByMerchantIdAndStatus(merchantId, PurchaseStatus.ACTIVE).stream()
                 .filter(Purchase::isUsable)
                 .filter(purchase -> purchase.getPurchaseType() != PurchaseType.ADD_ON)
                 .filter(purchase -> purchase.getPackageId() != null)

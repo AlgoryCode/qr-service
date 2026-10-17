@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_plan_change", indexes = {
-        @Index(name = "idx_plan_change_user_id", columnList = "user_id"),
+        @Index(name = "idx_plan_change_user_id", columnList = "merchant_id"),
         @Index(name = "idx_plan_change_status_effective", columnList = "status, effective_at")
 })
 @Getter
@@ -27,8 +27,8 @@ public class PlanChange {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "from_purchase_id", nullable = false)
     private Long fromPurchaseId;

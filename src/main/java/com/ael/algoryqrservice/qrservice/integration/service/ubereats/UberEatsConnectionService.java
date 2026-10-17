@@ -30,8 +30,8 @@ public class UberEatsConnectionService {
 
     @Transactional(readOnly = true)
     public List<UberEatsDtos.ConnectionResponse> listMine() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return connectionRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(merchantId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -43,11 +43,11 @@ public class UberEatsConnectionService {
 
     @Transactional
     public UberEatsDtos.ConnectionResponse upsert(UberEatsDtos.UpsertConnectionRequest request) {
-        Long userId = securityUtils.getCurrentMerchantId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         UberEatsConnection connection = connectionRepository
-                .findByUserId(userId)
+                .findByMerchantId(merchantId)
                 .orElseGet(() -> UberEatsConnection.builder()
-                        .userId(userId)
+                        .merchantId(merchantId)
                         .status(UberEatsConnectionStatus.DISCONNECTED)
                         .build());
         connection.setSellerId(request.getSellerId().trim());
@@ -86,7 +86,7 @@ public class UberEatsConnectionService {
     public UberEatsDtos.ConnectionResponse assignBranch(Long branchId) {
         UberEatsConnection connection = requireOwnedConnection();
         if (branchId != null) {
-            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getUserId())
+            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getMerchantId())
                     .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
         }
         connection.setBranchId(branchId);
@@ -109,8 +109,8 @@ public class UberEatsConnectionService {
 
     @Transactional(readOnly = true)
     public UberEatsConnection requireOwnedConnection() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return connectionRepository.findByUserId(userId)
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return connectionRepository.findByMerchantId(merchantId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
     }
 
@@ -125,8 +125,8 @@ public class UberEatsConnectionService {
     }
 
     @Transactional(readOnly = true)
-    public UberEatsConnection requireConnectedForUser(Long userId) {
-        UberEatsConnection connection = connectionRepository.findByUserId(userId)
+    public UberEatsConnection requireConnectedForUser(Long merchantId) {
+        UberEatsConnection connection = connectionRepository.findByMerchantId(merchantId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
         if (connection.getStatus() != UberEatsConnectionStatus.CONNECTED
                 || !hasText(connection.getRestaurantId())) {
@@ -136,8 +136,8 @@ public class UberEatsConnectionService {
     }
 
     @Transactional(readOnly = true)
-    public UberEatsConnection findByUserId(Long userId) {
-        return connectionRepository.findByUserId(userId).orElse(null);
+    public UberEatsConnection findByMerchantId(Long merchantId) {
+        return connectionRepository.findByMerchantId(merchantId).orElse(null);
     }
 
     public UberEatsDtos.Credentials decrypt(UberEatsConnection connection) {

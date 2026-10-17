@@ -15,17 +15,17 @@ public interface FulfillmentService {
 
     PackageFulfillment fulfillPaidPackage(FulfillmentCommand command);
 
-    void assignPackage(Long userId, String packageCode, int periodDays);
+    void assignPackage(Long merchantId, String packageCode, int periodDays);
 
-    Optional<ActivePackage> findActivePackage(Long userId);
+    Optional<ActivePackage> findActivePackage(Long merchantId);
 
-    ActivePackage requireActivePackage(Long userId);
+    ActivePackage requireActivePackage(Long merchantId);
 
-    ActivePackageView requireActivePackageView(Long userId);
+    ActivePackageView requireActivePackageView(Long merchantId);
 
     PackageFulfillment requireFulfillment(Long fulfillmentId);
 
-    Page<PackageFulfillment> listFulfillments(Long userId, Pageable pageable);
+    Page<PackageFulfillment> listFulfillments(Long merchantId, Pageable pageable);
 
-    List<UserEntitlement> listActiveEntitlements(Long userId);
+    List<UserEntitlement> listActiveEntitlements(Long merchantId);
 }

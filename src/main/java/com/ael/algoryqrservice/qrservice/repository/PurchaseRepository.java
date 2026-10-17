@@ -22,7 +22,7 @@ import com.ael.algoryqrservice.qrservice.model.enums.RefundStatus;
 @Repository
 public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
-    List<Purchase> findByUserIdOrderByPurchasedAtDesc(Long userId);
+    List<Purchase> findByMerchantIdOrderByPurchasedAtDesc(Long merchantId);
 
     List<Purchase> findByStatusAndExpiresAtBefore(PurchaseStatus status, LocalDateTime expiresAt);
 
@@ -32,8 +32,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             LocalDateTime dateTime
     );
 
-    List<Purchase> findByUserIdAndStatusAndExpiresAtBefore(
-            Long userId,
+    List<Purchase> findByMerchantIdAndStatusAndExpiresAtBefore(
+            Long merchantId,
             PurchaseStatus status,
             LocalDateTime expiresAt
     );
@@ -52,11 +52,11 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             Pageable pageable
     );
 
-    List<Purchase> findByUserIdAndStatus(Long userId, PurchaseStatus status);
+    List<Purchase> findByMerchantIdAndStatus(Long merchantId, PurchaseStatus status);
 
-    List<Purchase> findByUserIdAndStatusAndPurchaseType(Long userId, PurchaseStatus status, PurchaseType purchaseType);
+    List<Purchase> findByMerchantIdAndStatusAndPurchaseType(Long merchantId, PurchaseStatus status, PurchaseType purchaseType);
 
-    boolean existsByUserIdAndStatus(Long userId, PurchaseStatus status);
+    boolean existsByMerchantIdAndStatus(Long merchantId, PurchaseStatus status);
 
     boolean existsByPackageIdAndStatus(Long packageId, PurchaseStatus status);
 
@@ -67,7 +67,7 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     Optional<Purchase> findByIdForUpdate(@Param("purchaseId") Long purchaseId);
 
     @Query("""
-            select distinct p.userId
+            select distinct p.merchantId
             from Purchase p
             where p.status = :status
               and p.purchaseType <> com.ael.algoryqrservice.qrservice.model.enums.PurchaseType.FREE
@@ -89,15 +89,15 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     @Query(
             value = """
-                    select distinct p.user_id
+                    select distinct p.merchant_id
                     from tbl_purchase p
                              left join active_package ap
-                                       on ap.user_id = p.user_id and ap.status = 'ACTIVE'
+                                       on ap.merchant_id = p.merchant_id and ap.status = 'ACTIVE'
                     where p.status = 'ACTIVE'
                       and p.expires_at is not null
                       and p.expires_at > :now
                       and ap.id is null
-                    order by p.user_id
+                    order by p.merchant_id
                     """,
             nativeQuery = true
     )

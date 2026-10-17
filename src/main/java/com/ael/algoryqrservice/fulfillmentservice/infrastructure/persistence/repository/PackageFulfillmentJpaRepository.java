@@ -15,16 +15,16 @@ public interface PackageFulfillmentJpaRepository extends JpaRepository<PackageFu
 
     Optional<PackageFulfillmentEntity> findByEventId(String eventId);
 
-    Page<PackageFulfillmentEntity> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+    Page<PackageFulfillmentEntity> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
 
     @Modifying
     @Query("""
             update PackageFulfillmentEntity f
             set f.status = :status, f.updatedAt = CURRENT_TIMESTAMP
-            where f.userId = :userId and f.id <> :keepId and f.status = :activeStatus
+            where f.merchantId = :merchantId and f.id <> :keepId and f.status = :activeStatus
             """)
     int supersedeOthers(
-            @Param("userId") Long userId,
+            @Param("userId") Long merchantId,
             @Param("keepId") Long keepId,
             @Param("status") FulfillmentStatus status,
             @Param("activeStatus") FulfillmentStatus activeStatus

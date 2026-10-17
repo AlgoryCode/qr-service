@@ -8,7 +8,7 @@ import java.util.List;
 
 public record ActivePackageResponse(
         Long id,
-        Long userId,
+        Long merchantId,
         Long fulfillmentId,
         Long purchaseId,
         Long packageId,

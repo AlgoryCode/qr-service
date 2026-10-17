@@ -16,15 +16,15 @@ import java.util.Optional;
 @Repository
 public interface PlanChangeRepository extends JpaRepository<PlanChange, Long> {
 
-    List<PlanChange> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<PlanChange> findByMerchantIdOrderByCreatedAtDesc(Long merchantId);
 
-    Optional<PlanChange> findByUserIdAndStatus(Long userId, PlanChangeStatus status);
+    Optional<PlanChange> findByMerchantIdAndStatus(Long merchantId, PlanChangeStatus status);
 
     Optional<PlanChange> findByResultingPurchaseId(Long resultingPurchaseId);
 
     List<PlanChange> findByStatusAndEffectiveAtLessThanEqual(PlanChangeStatus status, LocalDateTime effectiveAt);
 
-    boolean existsByUserIdAndStatus(Long userId, PlanChangeStatus status);
+    boolean existsByMerchantIdAndStatus(Long merchantId, PlanChangeStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select pc from PlanChange pc where pc.id = :id")

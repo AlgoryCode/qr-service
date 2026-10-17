@@ -20,7 +20,7 @@ import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
 
 @Entity
 @Table(name = "tbl_purchase", indexes = {
-        @Index(name = "idx_purchase_user_id", columnList = "user_id"),
+        @Index(name = "idx_purchase_user_id", columnList = "merchant_id"),
         @Index(name = "idx_purchase_status", columnList = "status"),
         @Index(name = "idx_purchase_expires_at", columnList = "expires_at")
 })
@@ -35,8 +35,8 @@ public class Purchase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name = "merchant_id")
+    private Long merchantId;
 
     @Column(name = "package_id")
     private Long packageId;

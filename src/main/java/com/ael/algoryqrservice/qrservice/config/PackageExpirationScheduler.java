@@ -39,7 +39,7 @@ public class PackageExpirationScheduler {
 
         suspendExpiredGracePeriods();
 
-        List<Long> affectedUserIds = duePurchases.stream().map(Purchase::getUserId).distinct().toList();
+        List<Long> affectedUserIds = duePurchases.stream().map(Purchase::getMerchantId).distinct().toList();
         menuPublicAccessService.syncForUsers(affectedUserIds);
     }
 
@@ -56,7 +56,7 @@ public class PackageExpirationScheduler {
             purchaseRepository.save(purchase);
             log.warn("Subscription suspended after grace period. purchaseId={} graceEndsAt={}",
                     purchase.getId(), purchase.getSubscriptionGraceEndsAt());
-            menuPublicAccessService.syncForUser(purchase.getUserId());
+            menuPublicAccessService.syncForUser(purchase.getMerchantId());
         }
     }
 

@@ -83,7 +83,7 @@ public class RestaurantTableService {
 
         LocalDateTime now = LocalDateTime.now();
         RestaurantTable table = RestaurantTable.builder()
-                .userId(menu.getUserId())
+                .merchantId(menu.getMerchantId())
                 .menuId(menu.getMenuId())
                 .layoutId(layoutId)
                 .areaId(areaId)
@@ -187,8 +187,8 @@ public class RestaurantTableService {
 
     @Transactional(readOnly = true)
     public List<RestaurantTableDtos.TableResponse> listOwnedTables(Long layoutId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
         Map<Long, String> areaNames = restaurantAreaRepository.findByLayoutIdOrderBySortOrderAscIdAsc(layout.getId()).stream()
                 .collect(Collectors.toMap(RestaurantArea::getId, RestaurantArea::getName, (left, right) -> left));
         Map<Long, Menu> menus = new HashMap<>();
@@ -205,22 +205,22 @@ public class RestaurantTableService {
         if (request == null || request.getName() == null || request.getName().isBlank()) {
             throw new BadRequestException("Masa adı zorunludur");
         }
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
-        RestaurantArea area = request.getAreaId() == null ? null : requireLayoutArea(userId, layout.getId(), request.getAreaId());
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
+        RestaurantArea area = request.getAreaId() == null ? null : requireLayoutArea(merchantId, layout.getId(), request.getAreaId());
         if (area != null && area.getMenuId() != null) {
             return createTable(area.getMenuId(), request);
         }
 
         String name = request.getName().trim();
         Long areaId = area == null ? null : area.getId();
-        if (ownedTableNameTaken(userId, areaId, name, null)) {
+        if (ownedTableNameTaken(merchantId, areaId, name, null)) {
             throw new BadRequestException("Bu alanda aynı masa adı zaten var");
         }
 
         LocalDateTime now = LocalDateTime.now();
         RestaurantTable table = RestaurantTable.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .layoutId(layout.getId())
                 .menuId(null)
                 .areaId(areaId)
@@ -247,8 +247,8 @@ public class RestaurantTableService {
             Long tableId,
             RestaurantTableDtos.UpdateTableRequest request
     ) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantTable table = requireOwnedTable(userId, layoutId, tableId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantTable table = requireOwnedTable(merchantId, layoutId, tableId);
         if (table.getMenuId() != null) {
             return updateTable(table.getMenuId(), tableId, request);
         }
@@ -259,9 +259,9 @@ public class RestaurantTableService {
                     throw new BadRequestException("Masa adı boş olamaz");
                 }
                 Long areaId = request.getAreaId() != null
-                        ? requireLayoutArea(userId, layoutId, request.getAreaId()).getId()
+                        ? requireLayoutArea(merchantId, layoutId, request.getAreaId()).getId()
                         : table.getAreaId();
-                if (ownedTableNameTaken(userId, areaId, name, table.getId())) {
+                if (ownedTableNameTaken(merchantId, areaId, name, table.getId())) {
                     throw new BadRequestException("Bu alanda aynı masa adı zaten var");
                 }
                 table.setName(name);
@@ -276,15 +276,15 @@ public class RestaurantTableService {
                 table.setActive(request.getActive());
             }
             if (request.getAreaId() != null) {
-                RestaurantArea area = requireLayoutArea(userId, layoutId, request.getAreaId());
-                if (ownedTableNameTaken(userId, area.getId(), table.getName(), table.getId())) {
+                RestaurantArea area = requireLayoutArea(merchantId, layoutId, request.getAreaId());
+                if (ownedTableNameTaken(merchantId, area.getId(), table.getName(), table.getId())) {
                     throw new BadRequestException("Bu alanda aynı masa adı zaten var");
                 }
                 table.setAreaId(area.getId());
                 table.setLayoutId(layoutId);
                 if (area.getMenuId() != null) {
                     table.setMenuId(area.getMenuId());
-                    table.setUserId(userId);
+                    table.setMerchantId(merchantId);
                     Menu menu = requireOwnedMenu(area.getMenuId());
                     table.setQrImageBase64(generateQrImage(buildPublicUrl(menu, table.getPublicToken())));
                 }
@@ -308,8 +308,8 @@ public class RestaurantTableService {
 
     @Transactional
     public RestaurantTableDtos.TableResponse regenerateOwnedQr(Long layoutId, Long tableId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantTable table = requireOwnedTable(userId, layoutId, tableId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantTable table = requireOwnedTable(merchantId, layoutId, tableId);
         if (table.getMenuId() == null) {
             throw new BadRequestException("QR için düzeni, menüsü olan bir şubeye bağlayın");
         }
@@ -318,8 +318,8 @@ public class RestaurantTableService {
 
     @Transactional
     public void deleteOwnedTable(Long layoutId, Long tableId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantTable table = requireOwnedTable(userId, layoutId, tableId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantTable table = requireOwnedTable(merchantId, layoutId, tableId);
         if (table.getMenuId() != null) {
             deleteTable(table.getMenuId(), tableId);
             return;
@@ -454,10 +454,10 @@ public class RestaurantTableService {
     }
 
     private String resolveOwnedAreaName(RestaurantTable table) {
-        if (table.getAreaId() == null || table.getUserId() == null) {
+        if (table.getAreaId() == null || table.getMerchantId() == null) {
             return null;
         }
-        return restaurantAreaRepository.findByIdAndUserId(table.getAreaId(), table.getUserId())
+        return restaurantAreaRepository.findByIdAndUserId(table.getAreaId(), table.getMerchantId())
                 .map(RestaurantArea::getName)
                 .orElse(null);
     }
@@ -469,29 +469,29 @@ public class RestaurantTableService {
         return menus.computeIfAbsent(menuId, id -> menuRepository.findById(id).orElse(null));
     }
 
-    private RestaurantArea requireOwnedArea(Long userId, Long areaId) {
-        return restaurantAreaRepository.findByIdAndUserId(areaId, userId)
+    private RestaurantArea requireOwnedArea(Long merchantId, Long areaId) {
+        return restaurantAreaRepository.findByIdAndUserId(areaId, merchantId)
                 .orElseThrow(() -> new BadRequestException("Alan bulunamadı"));
     }
 
-    private RestaurantLayout requireOwnedLayout(Long userId, Long layoutId) {
+    private RestaurantLayout requireOwnedLayout(Long merchantId, Long layoutId) {
         if (layoutId == null) {
             throw new NotFoundException("Düzen bulunamadı");
         }
-        return restaurantLayoutRepository.findByIdAndUserId(layoutId, userId)
+        return restaurantLayoutRepository.findByIdAndUserId(layoutId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
     }
 
-    private RestaurantArea requireLayoutArea(Long userId, Long layoutId, Long areaId) {
-        RestaurantArea area = requireOwnedArea(userId, areaId);
+    private RestaurantArea requireLayoutArea(Long merchantId, Long layoutId, Long areaId) {
+        RestaurantArea area = requireOwnedArea(merchantId, areaId);
         if (!layoutId.equals(area.getLayoutId())) {
             throw new BadRequestException("Alan bu düzene ait değil");
         }
         return area;
     }
 
-    private RestaurantTable requireOwnedTable(Long userId, Long layoutId, Long tableId) {
-        RestaurantTable table = restaurantTableRepository.findByIdAndUserIdAndDeletedFalse(tableId, userId)
+    private RestaurantTable requireOwnedTable(Long merchantId, Long layoutId, Long tableId) {
+        RestaurantTable table = restaurantTableRepository.findByIdAndUserIdAndDeletedFalse(tableId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
         if (!layoutId.equals(table.getLayoutId())) {
             throw new NotFoundException("Masa bulunamadı");
@@ -499,8 +499,8 @@ public class RestaurantTableService {
         return table;
     }
 
-    private boolean ownedTableNameTaken(Long userId, Long areaId, String name, Long excludeId) {
-        return restaurantTableRepository.findByUserIdAndDeletedFalseOrderByTableNumberAscNameAsc(userId).stream()
+    private boolean ownedTableNameTaken(Long merchantId, Long areaId, String name, Long excludeId) {
+        return restaurantTableRepository.findByMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(merchantId).stream()
                 .filter(table -> Objects.equals(table.getAreaId(), areaId))
                 .filter(table -> excludeId == null || !excludeId.equals(table.getId()))
                 .anyMatch(table -> namesEqual(table.getName(), name));
@@ -511,7 +511,7 @@ public class RestaurantTableService {
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
         Long currentUserId = securityUtils.getCurrentMerchantId();
-        if (!currentUserId.equals(menu.getUserId())) {
+        if (!currentUserId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

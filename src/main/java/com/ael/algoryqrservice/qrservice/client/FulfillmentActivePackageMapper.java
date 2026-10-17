@@ -29,7 +29,7 @@ public class FulfillmentActivePackageMapper {
                 : (int) ChronoUnit.DAYS.between(LocalDate.now(), source.periodEnd());
         return PurchaseSummaryResponse.builder()
                 .purchaseId(source.purchaseId())
-                .userId(source.userId())
+                .merchantId(source.merchantId())
                 .packageId(source.packageId())
                 .packageCode(source.packageCode())
                 .packageName(source.packageName())

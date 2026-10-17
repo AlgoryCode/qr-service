@@ -81,13 +81,13 @@ public class IntegrationApprovalService {
             Long menuId,
             UUID id,
             IntegrationPendingProductDtos.ApprovalRequest request,
-            Long userId
+            Long merchantId
     ) {
         IntegrationPendingProduct product = requireWaitingProduct(menuId, id);
         validateTargets(request.getPublishTargets());
         product.setApprovalStatus(IntegrationJobStatus.APPROVED);
         product.setPublishTargets(new LinkedHashSet<>(request.getPublishTargets()));
-        product.setApprovedBy(userId);
+        product.setApprovedBy(merchantId);
         product.setApprovedAt(LocalDateTime.now());
         product.setUpdatedAt(LocalDateTime.now());
         IntegrationPendingProduct saved = repository.save(product);
@@ -99,7 +99,7 @@ public class IntegrationApprovalService {
     public List<IntegrationPendingProductDtos.Response> bulkApprove(
             Long menuId,
             IntegrationPendingProductDtos.BulkApproveRequest request,
-            Long userId
+            Long merchantId
     ) {
         validateTargets(request.getPublishTargets());
         menuService.requireOwnedMenu(menuId);
@@ -115,7 +115,7 @@ public class IntegrationApprovalService {
             }
             product.setApprovalStatus(IntegrationJobStatus.APPROVED);
             product.setPublishTargets(new LinkedHashSet<>(request.getPublishTargets()));
-            product.setApprovedBy(userId);
+            product.setApprovedBy(merchantId);
             product.setApprovedAt(now);
             product.setUpdatedAt(now);
             IntegrationPendingProduct saved = repository.save(product);

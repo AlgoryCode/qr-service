@@ -89,16 +89,16 @@ public class ProductImageStorageService {
         return uploadWithPrefix(menuId, file, "menus/" + menuId + "/categories/" + categoryId + "/");
     }
 
-    public ProductImageDtos.UploadResponse uploadLibraryCategoryCover(Long userId, Long categoryId, MultipartFile file) {
-        return uploadWithPrefix(userId, file, "catalog/" + userId + "/categories/" + categoryId + "/");
+    public ProductImageDtos.UploadResponse uploadLibraryCategoryCover(Long merchantId, Long categoryId, MultipartFile file) {
+        return uploadWithPrefix(merchantId, file, "catalog/" + merchantId + "/categories/" + categoryId + "/");
     }
 
     public ProductImageDtos.UploadResponse uploadBranchPhoto(Long branchId, MultipartFile file) {
         return uploadWithPrefix(branchId, file, "branches/" + branchId + "/photo/");
     }
 
-    public ProductImageDtos.UploadResponse uploadFeedbackScreenshot(Long userId, MultipartFile file) {
-        return uploadWithPrefix(userId, file, "platform-feedback/" + userId + "/");
+    public ProductImageDtos.UploadResponse uploadFeedbackScreenshot(Long merchantId, MultipartFile file) {
+        return uploadWithPrefix(merchantId, file, "platform-feedback/" + merchantId + "/");
     }
 
     public void deleteForMenu(Long menuId, String objectKey, String imageUrl) {

@@ -20,7 +20,7 @@ import java.util.List;
 @Component
 public class QrPaymentClientMapper {
 
-    public CreatePaymentCommand toCreatePaymentCommand(Long userId, PaymentThreeDsRequest request) {
+    public CreatePaymentCommand toCreatePaymentCommand(Long merchantId, PaymentThreeDsRequest request) {
         CreatePaymentCommand command = CreatePaymentCommand.builder()
                 .serviceName(request.getServiceName())
                 .sourceReferenceId(request.getSourceReferenceId())
@@ -44,11 +44,11 @@ public class QrPaymentClientMapper {
                 .billingAddress(toAddressInfo(request.getBillingAddress()))
                 .basketItems(toBasketItems(request.getBasketItems()))
                 .build();
-        command.setAccountId(userId == null ? null : String.valueOf(userId));
+        command.setAccountId(merchantId == null ? null : String.valueOf(merchantId));
         return command;
     }
 
-    public InitializeCheckoutFormCommand toInitializeCheckoutFormCommand(Long userId, PaymentCheckoutFormRequest request) {
+    public InitializeCheckoutFormCommand toInitializeCheckoutFormCommand(Long merchantId, PaymentCheckoutFormRequest request) {
         InitializeCheckoutFormCommand command = InitializeCheckoutFormCommand.builder()
                 .serviceName(request.getServiceName())
                 .sourceReferenceId(request.getSourceReferenceId())
@@ -68,7 +68,7 @@ public class QrPaymentClientMapper {
                 .billingAddress(toAddressInfo(request.getBillingAddress()))
                 .basketItems(toBasketItems(request.getBasketItems()))
                 .build();
-        command.setAccountId(userId == null ? null : String.valueOf(userId));
+        command.setAccountId(merchantId == null ? null : String.valueOf(merchantId));
         return command;
     }
 

@@ -19,8 +19,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "tbl_smart_report_events", indexes = {
-        @Index(name = "idx_smart_report_events_user_created", columnList = "user_id, created_at"),
-        @Index(name = "idx_smart_report_events_user_status_created", columnList = "user_id, status, created_at"),
+        @Index(name = "idx_smart_report_events_user_created", columnList = "merchant_id, created_at"),
+        @Index(name = "idx_smart_report_events_user_status_created", columnList = "merchant_id, status, created_at"),
         @Index(name = "idx_smart_report_events_menu_status", columnList = "menu_id, status")
 })
 @Getter
@@ -39,8 +39,8 @@ public class SmartReportEvent {
     @Column(name = "process_id", nullable = false)
     private UUID processId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "menu_id")
     private Long menuId;

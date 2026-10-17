@@ -35,7 +35,7 @@ public class MenuQrSoftDeleteService {
             if (branchId != null) {
                 long remaining = menuRepository.countActiveLiveMenusForBranch(branchId);
                 if (remaining >= 1) {
-                    fulfillmentClient.release(qr.getUserId(), CatalogProducts.QR_MENU, 1);
+                    fulfillmentClient.release(qr.getMerchantId(), CatalogProducts.QR_MENU, 1);
                 }
             }
         });

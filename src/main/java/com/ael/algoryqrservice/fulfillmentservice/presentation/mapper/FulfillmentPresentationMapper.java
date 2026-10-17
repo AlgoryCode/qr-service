@@ -21,7 +21,7 @@ public class FulfillmentPresentationMapper {
     public ActivePackageResponse toActivePackageResponse(ActivePackageView view) {
         return new ActivePackageResponse(
                 view.id(),
-                view.userId(),
+                view.merchantId(),
                 view.fulfillmentId(),
                 view.purchaseId(),
                 view.packageId(),
@@ -43,7 +43,7 @@ public class FulfillmentPresentationMapper {
                 fulfillment.eventId(),
                 fulfillment.eventType(),
                 fulfillment.purchaseId(),
-                fulfillment.userId(),
+                fulfillment.merchantId(),
                 fulfillment.packageId(),
                 fulfillment.packageCode(),
                 fulfillment.conversationId(),
@@ -96,7 +96,7 @@ public class FulfillmentPresentationMapper {
     public EntitlementResponse toEntitlementResponse(UserEntitlement entitlement, String productCode) {
         return new EntitlementResponse(
                 entitlement.id(),
-                entitlement.userId(),
+                entitlement.merchantId(),
                 entitlement.fulfillmentId(),
                 entitlement.purchaseId(),
                 entitlement.productId(),

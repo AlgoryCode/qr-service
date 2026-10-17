@@ -15,7 +15,7 @@ public class CouponLogWriter {
 
     public void write(
             Long couponId,
-            Long userId,
+            Long merchantId,
             Long purchaseId,
             CouponLogAction action,
             CouponQuote quote,
@@ -23,7 +23,7 @@ public class CouponLogWriter {
     ) {
         couponLogRepository.save(CouponLog.builder()
                 .couponId(couponId)
-                .userId(userId)
+                .merchantId(merchantId)
                 .purchaseId(purchaseId)
                 .action(action)
                 .listPrice(quote == null ? null : quote.listPrice())

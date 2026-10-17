@@ -12,7 +12,7 @@ public class PurchaseLogResponse {
 
     private Long id;
     private Long purchaseId;
-    private Long userId;
+    private Long merchantId;
     private PurchaseLogAction action;
     private String message;
     private LocalDateTime createdAt;

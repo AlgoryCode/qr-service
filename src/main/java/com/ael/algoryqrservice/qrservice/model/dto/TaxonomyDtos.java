@@ -90,7 +90,7 @@ public final class TaxonomyDtos {
     public static class MainCategoryResponse {
         private Long id;
         private Long menuId;
-        private Long userId;
+        private Long merchantId;
         private String slug;
         private String name;
         private int sortOrder;

@@ -63,11 +63,11 @@ public class KitchenCloseGuard {
         if (!menuIds.isEmpty() && menuOrderRepository.existsByMenuIdInAndStatusIn(menuIds, ACTIVE_TABLE_STATUSES)) {
             return true;
         }
-        Long ownerId = branch.getUserId();
+        Long ownerId = branch.getMerchantId();
         if (ownerId == null) {
             return false;
         }
-        boolean storeActive = merchantRepository.findByUserIdAndDeletedFalse(ownerId)
+        boolean storeActive = merchantRepository.findByOwnerMerchantIdAndDeletedFalse(ownerId)
                 .map(merchant -> storeOrderRepository.existsForBranch(
                         merchant.getId(),
                         branch.getId(),

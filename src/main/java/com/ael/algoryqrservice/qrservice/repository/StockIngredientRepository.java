@@ -15,27 +15,27 @@ import java.util.Optional;
 
 public interface StockIngredientRepository extends JpaRepository<StockIngredient, Long> {
 
-    Optional<StockIngredient> findByIdAndUserIdAndDeletedFalse(Long id, Long userId);
+    Optional<StockIngredient> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
 
     @Query(
             value = """
                     select i from StockIngredient i
                     where i.branchId = :branchId
-                      and i.userId = :userId
+                      and i.merchantId = :merchantId
                       and i.deleted = false
                       and (:lowOnly = false or i.quantity <= i.minQuantity)
                     """,
             countQuery = """
                     select count(i) from StockIngredient i
                     where i.branchId = :branchId
-                      and i.userId = :userId
+                      and i.merchantId = :merchantId
                       and i.deleted = false
                       and (:lowOnly = false or i.quantity <= i.minQuantity)
                     """
     )
     Page<StockIngredient> search(
             @Param("branchId") Long branchId,
-            @Param("userId") Long userId,
+            @Param("userId") Long merchantId,
             @Param("lowOnly") boolean lowOnly,
             Pageable pageable
     );

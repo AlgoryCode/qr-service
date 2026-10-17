@@ -183,7 +183,7 @@ public class YemekSepetiOrderService {
         }
         YemekSepetiOrder saved = orderRepository.save(order);
         if (isNew) {
-            printOrderEnqueueService.enqueueYemekSepetiOrder(connection.getUserId(), null, saved, items);
+            printOrderEnqueueService.enqueueYemekSepetiOrder(connection.getMerchantId(), null, saved, items);
         }
         return saved;
     }

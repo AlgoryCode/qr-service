@@ -10,17 +10,17 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategory, Long
 
     List<MenuCategory> findByMenuIdAndDeletedFalseOrderBySortOrderAscIdAsc(Long menuId);
 
-    List<MenuCategory> findByUserIdAndDeletedFalseOrderBySortOrderAscIdAsc(Long userId);
+    List<MenuCategory> findByMerchantIdAndDeletedFalseOrderBySortOrderAscIdAsc(Long merchantId);
 
-    List<MenuCategory> findByUserIdAndMenuIdIsNullAndDeletedFalseOrderBySortOrderAscIdAsc(Long userId);
+    List<MenuCategory> findByMerchantIdAndMenuIdIsNullAndDeletedFalseOrderBySortOrderAscIdAsc(Long merchantId);
 
     Optional<MenuCategory> findByIdAndMenuIdAndDeletedFalse(Long id, Long menuId);
 
-    Optional<MenuCategory> findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(Long id, Long userId);
+    Optional<MenuCategory> findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(Long id, Long merchantId);
 
-    boolean existsByUserIdAndMenuIdIsNullAndSlugAndDeletedFalse(Long userId, String slug);
+    boolean existsByMerchantIdAndMenuIdIsNullAndSlugAndDeletedFalse(Long merchantId, String slug);
 
-    Optional<MenuCategory> findByIdAndUserIdAndDeletedFalse(Long id, Long userId);
+    Optional<MenuCategory> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
 
     Optional<MenuCategory> findByMenuIdAndSlugAndDeletedFalse(Long menuId, String slug);
 

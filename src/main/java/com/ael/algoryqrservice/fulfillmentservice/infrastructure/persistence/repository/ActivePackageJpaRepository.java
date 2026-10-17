@@ -7,5 +7,5 @@ import java.util.Optional;
 
 public interface ActivePackageJpaRepository extends JpaRepository<ActivePackageEntity, Long> {
 
-    Optional<ActivePackageEntity> findByUserId(Long userId);
+    Optional<ActivePackageEntity> findByMerchantId(Long merchantId);
 }

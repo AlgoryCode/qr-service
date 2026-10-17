@@ -23,11 +23,11 @@ public class BillingAddressService {
     private final BillingAddressRepository repository;
 
     @Transactional(readOnly = true)
-    public BillingAddressPageResponse list(Long userId, int page, int size) {
+    public BillingAddressPageResponse list(Long merchantId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
-        Page<BillingAddress> result = repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(
-                userId,
+        Page<BillingAddress> result = repository.findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(
+                merchantId,
                 PageRequest.of(safePage, safeSize)
         );
         return BillingAddressPageResponse.builder()
@@ -41,27 +41,27 @@ public class BillingAddressService {
     }
 
     @Transactional(readOnly = true)
-    public BillingAddressDtos.Response get(Long userId, Long id) {
-        return toResponse(owned(userId, id));
+    public BillingAddressDtos.Response get(Long merchantId, Long id) {
+        return toResponse(owned(merchantId, id));
     }
 
     @Transactional
-    public BillingAddressDtos.Response create(Long userId, BillingAddressDtos.Request request) {
-        BillingAddress address = apply(BillingAddress.builder().userId(userId).build(), request);
-        if (request.defaultAddress() || repository.findByUserIdAndDefaultAddressTrue(userId).isEmpty()) {
-            clearDefault(userId);
+    public BillingAddressDtos.Response create(Long merchantId, BillingAddressDtos.Request request) {
+        BillingAddress address = apply(BillingAddress.builder().merchantId(merchantId).build(), request);
+        if (request.defaultAddress() || repository.findByMerchantIdAndDefaultAddressTrue(merchantId).isEmpty()) {
+            clearDefault(merchantId);
             address.setDefaultAddress(true);
         }
         return toResponse(repository.save(address));
     }
 
     @Transactional
-    public BillingAddressDtos.Response update(Long userId, Long id, BillingAddressDtos.Request request) {
-        BillingAddress address = owned(userId, id);
+    public BillingAddressDtos.Response update(Long merchantId, Long id, BillingAddressDtos.Request request) {
+        BillingAddress address = owned(merchantId, id);
         boolean wasDefault = address.isDefaultAddress();
         apply(address, request);
         if (request.defaultAddress()) {
-            clearDefault(userId);
+            clearDefault(merchantId);
             address.setDefaultAddress(true);
         } else if (wasDefault) {
             address.setDefaultAddress(true);
@@ -70,21 +70,21 @@ public class BillingAddressService {
     }
 
     @Transactional
-    public BillingAddressDtos.Response makeDefault(Long userId, Long id) {
-        BillingAddress address = owned(userId, id);
-        clearDefault(userId);
+    public BillingAddressDtos.Response makeDefault(Long merchantId, Long id) {
+        BillingAddress address = owned(merchantId, id);
+        clearDefault(merchantId);
         address.setDefaultAddress(true);
         return toResponse(repository.save(address));
     }
 
     @Transactional
-    public void delete(Long userId, Long id) {
-        BillingAddress address = owned(userId, id);
+    public void delete(Long merchantId, Long id) {
+        BillingAddress address = owned(merchantId, id);
         boolean wasDefault = address.isDefaultAddress();
         repository.delete(address);
         repository.flush();
         if (wasDefault) {
-            repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(userId).stream()
+            repository.findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(merchantId).stream()
                     .findFirst()
                     .ifPresent(next -> {
                         next.setDefaultAddress(true);
@@ -94,11 +94,11 @@ public class BillingAddressService {
     }
 
     @Transactional
-    public BillingSnapshot resolveSnapshot(Long userId, Long id, BillingAddressDtos.Request inline) {
+    public BillingSnapshot resolveSnapshot(Long merchantId, Long id, BillingAddressDtos.Request inline) {
         if ((id == null) == (inline == null)) {
             throw new BadRequestException("Fatura adresi seçimi geçersiz; billingAddressId veya inlineBillingAddress alanlarından yalnızca biri gönderilmelidir");
         }
-        BillingAddress address = id != null ? owned(userId, id) : createEntity(userId, inline);
+        BillingAddress address = id != null ? owned(merchantId, id) : createEntity(merchantId, inline);
         if (id == null) {
             address = repository.save(address);
         }
@@ -106,16 +106,16 @@ public class BillingAddressService {
     }
 
     @Transactional(readOnly = true)
-    public BillingSnapshot resolveDefaultSnapshot(Long userId) {
-        BillingAddress address = repository.findByUserIdAndDefaultAddressTrue(userId)
-                .or(() -> repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(userId).stream().findFirst())
+    public BillingSnapshot resolveDefaultSnapshot(Long merchantId) {
+        BillingAddress address = repository.findByMerchantIdAndDefaultAddressTrue(merchantId)
+                .or(() -> repository.findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(merchantId).stream().findFirst())
                 .orElseThrow(() -> new BadRequestException(
                         "Kart eklemek icin once bir fatura adresi eklemelisiniz."
                 ));
         return toSnapshot(address);
     }
 
-    public BillingSnapshot legacySnapshot(Long userId, AddressDto address, String identityNumber) {
+    public BillingSnapshot legacySnapshot(Long merchantId, AddressDto address, String identityNumber) {
         return BillingSnapshot.builder()
                 .type(com.ael.algoryqrservice.qrservice.model.enums.BillingAddressType.INDIVIDUAL)
                 .name(address.getContactName())
@@ -127,8 +127,8 @@ public class BillingAddressService {
                 .build();
     }
 
-    private BillingAddress createEntity(Long userId, BillingAddressDtos.Request request) {
-        return apply(BillingAddress.builder().userId(userId).build(), request);
+    private BillingAddress createEntity(Long merchantId, BillingAddressDtos.Request request) {
+        return apply(BillingAddress.builder().merchantId(merchantId).build(), request);
     }
 
     private BillingAddress apply(BillingAddress address, BillingAddressDtos.Request request) {
@@ -153,15 +153,15 @@ public class BillingAddressService {
         return address;
     }
 
-    private void clearDefault(Long userId) {
-        repository.findByUserIdAndDefaultAddressTrue(userId).ifPresent(current -> {
+    private void clearDefault(Long merchantId) {
+        repository.findByMerchantIdAndDefaultAddressTrue(merchantId).ifPresent(current -> {
             current.setDefaultAddress(false);
             repository.save(current);
         });
     }
 
-    private BillingAddress owned(Long userId, Long id) {
-        return repository.findByIdAndUserId(id, userId)
+    private BillingAddress owned(Long merchantId, Long id) {
+        return repository.findByIdAndUserId(id, merchantId)
                 .orElseThrow(() -> new NotFoundException("Fatura adresi bulunamadı"));
     }
 

@@ -29,7 +29,7 @@ public class CouponRedemptionService {
     private final CouponLogWriter couponLogWriter;
 
     @Transactional
-    public AppliedCoupon reserve(String rawCode, Long userId, Long purchaseId, BigDecimal listPrice) {
+    public AppliedCoupon reserve(String rawCode, Long merchantId, Long purchaseId, BigDecimal listPrice) {
         String code = CouponPolicy.normalizeCode(rawCode);
         Coupon coupon = couponRepository.findByCodeForUpdate(code)
                 .orElseThrow(() -> new BadRequestException("Kupon bulunamadi"));
@@ -45,7 +45,7 @@ public class CouponRedemptionService {
             couponRepository.save(coupon);
             couponLogWriter.write(
                     coupon.getId(),
-                    userId,
+                    merchantId,
                     purchaseId,
                     CouponLogAction.RESERVED,
                     quote,
@@ -55,7 +55,7 @@ public class CouponRedemptionService {
         } catch (BadRequestException exception) {
             couponLogWriter.write(
                     coupon.getId(),
-                    userId,
+                    merchantId,
                     purchaseId,
                     CouponLogAction.REJECTED,
                     null,
@@ -79,13 +79,13 @@ public class CouponRedemptionService {
         }
         coupon.setStatus(CouponStatus.USED);
         coupon.setUsedPurchaseId(purchase.getId());
-        coupon.setUsedByUserId(purchase.getUserId());
+        coupon.setUsedByMerchantId(purchase.getMerchantId());
         coupon.setUsedAt(AppTime.nowLocal());
         coupon.setReservedPurchaseId(null);
         couponRepository.save(coupon);
         couponLogWriter.write(
                 coupon.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 purchase.getId(),
                 CouponLogAction.USED,
                 quoteOf(purchase),
@@ -111,7 +111,7 @@ public class CouponRedemptionService {
         couponRepository.save(coupon);
         couponLogWriter.write(
                 coupon.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 purchase.getId(),
                 CouponLogAction.RELEASED,
                 quoteOf(purchase),

@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "yemeksepeti_connections", indexes = {
-        @Index(name = "uk_yemeksepeti_connections_user", columnList = "user_id", unique = true),
+        @Index(name = "uk_yemeksepeti_connections_user", columnList = "merchant_id", unique = true),
         @Index(name = "idx_yemeksepeti_connections_vendor", columnList = "vendor_id")
 })
 @Getter
@@ -38,8 +38,8 @@ public class YemekSepetiConnection {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     /** Siparişlerin düştüğü şube mutfağı; boşsa tüm şubelerde görünür. */
     @Column(name = "branch_id")

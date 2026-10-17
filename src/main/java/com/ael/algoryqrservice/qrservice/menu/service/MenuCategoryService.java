@@ -77,7 +77,7 @@ public class MenuCategoryService {
             filtered.add(TaxonomyDtos.MainCategoryResponse.builder()
                     .id(main.getId())
                     .menuId(main.getMenuId())
-                    .userId(main.getUserId())
+                    .merchantId(main.getMerchantId())
                     .slug(main.getSlug())
                     .name(main.getName())
                     .sortOrder(main.getSortOrder())
@@ -145,12 +145,12 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse createCategory(Long menuId, TaxonomyDtos.MainCategoryRequest request) {
-        Long userId = requireMenuUserId(menuId);
+        Long merchantId = requireMenuUserId(menuId);
         String name = requireName(request.getName());
         String slug = resolveSlug(menuId, request.getSlug(), name, true);
         MenuCategory saved = menuCategoryRepository.save(MenuCategory.builder()
                 .menuId(menuId)
-                .userId(userId)
+                .merchantId(merchantId)
                 .slug(slug)
                 .name(name)
                 .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
@@ -277,12 +277,12 @@ public class MenuCategoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaxonomyDtos.MainCategoryResponse> listLibrary(Long userId) {
-        if (userId == null) {
+    public List<TaxonomyDtos.MainCategoryResponse> listLibrary(Long merchantId) {
+        if (merchantId == null) {
             return List.of();
         }
         List<MenuCategory> categories = menuCategoryRepository
-                .findByUserIdAndMenuIdIsNullAndDeletedFalseOrderBySortOrderAscIdAsc(userId);
+                .findByMerchantIdAndMenuIdIsNullAndDeletedFalseOrderBySortOrderAscIdAsc(merchantId);
         if (categories.isEmpty()) {
             return List.of();
         }
@@ -299,14 +299,14 @@ public class MenuCategoryService {
     }
 
     @Transactional
-    public TaxonomyDtos.MainCategoryResponse createLibrary(Long userId, TaxonomyDtos.MainCategoryRequest request) {
-        if (userId == null) {
+    public TaxonomyDtos.MainCategoryResponse createLibrary(Long merchantId, TaxonomyDtos.MainCategoryRequest request) {
+        if (merchantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Oturum bulunamadı");
         }
         String name = requireName(request == null ? null : request.getName());
-        String slug = resolveLibrarySlug(userId, null, request == null ? null : request.getSlug(), name, true);
+        String slug = resolveLibrarySlug(merchantId, null, request == null ? null : request.getSlug(), name, true);
         MenuCategory saved = menuCategoryRepository.save(MenuCategory.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .slug(slug)
                 .name(name)
                 .sortOrder(request == null || request.getSortOrder() == null ? 0 : request.getSortOrder())
@@ -319,11 +319,11 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyDtos.MainCategoryResponse updateLibrary(
-            Long userId,
+            Long merchantId,
             Long categoryId,
             TaxonomyDtos.MainCategoryUpdateRequest request
     ) {
-        MenuCategory category = requireLibraryCategory(userId, categoryId);
+        MenuCategory category = requireLibraryCategory(merchantId, categoryId);
         if (request.getName() != null && !request.getName().isBlank()) {
             category.setName(request.getName().trim());
         }
@@ -332,15 +332,15 @@ public class MenuCategoryService {
         }
         category.setUpdatedAt(LocalDateTime.now());
         menuCategoryRepository.save(category);
-        return listLibrary(userId).stream()
+        return listLibrary(merchantId).stream()
                 .filter(item -> item.getId().equals(categoryId))
                 .findFirst()
                 .orElseThrow();
     }
 
     @Transactional
-    public void deleteLibrary(Long userId, Long categoryId) {
-        MenuCategory category = requireLibraryCategory(userId, categoryId);
+    public void deleteLibrary(Long merchantId, Long categoryId) {
+        MenuCategory category = requireLibraryCategory(merchantId, categoryId);
         if (menuSubCategoryRepository.countByMenuCategoryIdAndDeletedFalse(categoryId) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Alt kategorisi olan kategori silinemez");
         }
@@ -352,9 +352,9 @@ public class MenuCategoryService {
     }
 
     @Transactional
-    public TaxonomyDtos.MainCategoryResponse uploadLibraryCover(Long userId, Long categoryId, MultipartFile file) {
-        MenuCategory category = requireLibraryCategory(userId, categoryId);
-        ProductImageDtos.UploadResponse uploaded = productImageStorageService.uploadLibraryCategoryCover(userId, categoryId, file);
+    public TaxonomyDtos.MainCategoryResponse uploadLibraryCover(Long merchantId, Long categoryId, MultipartFile file) {
+        MenuCategory category = requireLibraryCategory(merchantId, categoryId);
+        ProductImageDtos.UploadResponse uploaded = productImageStorageService.uploadLibraryCategoryCover(merchantId, categoryId, file);
         String previousKey = category.getImageKey();
         category.setImageUrl(uploaded.imageUrl());
         category.setImageKey(uploaded.objectKey());
@@ -367,8 +367,8 @@ public class MenuCategoryService {
     }
 
     @Transactional
-    public TaxonomyDtos.MainCategoryResponse clearLibraryCover(Long userId, Long categoryId) {
-        MenuCategory category = requireLibraryCategory(userId, categoryId);
+    public TaxonomyDtos.MainCategoryResponse clearLibraryCover(Long merchantId, Long categoryId) {
+        MenuCategory category = requireLibraryCategory(merchantId, categoryId);
         String previousKey = category.getImageKey();
         category.setImageUrl(null);
         category.setImageKey(null);
@@ -380,13 +380,13 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyDtos.SubCategoryResponse createLibrarySub(
-            Long userId,
+            Long merchantId,
             Long categoryId,
             TaxonomyDtos.SubCategoryRequest request
     ) {
-        requireLibraryCategory(userId, categoryId);
+        requireLibraryCategory(merchantId, categoryId);
         String name = requireName(request == null ? null : request.getName());
-        String slug = resolveLibrarySlug(userId, categoryId, request == null ? null : request.getSlug(), name, false);
+        String slug = resolveLibrarySlug(merchantId, categoryId, request == null ? null : request.getSlug(), name, false);
         MenuSubCategory saved = menuSubCategoryRepository.save(MenuSubCategory.builder()
                 .menuCategoryId(categoryId)
                 .slug(slug)
@@ -401,13 +401,13 @@ public class MenuCategoryService {
 
     @Transactional
     public TaxonomyDtos.SubCategoryResponse updateLibrarySub(
-            Long userId,
+            Long merchantId,
             Long subId,
             TaxonomyDtos.SubCategoryUpdateRequest request
     ) {
-        MenuSubCategory sub = requireLibrarySubCategory(userId, subId);
+        MenuSubCategory sub = requireLibrarySubCategory(merchantId, subId);
         if (request.getMainCategoryId() != null) {
-            requireLibraryCategory(userId, request.getMainCategoryId());
+            requireLibraryCategory(merchantId, request.getMainCategoryId());
             sub.setMenuCategoryId(request.getMainCategoryId());
         }
         if (request.getName() != null && !request.getName().isBlank()) {
@@ -421,8 +421,8 @@ public class MenuCategoryService {
     }
 
     @Transactional
-    public void deleteLibrarySub(Long userId, Long subId) {
-        MenuSubCategory sub = requireLibrarySubCategory(userId, subId);
+    public void deleteLibrarySub(Long merchantId, Long subId) {
+        MenuSubCategory sub = requireLibrarySubCategory(merchantId, subId);
         if (menuProductRepository.countBySubCategoryIdAndDeletedFalse(subId) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ürünü olan alt kategori silinemez");
         }
@@ -432,8 +432,8 @@ public class MenuCategoryService {
     }
 
     @Transactional(readOnly = true)
-    public MenuSubCategory requireLibrarySubCategory(Long userId, Long subCategoryId) {
-        return requireLibrarySubCategoryInternal(userId, subCategoryId);
+    public MenuSubCategory requireLibrarySubCategory(Long merchantId, Long subCategoryId) {
+        return requireLibrarySubCategoryInternal(merchantId, subCategoryId);
     }
 
     public record TaxonomyCloneResult(Map<Long, Long> categoryIds, Map<Long, Long> subCategoryIds) {
@@ -449,7 +449,7 @@ public class MenuCategoryService {
         for (MenuCategory source : sourceCategories) {
             MenuCategory copied = menuCategoryRepository.save(MenuCategory.builder()
                     .menuId(targetMenuId)
-                    .userId(targetUserId)
+                    .merchantId(targetUserId)
                     .slug(source.getSlug())
                     .name(source.getName())
                     .sortOrder(source.getSortOrder())
@@ -481,21 +481,21 @@ public class MenuCategoryService {
         return new TaxonomyCloneResult(sourceCategoryToTarget, sourceSubToTargetSub);
     }
 
-    private MenuCategory requireLibraryCategory(Long userId, Long categoryId) {
-        if (userId == null || categoryId == null) {
+    private MenuCategory requireLibraryCategory(Long merchantId, Long categoryId) {
+        if (merchantId == null || categoryId == null) {
             throw new BadRequestException("Kategori bulunamadi");
         }
-        return menuCategoryRepository.findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(categoryId, userId)
+        return menuCategoryRepository.findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(categoryId, merchantId)
                 .orElseThrow(() -> new BadRequestException("Kategori bulunamadi: " + categoryId));
     }
 
-    private MenuSubCategory requireLibrarySubCategoryInternal(Long userId, Long subCategoryId) {
+    private MenuSubCategory requireLibrarySubCategoryInternal(Long merchantId, Long subCategoryId) {
         if (subCategoryId == null) {
             throw new BadRequestException("subCategoryId zorunludur");
         }
         MenuSubCategory sub = menuSubCategoryRepository.findByIdAndDeletedFalse(subCategoryId)
                 .orElseThrow(() -> new BadRequestException("Alt kategori bulunamadi: " + subCategoryId));
-        requireLibraryCategory(userId, sub.getMenuCategoryId());
+        requireLibraryCategory(merchantId, sub.getMenuCategoryId());
         return sub;
     }
 
@@ -503,10 +503,10 @@ public class MenuCategoryService {
         return menuSubCategoryRepository.findByMenuCategoryIdAndDeletedFalseOrderBySortOrderAscIdAsc(categoryId);
     }
 
-    private String resolveLibrarySlug(Long userId, Long categoryId, String requested, String name, boolean forCategory) {
+    private String resolveLibrarySlug(Long merchantId, Long categoryId, String requested, String name, boolean forCategory) {
         String base = requested == null || requested.isBlank() ? slugify(name) : requireSlug(requested);
         if (forCategory) {
-            if (menuCategoryRepository.existsByUserIdAndMenuIdIsNullAndSlugAndDeletedFalse(userId, base)) {
+            if (menuCategoryRepository.existsByMerchantIdAndMenuIdIsNullAndSlugAndDeletedFalse(merchantId, base)) {
                 throw new BadRequestException("Kategori slug zaten var: " + base);
             }
             return base;
@@ -521,17 +521,17 @@ public class MenuCategoryService {
         Menu menu = menuRepository.findById(menuId)
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
-        if (menu.getUserId() == null) {
+        if (menu.getMerchantId() == null) {
             throw new BadRequestException("Menü sahibi bulunamadı");
         }
-        return menu.getUserId();
+        return menu.getMerchantId();
     }
 
     private TaxonomyDtos.MainCategoryResponse toMainResponse(MenuCategory category, List<MenuSubCategory> subs) {
         return TaxonomyDtos.MainCategoryResponse.builder()
                 .id(category.getId())
                 .menuId(category.getMenuId())
-                .userId(category.getUserId())
+                .merchantId(category.getMerchantId())
                 .slug(category.getSlug())
                 .name(category.getName())
                 .sortOrder(category.getSortOrder())

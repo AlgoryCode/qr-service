@@ -57,7 +57,7 @@ public class ProductAccessGatewayFilter extends OncePerRequestFilter {
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || !(authentication.getDetails() instanceof JwtAccessPrincipal principal)
-                || principal.userId() == null
+                || principal.merchantId() == null
                 || principal.isCustomer()
                 || principal.isWaiter()) {
             response.setStatus(HttpStatus.FORBIDDEN.value());
@@ -67,7 +67,7 @@ public class ProductAccessGatewayFilter extends OncePerRequestFilter {
         }
 
         try {
-            productUsageGateway.allow(principal.userId(), productCode);
+            productUsageGateway.allow(principal.merchantId(), productCode);
         } catch (FulfillmentUnavailableException exception) {
             response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

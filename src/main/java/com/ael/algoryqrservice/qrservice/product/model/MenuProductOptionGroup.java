@@ -46,8 +46,8 @@ public class MenuProductOptionGroup {
     @Column(name = "product_id")
     private Long productId;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name = "merchant_id")
+    private Long merchantId;
 
     @Column(name = "library_group_id")
     private Long libraryGroupId;

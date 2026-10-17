@@ -56,7 +56,7 @@ public class RestaurantAreaService {
 
         LocalDateTime now = LocalDateTime.now();
         RestaurantArea area = RestaurantArea.builder()
-                .userId(menu.getUserId())
+                .merchantId(menu.getMerchantId())
                 .menuId(menu.getMenuId())
                 .name(name)
                 .sortOrder(sortOrder)
@@ -100,8 +100,8 @@ public class RestaurantAreaService {
 
     @Transactional(readOnly = true)
     public List<RestaurantAreaDtos.AreaResponse> listOwnedAreas(Long layoutId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
         return restaurantAreaRepository.findByLayoutIdOrderBySortOrderAscIdAsc(layout.getId()).stream()
                 .map(this::toResponse)
                 .toList();
@@ -112,8 +112,8 @@ public class RestaurantAreaService {
             Long layoutId,
             RestaurantAreaDtos.CreateAreaRequest request
     ) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantLayout layout = requireOwnedLayout(userId, layoutId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantLayout layout = requireOwnedLayout(merchantId, layoutId);
         String name = requireName(request == null ? null : request.getName());
         if (ownedAreaNameTaken(layout.getId(), name, null)) {
             throw new BadRequestException("Bu alan adı zaten kullanılıyor");
@@ -124,7 +124,7 @@ public class RestaurantAreaService {
                 .orElse(0) + 10;
         LocalDateTime now = LocalDateTime.now();
         RestaurantArea area = RestaurantArea.builder()
-                .userId(userId)
+                .merchantId(merchantId)
                 .layoutId(layout.getId())
                 .menuId(linkedMenuId(layout))
                 .name(name)
@@ -141,8 +141,8 @@ public class RestaurantAreaService {
             Long areaId,
             RestaurantAreaDtos.UpdateAreaRequest request
     ) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantArea area = requireOwnedArea(userId, layoutId, areaId);
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantArea area = requireOwnedArea(merchantId, layoutId, areaId);
         if (request != null && request.getName() != null) {
             String name = requireName(request.getName());
             if (ownedAreaNameTaken(layoutId, name, area.getId())) {
@@ -156,9 +156,9 @@ public class RestaurantAreaService {
 
     @Transactional
     public void deleteOwnedArea(Long layoutId, Long areaId) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        RestaurantArea area = requireOwnedArea(userId, layoutId, areaId);
-        List<RestaurantTable> tables = restaurantTableRepository.findByUserIdAndAreaIdAndDeletedFalse(userId, area.getId());
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        RestaurantArea area = requireOwnedArea(merchantId, layoutId, areaId);
+        List<RestaurantTable> tables = restaurantTableRepository.findByMerchantIdAndAreaIdAndDeletedFalse(merchantId, area.getId());
         LocalDateTime now = LocalDateTime.now();
         for (RestaurantTable table : tables) {
             table.setAreaId(null);
@@ -180,16 +180,16 @@ public class RestaurantAreaService {
         return raw.trim();
     }
 
-    private RestaurantLayout requireOwnedLayout(Long userId, Long layoutId) {
+    private RestaurantLayout requireOwnedLayout(Long merchantId, Long layoutId) {
         if (layoutId == null) {
             throw new NotFoundException("Düzen bulunamadı");
         }
-        return restaurantLayoutRepository.findByIdAndUserId(layoutId, userId)
+        return restaurantLayoutRepository.findByIdAndUserId(layoutId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
     }
 
-    private RestaurantArea requireOwnedArea(Long userId, Long layoutId, Long areaId) {
-        RestaurantArea area = restaurantAreaRepository.findByIdAndUserId(areaId, userId)
+    private RestaurantArea requireOwnedArea(Long merchantId, Long layoutId, Long areaId) {
+        RestaurantArea area = restaurantAreaRepository.findByIdAndUserId(areaId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Alan bulunamadı"));
         if (!layoutId.equals(area.getLayoutId())) {
             throw new NotFoundException("Alan bulunamadı");
@@ -243,7 +243,7 @@ public class RestaurantAreaService {
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
         Long currentUserId = securityUtils.getCurrentMerchantId();
-        if (!currentUserId.equals(menu.getUserId())) {
+        if (!currentUserId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

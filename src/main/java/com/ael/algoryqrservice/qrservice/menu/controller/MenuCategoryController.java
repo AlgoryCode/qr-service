@@ -116,7 +116,7 @@ public class MenuCategoryController {
                 .filter(item -> !item.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı"));
         Long currentUserId = securityUtils.getCurrentMerchantId();
-        if (!currentUserId.equals(menu.getUserId())) {
+        if (!currentUserId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
     }

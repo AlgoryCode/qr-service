@@ -241,8 +241,8 @@ public class MenuOrderService {
                     .map(this::toOrderResponse)
                     .toList());
         }
-        listed.addAll(kitchenUberEatsService.listManagedForOwner(menu.getUserId()));
-        listed.addAll(kitchenYemekSepetiService.listManagedForOwner(menu.getUserId()));
+        listed.addAll(kitchenUberEatsService.listManagedForOwner(menu.getMerchantId()));
+        listed.addAll(kitchenYemekSepetiService.listManagedForOwner(menu.getMerchantId()));
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status.trim())) {
             MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
             return listed.stream().filter(order -> order.getStatus() == orderStatus).toList();
@@ -326,8 +326,8 @@ public class MenuOrderService {
         List<MenuOrderDtos.OrderResponse> combined = new ArrayList<>(active);
         combined.addAll(tableBillService.hideClosedTableTickets(servedToday));
         combined.addAll(cancelledToday);
-        combined.addAll(kitchenUberEatsService.listActiveForBranch(menu.getUserId(), menu.getBranchId()));
-        combined.addAll(kitchenYemekSepetiService.listActiveForBranch(menu.getUserId(), menu.getBranchId()));
+        combined.addAll(kitchenUberEatsService.listActiveForBranch(menu.getMerchantId(), menu.getBranchId()));
+        combined.addAll(kitchenYemekSepetiService.listActiveForBranch(menu.getMerchantId(), menu.getBranchId()));
         return combined;
     }
 
@@ -348,11 +348,11 @@ public class MenuOrderService {
     public MenuOrderDtos.OrderResponse merchantMarkReady(Long menuId, Long orderId, String source) {
         if (KitchenUberEatsMapper.isUberEatsSource(source)) {
             Menu menu = requireOwnedMenu(menuId);
-            return kitchenUberEatsService.markReady(menu.getUserId(), orderId);
+            return kitchenUberEatsService.markReady(menu.getMerchantId(), orderId);
         }
         if (KitchenUberEatsMapper.isYemekSepetiSource(source)) {
             Menu menu = requireOwnedMenu(menuId);
-            return kitchenYemekSepetiService.markReady(menu.getUserId(), orderId);
+            return kitchenYemekSepetiService.markReady(menu.getMerchantId(), orderId);
         }
         return merchantKitchenTransition(menuId, orderId, MenuOrderStatus.PREPARING, MenuOrderStatus.READY);
     }
@@ -610,7 +610,7 @@ public class MenuOrderService {
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new NotFoundException("Menü bulunamadı"));
         Long currentUserId = securityUtils.getCurrentMerchantId();
-        if (!currentUserId.equals(menu.getUserId())) {
+        if (!currentUserId.equals(menu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         return menu;

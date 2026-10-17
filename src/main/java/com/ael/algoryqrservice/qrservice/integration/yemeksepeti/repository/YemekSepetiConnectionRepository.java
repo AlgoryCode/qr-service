@@ -9,9 +9,9 @@ import java.util.Optional;
 
 public interface YemekSepetiConnectionRepository extends JpaRepository<YemekSepetiConnection, Long> {
 
-    Optional<YemekSepetiConnection> findByUserId(Long userId);
+    Optional<YemekSepetiConnection> findByMerchantId(Long merchantId);
 
-    List<YemekSepetiConnection> findByUserIdOrderByUpdatedAtDesc(Long userId);
+    List<YemekSepetiConnection> findByMerchantIdOrderByUpdatedAtDesc(Long merchantId);
 
     List<YemekSepetiConnection> findByStatus(YemekSepetiConnectionStatus status);
 

@@ -118,7 +118,7 @@ public class CustomerAccountService {
 
         return membershipRepository.findByCustomerIdAndMenuId(customerId, menuId)
                 .map(existing -> {
-                    existing.setBusinessId(menu.getUserId());
+                    existing.setBusinessId(menu.getMerchantId());
                     existing.setStatus(MembershipStatus.ACTIVE);
                     if (existing.getJoinedAt() == null) {
                         existing.setJoinedAt(LocalDateTime.now());
@@ -128,7 +128,7 @@ public class CustomerAccountService {
                 .orElseGet(() -> membershipRepository.save(CustomerMembership.builder()
                         .customerId(customerId)
                         .menuId(menuId)
-                        .businessId(menu.getUserId())
+                        .businessId(menu.getMerchantId())
                         .status(MembershipStatus.ACTIVE)
                         .joinedAt(LocalDateTime.now())
                         .build()));

@@ -21,9 +21,9 @@ public class UserAccessProfileService {
     private final FulfillmentServiceClient fulfillmentServiceClient;
 
     @Transactional
-    public UserAccessProfile resolve(Long userId) {
-        purchaseExpiryService.expireDueForUser(userId);
-        PackageView view = fulfillmentServiceClient.findPackage(userId);
+    public UserAccessProfile resolve(Long merchantId) {
+        purchaseExpiryService.expireDueForUser(merchantId);
+        PackageView view = fulfillmentServiceClient.findPackage(merchantId);
         if (!"ACTIVE".equals(view.status()) || view.body() == null) {
             return EMPTY_PROFILE;
         }

@@ -157,7 +157,7 @@ public class PurchaseService {
         CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), request.getPaymentMethodId());
         String conversationId = paymentRequestMapper.newPaymentAttemptId(user.getId());
         Purchase purchase = purchaseRepository.save(Purchase.builder()
-                .userId(user.getId())
+                .merchantId(user.getId())
                 .packageId(planPackage.getId())
                 .packageCode(planPackage.getCode())
                 .packageName(planPackage.getName())
@@ -281,7 +281,7 @@ public class PurchaseService {
 
         purchaseLogService.log(
                 purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 PurchaseLogAction.PURCHASE_COMPLETED,
                 purchase.getPackageName() + " paketi " + metadata.installmentNumber()
                         + "/" + metadata.installmentCount() + " taksiti işlendi"
@@ -343,7 +343,7 @@ public class PurchaseService {
                     : event.getFailureReason();
             purchaseLogService.log(
                     purchase.getId(),
-                    purchase.getUserId(),
+                    purchase.getMerchantId(),
                     PurchaseLogAction.PURCHASE_PAYMENT_FAILED,
                     purchase.getPackageName() + " paketi ödemesi başarısız: " + reason
             );
@@ -379,7 +379,7 @@ public class PurchaseService {
         purchaseRepository.save(purchase);
         purchaseLogService.log(
                 purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 PurchaseLogAction.PURCHASE_PAYMENT_FAILED,
                 purchase.getPackageName() + " abonelik odemesi gecikti; "
                         + billingSubscriptionProperties.getManualPaymentGraceDays()
@@ -398,7 +398,7 @@ public class PurchaseService {
     public PurchaseInitiateResponse paySubscriptionDebt(User user, Long purchaseId, String clientIp) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
-        if (!purchase.getUserId().equals(user.getId())) {
+        if (!purchase.getMerchantId().equals(user.getId())) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
         if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
@@ -573,7 +573,7 @@ public class PurchaseService {
         }
 
         Optional<BillingPaymentDtos.RefundablePayment> paymentOptional = paymentServiceClient.findPayment(
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 purchase.getPaymentConversationId()
         );
         if (paymentOptional.isEmpty()) {
@@ -617,7 +617,7 @@ public class PurchaseService {
 
             if (purchase.getPaymentConversationId() != null && !purchase.getPaymentConversationId().isBlank()) {
                 Optional<BillingPaymentDtos.RefundablePayment> paymentOptional = paymentServiceClient.findPayment(
-                        purchase.getUserId(),
+                        purchase.getMerchantId(),
                         purchase.getPaymentConversationId()
                 );
                 if (paymentOptional.isPresent() && paymentOptional.get().isSuccess()) {
@@ -638,7 +638,7 @@ public class PurchaseService {
             couponRedemptionService.release(purchase);
             purchaseLogService.log(
                     purchase.getId(),
-                    purchase.getUserId(),
+                    purchase.getMerchantId(),
                     PurchaseLogAction.PURCHASE_CANCELLED,
                     purchase.getPackageName() + " paketi ödeme zaman aşımı nedeniyle iptal edildi"
             );
@@ -667,7 +667,7 @@ public class PurchaseService {
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("purchaseId", purchase.getId());
-        metadata.put("userId", purchase.getUserId());
+        metadata.put("userId", purchase.getMerchantId());
         metadata.put("packageId", purchase.getPackageId());
         metadata.put("packageCode", purchase.getPackageCode());
         metadata.put("purchaseConversationId", purchase.getPaymentConversationId());
@@ -686,7 +686,7 @@ public class PurchaseService {
         event.setSourceReferenceId(String.valueOf(purchase.getId()));
         event.setSourceMetadata(metadata);
         event.setPurchaseId(String.valueOf(purchase.getId()));
-        event.setUserId(String.valueOf(purchase.getUserId()));
+        event.setUserId(String.valueOf(purchase.getMerchantId()));
         event.setPackageId(String.valueOf(purchase.getPackageId()));
         event.setPackageCode(purchase.getPackageCode());
         event.setInstallmentId(installmentId);
@@ -726,27 +726,27 @@ public class PurchaseService {
     }
 
     @Transactional
-    public List<PurchaseResponse> getUserPurchases(Long userId) {
-        purchaseExpiryService.expireDueForUser(userId);
-        return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(userId).stream()
+    public List<PurchaseResponse> getUserPurchases(Long merchantId) {
+        purchaseExpiryService.expireDueForUser(merchantId);
+        return purchaseRepository.findByMerchantIdOrderByPurchasedAtDesc(merchantId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional
-    public SubscriptionOverviewResponse getMySubscriptionOverview(Long userId) {
-        purchaseExpiryService.expireDueForUser(userId);
-        SubscriptionOverviewResponse overview = externalPackageView.overview(userId)
+    public SubscriptionOverviewResponse getMySubscriptionOverview(Long merchantId) {
+        purchaseExpiryService.expireDueForUser(merchantId);
+        SubscriptionOverviewResponse overview = externalPackageView.overview(merchantId)
                 .orElseThrow(() -> new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor"));
         if (overview.getActivePackage() != null) {
             overview.getActivePackage().setProducts(overview.getEntitlements());
         }
-        overview.setAddonPurchases(addonPurchases(userId));
+        overview.setAddonPurchases(addonPurchases(merchantId));
         return overview;
     }
 
-    private List<PurchaseSummaryResponse> addonPurchases(Long userId) {
-        return purchaseRepository.findByUserIdOrderByPurchasedAtDesc(userId)
+    private List<PurchaseSummaryResponse> addonPurchases(Long merchantId) {
+        return purchaseRepository.findByMerchantIdOrderByPurchasedAtDesc(merchantId)
                 .stream()
                 .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
                 .filter(Purchase::isUsable)
@@ -755,15 +755,15 @@ public class PurchaseService {
     }
 
     @Transactional
-    public PurchaseSummaryResponse getPurchaseSummary(Long purchaseId, Long userId) {
-        purchaseExpiryService.expireDueForUser(userId);
-        Purchase purchase = findUserPurchase(purchaseId, userId);
+    public PurchaseSummaryResponse getPurchaseSummary(Long purchaseId, Long merchantId) {
+        purchaseExpiryService.expireDueForUser(merchantId);
+        Purchase purchase = findUserPurchase(purchaseId, merchantId);
         return toSummary(purchase);
     }
 
     @Transactional(readOnly = true)
-    public List<PurchaseFulfillmentResponse> getPurchaseInstallments(Long purchaseId, Long userId) {
-        findUserPurchase(purchaseId, userId);
+    public List<PurchaseFulfillmentResponse> getPurchaseInstallments(Long purchaseId, Long merchantId) {
+        findUserPurchase(purchaseId, merchantId);
         return purchaseFulfillmentService.getFulfillments(purchaseId);
     }
 
@@ -782,7 +782,7 @@ public class PurchaseService {
         requireExpirable(purchase.getStatus());
         remoteSubscriptionCanceller.cancelIfNeeded(purchase);
         purchaseExpiryService.expire(purchase);
-        menuPublicAccessService.syncForUser(purchase.getUserId());
+        menuPublicAccessService.syncForUser(purchase.getMerchantId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
 
@@ -816,11 +816,11 @@ public class PurchaseService {
     }
 
     @Transactional
-    public PurchaseResponse cancelMyPurchase(Long purchaseId, Long userId) {
+    public PurchaseResponse cancelMyPurchase(Long purchaseId, Long merchantId) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (!purchase.getUserId().equals(userId)) {
+        if (!purchase.getMerchantId().equals(merchantId)) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
 
@@ -830,15 +830,15 @@ public class PurchaseService {
                     "Aktif abonelik icin donem sonu iptal veya iade ile iptal kullanin"
             );
         }
-        return finalizeImmediateCancel(purchase, userId, null);
+        return finalizeImmediateCancel(purchase, merchantId, null);
     }
 
     @Transactional
-    public PurchaseResponse cancelAtPeriodEnd(Long purchaseId, Long userId) {
+    public PurchaseResponse cancelAtPeriodEnd(Long purchaseId, Long merchantId) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (!purchase.getUserId().equals(userId)) {
+        if (!purchase.getMerchantId().equals(merchantId)) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
@@ -847,13 +847,13 @@ public class PurchaseService {
         }
 
         requireSubscriptionId(purchase);
-        paymentServiceClient.cancelSubscriptionAtPeriodEnd(userId, purchase.getSubscriptionId());
+        paymentServiceClient.cancelSubscriptionAtPeriodEnd(merchantId, purchase.getSubscriptionId());
         purchase.setCancelAtPeriodEnd(true);
         purchaseRepository.save(purchase);
 
         purchaseLogService.log(
                 purchase.getId(),
-                userId,
+                merchantId,
                 PurchaseLogAction.PURCHASE_CANCEL_AT_PERIOD_END,
                 purchase.getPackageName() + " aboneligi donem sonunda bitirilecek"
         );
@@ -861,11 +861,11 @@ public class PurchaseService {
     }
 
     @Transactional
-    public PurchaseResponse resumeRenewal(Long purchaseId, Long userId) {
+    public PurchaseResponse resumeRenewal(Long purchaseId, Long merchantId) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (!purchase.getUserId().equals(userId)) {
+        if (!purchase.getMerchantId().equals(merchantId)) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
@@ -874,34 +874,34 @@ public class PurchaseService {
         }
 
         requireSubscriptionId(purchase);
-        paymentServiceClient.resumeSubscription(userId, purchase.getSubscriptionId());
+        paymentServiceClient.resumeSubscription(merchantId, purchase.getSubscriptionId());
         purchase.setCancelAtPeriodEnd(false);
         purchaseRepository.save(purchase);
 
         purchaseLogService.log(
                 purchase.getId(),
-                userId,
+                merchantId,
                 PurchaseLogAction.PURCHASE_RENEWAL_RESUMED,
                 purchase.getPackageName() + " abonelik yenilemesi tekrar acildi"
         );
         return toResponse(purchase);
     }
 
-    public PurchaseResponse cancelWithRefund(Long purchaseId, Long userId, String clientIp) {
+    public PurchaseResponse cancelWithRefund(Long purchaseId, Long merchantId, String clientIp) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        RefundPrep prep = tx.execute(status -> prepareRefund(purchaseId, userId, false));
+        RefundPrep prep = tx.execute(status -> prepareRefund(purchaseId, merchantId, false));
         if (prep == null) {
             throw new BadRequestException("Iade hazirligi basarisiz");
         }
 
         try {
-            paymentServiceClient.refundPayment(userId, prep.conversationId(), prep.amount(), clientIp);
+            paymentServiceClient.refundPayment(merchantId, prep.conversationId(), prep.amount(), clientIp);
         } catch (RuntimeException exception) {
             tx.executeWithoutResult(status -> clearPendingRefund(purchaseId));
             throw exception;
         }
 
-        return tx.execute(status -> completeRefundCancel(purchaseId, userId, prep.amount()));
+        return tx.execute(status -> completeRefundCancel(purchaseId, merchantId, prep.amount()));
     }
 
     public PurchaseResponse adminCancelWithRefund(Long purchaseId, BigDecimal amount, String clientIp) {
@@ -911,22 +911,22 @@ public class PurchaseService {
             throw new BadRequestException("Iade hazirligi basarisiz");
         }
 
-        Long userId = prep.userId();
+        Long merchantId = prep.merchantId();
         try {
-            paymentServiceClient.refundPayment(userId, prep.conversationId(), prep.amount(), clientIp);
+            paymentServiceClient.refundPayment(merchantId, prep.conversationId(), prep.amount(), clientIp);
         } catch (RuntimeException exception) {
             tx.executeWithoutResult(status -> clearPendingRefund(purchaseId));
             throw exception;
         }
 
-        return tx.execute(status -> completeRefundCancel(purchaseId, userId, prep.amount()));
+        return tx.execute(status -> completeRefundCancel(purchaseId, merchantId, prep.amount()));
     }
 
-    private RefundPrep prepareRefund(Long purchaseId, Long userId, boolean adminOverride) {
+    private RefundPrep prepareRefund(Long purchaseId, Long merchantId, boolean adminOverride) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (!adminOverride && !purchase.getUserId().equals(userId)) {
+        if (!adminOverride && !purchase.getMerchantId().equals(merchantId)) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
@@ -952,7 +952,7 @@ public class PurchaseService {
         }
 
         BillingPaymentDtos.RefundablePayment refundable =
-                paymentServiceClient.getRefundablePayment(purchase.getUserId(), conversationId);
+                paymentServiceClient.getRefundablePayment(purchase.getMerchantId(), conversationId);
         BigDecimal remaining = refundable.remaining() == null ? BigDecimal.ZERO : refundable.remaining();
         if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Iade edilecek tutar bulunamadi");
@@ -963,11 +963,11 @@ public class PurchaseService {
         purchaseRepository.save(purchase);
         purchaseLogService.log(
                 purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 PurchaseLogAction.PURCHASE_REFUND_STARTED,
                 purchase.getPackageName() + " abonelik iadesi baslatildi: " + remaining
         );
-        return new RefundPrep(conversationId, remaining, purchase.getUserId());
+        return new RefundPrep(conversationId, remaining, purchase.getMerchantId());
     }
 
     private RefundPrep prepareAdminRefund(Long purchaseId, BigDecimal requestedAmount) {
@@ -981,7 +981,7 @@ public class PurchaseService {
         if (requestedAmount.compareTo(prep.amount()) > 0) {
             throw new BadRequestException("Iade tutari kalan tutari asamaz");
         }
-        return new RefundPrep(prep.conversationId(), requestedAmount, prep.userId());
+        return new RefundPrep(prep.conversationId(), requestedAmount, prep.merchantId());
     }
 
     private void clearPendingRefund(Long purchaseId) {
@@ -994,7 +994,7 @@ public class PurchaseService {
         });
     }
 
-    private PurchaseResponse completeRefundCancel(Long purchaseId, Long userId, BigDecimal refundedAmount) {
+    private PurchaseResponse completeRefundCancel(Long purchaseId, Long merchantId, BigDecimal refundedAmount) {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
@@ -1003,21 +1003,21 @@ public class PurchaseService {
         purchase.setRefundPendingAt(null);
         purchaseLogService.log(
                 purchase.getId(),
-                userId,
+                merchantId,
                 PurchaseLogAction.PURCHASE_REFUND_COMPLETED,
                 purchase.getPackageName() + " abonelik iadesi tamamlandi: " + refundedAmount
         );
 
         try {
-            cancelRemoteSubscriptionIfRequired(purchase, userId);
-            return applyLocalImmediateCancel(purchase, userId, refundedAmount);
+            cancelRemoteSubscriptionIfRequired(purchase, merchantId);
+            return applyLocalImmediateCancel(purchase, merchantId, refundedAmount);
         } catch (PaymentServiceException exception) {
             log.error(
                     "Remote subscription cancel failed after refund; marking NEEDS_RECONCILE. purchaseId={}",
                     purchaseId,
                     exception
             );
-            PurchaseResponse response = applyLocalImmediateCancel(purchase, userId, refundedAmount);
+            PurchaseResponse response = applyLocalImmediateCancel(purchase, merchantId, refundedAmount);
             purchase.setRefundStatus(RefundStatus.NEEDS_RECONCILE);
             purchaseRepository.save(purchase);
             return response;
@@ -1036,7 +1036,7 @@ public class PurchaseService {
                 if (locked.getPaymentStyle() == PaymentStyle.SUBSCRIPTION
                         && locked.getSubscriptionId() != null
                         && !locked.getSubscriptionId().isBlank()) {
-                    paymentServiceClient.cancelSubscription(locked.getUserId(), locked.getSubscriptionId());
+                    paymentServiceClient.cancelSubscription(locked.getMerchantId(), locked.getSubscriptionId());
                     locked.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
                 }
                 locked.setRefundStatus(RefundStatus.COMPLETED);
@@ -1072,7 +1072,7 @@ public class PurchaseService {
 
                 BillingPaymentDtos.RefundablePayment payment;
                 try {
-                    payment = paymentServiceClient.getRefundablePayment(locked.getUserId(), conversationId);
+                    payment = paymentServiceClient.getRefundablePayment(locked.getMerchantId(), conversationId);
                 } catch (PaymentServiceException exception) {
                     log.warn(
                             "Pending refund payment lookup failed. purchaseId={} reason={}",
@@ -1087,7 +1087,7 @@ public class PurchaseService {
                     BigDecimal refundedAmount = payment.refundedAmount() == null
                             ? locked.getPrice()
                             : payment.refundedAmount();
-                    completeRefundCancel(locked.getId(), locked.getUserId(), refundedAmount);
+                    completeRefundCancel(locked.getId(), locked.getMerchantId(), refundedAmount);
                     log.info(
                             "Pending refund completed by reconcile. purchaseId={} conversationId={}",
                             locked.getId(),
@@ -1146,7 +1146,7 @@ public class PurchaseService {
         }
 
         fulfillmentQueuePublisher.publishRevoked(purchase);
-        menuPublicAccessService.deactivateActiveMenusForUser(purchase.getUserId());
+        menuPublicAccessService.deactivateActiveMenusForUser(purchase.getMerchantId());
         cancelRemoteSubscriptionBestEffort(purchase);
         purchaseRepository.save(purchase);
     }
@@ -1161,7 +1161,7 @@ public class PurchaseService {
             purchase.setRefundPendingAt(null);
         }
         try {
-            cancelRemoteSubscriptionIfRequired(purchase, purchase.getUserId());
+            cancelRemoteSubscriptionIfRequired(purchase, purchase.getMerchantId());
         } catch (PaymentServiceException exception) {
             log.error(
                     "Remote subscription cancel failed after external refund; marking NEEDS_RECONCILE. purchaseId={}",
@@ -1171,7 +1171,7 @@ public class PurchaseService {
             purchase.setRefundStatus(RefundStatus.NEEDS_RECONCILE);
             purchaseRepository.save(purchase);
         }
-        applyLocalImmediateCancel(purchase, purchase.getUserId(), refundedAmount);
+        applyLocalImmediateCancel(purchase, purchase.getMerchantId(), refundedAmount);
     }
 
     private void cancelRemoteSubscriptionBestEffort(Purchase purchase) {
@@ -1186,7 +1186,7 @@ public class PurchaseService {
             return;
         }
         try {
-            paymentServiceClient.cancelSubscription(purchase.getUserId(), subscriptionId);
+            paymentServiceClient.cancelSubscription(purchase.getMerchantId(), subscriptionId);
             purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
             if (purchase.getRefundStatus() == RefundStatus.NEEDS_RECONCILE) {
                 purchase.setRefundStatus(RefundStatus.COMPLETED);
@@ -1213,12 +1213,12 @@ public class PurchaseService {
         return purchase.getPaymentConversationId();
     }
 
-    private PurchaseResponse finalizeImmediateCancel(Purchase purchase, Long userId, BigDecimal refundedAmount) {
-        cancelRemoteSubscriptionIfRequired(purchase, userId);
-        return applyLocalImmediateCancel(purchase, userId, refundedAmount);
+    private PurchaseResponse finalizeImmediateCancel(Purchase purchase, Long merchantId, BigDecimal refundedAmount) {
+        cancelRemoteSubscriptionIfRequired(purchase, merchantId);
+        return applyLocalImmediateCancel(purchase, merchantId, refundedAmount);
     }
 
-    private PurchaseResponse applyLocalImmediateCancel(Purchase purchase, Long userId, BigDecimal refundedAmount) {
+    private PurchaseResponse applyLocalImmediateCancel(Purchase purchase, Long merchantId, BigDecimal refundedAmount) {
         LocalDateTime cancelledAt = LocalDateTime.now();
         PurchaseStatus previousStatus = purchase.getStatus();
         purchase.setStatus(PurchaseStatus.CANCELLED);
@@ -1239,10 +1239,10 @@ public class PurchaseService {
                 || refundedAmount != null;
         if (needsCleanup) {
             fulfillmentQueuePublisher.publishRevoked(purchase);
-            menuPublicAccessService.deactivateActiveMenusForUser(userId);
+            menuPublicAccessService.deactivateActiveMenusForUser(merchantId);
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
-        menuPublicAccessService.syncForUser(userId);
+        menuPublicAccessService.syncForUser(merchantId);
 
         String detail = purchase.getPackageName() + " paketi kullanıcı tarafından iptal edildi";
         if (refundedAmount != null) {
@@ -1250,14 +1250,14 @@ public class PurchaseService {
         }
         purchaseLogService.log(
                 purchase.getId(),
-                userId,
+                merchantId,
                 PurchaseLogAction.PURCHASE_CANCELLED,
                 detail
         );
         return toResponse(purchase);
     }
 
-    private record RefundPrep(String conversationId, BigDecimal amount, Long userId) {
+    private record RefundPrep(String conversationId, BigDecimal amount, Long merchantId) {
     }
 
     private void validateUserCancellable(Purchase purchase) {
@@ -1299,7 +1299,7 @@ public class PurchaseService {
         }
     }
 
-    private void cancelRemoteSubscriptionIfRequired(Purchase purchase, Long userId) {
+    private void cancelRemoteSubscriptionIfRequired(Purchase purchase, Long merchantId) {
         if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
             return;
         }
@@ -1312,16 +1312,16 @@ public class PurchaseService {
                     "Abonelik kimligi bulunamadigi icin paket guvenli sekilde iptal edilemiyor"
             );
         }
-        paymentServiceClient.cancelSubscription(userId, subscriptionId);
+        paymentServiceClient.cancelSubscription(merchantId, subscriptionId);
         purchase.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
     }
 
     @Transactional(readOnly = true)
-    public Purchase findUserPurchase(Long purchaseId, Long userId) {
+    public Purchase findUserPurchase(Long purchaseId, Long merchantId) {
         Purchase purchase = purchaseRepository.findById(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
-        if (!purchase.getUserId().equals(userId)) {
+        if (!purchase.getMerchantId().equals(merchantId)) {
             throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
         }
 
@@ -1408,7 +1408,7 @@ public class PurchaseService {
         if (!purchase.getCurrency().equalsIgnoreCase(event.getCurrency())) {
             throw new InvalidPaymentEventException("Payment currency does not match purchase");
         }
-        if (!purchase.getUserId().equals(metadata.userId())
+        if (!purchase.getMerchantId().equals(metadata.merchantId())
                 || !purchase.getPackageId().equals(metadata.packageId())
                 || !purchase.getPackageCode().equals(metadata.packageCode())
                 || !purchase.getId().equals(metadata.purchaseId())) {
@@ -1432,7 +1432,7 @@ public class PurchaseService {
                 && subscriptionRefundPolicy.isRefundEligible(purchase, now);
         return PurchaseSummaryResponse.builder()
                 .purchaseId(purchase.getId())
-                .userId(purchase.getUserId())
+                .merchantId(purchase.getMerchantId())
                 .packageId(purchase.getPackageId())
                 .packageCode(purchase.getPackageCode())
                 .packageName(purchase.getPackageName())
@@ -1485,7 +1485,7 @@ public class PurchaseService {
                 && subscriptionRefundPolicy.isRefundEligible(purchase, now);
         return PurchaseResponse.builder()
                 .id(purchase.getId())
-                .userId(purchase.getUserId())
+                .merchantId(purchase.getMerchantId())
                 .packageId(purchase.getPackageId())
                 .packageCode(purchase.getPackageCode())
                 .packageName(purchase.getPackageName())
@@ -1537,7 +1537,7 @@ public class PurchaseService {
         }
         try {
             BillingPaymentDtos.RefundablePayment refundable =
-                    paymentServiceClient.getRefundablePayment(purchase.getUserId(), conversationId);
+                    paymentServiceClient.getRefundablePayment(purchase.getMerchantId(), conversationId);
             BigDecimal remaining = refundable.remaining();
             if (remaining == null || remaining.compareTo(BigDecimal.ZERO) <= 0) {
                 return null;
@@ -1657,9 +1657,9 @@ public class PurchaseService {
         }
         purchaseRepository.save(purchase);
         fulfillmentQueuePublisher.publishGranted(purchase);
-        if (purchase.getPackageId() != null && purchase.getUserId() != null) {
-            List<Purchase> addons = purchaseRepository.findByUserIdAndStatusAndPurchaseType(
-                    purchase.getUserId(),
+        if (purchase.getPackageId() != null && purchase.getMerchantId() != null) {
+            List<Purchase> addons = purchaseRepository.findByMerchantIdAndStatusAndPurchaseType(
+                    purchase.getMerchantId(),
                     PurchaseStatus.ACTIVE,
                     PurchaseType.ADD_ON
             );
@@ -1672,10 +1672,10 @@ public class PurchaseService {
                 fulfillmentQueuePublisher.publishGranted(addon);
             }
         }
-        menuPublicAccessService.syncForUser(purchase.getUserId());
+        menuPublicAccessService.syncForUser(purchase.getMerchantId());
         purchaseLogService.log(
                 purchase.getId(),
-                purchase.getUserId(),
+                purchase.getMerchantId(),
                 PurchaseLogAction.PURCHASE_EXTENDED,
                 purchase.getPackageName() + " paketi admin tarafindan " + days + " gun uzatildi"
         );
@@ -1691,18 +1691,18 @@ public class PurchaseService {
     ) {
     }
 
-    private CardSnapshot resolveCardSnapshot(Long userId, Long paymentMethodId) {
+    private CardSnapshot resolveCardSnapshot(Long merchantId, Long paymentMethodId) {
         if (paymentMethodId == null) {
             return CardSnapshot.empty();
         }
         try {
-            return paymentServiceClient.getPaymentMethods(userId).stream()
+            return paymentServiceClient.getPaymentMethods(merchantId).stream()
                     .filter(method -> String.valueOf(paymentMethodId).equals(method.id()))
                     .findFirst()
                     .map(method -> new CardSnapshot(trimToNull(method.brand()), trimToNull(method.lastFour())))
                     .orElse(CardSnapshot.empty());
         } catch (RuntimeException exception) {
-            log.warn("Kart snapshot alinamadi. userId={} paymentMethodId={}", userId, paymentMethodId, exception);
+            log.warn("Kart snapshot alinamadi. merchantId={} paymentMethodId={}", merchantId, paymentMethodId, exception);
             return CardSnapshot.empty();
         }
     }

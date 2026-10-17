@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public class PurchaseResponse {
 
     private Long id;
-    private Long userId;
+    private Long merchantId;
     private Long packageId;
     private String packageCode;
     private String packageName;

@@ -39,23 +39,23 @@ public class MenuCatalogCloneService {
     private final MerchantRepository merchantRepository;
 
     @Transactional
-    public int cloneInto(Menu targetMenu, Long sourceMenuId, Long userId) {
-        return copyCatalog(requireCloneableSource(sourceMenuId, userId), targetMenu, userId).size();
+    public int cloneInto(Menu targetMenu, Long sourceMenuId, Long merchantId) {
+        return copyCatalog(requireCloneableSource(sourceMenuId, merchantId), targetMenu, merchantId).size();
     }
 
     @Transactional
     public Map<Long, Long> cloneFromTemplate(Menu targetMenu, Long sourceMenuId, Long templateUserId) {
         Menu sourceMenu = requireTemplateSource(sourceMenuId, templateUserId);
-        return copyCatalog(sourceMenu, targetMenu, targetMenu.getUserId());
+        return copyCatalog(sourceMenu, targetMenu, targetMenu.getMerchantId());
     }
 
-    private Map<Long, Long> copyCatalog(Menu sourceMenu, Menu targetMenu, Long userId) {
+    private Map<Long, Long> copyCatalog(Menu sourceMenu, Menu targetMenu, Long merchantId) {
         List<MenuProduct> sourceProducts = menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(sourceMenu.getMenuId());
         if (sourceProducts.isEmpty()) {
             return Map.of();
         }
-        productUsageGateway.use(userId, CatalogProducts.MENU_PRODUCT, sourceProducts.size());
+        productUsageGateway.use(merchantId, CatalogProducts.MENU_PRODUCT, sourceProducts.size());
 
         MenuCategoryService.TaxonomyCloneResult taxonomy = menuCategoryService.cloneTaxonomyToMenu(
                 sourceMenu.getMenuId(),
@@ -87,18 +87,18 @@ public class MenuCatalogCloneService {
 
     @Transactional
     public void mirrorOptionsToStoreCatalog(
-            Long userId,
+            Long merchantId,
             Long sourceMenuId,
             Long sourceProductId,
             String productName
     ) {
-        if (userId == null || sourceMenuId == null || sourceProductId == null) {
+        if (merchantId == null || sourceMenuId == null || sourceProductId == null) {
             return;
         }
         if (productName == null || productName.isBlank()) {
             return;
         }
-        Merchant merchant = merchantRepository.findByUserIdAndDeletedFalse(userId).orElse(null);
+        Merchant merchant = merchantRepository.findByOwnerMerchantIdAndDeletedFalse(merchantId).orElse(null);
         if (merchant == null || merchant.getCatalogMenuId() == null) {
             return;
         }
@@ -114,18 +114,18 @@ public class MenuCatalogCloneService {
     }
 
     @Transactional(readOnly = true)
-    public int countCloneableProducts(Long sourceMenuId, Long userId) {
-        requireCloneableSource(sourceMenuId, userId);
+    public int countCloneableProducts(Long sourceMenuId, Long merchantId) {
+        requireCloneableSource(sourceMenuId, merchantId);
         return menuProductRepository
                 .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(sourceMenuId)
                 .size();
     }
 
-    private Menu requireCloneableSource(Long sourceMenuId, Long userId) {
+    private Menu requireCloneableSource(Long sourceMenuId, Long merchantId) {
         Menu sourceMenu = menuRepository.findById(sourceMenuId)
                 .filter(menu -> !menu.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Kaynak menü bulunamadı"));
-        if (!userId.equals(sourceMenu.getUserId())) {
+        if (!merchantId.equals(sourceMenu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu menüye erişim yetkiniz yok");
         }
         if (!sourceMenu.isActive()) {
@@ -138,7 +138,7 @@ public class MenuCatalogCloneService {
         Menu sourceMenu = menuRepository.findById(sourceMenuId)
                 .filter(menu -> !menu.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şablon menü bulunamadı"));
-        if (templateUserId == null || !templateUserId.equals(sourceMenu.getUserId())) {
+        if (templateUserId == null || !templateUserId.equals(sourceMenu.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Şablon menü bu kullanıcıya ait değil");
         }
         if (!sourceMenu.isActive()) {

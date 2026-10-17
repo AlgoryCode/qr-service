@@ -12,7 +12,7 @@ import java.util.Map;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class QrListResponse {
     private Long qrId;
-    private Long userId;
+    private Long merchantId;
     private String qrName;
     private String imgSrc;
     private Map<String, Object> details;

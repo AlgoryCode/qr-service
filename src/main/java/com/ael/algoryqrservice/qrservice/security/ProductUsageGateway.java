@@ -21,34 +21,34 @@ public class ProductUsageGateway {
 
     private final FulfillmentServiceClient fulfillmentClient;
 
-    public void allow(Long userId, String productCode) {
-        ExternalProductAccessResponse access = readAccess(userId, productCode);
+    public void allow(Long merchantId, String productCode) {
+        ExternalProductAccessResponse access = readAccess(merchantId, productCode);
         if (!access.allowed()) {
             deny(access);
         }
     }
 
-    public ExternalConsumeResponse use(Long userId, String productCode, int quantity) {
-        ExternalProductAccessResponse access = fulfillmentClient.findProductAccess(userId, productCode);
+    public ExternalConsumeResponse use(Long merchantId, String productCode, int quantity) {
+        ExternalProductAccessResponse access = fulfillmentClient.findProductAccess(merchantId, productCode);
         if (!access.allowed()) {
             deny(access);
         }
-        if (quantity <= 0 || !countable(fulfillmentClient, userId, productCode)) {
+        if (quantity <= 0 || !countable(fulfillmentClient, merchantId, productCode)) {
             return null;
         }
         try {
-            return fulfillmentClient.consume(userId, productCode, quantity);
+            return fulfillmentClient.consume(merchantId, productCode, quantity);
         } catch (FulfillmentQuotaExceededException exception) {
             throw quotaExceeded(productCode);
         }
     }
 
-    private ExternalProductAccessResponse readAccess(Long userId, String productCode) {
-        return fulfillmentClient.findProductAccess(userId, productCode);
+    private ExternalProductAccessResponse readAccess(Long merchantId, String productCode) {
+        return fulfillmentClient.findProductAccess(merchantId, productCode);
     }
 
-    private boolean countable(FulfillmentServiceClient client, Long userId, String productCode) {
-        return client.listEntitlements(userId).stream()
+    private boolean countable(FulfillmentServiceClient client, Long merchantId, String productCode) {
+        return client.listEntitlements(merchantId).stream()
                 .filter(item -> matches(item, productCode))
                 .filter(this::open)
                 .anyMatch(item -> !item.unlimited());

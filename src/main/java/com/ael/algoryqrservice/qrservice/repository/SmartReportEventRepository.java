@@ -11,15 +11,15 @@ import java.util.UUID;
 
 public interface SmartReportEventRepository extends JpaRepository<SmartReportEvent, UUID> {
 
-    long countByUserIdAndCreatedAtGreaterThanEqual(Long userId, LocalDateTime createdAt);
+    long countByUserIdAndCreatedAtGreaterThanEqual(Long merchantId, LocalDateTime createdAt);
 
-    Page<SmartReportEvent> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+    Page<SmartReportEvent> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
 
-    Page<SmartReportEvent> findByUserIdAndStatusOrderByCreatedAtDesc(
-            Long userId,
+    Page<SmartReportEvent> findByMerchantIdAndStatusOrderByCreatedAtDesc(
+            Long merchantId,
             String status,
             Pageable pageable
     );
 
-    Optional<SmartReportEvent> findByProcessIdAndUserId(UUID processId, Long userId);
+    Optional<SmartReportEvent> findByProcessIdAndUserId(UUID processId, Long merchantId);
 }

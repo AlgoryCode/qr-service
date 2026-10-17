@@ -71,50 +71,50 @@ public class PurchaseController {
 
     @GetMapping("/my")
     public ResponseEntity<List<PurchaseResponse>> getMyPurchases() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return ResponseEntity.ok(purchaseService.getUserPurchases(userId));
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.ok(purchaseService.getUserPurchases(merchantId));
     }
 
     @GetMapping("/my/subscription-overview")
     public ResponseEntity<SubscriptionOverviewResponse> getMySubscriptionOverview() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return ResponseEntity.ok(purchaseService.getMySubscriptionOverview(userId));
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.ok(purchaseService.getMySubscriptionOverview(merchantId));
     }
 
     @GetMapping("/my/entitlements")
     public ResponseEntity<List<UserEntitlementResponse>> getMyEntitlements() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        return ResponseEntity.ok(externalPackageView.entitlements(userId).orElseGet(List::of));
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.ok(externalPackageView.entitlements(merchantId).orElseGet(List::of));
     }
 
     @GetMapping("/my/logs")
     public ResponseEntity<List<PurchaseLogResponse>> getMyPurchaseLogs() {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseLogService.getUserLogs(userId));
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseLogService.getUserLogs(merchantId));
     }
 
     @GetMapping("/{purchaseId}/summary")
     public ResponseEntity<PurchaseSummaryResponse> getPurchaseSummary(@PathVariable Long purchaseId) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.getPurchaseSummary(purchaseId, userId));
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.getPurchaseSummary(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/cancel")
     public ResponseEntity<PurchaseResponse> cancelMyPurchase(@PathVariable Long purchaseId) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.cancelMyPurchase(purchaseId, userId));
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.cancelMyPurchase(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/cancel-at-period-end")
     public ResponseEntity<PurchaseResponse> cancelAtPeriodEnd(@PathVariable Long purchaseId) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.cancelAtPeriodEnd(purchaseId, userId));
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.cancelAtPeriodEnd(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/resume-renewal")
     public ResponseEntity<PurchaseResponse> resumeRenewal(@PathVariable Long purchaseId) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.resumeRenewal(purchaseId, userId));
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.resumeRenewal(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/pay-debt")
@@ -133,24 +133,24 @@ public class PurchaseController {
             @PathVariable Long purchaseId,
             HttpServletRequest httpServletRequest
     ) {
-        Long userId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentUser().getId();
         return ResponseEntity.ok(purchaseService.cancelWithRefund(
                 purchaseId,
-                userId,
+                merchantId,
                 resolveClientIp(httpServletRequest)
         ));
     }
 
     @GetMapping("/{purchaseId}/installments")
     public ResponseEntity<List<PurchaseFulfillmentResponse>> getPurchaseInstallments(@PathVariable Long purchaseId) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        return ResponseEntity.ok(purchaseService.getPurchaseInstallments(purchaseId, userId));
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        return ResponseEntity.ok(purchaseService.getPurchaseInstallments(purchaseId, merchantId));
     }
 
     @GetMapping("/{purchaseId}/logs")
     public ResponseEntity<List<PurchaseLogResponse>> getPurchaseLogs(@PathVariable Long purchaseId) {
-        Long userId = securityUtils.getCurrentUser().getId();
-        purchaseService.findUserPurchase(purchaseId, userId);
+        Long merchantId = securityUtils.getCurrentUser().getId();
+        purchaseService.findUserPurchase(purchaseId, merchantId);
         return ResponseEntity.ok(purchaseLogService.getPurchaseLogs(purchaseId));
     }
 

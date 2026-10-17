@@ -124,10 +124,10 @@ public class SessionContextService {
     }
 
     private boolean ownsMerchant(JwtAccessPrincipal principal, Long merchantId) {
-        if (principal.merchantId() == null && principal.userId() == null) {
+        if (principal.merchantId() == null && principal.merchantId() == null) {
             return true;
         }
-        return merchantId.equals(principal.merchantId()) || merchantId.equals(principal.userId());
+        return merchantId.equals(principal.merchantId()) || merchantId.equals(principal.merchantId());
     }
 
 }

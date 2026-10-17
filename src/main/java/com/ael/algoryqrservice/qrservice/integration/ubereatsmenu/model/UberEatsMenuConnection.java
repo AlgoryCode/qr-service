@@ -34,8 +34,8 @@ public class UberEatsMenuConnection {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
 
     @Column(name = "menu_id", nullable = false)
     private Long menuId;

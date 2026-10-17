@@ -51,8 +51,8 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        Long userId = currentUserId();
-        if (userId == null || !emailVerificationGate.isVerificationPending(userId)) {
+        Long merchantId = currentUserId();
+        if (merchantId == null || !emailVerificationGate.isVerificationPending(merchantId)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -82,6 +82,6 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
         if (principal.isCustomer() || principal.isWaiter()) {
             return null;
         }
-        return principal.userId();
+        return principal.merchantId();
     }
 }

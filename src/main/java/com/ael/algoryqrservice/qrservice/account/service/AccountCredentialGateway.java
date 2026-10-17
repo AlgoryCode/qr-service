@@ -20,23 +20,23 @@ public class AccountCredentialGateway {
     private final EmailVerificationGate emailVerificationGate;
 
     public EmailVerificationDtos.Status emailStatus() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        EmailVerificationDtos.Status status = authCredentialClient.emailStatus(userId);
-        syncVerified(userId, status.verified());
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        EmailVerificationDtos.Status status = authCredentialClient.emailStatus(merchantId);
+        syncVerified(merchantId, status.verified());
         return status;
     }
 
     public EmailVerificationDtos.Status requestEmailCode() {
-        Long userId = securityUtils.getCurrentMerchantId();
-        EmailVerificationDtos.Status status = authCredentialClient.requestEmailCode(userId);
-        syncVerified(userId, status.verified());
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        EmailVerificationDtos.Status status = authCredentialClient.requestEmailCode(merchantId);
+        syncVerified(merchantId, status.verified());
         return status;
     }
 
     public EmailVerificationDtos.Status verifyEmail(EmailVerificationDtos.VerifyRequest request) {
-        Long userId = securityUtils.getCurrentMerchantId();
-        EmailVerificationDtos.Status status = authCredentialClient.verifyEmail(userId, request.code());
-        syncVerified(userId, status.verified());
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        EmailVerificationDtos.Status status = authCredentialClient.verifyEmail(merchantId, request.code());
+        syncVerified(merchantId, status.verified());
         return status;
     }
 
@@ -66,12 +66,12 @@ public class AccountCredentialGateway {
         );
     }
 
-    private void syncVerified(Long userId, boolean verified) {
-        if (!verified || userId == null) {
+    private void syncVerified(Long merchantId, boolean verified) {
+        if (!verified || merchantId == null) {
             return;
         }
-        userRepository.findById(userId).ifPresent(this::markLocalVerified);
-        emailVerificationGate.markVerified(userId);
+        userRepository.findById(merchantId).ifPresent(this::markLocalVerified);
+        emailVerificationGate.markVerified(merchantId);
     }
 
     private void markLocalVerified(User user) {
