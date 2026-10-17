@@ -80,7 +80,7 @@ public class MerchantSetupService {
                 .build());
 
         Merchant merchant = Merchant.builder()
-                .merchantId(merchantId)
+                .ownerMerchantId(merchantId)
                 .branchId(branchId)
                 .catalogMenuId(catalogMenu.getMenuId())
                 .storeNo(merchantRepository.nextStoreNo())

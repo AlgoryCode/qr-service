@@ -171,7 +171,7 @@ public class PrintOrderEnqueueService {
             }
         }
         printJobService.enqueueKitchenTicket(
-                merchant.getMerchantId(),
+                merchant.getOwnerMerchantId(),
                 merchant.getBranchId(),
                 PrintSourceType.STORE_ORDER,
                 String.valueOf(order.getId()),

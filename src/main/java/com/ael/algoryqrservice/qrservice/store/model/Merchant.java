@@ -30,8 +30,8 @@ public class Merchant {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "merchant_id", nullable = false)
-    private Long merchantId;
+    @Column(name = "owner_merchant_id", nullable = false)
+    private Long ownerMerchantId;
 
     @Column(name = "branch_id")
     private Long branchId;
