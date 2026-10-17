@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backfill tbl_merchant from tbl_user and repoint legacy user_id (V157/V159 logic)."""
+"""Deprecated wrapper — use scripts/user_merchant_cutover.py migrate instead."""
 
 from __future__ import annotations
 
@@ -88,13 +88,12 @@ def main() -> None:
     parser.add_argument("--env", choices=("prod", "stage", "both"), default="both")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    targets = []
-    if args.env in ("prod", "both"):
-        targets.append(("PROD", PROD))
-    if args.env in ("stage", "both"):
-        targets.append(("STAGE", STAGE))
-    for label, cfg in targets:
-        run_backfill(label, cfg, dry_run=args.dry_run)
+    import subprocess
+
+    cmd = [sys.executable, str(ROOT / "scripts/user_merchant_cutover.py"), "migrate", "--env", args.env.replace("both", "both")]
+    if args.dry_run:
+        cmd.append("--dry-run")
+    raise SystemExit(subprocess.call(cmd))
 
 
 if __name__ == "__main__":
