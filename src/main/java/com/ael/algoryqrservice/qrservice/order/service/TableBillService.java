@@ -590,6 +590,7 @@ public class TableBillService {
             return Map.of();
         }
         return tableBillRepository.findByMenuIdInAndStatus(menuIds, TableBillStatus.OPEN).stream()
+                .filter(bill -> bill.getTableId() != null)
                 .collect(Collectors.toMap(TableBill::getTableId, bill -> bill, (a, b) -> a));
     }
 

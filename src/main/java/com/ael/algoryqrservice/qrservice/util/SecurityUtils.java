@@ -66,10 +66,16 @@ public class SecurityUtils {
                 if (principal.merchantId() != null) {
                     return principal.merchantId();
                 }
-                if (principal.isWaiter() && principal.staffId() != null) {
-                    return merchantStaffRepository.findById(principal.staffId())
-                            .map(MerchantStaff::getMerchantId)
-                            .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
+                if (principal.staffId() != null) {
+                    Optional<Long> fromStaff = merchantStaffRepository.findById(principal.staffId())
+                            .map(MerchantStaff::getMerchantId);
+                    if (fromStaff.isPresent()) {
+                        return fromStaff.get();
+                    }
+                    if (principal.merchantId() != null) {
+                        return principal.merchantId();
+                    }
+                    throw new UnauthorizedException("Personel bulunamadı");
                 }
                 if (!principal.isWaiter() && principal.merchantId() != null) {
                     return resolveMerchantAccountId(principal.merchantId(), authentication.getName());
@@ -154,7 +160,7 @@ public class SecurityUtils {
 
     public Long getCurrentStaffId() {
         return findCurrentStaffId()
-                .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
+                .orElseThrow(() -> new UnauthorizedException("Personel oturumu gerekli"));
     }
 
     public Long getCurrentWaiterId() {
@@ -172,16 +178,16 @@ public class SecurityUtils {
         }
         if (authentication.getDetails() instanceof JwtAccessPrincipal principal
                 && principal.staffId() != null
-                && isStaffFulfillmentAuthentication(authentication, principal)) {
+                && isStaffAuthentication(authentication, principal)) {
             return Optional.of(principal.staffId());
         }
         return Optional.empty();
     }
 
     public Long getCurrentWaiterBranchId() {
-        Authentication authentication = requireAuthentication("Garson bulunamadı");
+        Authentication authentication = requireAuthentication("Personel oturumu gerekli");
         if (authentication.getDetails() instanceof JwtAccessPrincipal principal
-                && isStaffFulfillmentAuthentication(authentication, principal)) {
+                && isStaffAuthentication(authentication, principal)) {
             if (principal.branchId() != null) {
                 return principal.branchId();
             }
@@ -189,10 +195,10 @@ public class SecurityUtils {
                 return merchantStaffRepository.findById(principal.staffId())
                         .map(MerchantStaff::getBranchId)
                         .filter(id -> id != null)
-                        .orElseThrow(() -> new UnauthorizedException("Garson şube bilgisi bulunamadı"));
+                        .orElseThrow(() -> new UnauthorizedException("Şube bilgisi bulunamadı"));
             }
         }
-        throw new UnauthorizedException("Garson şube bilgisi bulunamadı");
+        throw new UnauthorizedException("Şube bilgisi bulunamadı");
     }
 
     private Authentication requireAuthentication(String message) {
@@ -211,13 +217,18 @@ public class SecurityUtils {
         return hasRole(authentication, "ROLE_CUSTOMER");
     }
 
-    private boolean isStaffFulfillmentAuthentication(Authentication authentication, JwtAccessPrincipal principal) {
+    /** Staff panel JWT: staffId claim yeterli; garson/mutfak/kurye rolü API'de ayrılmaz. */
+    private boolean isStaffAuthentication(Authentication authentication, JwtAccessPrincipal principal) {
+        if (principal.staffId() != null) {
+            return true;
+        }
         if (principal.isWaiter()) {
             return true;
         }
         return hasRole(authentication, "ROLE_WAITER")
                 || hasRole(authentication, "ROLE_KITCHEN")
-                || hasRole(authentication, "ROLE_COURIER");
+                || hasRole(authentication, "ROLE_COURIER")
+                || hasRole(authentication, "ROLE_STAFF");
     }
 
     private boolean hasRole(Authentication authentication, String role) {

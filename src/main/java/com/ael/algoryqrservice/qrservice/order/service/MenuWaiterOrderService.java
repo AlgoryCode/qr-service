@@ -91,8 +91,8 @@ public class MenuWaiterOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<MenuWaiterDtos.TableOrderSummary> listTables() {
-        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
+    public List<MenuWaiterDtos.TableOrderSummary> listTablesForMerchantBranch(Long merchantId, Long branchId) {
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaffForMerchantBranch(merchantId, branchId);
         List<Menu> menus = waiterAccessService.menusForWaiter(waiter);
         List<RestaurantTable> tables = waiterAccessService.tablesForWaiter(waiter);
         if (tables.isEmpty()) {
@@ -118,10 +118,13 @@ public class MenuWaiterOrderService {
                 : menuOrderRepository.findByMenuIdInAndStatusOrderBySubmittedAtDesc(menuIds, MenuOrderStatus.READY);
 
         Map<Long, List<MenuOrder>> pendingByTable = pendingOrders.stream()
+                .filter(order -> order.getTableId() != null)
                 .collect(Collectors.groupingBy(MenuOrder::getTableId));
         Map<Long, List<MenuOrder>> kitchenByTable = kitchenOrders.stream()
+                .filter(order -> order.getTableId() != null)
                 .collect(Collectors.groupingBy(MenuOrder::getTableId));
         Map<Long, List<MenuOrder>> readyByTable = readyOrders.stream()
+                .filter(order -> order.getTableId() != null)
                 .collect(Collectors.groupingBy(MenuOrder::getTableId));
 
         Map<Long, TableBill> openBillsByTable = tableBillService.findOpenBillsByMenuIds(menuIds);

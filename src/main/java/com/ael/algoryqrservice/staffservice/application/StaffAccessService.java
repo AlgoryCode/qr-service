@@ -34,51 +34,48 @@ public class StaffAccessService {
     private final RestaurantAreaRepository restaurantAreaRepository;
     private final SecurityUtils securityUtils;
 
-    public MerchantStaff requireCurrentWaiter() {
-        Long staffId = securityUtils.getCurrentWaiterId();
-        MerchantStaff waiter = merchantStaffRepository.findById(staffId)
-                .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
-        if (!waiter.isActive()) {
+    /** JWT staffId + aktif kayıt; rol/şube token eşleşmesi kontrol edilmez. */
+    public MerchantStaff requireCurrentStaff() {
+        Long staffId = securityUtils.getCurrentStaffId();
+        MerchantStaff staff = merchantStaffRepository.findById(staffId)
+                .orElseThrow(() -> new NotFoundException("Personel bulunamadı"));
+        if (!staff.isActive()) {
             throw new ForbiddenException("Hesap pasif");
         }
-        if (waiter.getBranchId() == null) {
-            throw new ForbiddenException("Bu hesap henüz bir şubeye atanmadı");
-        }
-        Long tokenBranchId = securityUtils.getCurrentWaiterBranchId();
-        if (tokenBranchId == null || !tokenBranchId.equals(waiter.getBranchId())) {
-            throw new ForbiddenException("Bu şubeye erişim yetkiniz yok");
-        }
-        return waiter;
+        return staff;
+    }
+
+    public MerchantStaff requireCurrentWaiter() {
+        return requireCurrentStaff();
     }
 
     public MerchantStaff requireWaiterStaff() {
-        MerchantStaff staff = requireCurrentWaiter();
-        if (!staff.isWaiterStaff()) {
-            throw new ForbiddenException("Bu işlem yalnızca garson içindir");
+        return requireCurrentStaff();
+    }
+
+    public MerchantStaff requireWaiterStaffForMerchantBranch(Long merchantId, Long branchId) {
+        MerchantStaff staff = requireCurrentStaff();
+        if (merchantId != null && !merchantId.equals(staff.getMerchantId())) {
+            throw new ForbiddenException("Bu işletmeye erişim yetkiniz yok");
+        }
+        if (branchId != null && staff.getBranchId() != null && !branchId.equals(staff.getBranchId())) {
+            throw new ForbiddenException("Bu şubeye erişim yetkiniz yok");
         }
         return staff;
     }
 
     public MerchantStaff requireKitchenStaff() {
-        MerchantStaff staff = requireCurrentWaiter();
-        if (!staff.isKitchen()) {
-            throw new ForbiddenException("Bu işlem yalnızca mutfak içindir");
-        }
-        return staff;
+        return requireCurrentStaff();
     }
 
     public MerchantStaff requireCourierStaff() {
-        MerchantStaff staff = requireCurrentWaiter();
-        if (!staff.isCourier()) {
-            throw new ForbiddenException("Bu işlem yalnızca kurye içindir");
-        }
-        return staff;
+        return requireCurrentStaff();
     }
 
     public MerchantStaff requireWaiterForMenu(Long menuId) {
-        MerchantStaff waiter = requireWaiterStaff();
-        requireMenuInWaiterBranch(menuId, waiter);
-        return waiter;
+        MerchantStaff staff = requireCurrentStaff();
+        requireMenuInWaiterBranch(menuId, staff);
+        return staff;
     }
 
     public Menu requireMenuInWaiterBranch(Long menuId, MerchantStaff waiter) {

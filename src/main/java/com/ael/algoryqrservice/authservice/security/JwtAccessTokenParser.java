@@ -36,7 +36,7 @@ public class JwtAccessTokenParser {
             }
             String subjectType = claims.get("subjectType", String.class);
             Long merchantId = longClaim(claims, "merchantId");
-            Long staffId = longClaim(claims, "staffId");
+            Long staffId = staffIdClaim(claims, subjectType);
             Long customerId = longClaim(claims, "customerId");
             Long authSubjectId = longClaim(claims, "authSubjectId");
             if (!hasIdentity(subjectType, merchantId, staffId, customerId, authSubjectId)) {
@@ -90,6 +90,17 @@ public class JwtAccessTokenParser {
     private static Long longClaim(Claims claims, String name) {
         Number value = claims.get(name, Number.class);
         return value == null ? null : value.longValue();
+    }
+
+    private static Long staffIdClaim(Claims claims, String subjectType) {
+        Long staffId = longClaim(claims, "staffId");
+        if (staffId != null) {
+            return staffId;
+        }
+        if (AuthSubject.TYPE_STAFF.equals(subjectType)) {
+            return longClaim(claims, "userId");
+        }
+        return null;
     }
 
     private SecretKey signingKey() {

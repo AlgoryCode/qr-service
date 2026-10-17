@@ -51,11 +51,6 @@ public class StaffOrderController {
         return ResponseEntity.ok(menuWaiterOrderService.createOrder(request));
     }
 
-    @GetMapping("/tables")
-    public ResponseEntity<List<MenuWaiterDtos.TableOrderSummary>> listTables() {
-        return ResponseEntity.ok(menuWaiterOrderService.listTables());
-    }
-
     @GetMapping("/tables/{tableId}/today")
     public ResponseEntity<List<MenuOrderDtos.OrderResponse>> getTableTodayOrders(@PathVariable Long tableId) {
         return ResponseEntity.ok(menuWaiterOrderService.getTableTodayOrders(tableId));

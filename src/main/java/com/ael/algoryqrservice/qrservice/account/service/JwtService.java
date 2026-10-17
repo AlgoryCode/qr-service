@@ -156,7 +156,14 @@ public class JwtService {
     }
 
     public Long extractStaffId(Claims claims) {
-        return extractLongClaim(claims, "staffId");
+        Long staffId = extractLongClaim(claims, "staffId");
+        if (staffId != null) {
+            return staffId;
+        }
+        if (SUBJECT_STAFF.equals(extractSubjectType(claims))) {
+            return extractLongClaim(claims, "userId");
+        }
+        return null;
     }
 
     public Long extractCustomerId(Claims claims) {
