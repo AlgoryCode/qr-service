@@ -92,7 +92,18 @@ public class MemberPackageAccessRepairService {
             if (purchase.isEmpty()) {
                 return false;
             }
-            return self.applyFulfillmentRepair(purchase.get());
+            Purchase selected = purchase.get();
+            if (!self.applyFulfillmentRepair(selected)) {
+                return false;
+            }
+            self.syncMenuPublicAccessAfterRepair(selected.getUserId());
+            log.info(
+                    "Repaired fulfillment from active purchase. merchantId={} purchaseId={} packageCode={}",
+                    selected.getUserId(),
+                    selected.getId(),
+                    selected.getPackageCode()
+            );
+            return true;
         }
 
         @Transactional(readOnly = true)
@@ -136,13 +147,6 @@ public class MemberPackageAccessRepairService {
                                 "packageCode", purchase.getPackageCode()
                         )
                 ));
-                menuPublicAccessService.syncForUser(purchase.getUserId());
-                log.info(
-                        "Repaired fulfillment from active purchase. merchantId={} purchaseId={} packageCode={}",
-                        purchase.getUserId(),
-                        purchase.getId(),
-                        purchase.getPackageCode()
-                );
                 return true;
             } catch (RuntimeException exception) {
                 log.warn(
@@ -153,6 +157,11 @@ public class MemberPackageAccessRepairService {
                 );
                 return false;
             }
+        }
+
+        @Transactional(transactionManager = "transactionManager")
+        void syncMenuPublicAccessAfterRepair(Long userId) {
+            menuPublicAccessService.syncForUser(userId);
         }
 
         private static LocalDate resolvePeriodStart(Purchase purchase) {

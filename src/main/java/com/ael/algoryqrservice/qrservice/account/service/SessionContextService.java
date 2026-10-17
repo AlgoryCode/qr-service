@@ -17,6 +17,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class SessionContextService {
@@ -38,14 +40,23 @@ public class SessionContextService {
     }
 
     private SessionUserResponse sessionUser(Long merchantId) {
-        return userRepository.findById(merchantId)
-                .map(this::fromUser)
-                .orElseGet(() -> fromToken(merchantId));
+        Optional<User> user = userRepository.findById(merchantId);
+        if (user.isPresent()) {
+            return fromUser(user.get(), merchantId);
+        }
+        Optional<String> login = currentLoginEmail();
+        if (login.isPresent()) {
+            Optional<User> byEmail = userRepository.findByEmail(login.get());
+            if (byEmail.isPresent()) {
+                return fromUser(byEmail.get(), merchantId);
+            }
+        }
+        return fromToken(merchantId);
     }
 
-    private SessionUserResponse fromUser(User user) {
+    private SessionUserResponse fromUser(User user, Long merchantId) {
         return new SessionUserResponse(
-                user.getId(),
+                merchantId,
                 user.getFirstName(),
                 user.getLastName(),
                 user.getEmail(),
@@ -53,6 +64,14 @@ public class SessionContextService {
                 user.getProvider(),
                 user.getRole()
         );
+    }
+
+    private Optional<String> currentLoginEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(authentication.getName().trim());
     }
 
     private SessionUserResponse fromToken(Long merchantId) {

@@ -17,6 +17,7 @@ import com.ael.algoryqrservice.fulfillmentservice.domain.port.FulfillmentReposit
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.PackageCatalogPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -55,28 +56,42 @@ public class FulfillmentServiceImpl implements FulfillmentService {
         }
 
         Instant now = Instant.now();
-        PackageFulfillment created = fulfillmentRepository.saveFulfillment(
-                new PackageFulfillment(
-                        null,
+        PackageFulfillment created;
+        try {
+            created = fulfillmentRepository.saveFulfillment(
+                    new PackageFulfillment(
+                            null,
+                            command.eventId(),
+                            command.eventType(),
+                            command.purchaseId(),
+                            command.userId(),
+                            command.packageId(),
+                            command.packageCode(),
+                            command.conversationId(),
+                            command.paymentId(),
+                            command.subscriptionId(),
+                            command.billingCycleNumber(),
+                            command.periodStart(),
+                            command.periodEnd(),
+                            command.amount(),
+                            command.currency(),
+                            FulfillmentStatus.ACTIVE,
+                            now,
+                            now
+                    )
+            );
+        } catch (DataIntegrityViolationException exception) {
+            Optional<PackageFulfillment> raced = fulfillmentRepository.findByEventId(command.eventId());
+            if (raced.isPresent()) {
+                log.info(
+                        "Fulfillment already applied after concurrent insert. eventId={} fulfillmentId={}",
                         command.eventId(),
-                        command.eventType(),
-                        command.purchaseId(),
-                        command.userId(),
-                        command.packageId(),
-                        command.packageCode(),
-                        command.conversationId(),
-                        command.paymentId(),
-                        command.subscriptionId(),
-                        command.billingCycleNumber(),
-                        command.periodStart(),
-                        command.periodEnd(),
-                        command.amount(),
-                        command.currency(),
-                        FulfillmentStatus.ACTIVE,
-                        now,
-                        now
-                )
-        );
+                        raced.get().id()
+                );
+                return raced.get();
+            }
+            throw exception;
+        }
 
         fulfillmentRepository.supersedeOtherFulfillments(command.userId(), created.id());
         entitlementPort.supersedeOtherEntitlements(command.userId(), created.id());

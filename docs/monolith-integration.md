@@ -29,3 +29,10 @@ Tek Spring Boot uygulaması (`AlgoryqrServiceApplication`) altında dört domain
 ## HTTP API
 
 Modül controller'ları (`/api/v1/...`, `/payments/...`, auth endpoint'leri) dış istemciler için aynı kalır; monolit içi çağrılar mümkün olduğunda application katmanına gider.
+
+## İşletme kimliği (`tbl_user` → `tbl_merchant`)
+
+- Giriş ve JWT: `tbl_merchant.id` (`merchantId`).
+- `tbl_user`: panel profili / legacy satır; silinmez.
+- Flyway **V157**, **V156**, **V158**, **V159**: eksik merchant oluşturma ve panel verisindeki `user_id` / `merchant_id` alanlarını e-posta eşleşmesiyle `tbl_merchant.id`'ye taşıma (satır silmeden).
+- Uygulama: `SecurityUtils.getCurrentMerchantId()` ve `/access/context` her zaman merchant id kullanır; profil için `tbl_user` e-posta ile bulunur.
