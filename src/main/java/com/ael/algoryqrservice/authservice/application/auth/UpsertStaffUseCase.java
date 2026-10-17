@@ -1,15 +1,16 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
+import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 import com.ael.algoryqrservice.authservice.exception.BadRequestException;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantStaffEntity;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.RoleEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.MerchantStaffJpaRepository;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.RoleJpaRepository;
+import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
+import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Set;
 
@@ -20,7 +21,6 @@ public class UpsertStaffUseCase {
     static final Set<String> STAFF_ROLES = Set.of("WAITER", "KITCHEN", "COURIER");
 
     private final MerchantStaffJpaRepository staffRepository;
-    private final RoleJpaRepository roleRepository;
 
     @AuthTransactional
     public void upsert(Long staffId, Command command) {
@@ -43,15 +43,13 @@ public class UpsertStaffUseCase {
             throw new BadRequestException("Görünen ad geçersiz");
         }
 
-        RoleEntity role = roleRepository.findByCode(roleCode)
-                .orElseThrow(() -> new BadRequestException("Personel rolü bulunamadı"));
         staffRepository.findByUsernameIgnoreCase(username)
                 .filter(existing -> !staffId.equals(existing.getId()))
                 .ifPresent(existing -> {
                     throw new BadRequestException("Bu kullanıcı adı başka bir personelde kullanılıyor");
                 });
 
-        MerchantStaffEntity staff = staffRepository.findById(staffId).orElseGet(MerchantStaffEntity::new);
+        MerchantStaff staff = staffRepository.findById(staffId).orElseGet(MerchantStaff::new);
         boolean created = staff.getId() == null;
         String passwordHash = command.passwordHash() == null ? "" : command.passwordHash().trim();
         if (created) {
@@ -59,10 +57,13 @@ public class UpsertStaffUseCase {
                 throw new BadRequestException("Şifre hash gerekli");
             }
             staff.setId(staffId);
+            LocalDateTime now = LocalDateTime.now();
+            staff.setCreatedAt(now);
+            staff.setUpdatedAt(now);
         }
 
         staff.setMerchantId(command.merchantId());
-        staff.setRole(role);
+        staff.setStaffRole(StaffRole.valueOf(roleCode));
         staff.setBranchId(command.branchId());
         staff.setUsername(username);
         staff.setDisplayName(displayName);
@@ -71,9 +72,20 @@ public class UpsertStaffUseCase {
             staff.setPasswordHash(passwordHash);
         }
         staff.setCommissionEnabled(Boolean.TRUE.equals(command.commissionEnabled()));
-        staff.setCommissionType(blankToNull(command.commissionType()));
+        staff.setCommissionType(parseCommissionType(command.commissionType()));
         staff.setCommissionValue(command.commissionValue());
+        if (!created) {
+            staff.setUpdatedAt(LocalDateTime.now());
+        }
         staffRepository.save(staff);
+    }
+
+    private static WaiterCommissionType parseCommissionType(String value) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        return WaiterCommissionType.valueOf(normalized);
     }
 
     private static String blankToNull(String value) {

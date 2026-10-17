@@ -16,27 +16,27 @@ public class PackageCatalogServiceImpl implements PackageCatalogService {
     private final PackageCatalogPort packageCatalogPort;
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public PlanPackage requireByCode(String code) {
         return packageCatalogPort.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found: " + code));
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public PlanPackage requireById(Long id) {
         return packageCatalogPort.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found: " + id));
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public Page<PlanPackage> listActive(Pageable pageable) {
         return packageCatalogPort.findActive(pageable);
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public Page<PlanPackage> listPurchasable(Pageable pageable) {
         return packageCatalogPort.findPurchasable(pageable);
     }

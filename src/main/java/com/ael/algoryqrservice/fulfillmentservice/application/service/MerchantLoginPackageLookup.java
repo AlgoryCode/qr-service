@@ -15,7 +15,7 @@ public class MerchantLoginPackageLookup {
 
     private final FulfillmentRepositoryPort fulfillmentRepository;
 
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public Optional<ActivePackage> findActive(Long merchantId) {
         if (merchantId == null || merchantId <= 0) {
             return Optional.empty();

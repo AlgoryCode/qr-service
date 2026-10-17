@@ -2,8 +2,8 @@ package com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.ad
 
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.CatalogProduct;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.ProductPort;
-import com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity.ProductEntity;
 import com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.repository.ProductJpaRepository;
+import com.ael.algoryqrservice.qrservice.model.Product;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -37,7 +37,7 @@ public class ProductAdapter implements ProductPort {
                 .collect(Collectors.toMap(CatalogProduct::id, Function.identity()));
     }
 
-    private CatalogProduct toDomain(ProductEntity entity) {
+    private CatalogProduct toDomain(Product entity) {
         return new CatalogProduct(
                 entity.getId(),
                 entity.getCode(),

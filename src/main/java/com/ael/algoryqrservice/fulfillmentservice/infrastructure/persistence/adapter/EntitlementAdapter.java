@@ -32,7 +32,7 @@ public class EntitlementAdapter implements EntitlementPort {
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public List<UserEntitlement> findActiveByUserId(Long userId) {
         return userEntitlementJpaRepository.findActiveByUserId(userId, PackageStatus.ACTIVE, Instant.now())
                 .stream()
@@ -41,7 +41,7 @@ public class EntitlementAdapter implements EntitlementPort {
     }
 
     @Override
-    @Transactional(transactionManager = "fulfillmentTransactionManager")
+    @Transactional
     public void supersedeOtherEntitlements(Long userId, Long keepFulfillmentId) {
         userEntitlementJpaRepository.supersedeOthers(
                 userId,

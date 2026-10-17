@@ -40,7 +40,7 @@ public class PaymentMethodService {
         this.tokenCipher = tokenCipher;
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public PaymentMethodResponse create(String accountId, CreatePaymentMethodRequest request) {
         requireAccount(accountId);
         log.info("Card tokenization started. accountId={}, provider={}", accountId, PROVIDER);
@@ -96,18 +96,18 @@ public class PaymentMethodService {
         return toResponse(saved);
     }
 
-    @Transactional(readOnly = true, transactionManager = "paymentTransactionManager")
+    @Transactional(readOnly = true)
     public Page<PaymentMethodResponse> list(String accountId, Pageable pageable) {
         requireAccount(accountId);
         return repository.findByAccountIdAndDeletedAtIsNull(accountId, pageable).map(this::toResponse);
     }
 
-    @Transactional(readOnly = true, transactionManager = "paymentTransactionManager")
+    @Transactional(readOnly = true)
     public PaymentMethodResponse get(String accountId, Long id) {
         return toResponse(requireOwned(accountId, id));
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public PaymentMethodResponse rename(String accountId, Long id, String alias) {
         PaymentMethodEntity method = requireOwned(accountId, id);
         method.setCardAlias(alias);
@@ -115,7 +115,7 @@ public class PaymentMethodService {
         return toResponse(repository.save(method));
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public PaymentMethodResponse makeDefault(String accountId, Long id) {
         PaymentMethodEntity method = requireOwned(accountId, id);
         repository.clearDefault(accountId);
@@ -124,7 +124,7 @@ public class PaymentMethodService {
         return toResponse(repository.save(method));
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void delete(String accountId, Long id) {
         PaymentMethodEntity method = requireOwned(accountId, id);
         boolean wasDefault = method.isDefaultMethod();
@@ -152,7 +152,7 @@ public class PaymentMethodService {
         log.info("Card deleted. accountId={}, paymentMethodId={}", accountId, id);
     }
 
-    @Transactional(readOnly = true, transactionManager = "paymentTransactionManager")
+    @Transactional(readOnly = true)
     public PaymentCardInfo resolveToken(String accountId, Long id) {
         PaymentMethodEntity method = requireOwned(accountId, id);
         return PaymentCardInfo.builder()
@@ -166,7 +166,7 @@ public class PaymentMethodService {
      * Returns decrypted gateway tokens only inside the payment service. Tokens are
      * never exposed by an HTTP response; the scheduler uses this for card fallback.
      */
-    @Transactional(readOnly = true, transactionManager = "paymentTransactionManager")
+    @Transactional(readOnly = true)
     public List<StoredPaymentMethod> resolveTokens(String accountId) {
         requireAccount(accountId);
         return repository.findByAccountIdAndDeletedAtIsNullOrderByDefaultMethodDescIdAsc(accountId)
@@ -192,7 +192,7 @@ public class PaymentMethodService {
     ) {
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public PaymentMethodEntity saveGatewayToken(
             String accountId,
             String alias,

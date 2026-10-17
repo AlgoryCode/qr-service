@@ -17,7 +17,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-        basePackages = "com.ael.algoryqrservice.qrservice",
+        basePackages = {
+                "com.ael.algoryqrservice.qrservice",
+                "com.ael.algoryqrservice.authservice.infrastructure.persistence.repository",
+                "com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.repository",
+                "com.ael.algoryqrservice.paymentservice.infrastructure.persistence.repository"
+        },
         entityManagerFactoryRef = "entityManagerFactory",
         transactionManagerRef = "transactionManager"
 )
@@ -40,9 +45,12 @@ public class QrDatabaseConfiguration {
                 "com.ael.algoryqrservice.qrservice.print.model",
                 "com.ael.algoryqrservice.qrservice.integration.ubereats.model",
                 "com.ael.algoryqrservice.qrservice.integration.ubereatsmenu.model",
-                "com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model"
+                "com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model",
+                "com.ael.algoryqrservice.authservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.paymentservice.infrastructure.persistence.entity"
         );
-        factory.setPersistenceUnitName("qr");
+        factory.setPersistenceUnitName("default");
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         factory.setJpaPropertyMap(jpaEmfPropertiesFactory.build());
         return factory;

@@ -39,7 +39,7 @@ public class PaymentEventOutboxPublisher {
     }
 
     @Scheduled(fixedDelayString = "${payment.outbox.fixed-delay:5000}")
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void publishPendingEvents() {
         List<PaymentEventOutboxEntity> events =
                 outboxRepository.findByStatusAndNextAttemptAtLessThanEqualOrderById(
@@ -50,7 +50,7 @@ public class PaymentEventOutboxPublisher {
         events.forEach(this::publish);
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void publishByEventId(String eventId) {
         if (eventId == null || eventId.isBlank()) {
             return;

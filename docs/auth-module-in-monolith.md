@@ -11,7 +11,7 @@ Kimlik ve oturum akışı `com.ael.algoryqrservice.qrservice.authservice` paketi
 
 - Tek Postgres: `spring.datasource.*` (`DB_URL`, varsayılan `algoryqrdb`).
 - Auth şeması ana Flyway ile gelir: `db/migration` içinde `V143__auth_schema.sql` … `V149__auth_demo_account_password.sql`.
-- Auth JPA ayrı persistence unit kullanır (`authEntityManagerFactory`); QR `tbl_merchant_staff` ile auth entity eşlemesi aynı tabloda çakışmasın diye birimler ayrı tutulur.
+- Auth, fulfillment, payment ve QR domain aynı Postgres ve tek JPA persistence unit (`QrDatabaseConfiguration`) üzerinden çalışır; modüller yalnızca paket olarak ayrılır.
 
 Prod’da veri hâlâ `algoryqr-authdb` içindeyse, tek seferlik taşıma gerekir (eski authservice `scripts/MIGRATION.md`).
 

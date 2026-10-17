@@ -21,7 +21,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -43,7 +42,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     private final EntitlementPort entitlementPort;
 
     @Override
-    @Transactional(transactionManager = "fulfillmentTransactionManager")
+    @Transactional
     public PackageFulfillment fulfillPaidPackage(FulfillmentCommand command) {
         Optional<PackageFulfillment> existing = fulfillmentRepository.findByEventId(command.eventId());
         if (existing.isPresent()) {
@@ -123,7 +122,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     }
 
     @Override
-    @Transactional(transactionManager = "fulfillmentTransactionManager")
+    @Transactional
     public void assignPackage(Long userId, String packageCode, int periodDays) {
         if (findActivePackage(userId).isPresent()) {
             throw new PackageAlreadyAssignedException();
@@ -156,25 +155,21 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public Optional<ActivePackage> findActivePackage(Long userId) {
         return fulfillmentRepository.findActiveByUserId(userId)
                 .filter(active -> active.status() == PackageStatus.ACTIVE);
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public ActivePackage requireActivePackage(Long userId) {
         return findActivePackage(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Active package not found for user " + userId));
     }
 
     @Override
-    @Transactional(
-            readOnly = true,
-            transactionManager = "fulfillmentTransactionManager",
-            propagation = Propagation.REQUIRES_NEW
-    )
+    @Transactional(readOnly = true)
     public ActivePackageView requireActivePackageView(Long userId) {
         ActivePackage active = requireActivePackage(userId);
         List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(userId);
@@ -199,20 +194,20 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public PackageFulfillment requireFulfillment(Long fulfillmentId) {
         return fulfillmentRepository.findById(fulfillmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Fulfillment not found: " + fulfillmentId));
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public Page<PackageFulfillment> listFulfillments(Long userId, Pageable pageable) {
         return fulfillmentRepository.findByUserId(userId, pageable);
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public List<UserEntitlement> listActiveEntitlements(Long userId) {
         return entitlementPort.findActiveByUserId(userId);
     }

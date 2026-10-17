@@ -77,7 +77,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final SubscriptionService subscriptionService;
 
     @Override
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public PaymentResultDto createDirectPayment(CreatePaymentCommand command) {
         validateServiceMetadata(command);
         command.setConversationId(PaytrMerchantOid.sanitize(command.getConversationId()));
@@ -127,7 +127,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public CheckoutFormResultDto initializeCheckoutForm(InitializeCheckoutFormCommand command) {
         serviceNameValidator.validate(command.getServiceName());
         command.setConversationId(PaytrMerchantOid.sanitize(command.getConversationId()));
@@ -164,7 +164,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public PaymentResultDto retrievePayment(String conversationId) {
         PaymentTransaction transaction = requireTransaction(conversationId);
         if (transaction.getStatus() == PaymentStatus.INITIATED) {
@@ -174,14 +174,14 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional(readOnly = true, transactionManager = "paymentTransactionManager")
+    @Transactional(readOnly = true)
     public Page<PaymentResultDto> searchPayments(PaymentSearchQuery query, Pageable pageable) {
         return paymentRepositoryPort.search(query, pageable)
                 .map(paymentApplicationMapper::toPaymentResultDto);
     }
 
     @Override
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public String handlePaytrNotification(PaytrNotificationCommand command) {
         log.info(
                 "Card verification callback step=RECEIVED conversationId={} status={} "
@@ -301,7 +301,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void refundPendingVerificationCharges() {
         LocalDateTime updatedBefore = LocalDateTime.now().minusSeconds(30);
         LocalDateTime createdAfter = LocalDateTime.now().minusDays(7);
@@ -482,7 +482,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public RefundResultDto refundPayment(RefundPaymentCommand command) {
         PaymentTransaction transaction = requireTransaction(command.getConversationId());
 

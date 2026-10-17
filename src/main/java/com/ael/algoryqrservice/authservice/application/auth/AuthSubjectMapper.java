@@ -1,30 +1,37 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
+import com.ael.algoryqrservice.authservice.exception.BadRequestException;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.AdminEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantEntity;
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantStaffEntity;
+import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.RoleEntity;
+import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.RoleJpaRepository;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.ScopeJpaRepository;
+import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
 @Component
 @RequiredArgsConstructor
 public class AuthSubjectMapper {
 
     private final ScopeJpaRepository scopeRepository;
+    private final RoleJpaRepository roleRepository;
 
-    public AuthSubject fromStaff(MerchantStaffEntity staff) {
+    public AuthSubject fromStaff(MerchantStaff staff) {
+        RoleEntity role = roleRepository.findByCode(staff.resolvedStaffRole().name())
+                .orElseThrow(() -> new BadRequestException("Personel rolü bulunamadı"));
         return new AuthSubject(
                 AuthSubject.TYPE_STAFF,
                 staff.getId(),
-                staff.getRole().getId(),
-                staff.getRole().getCode(),
+                role.getId(),
+                role.getCode(),
                 staff.getPasswordHash(),
                 staff.getDisplayName(),
                 staff.getUsername(),
                 "BASIC",
                 staff.getMerchantId(),
                 staff.getBranchId(),
-                scopeRepository.findCodesByRoleId(staff.getRole().getId())
+                scopeRepository.findCodesByRoleId(role.getId())
         );
     }
 

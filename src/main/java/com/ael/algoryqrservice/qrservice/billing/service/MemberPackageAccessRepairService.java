@@ -46,7 +46,7 @@ public class MemberPackageAccessRepairService {
     /**
      * Must not join auth (or other) transactions that already bound the shared JDBC connection.
      */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED, transactionManager = "authTransactionManager")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public boolean repairIfMissingActivePackage(Long merchantId) {
         if (merchantId == null || merchantId <= 0) {
             return false;
@@ -113,7 +113,7 @@ public class MemberPackageAccessRepairService {
                     .findFirst();
         }
 
-        @Transactional(transactionManager = "fulfillmentTransactionManager")
+        @Transactional
         public boolean applyFulfillmentRepair(Purchase purchase) {
             if (purchase.getUserId() == null
                     || purchase.getPackageCode() == null
@@ -159,7 +159,7 @@ public class MemberPackageAccessRepairService {
             }
         }
 
-        @Transactional(transactionManager = "transactionManager")
+        @Transactional
         void syncMenuPublicAccessAfterRepair(Long userId) {
             menuPublicAccessService.syncForUser(userId);
         }

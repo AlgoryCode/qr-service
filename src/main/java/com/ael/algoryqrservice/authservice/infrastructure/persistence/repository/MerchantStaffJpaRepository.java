@@ -1,24 +1,20 @@
 package com.ael.algoryqrservice.authservice.infrastructure.persistence.repository;
 
-import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.MerchantStaffEntity;
-import org.springframework.data.jpa.repository.EntityGraph;
+import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-public interface MerchantStaffJpaRepository extends JpaRepository<MerchantStaffEntity, Long> {
-    @EntityGraph(attributePaths = "role")
-    Optional<MerchantStaffEntity> findByUsernameIgnoreCase(String username);
+public interface MerchantStaffJpaRepository extends JpaRepository<MerchantStaff, Long> {
 
-    @EntityGraph(attributePaths = "role")
-    Optional<MerchantStaffEntity> findByUsernameIgnoreCaseAndActiveTrue(String username);
+    Optional<MerchantStaff> findByUsernameIgnoreCase(String username);
 
-    @EntityGraph(attributePaths = "role")
-    Optional<MerchantStaffEntity> findByMerchantIdAndUsernameIgnoreCaseAndActiveTrue(Long merchantId, String username);
+    Optional<MerchantStaff> findByUsernameIgnoreCaseAndActiveTrue(String username);
 
-    @EntityGraph(attributePaths = "role")
-    @Query("select s from MerchantStaffEntity s where s.id = :id and s.active = true")
-    Optional<MerchantStaffEntity> findActiveByIdWithRole(@Param("id") Long id);
+    Optional<MerchantStaff> findByMerchantIdAndUsernameIgnoreCaseAndActiveTrue(Long merchantId, String username);
+
+    @Query("select s from MerchantStaff s where s.id = :id and s.active = true")
+    Optional<MerchantStaff> findActiveByIdWithRole(@Param("id") Long id);
 }

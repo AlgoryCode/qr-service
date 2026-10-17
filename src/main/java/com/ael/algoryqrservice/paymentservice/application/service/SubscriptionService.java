@@ -50,7 +50,7 @@ public class SubscriptionService {
     private final JsonMapper jsonMapper;
     private final SourceMetadataConverter sourceMetadataConverter;
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public SubscriptionResponse bootstrap(
             String accountId,
             String serviceName,
@@ -142,7 +142,7 @@ public class SubscriptionService {
         return toResponse(saved);
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void initialize(CreatePaymentCommand command) {
         validateInitialCommand(command);
         String seed = command.getAccountId() + ":" + command.getConversationId();
@@ -180,7 +180,7 @@ public class SubscriptionService {
                 .build());
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void prepareCheckoutFormSubscription(InitializeCheckoutFormCommand command) {
         validateInitialCheckoutFormCommand(command);
         Optional<SubscriptionEntity> existing = findExistingForCheckout(command);
@@ -197,7 +197,7 @@ public class SubscriptionService {
         initializeFromCheckoutForm(command);
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void initializeFromCheckoutForm(InitializeCheckoutFormCommand command) {
         validateInitialCheckoutFormCommand(command);
         String seed = command.getAccountId() + ":" + command.getConversationId();
@@ -228,7 +228,7 @@ public class SubscriptionService {
                 .build());
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void activate(PaymentTransaction transaction, PaymentGatewayResult result) {
         SubscriptionEntity subscription = resolveSubscription(transaction);
         if (subscription == null) {
@@ -277,7 +277,7 @@ public class SubscriptionService {
         repository.save(subscription);
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void markManualPaymentRequired(SubscriptionEntity subscription, String reason) {
         LocalDateTime now = LocalDateTime.now();
         subscription.setStatus("PAST_DUE");
@@ -291,12 +291,12 @@ public class SubscriptionService {
         return MANUAL_PAYMENT_GRACE_DAYS;
     }
 
-    @Transactional(readOnly = true, transactionManager = "paymentTransactionManager")
+    @Transactional(readOnly = true)
     public SubscriptionResponse get(String accountId, String id) {
         return toResponse(requireOwned(accountId, id));
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public SubscriptionResponse cancel(String accountId, String id) {
         SubscriptionEntity subscription = requireOwned(accountId, id);
         subscription.setStatus("CANCELLED");
@@ -305,7 +305,7 @@ public class SubscriptionService {
         return toResponse(repository.save(subscription));
     }
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public SubscriptionResponse changeCard(String accountId, String id, Long paymentMethodId) {
         SubscriptionEntity subscription = requireOwned(accountId, id);
         paymentMethodService.resolveToken(accountId, paymentMethodId);

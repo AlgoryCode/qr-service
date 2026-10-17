@@ -34,7 +34,7 @@ public class CardStorageService {
     private final SourceMetadataConverter sourceMetadataConverter;
     private final PaymentGatewayProperties paymentGatewayProperties;
 
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public CardStorageSessionDto initiate(StoreCardCommand command) {
         log.info(
                 "Card storage step=START accountId={} conversationId={} serviceName={} currency={}",

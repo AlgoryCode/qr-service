@@ -42,7 +42,7 @@ public class SubscriptionRenewalScheduler {
     private final JsonMapper jsonMapper;
 
     @Scheduled(fixedDelayString = "${payment.subscriptions.fixed-delay:60000}")
-    @Transactional(transactionManager = "paymentTransactionManager")
+    @Transactional
     public void renewDueSubscriptions() {
         List<SubscriptionEntity> subscriptions = repository
                 .findByStatusInAndNextChargeAtLessThanEqualOrderByNextChargeAt(

@@ -12,7 +12,6 @@ import com.ael.algoryqrservice.fulfillmentservice.domain.port.FulfillmentReposit
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.ProductPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -29,11 +28,7 @@ public class EntitlementUsageService {
     private final EntitlementPort entitlementPort;
     private final ProductPort productPort;
 
-    @Transactional(
-            readOnly = true,
-            transactionManager = "fulfillmentTransactionManager",
-            propagation = Propagation.REQUIRES_NEW
-    )
+    @Transactional(readOnly = true)
     public List<ListedEntitlement> listActive(Long userId) {
         List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(userId);
         Map<Long, CatalogProduct> products = productPort.findByIds(productIds(entitlements));
@@ -42,7 +37,7 @@ public class EntitlementUsageService {
                 .toList();
     }
 
-    @Transactional(readOnly = true, transactionManager = "fulfillmentTransactionManager")
+    @Transactional(readOnly = true)
     public ProductAccessView productAccess(Long userId, String productCode) {
         Optional<ActivePackage> active = fulfillmentRepository.findActiveByUserId(userId);
         if (active.isEmpty()) {
@@ -53,7 +48,7 @@ public class EntitlementUsageService {
                 .orElseGet(() -> ProductAccessView.denied(active.get().packageCode()));
     }
 
-    @Transactional(transactionManager = "fulfillmentTransactionManager")
+    @Transactional
     public UserEntitlement consume(Long userId, String productCode, int quantity) {
         requireQuantity(quantity);
         UserEntitlement entitlement = requireMatch(userId, productCode);
@@ -67,7 +62,7 @@ public class EntitlementUsageService {
         return entitlementPort.save(copyUsed(entitlement, used));
     }
 
-    @Transactional(transactionManager = "fulfillmentTransactionManager")
+    @Transactional
     public Optional<UserEntitlement> release(Long userId, String productCode, int quantity) {
         requireQuantity(quantity);
         Optional<UserEntitlement> match = match(userId, productCode);
