@@ -22,6 +22,7 @@ public class AuthSecurityConfig {
     private final GoogleOidcAuthenticationSuccessHandler googleSuccessHandler;
     private final GoogleOidcAuthenticationFailureHandler googleFailureHandler;
     private final GoogleOAuthLoopbackHostNormalizerFilter googleOAuthLoopbackHostNormalizerFilter;
+    private final CookieOAuth2AuthorizationRequestRepository cookieOAuth2AuthorizationRequestRepository;
 
     @Bean
     @Order(0)
@@ -67,6 +68,8 @@ public class AuthSecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(endpoint -> endpoint
+                                .authorizationRequestRepository(cookieOAuth2AuthorizationRequestRepository))
                         .redirectionEndpoint(redir -> redir.baseUri(GoogleOAuthPaths.CALLBACK))
                         .successHandler(googleSuccessHandler)
                         .failureHandler(googleFailureHandler)

@@ -43,7 +43,7 @@ public class GoogleAuthSessionService {
         HttpSession session = request.getSession(true);
         session.setAttribute(INTENT, intent);
         session.setAttribute(AUDIENCE, audience);
-        attachPendingCookie(response, intent, audience);
+        attachPendingCookie(response, intent, audience, request.isSecure());
         log.info(
                 "Google OAuth flow started intent={} audience={} sessionId={}",
                 intent.value(),
@@ -70,7 +70,7 @@ public class GoogleAuthSessionService {
         if (session != null) {
             session.invalidate();
         }
-        clearPendingCookie(response);
+        clearPendingCookie(response, request.isSecure());
     }
 
     private Optional<PendingGoogleAuth> findInSession(HttpServletRequest request) {
@@ -100,22 +100,27 @@ public class GoogleAuthSessionService {
         return Optional.empty();
     }
 
-    private void attachPendingCookie(HttpServletResponse response, GoogleAuthIntent intent, String audience) {
+    private void attachPendingCookie(
+            HttpServletResponse response,
+            GoogleAuthIntent intent,
+            String audience,
+            boolean secure
+    ) {
         long expiresAt = Instant.now().getEpochSecond() + PENDING_MAX_AGE_SECONDS;
         String payload = intent.value() + "|" + resolveAudience(audience) + "|" + expiresAt;
         String signed = sign(payload);
         Cookie cookie = new Cookie(PENDING_COOKIE, signed);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
+        cookie.setSecure(secure);
         cookie.setPath("/");
         cookie.setMaxAge(PENDING_MAX_AGE_SECONDS);
         response.addCookie(cookie);
     }
 
-    private void clearPendingCookie(HttpServletResponse response) {
+    private void clearPendingCookie(HttpServletResponse response, boolean secure) {
         Cookie cookie = new Cookie(PENDING_COOKIE, "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
+        cookie.setSecure(secure);
         cookie.setPath("/");
         cookie.setMaxAge(0);
         response.addCookie(cookie);
