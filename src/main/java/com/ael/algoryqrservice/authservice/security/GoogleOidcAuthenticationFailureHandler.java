@@ -35,12 +35,19 @@ public class GoogleOidcAuthenticationFailureHandler implements AuthenticationFai
         sessionService.clear(request, response);
 
         GoogleAuthErrorCode errorCode = resolveErrorCode(exception);
+        boolean staleCallback = pending == null && errorCode == GoogleAuthErrorCode.INVALID_INTENT;
         if (errorCode == GoogleAuthErrorCode.INVALID_CLIENT) {
             log.error(
                     "Google OAuth authentication failed intent={} errorCode={}: GOOGLE_CLIENT_SECRET does not match GOOGLE_CLIENT_ID. "
                             + "Copy the client secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs).",
                     pending == null ? "unknown" : pending.intent().value(),
                     errorCode.value()
+            );
+        } else if (staleCallback) {
+            log.info(
+                    "Google OAuth duplicate or expired callback ignored errorCode={} reason={}",
+                    errorCode.value(),
+                    exception.getMessage()
             );
         } else {
             log.warn(
@@ -73,7 +80,9 @@ public class GoogleOidcAuthenticationFailureHandler implements AuthenticationFai
                 }
             }
         }
-        if (aggregated.contains("authorization request not found") || aggregated.contains("invalid state")) {
+        if (aggregated.contains("authorization_request_not_found")
+                || aggregated.contains("authorization request not found")
+                || aggregated.contains("invalid state")) {
             return GoogleAuthErrorCode.INVALID_INTENT;
         }
         return GoogleAuthErrorCode.OAUTH_FAILED;
