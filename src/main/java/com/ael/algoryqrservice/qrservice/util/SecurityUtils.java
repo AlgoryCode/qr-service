@@ -62,12 +62,16 @@ public class SecurityUtils {
                 }
             }
             if (authentication.getDetails() instanceof JwtAccessPrincipal principal
-                    && !principal.isCustomer()
-                    && !principal.isWaiter()) {
+                    && !principal.isCustomer()) {
                 if (principal.merchantId() != null) {
                     return principal.merchantId();
                 }
-                if (principal.userId() != null) {
+                if (principal.isWaiter() && principal.userId() != null) {
+                    return merchantStaffRepository.findById(principal.userId())
+                            .map(MerchantStaff::getMerchantId)
+                            .orElseThrow(() -> new UnauthorizedException("Garson bulunamadı"));
+                }
+                if (!principal.isWaiter() && principal.userId() != null) {
                     return resolveMerchantAccountId(principal.userId(), authentication.getName());
                 }
             }
