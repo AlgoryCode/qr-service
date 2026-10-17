@@ -10,11 +10,11 @@ public interface BranchRepository extends JpaRepository<Branch, Long> {
 
     List<Branch> findByMerchantIdAndDeletedFalseOrderByIdDesc(Long merchantId);
 
-    Optional<Branch> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
+    Optional<Branch> findByIdAndMerchantIdAndDeletedFalse(Long id, Long merchantId);
 
-    long countByUserIdAndDeletedFalse(Long merchantId);
+    long countByMerchantIdAndDeletedFalse(Long merchantId);
 
-    long countByUserIdAndGrandfatheredTrueAndDeletedFalse(Long merchantId);
+    long countByMerchantIdAndGrandfatheredTrueAndDeletedFalse(Long merchantId);
 
     List<Branch> findByMerchantIdAndDeletedFalse(Long merchantId);
 }

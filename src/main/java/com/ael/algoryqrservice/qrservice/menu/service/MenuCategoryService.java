@@ -485,7 +485,7 @@ public class MenuCategoryService {
         if (merchantId == null || categoryId == null) {
             throw new BadRequestException("Kategori bulunamadi");
         }
-        return menuCategoryRepository.findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(categoryId, merchantId)
+        return menuCategoryRepository.findByIdAndMerchantIdAndMenuIdIsNullAndDeletedFalse(categoryId, merchantId)
                 .orElseThrow(() -> new BadRequestException("Kategori bulunamadi: " + categoryId));
     }
 

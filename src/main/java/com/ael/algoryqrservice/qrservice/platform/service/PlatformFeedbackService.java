@@ -130,7 +130,7 @@ public class PlatformFeedbackService {
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Specification<PlatformFeedback> spec = Specification
-                .where(PlatformFeedbackSpecifications.hasUserId(merchantId))
+                .where(PlatformFeedbackSpecifications.hasMerchantId(merchantId))
                 .and(PlatformFeedbackSpecifications.hasStatus(status))
                 .and(PlatformFeedbackSpecifications.matchesQuery(q));
 

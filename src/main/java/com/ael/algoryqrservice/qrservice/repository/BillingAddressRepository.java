@@ -13,7 +13,7 @@ public interface BillingAddressRepository extends JpaRepository<BillingAddress, 
 
     Page<BillingAddress> findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(Long merchantId, Pageable pageable);
 
-    Optional<BillingAddress> findByIdAndUserId(Long id, Long merchantId);
+    Optional<BillingAddress> findByIdAndMerchantId(Long id, Long merchantId);
 
     Optional<BillingAddress> findByMerchantIdAndDefaultAddressTrue(Long merchantId);
 }

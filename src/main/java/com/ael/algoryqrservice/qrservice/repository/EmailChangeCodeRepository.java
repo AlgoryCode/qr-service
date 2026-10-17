@@ -30,7 +30,7 @@ public interface EmailChangeCodeRepository extends JpaRepository<EmailChangeCode
               and c.status = com.ael.algoryqrservice.qrservice.model.enums.EmailChangeCodeStatus.PENDING
               and c.revoked = false
             """)
-    int revokePendingByUserId(@Param("userId") Long merchantId, @Param("now") LocalDateTime now);
+    int revokePendingByMerchantId(@Param("merchantId") Long merchantId, @Param("now") LocalDateTime now);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

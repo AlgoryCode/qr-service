@@ -54,8 +54,8 @@ public class EmailChangeService {
         LocalDateTime now = LocalDateTime.now();
 
         codeRepository.expireAllTimedOut(now);
-        challengeRepository.cancelActiveByUserId(user.getId(), ACTIVE_STATUSES);
-        codeRepository.revokePendingByUserId(user.getId(), now);
+        challengeRepository.cancelActiveByMerchantId(user.getId(), ACTIVE_STATUSES);
+        codeRepository.revokePendingByMerchantId(user.getId(), now);
 
         EmailChangeChallenge challenge = EmailChangeChallenge.builder()
                 .id(UUID.randomUUID())
@@ -236,7 +236,7 @@ public class EmailChangeService {
         } catch (IllegalArgumentException exception) {
             throw new BadRequestException("Geçersiz işlem kimliği");
         }
-        return challengeRepository.findByIdAndUserId(id, merchantId)
+        return challengeRepository.findByIdAndMerchantId(id, merchantId)
                 .orElseThrow(() -> new BadRequestException("İşlem bulunamadı. Sürece yeniden başlayın."));
     }
 

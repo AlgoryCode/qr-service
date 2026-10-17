@@ -353,7 +353,7 @@ public class UserAccountingService {
     }
 
     private Map<Long, String> resolveMenuNames(Long merchantId) {
-        List<Long> menuIds = menuRepository.findMenuIdsByUserIdAndChannel(merchantId, MenuChannel.QR);
+        List<Long> menuIds = menuRepository.findMenuIdsByMerchantIdAndChannel(merchantId, MenuChannel.QR);
         Map<Long, String> menuNames = new HashMap<>();
         for (Long menuId : menuIds) {
             menuRepository.findById(menuId)

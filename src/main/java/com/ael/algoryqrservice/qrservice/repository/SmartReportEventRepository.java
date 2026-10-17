@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public interface SmartReportEventRepository extends JpaRepository<SmartReportEvent, UUID> {
 
-    long countByUserIdAndCreatedAtGreaterThanEqual(Long merchantId, LocalDateTime createdAt);
+    long countByMerchantIdAndCreatedAtGreaterThanEqual(Long merchantId, LocalDateTime createdAt);
 
     Page<SmartReportEvent> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
 
@@ -21,5 +21,5 @@ public interface SmartReportEventRepository extends JpaRepository<SmartReportEve
             Pageable pageable
     );
 
-    Optional<SmartReportEvent> findByProcessIdAndUserId(UUID processId, Long merchantId);
+    Optional<SmartReportEvent> findByProcessIdAndMerchantId(UUID processId, Long merchantId);
 }

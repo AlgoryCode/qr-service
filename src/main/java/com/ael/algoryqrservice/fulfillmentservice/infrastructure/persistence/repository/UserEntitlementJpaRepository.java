@@ -19,7 +19,7 @@ public interface UserEntitlementJpaRepository extends JpaRepository<UserEntitlem
               and (e.expiresAt is null or e.expiresAt > :now)
             """)
     List<UserEntitlementEntity> findActiveByUserId(
-            @Param("userId") Long merchantId,
+            @Param("merchantId") Long merchantId,
             @Param("status") PackageStatus status,
             @Param("now") Instant now
     );
@@ -33,7 +33,7 @@ public interface UserEntitlementJpaRepository extends JpaRepository<UserEntitlem
               and e.fulfillmentId <> :keepFulfillmentId
             """)
     int supersedeOthers(
-            @Param("userId") Long merchantId,
+            @Param("merchantId") Long merchantId,
             @Param("keepFulfillmentId") Long keepFulfillmentId,
             @Param("currentStatus") PackageStatus currentStatus,
             @Param("newStatus") PackageStatus newStatus,

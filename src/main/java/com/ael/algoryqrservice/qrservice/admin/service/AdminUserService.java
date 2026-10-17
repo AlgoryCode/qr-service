@@ -76,8 +76,8 @@ public class AdminUserService {
                 .activePackage(accessProfile.activePackage())
                 .products(accessProfile.products())
                 .scopes(accessProfile.scopes())
-                .qrCount(qrRepository.countByUserIdAndDeletedFalse(user.getId()))
-                .activeMenuCount(menuRepository.countActiveLiveMenusForUser(user.getId()))
+                .qrCount(qrRepository.countByMerchantIdAndDeletedFalse(user.getId()))
+                .activeMenuCount(menuRepository.countActiveLiveMenusForMerchant(user.getId()))
                 .purchases(purchases)
                 .emailVerified(user.getProvider() == AuthProvider.BASIC ? user.isEmailVerified() : null)
                 .build();

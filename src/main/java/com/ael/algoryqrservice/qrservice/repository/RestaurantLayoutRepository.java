@@ -12,7 +12,7 @@ public interface RestaurantLayoutRepository extends JpaRepository<RestaurantLayo
 
     List<RestaurantLayout> findByMerchantIdOrderByIdAsc(Long merchantId);
 
-    Optional<RestaurantLayout> findByIdAndUserId(Long id, Long merchantId);
+    Optional<RestaurantLayout> findByIdAndMerchantId(Long id, Long merchantId);
 
     List<RestaurantLayout> findByMerchantIdAndBranchId(Long merchantId, Long branchId);
 

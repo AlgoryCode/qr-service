@@ -368,7 +368,7 @@ public class SmartReportService {
         ZoneId zone = zoneId();
         LocalDateTime periodStart = periodStart(zone);
         Instant resetsAt = periodEnd(zone).atZone(zone).toInstant();
-        long used = smartReportEventRepository.countByUserIdAndCreatedAtGreaterThanEqual(merchantId, periodStart);
+        long used = smartReportEventRepository.countByMerchantIdAndCreatedAtGreaterThanEqual(merchantId, periodStart);
         int limit = Math.max(quotaProperties.getQuotaLimit(), 0);
         long remaining = Math.max(limit - used, 0);
         int paidCredits = paidCredits(merchantId);
@@ -412,7 +412,7 @@ public class SmartReportService {
 
     @Transactional(readOnly = true)
     public SmartReportDtos.SmartReportDetailResponse getJobDetail(Long merchantId, UUID jobId) {
-        SmartReportEvent event = smartReportEventRepository.findByProcessIdAndUserId(jobId, merchantId)
+        SmartReportEvent event = smartReportEventRepository.findByProcessIdAndMerchantId(jobId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Akilli rapor bulunamadi: " + jobId));
         String storedResult = smartReportResultRepository.findByProcessId(event.getProcessId())
                 .map(SmartReportResult::getResultText)

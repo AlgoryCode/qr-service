@@ -457,7 +457,7 @@ public class RestaurantTableService {
         if (table.getAreaId() == null || table.getMerchantId() == null) {
             return null;
         }
-        return restaurantAreaRepository.findByIdAndUserId(table.getAreaId(), table.getMerchantId())
+        return restaurantAreaRepository.findByIdAndMerchantId(table.getAreaId(), table.getMerchantId())
                 .map(RestaurantArea::getName)
                 .orElse(null);
     }
@@ -470,7 +470,7 @@ public class RestaurantTableService {
     }
 
     private RestaurantArea requireOwnedArea(Long merchantId, Long areaId) {
-        return restaurantAreaRepository.findByIdAndUserId(areaId, merchantId)
+        return restaurantAreaRepository.findByIdAndMerchantId(areaId, merchantId)
                 .orElseThrow(() -> new BadRequestException("Alan bulunamadı"));
     }
 
@@ -478,7 +478,7 @@ public class RestaurantTableService {
         if (layoutId == null) {
             throw new NotFoundException("Düzen bulunamadı");
         }
-        return restaurantLayoutRepository.findByIdAndUserId(layoutId, merchantId)
+        return restaurantLayoutRepository.findByIdAndMerchantId(layoutId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
     }
 
@@ -491,7 +491,7 @@ public class RestaurantTableService {
     }
 
     private RestaurantTable requireOwnedTable(Long merchantId, Long layoutId, Long tableId) {
-        RestaurantTable table = restaurantTableRepository.findByIdAndUserIdAndDeletedFalse(tableId, merchantId)
+        RestaurantTable table = restaurantTableRepository.findByIdAndMerchantIdAndDeletedFalse(tableId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
         if (!layoutId.equals(table.getLayoutId())) {
             throw new NotFoundException("Masa bulunamadı");

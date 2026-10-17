@@ -139,7 +139,7 @@ public class PrintAgentDeviceService {
         if (!device.getMerchantId().equals(request.getMerchantId())) {
             throw new UnauthorizedException("Kullanici ID eslesmiyor");
         }
-        Branch branch = branchRepository.findByIdAndUserIdAndDeletedFalse(request.getBranchId(), request.getMerchantId())
+        Branch branch = branchRepository.findByIdAndMerchantIdAndDeletedFalse(request.getBranchId(), request.getMerchantId())
                 .orElseThrow(() -> new NotFoundException("Sube bulunamadi"));
         device.setBranchId(branch.getId());
         device.setLastSeenAt(LocalDateTime.now());
@@ -252,7 +252,7 @@ public class PrintAgentDeviceService {
     }
 
     private Branch requireOwnedBranch(Long branchId, Long merchantId) {
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
+        return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Sube bulunamadi"));
     }
 

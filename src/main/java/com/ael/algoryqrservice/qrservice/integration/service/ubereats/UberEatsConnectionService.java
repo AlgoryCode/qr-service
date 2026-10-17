@@ -86,7 +86,7 @@ public class UberEatsConnectionService {
     public UberEatsDtos.ConnectionResponse assignBranch(Long branchId) {
         UberEatsConnection connection = requireOwnedConnection();
         if (branchId != null) {
-            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getMerchantId())
+            branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, connection.getMerchantId())
                     .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
         }
         connection.setBranchId(branchId);

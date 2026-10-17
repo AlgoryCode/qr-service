@@ -46,7 +46,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and qr.deleted = false
             order by menu.menuId desc
             """)
-    List<Object[]> findActiveMenusWithQrByUserId(@Param("userId") Long merchantId);
+    List<Object[]> findActiveMenusWithQrByMerchantId(@Param("merchantId") Long merchantId);
 
     @Query("""
             select menu, qr
@@ -57,7 +57,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and qr.deleted = false
             order by menu.menuId desc
             """)
-    List<Object[]> findMenusWithQrByUserId(@Param("userId") Long merchantId);
+    List<Object[]> findMenusWithQrByMerchantId(@Param("merchantId") Long merchantId);
 
     @Query("""
             select menu.qrId
@@ -67,7 +67,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.active = true
               and menu.deleted = false
             """)
-    Set<Long> findActiveQrIdsByUserIdAndQrIdIn(@Param("userId") Long merchantId, @Param("qrIds") Collection<Long> qrIds);
+    Set<Long> findActiveQrIdsByMerchantIdAndQrIdIn(@Param("merchantId") Long merchantId, @Param("qrIds") Collection<Long> qrIds);
 
     @Query("""
             select case when count(menu) > 0 then true else false end
@@ -78,7 +78,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.deleted = false
               and qr.deleted = false
             """)
-    boolean existsActiveLiveMenuQrForUser(@Param("userId") Long merchantId);
+    boolean existsActiveLiveMenuQrForMerchant(@Param("merchantId") Long merchantId);
 
     @Query("""
             select count(menu)
@@ -89,7 +89,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.deleted = false
               and qr.deleted = false
             """)
-    long countActiveLiveMenusForUser(@Param("userId") Long merchantId);
+    long countActiveLiveMenusForMerchant(@Param("merchantId") Long merchantId);
 
     @Query("""
             select count(menu)
@@ -113,7 +113,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.branchId is not null
             group by menu.branchId
             """)
-    List<Object[]> countActiveLiveMenusGroupedByBranch(@Param("userId") Long merchantId);
+    List<Object[]> countActiveLiveMenusGroupedByBranch(@Param("merchantId") Long merchantId);
 
     List<Menu> findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(Long merchantId, MenuChannel channel);
 
@@ -126,7 +126,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.deleted = false
               and menu.channel = :channel
             """)
-    List<Long> findMenuIdsByUserIdAndChannel(@Param("userId") Long merchantId, @Param("channel") MenuChannel channel);
+    List<Long> findMenuIdsByMerchantIdAndChannel(@Param("merchantId") Long merchantId, @Param("channel") MenuChannel channel);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -136,8 +136,8 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
             where menu.merchantId = :merchantId
               and menu.deleted = false
             """)
-    int updatePublicAccessByUserId(
-            @Param("userId") Long merchantId,
+    int updatePublicAccessByMerchantId(
+            @Param("merchantId") Long merchantId,
             @Param("enabled") boolean enabled,
             @Param("reason") MenuPublicAccessDisabledReason reason
     );
@@ -150,5 +150,5 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
               and menu.deleted = false
               and menu.active = true
             """)
-    int deactivateActiveMenusByUserId(@Param("userId") Long merchantId);
+    int deactivateActiveMenusByMerchantId(@Param("merchantId") Long merchantId);
 }

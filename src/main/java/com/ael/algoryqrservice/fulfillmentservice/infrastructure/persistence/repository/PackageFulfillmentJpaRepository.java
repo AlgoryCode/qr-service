@@ -24,7 +24,7 @@ public interface PackageFulfillmentJpaRepository extends JpaRepository<PackageFu
             where f.merchantId = :merchantId and f.id <> :keepId and f.status = :activeStatus
             """)
     int supersedeOthers(
-            @Param("userId") Long merchantId,
+            @Param("merchantId") Long merchantId,
             @Param("keepId") Long keepId,
             @Param("status") FulfillmentStatus status,
             @Param("activeStatus") FulfillmentStatus activeStatus

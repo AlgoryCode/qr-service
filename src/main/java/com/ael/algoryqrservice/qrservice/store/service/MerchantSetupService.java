@@ -102,7 +102,7 @@ public class MerchantSetupService {
         if (branchId == null) {
             return null;
         }
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
+        return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
                 .map(Branch::getId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şube bulunamadı"));
     }
@@ -134,7 +134,7 @@ public class MerchantSetupService {
     }
 
     private List<Menu> cloneableMenus(Long merchantId) {
-        return menuRepository.findActiveMenusWithQrByUserId(merchantId).stream()
+        return menuRepository.findActiveMenusWithQrByMerchantId(merchantId).stream()
                 .map(row -> (Menu) row[0])
                 .filter(menu -> menu.getChannel() != MenuChannel.STORE)
                 .toList();

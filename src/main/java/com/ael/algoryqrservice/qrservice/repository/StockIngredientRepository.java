@@ -15,7 +15,7 @@ import java.util.Optional;
 
 public interface StockIngredientRepository extends JpaRepository<StockIngredient, Long> {
 
-    Optional<StockIngredient> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
+    Optional<StockIngredient> findByIdAndMerchantIdAndDeletedFalse(Long id, Long merchantId);
 
     @Query(
             value = """
@@ -35,7 +35,7 @@ public interface StockIngredientRepository extends JpaRepository<StockIngredient
     )
     Page<StockIngredient> search(
             @Param("branchId") Long branchId,
-            @Param("userId") Long merchantId,
+            @Param("merchantId") Long merchantId,
             @Param("lowOnly") boolean lowOnly,
             Pageable pageable
     );

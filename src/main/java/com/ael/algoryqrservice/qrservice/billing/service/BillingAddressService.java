@@ -161,7 +161,7 @@ public class BillingAddressService {
     }
 
     private BillingAddress owned(Long merchantId, Long id) {
-        return repository.findByIdAndUserId(id, merchantId)
+        return repository.findByIdAndMerchantId(id, merchantId)
                 .orElseThrow(() -> new NotFoundException("Fatura adresi bulunamadı"));
     }
 

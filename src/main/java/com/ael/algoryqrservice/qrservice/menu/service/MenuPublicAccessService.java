@@ -58,7 +58,7 @@ public class MenuPublicAccessService {
         if (merchantId == null) {
             return;
         }
-        menuRepository.deactivateActiveMenusByUserId(merchantId);
+        menuRepository.deactivateActiveMenusByMerchantId(merchantId);
     }
 
     @Transactional
@@ -67,7 +67,7 @@ public class MenuPublicAccessService {
             return;
         }
         AccessDecision decision = evaluate(merchantId);
-        menuRepository.updatePublicAccessByUserId(merchantId, decision.allowed(), decision.reason());
+        menuRepository.updatePublicAccessByMerchantId(merchantId, decision.allowed(), decision.reason());
     }
 
     @Transactional

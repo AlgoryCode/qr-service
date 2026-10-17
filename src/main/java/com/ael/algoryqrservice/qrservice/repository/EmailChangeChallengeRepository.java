@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public interface EmailChangeChallengeRepository extends JpaRepository<EmailChangeChallenge, UUID> {
 
-    Optional<EmailChangeChallenge> findByIdAndUserId(UUID id, Long merchantId);
+    Optional<EmailChangeChallenge> findByIdAndMerchantId(UUID id, Long merchantId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -21,8 +21,8 @@ public interface EmailChangeChallengeRepository extends JpaRepository<EmailChang
             where c.merchantId = :merchantId
               and c.status in :activeStatuses
             """)
-    int cancelActiveByUserId(
-            @Param("userId") Long merchantId,
+    int cancelActiveByMerchantId(
+            @Param("merchantId") Long merchantId,
             @Param("activeStatuses") java.util.Collection<EmailChangeChallengeStatus> activeStatuses
     );
 }

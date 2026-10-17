@@ -204,13 +204,13 @@ public class BranchService {
     @Transactional
     public Branch requireOwned(Long branchId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
+        return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şube bulunamadı"));
     }
 
     @Transactional(readOnly = true)
     public Branch requireOwnedForUser(Long branchId, Long merchantId) {
-        return branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
+        return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçerli bir şube seçin"));
     }
 
@@ -245,7 +245,7 @@ public class BranchService {
     }
 
     private BranchDtos.Quota branchQuota(Long merchantId) {
-        int used = (int) branchRepository.countByUserIdAndDeletedFalse(merchantId);
+        int used = (int) branchRepository.countByMerchantIdAndDeletedFalse(merchantId);
         int remaining = fulfillmentClient.remaining(merchantId, CatalogProducts.QR_BRANCH);
         return BranchDtos.Quota.builder()
                 .used(used)

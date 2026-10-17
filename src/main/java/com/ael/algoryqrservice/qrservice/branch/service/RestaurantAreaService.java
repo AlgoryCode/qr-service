@@ -184,12 +184,12 @@ public class RestaurantAreaService {
         if (layoutId == null) {
             throw new NotFoundException("Düzen bulunamadı");
         }
-        return restaurantLayoutRepository.findByIdAndUserId(layoutId, merchantId)
+        return restaurantLayoutRepository.findByIdAndMerchantId(layoutId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
     }
 
     private RestaurantArea requireOwnedArea(Long merchantId, Long layoutId, Long areaId) {
-        RestaurantArea area = restaurantAreaRepository.findByIdAndUserId(areaId, merchantId)
+        RestaurantArea area = restaurantAreaRepository.findByIdAndMerchantId(areaId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Alan bulunamadı"));
         if (!layoutId.equals(area.getLayoutId())) {
             throw new NotFoundException("Alan bulunamadı");

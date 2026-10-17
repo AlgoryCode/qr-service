@@ -15,11 +15,11 @@ public interface UserThemeAssignmentRepository extends JpaRepository<UserThemeAs
 
     boolean existsByMerchantIdAndThemeId(Long merchantId, Long themeId);
 
-    void deleteByUserIdAndThemeId(Long merchantId, Long themeId);
+    void deleteByMerchantIdAndThemeId(Long merchantId, Long themeId);
 
-    void deleteByUserId(Long merchantId);
+    void deleteByMerchantId(Long merchantId);
 
-    long countByUserId(Long merchantId);
+    long countByMerchantId(Long merchantId);
 
     List<UserThemeAssignment> findByMerchantIdAndThemeIdIn(Long merchantId, Collection<Long> themeIds);
 }

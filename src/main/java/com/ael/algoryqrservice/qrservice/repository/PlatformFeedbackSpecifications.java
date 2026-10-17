@@ -9,8 +9,8 @@ public final class PlatformFeedbackSpecifications {
     private PlatformFeedbackSpecifications() {
     }
 
-    public static Specification<PlatformFeedback> hasUserId(Long merchantId) {
-        return (root, query, cb) -> merchantId == null ? cb.conjunction() : cb.equal(root.get("userId"), merchantId);
+    public static Specification<PlatformFeedback> hasMerchantId(Long merchantId) {
+        return (root, query, cb) -> merchantId == null ? cb.conjunction() : cb.equal(root.get("merchantId"), merchantId);
     }
 
     public static Specification<PlatformFeedback> hasStatus(PlatformFeedbackStatus status) {

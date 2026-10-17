@@ -121,7 +121,7 @@ public class MenuThemeService {
         requireExistingUser(merchantId);
         List<String> codes = themeCodes == null ? List.of() : themeCodes;
         List<MenuTheme> themes = codes.isEmpty() ? List.of() : resolveActiveThemes(codes);
-        userThemeAssignmentRepository.deleteByUserId(merchantId);
+        userThemeAssignmentRepository.deleteByMerchantId(merchantId);
         userThemeAssignmentRepository.flush();
         for (MenuTheme theme : themes) {
             userThemeAssignmentRepository.save(UserThemeAssignment.builder()
@@ -142,7 +142,7 @@ public class MenuThemeService {
         }
         MenuTheme theme = menuThemeRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new NotFoundException("Tema bulunamadı: " + code));
-        userThemeAssignmentRepository.deleteByUserIdAndThemeId(merchantId, theme.getId());
+        userThemeAssignmentRepository.deleteByMerchantIdAndThemeId(merchantId, theme.getId());
         return listAssignedThemes(merchantId);
     }
 

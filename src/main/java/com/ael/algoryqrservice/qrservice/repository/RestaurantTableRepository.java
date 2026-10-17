@@ -36,7 +36,7 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
 
     List<RestaurantTable> findByMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(Long merchantId);
 
-    Optional<RestaurantTable> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
+    Optional<RestaurantTable> findByIdAndMerchantIdAndDeletedFalse(Long id, Long merchantId);
 
     List<RestaurantTable> findByMerchantIdAndMenuIdIsNullAndDeletedFalseOrderByTableNumberAscNameAsc(Long merchantId);
 

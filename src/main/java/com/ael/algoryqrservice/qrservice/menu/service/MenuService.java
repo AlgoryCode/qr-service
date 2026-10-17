@@ -1183,7 +1183,7 @@ public class MenuService {
     @Transactional(readOnly = true)
     public List<MenuDtos.ActiveMenuSummary> listActiveMenusForCurrentUser() {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return menuRepository.findActiveMenusWithQrByUserId(merchantId).stream()
+        return menuRepository.findActiveMenusWithQrByMerchantId(merchantId).stream()
                 .map(this::toMenuSummary)
                 .toList();
     }
@@ -1191,7 +1191,7 @@ public class MenuService {
     @Transactional(readOnly = true)
     public List<MenuDtos.ActiveMenuSummary> listMenusForCurrentUser() {
         Long merchantId = securityUtils.getCurrentUserId();
-        return menuRepository.findMenusWithQrByUserId(merchantId).stream()
+        return menuRepository.findMenusWithQrByMerchantId(merchantId).stream()
                 .map(this::toMenuSummary)
                 .toList();
     }
@@ -1218,7 +1218,7 @@ public class MenuService {
     @Transactional(readOnly = true)
     public MenuDtos.MenuProductsByQrResponse listProductsByQrId(Long qrId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        List<Object[]> rows = menuProductRepository.findMenuWithProductsByQrIdAndUserId(qrId, merchantId);
+        List<Object[]> rows = menuProductRepository.findMenuWithProductsByQrIdAndMerchantId(qrId, merchantId);
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
         }

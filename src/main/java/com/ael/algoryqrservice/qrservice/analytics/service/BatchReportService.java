@@ -122,7 +122,7 @@ public class BatchReportService {
 
     @Transactional(readOnly = true)
     public BatchReportDtos.BatchReportDetail getReport(Long merchantId, UUID batchId) {
-        BatchReport batch = batchReportRepository.findByIdAndUserId(batchId, merchantId)
+        BatchReport batch = batchReportRepository.findByIdAndMerchantId(batchId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Rapor bulunamadi: " + batchId));
         List<BatchReportItem> items = batchReportItemRepository.findByBatchIdOrderByCreatedAtAsc(batchId);
         return toDetail(batch, items);

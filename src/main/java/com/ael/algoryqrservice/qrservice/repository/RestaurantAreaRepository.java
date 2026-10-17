@@ -21,7 +21,7 @@ public interface RestaurantAreaRepository extends JpaRepository<RestaurantArea, 
 
     List<RestaurantArea> findByMerchantIdOrderBySortOrderAscIdAsc(Long merchantId);
 
-    Optional<RestaurantArea> findByIdAndUserId(Long id, Long merchantId);
+    Optional<RestaurantArea> findByIdAndMerchantId(Long id, Long merchantId);
 
     List<RestaurantArea> findByMerchantIdAndMenuIdIsNullOrderBySortOrderAscIdAsc(Long merchantId);
 

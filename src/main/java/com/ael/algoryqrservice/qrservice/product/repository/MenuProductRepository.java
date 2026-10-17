@@ -75,7 +75,7 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
             where p.merchantId = :merchantId
               and p.deleted = false
             """)
-    long countActiveProductsForUser(@Param("userId") Long merchantId);
+    long countActiveProductsForMerchant(@Param("merchantId") Long merchantId);
 
     boolean existsByMenuIdAndNameIgnoreCaseAndDeletedFalse(Long menuId, String name);
 
@@ -92,8 +92,8 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long>,
               and menu.deleted = false
             order by product.sortOrder asc, product.productId asc
             """)
-    List<Object[]> findMenuWithProductsByQrIdAndUserId(
+    List<Object[]> findMenuWithProductsByQrIdAndMerchantId(
             @Param("qrId") Long qrId,
-            @Param("userId") Long merchantId
+            @Param("merchantId") Long merchantId
     );
 }

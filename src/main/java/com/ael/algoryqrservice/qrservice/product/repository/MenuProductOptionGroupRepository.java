@@ -23,7 +23,7 @@ public interface MenuProductOptionGroupRepository extends JpaRepository<MenuProd
     List<MenuProductOptionGroup> findByMerchantIdAndProductIdIsNullOrderBySortOrderAscIdAsc(Long merchantId);
 
     @EntityGraph(attributePaths = "options")
-    Optional<MenuProductOptionGroup> findByIdAndUserIdAndProductIdIsNull(Long id, Long merchantId);
+    Optional<MenuProductOptionGroup> findByIdAndMerchantIdAndProductIdIsNull(Long id, Long merchantId);
 
     List<MenuProductOptionGroup> findByLibraryGroupIdIn(Collection<Long> libraryGroupIds);
 

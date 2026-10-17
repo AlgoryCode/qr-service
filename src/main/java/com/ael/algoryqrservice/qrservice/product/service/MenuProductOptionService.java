@@ -341,7 +341,7 @@ public class MenuProductOptionService {
         if (merchantId == null || groupId == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Opsiyon grubu bulunamadı");
         }
-        return optionGroupRepository.findByIdAndUserIdAndProductIdIsNull(groupId, merchantId)
+        return optionGroupRepository.findByIdAndMerchantIdAndProductIdIsNull(groupId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Opsiyon grubu bulunamadı"));
     }
 

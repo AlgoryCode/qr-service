@@ -168,7 +168,7 @@ public class StockIngredientService {
 
     private StockIngredient requireOwned(Long ingredientId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return ingredientRepository.findByIdAndUserIdAndDeletedFalse(ingredientId, merchantId)
+        return ingredientRepository.findByIdAndMerchantIdAndDeletedFalse(ingredientId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hammadde bulunamadı"));
     }
 

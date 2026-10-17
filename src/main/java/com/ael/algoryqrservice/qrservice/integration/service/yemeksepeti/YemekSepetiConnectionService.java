@@ -85,7 +85,7 @@ public class YemekSepetiConnectionService {
     public YemekSepetiDtos.ConnectionResponse assignBranch(Long branchId) {
         YemekSepetiConnection connection = requireOwnedConnection();
         if (branchId != null) {
-            branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, connection.getMerchantId())
+            branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, connection.getMerchantId())
                     .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
         }
         connection.setBranchId(branchId);

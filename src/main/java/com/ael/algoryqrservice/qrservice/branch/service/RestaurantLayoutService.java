@@ -134,7 +134,7 @@ public class RestaurantLayoutService {
             return toCountedResponse(merchantId, layout);
         }
 
-        Branch branch = branchRepository.findByIdAndUserIdAndDeletedFalse(branchId, merchantId)
+        Branch branch = branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new BadRequestException("Şube bulunamadı"));
         LocalDateTime now = LocalDateTime.now();
         for (RestaurantLayout other : restaurantLayoutRepository.findByMerchantIdAndBranchId(merchantId, branch.getId())) {
@@ -163,7 +163,7 @@ public class RestaurantLayoutService {
         if (layoutId == null) {
             throw new NotFoundException("Düzen bulunamadı");
         }
-        return restaurantLayoutRepository.findByIdAndUserId(layoutId, merchantId)
+        return restaurantLayoutRepository.findByIdAndMerchantId(layoutId, merchantId)
                 .orElseThrow(() -> new NotFoundException("Düzen bulunamadı"));
     }
 

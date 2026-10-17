@@ -16,11 +16,11 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategory, Long
 
     Optional<MenuCategory> findByIdAndMenuIdAndDeletedFalse(Long id, Long menuId);
 
-    Optional<MenuCategory> findByIdAndUserIdAndMenuIdIsNullAndDeletedFalse(Long id, Long merchantId);
+    Optional<MenuCategory> findByIdAndMerchantIdAndMenuIdIsNullAndDeletedFalse(Long id, Long merchantId);
 
     boolean existsByMerchantIdAndMenuIdIsNullAndSlugAndDeletedFalse(Long merchantId, String slug);
 
-    Optional<MenuCategory> findByIdAndUserIdAndDeletedFalse(Long id, Long merchantId);
+    Optional<MenuCategory> findByIdAndMerchantIdAndDeletedFalse(Long id, Long merchantId);
 
     Optional<MenuCategory> findByMenuIdAndSlugAndDeletedFalse(Long menuId, String slug);
 

@@ -14,7 +14,7 @@ public interface BatchReportRepository extends JpaRepository<BatchReport, UUID> 
 
     Page<BatchReport> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
 
-    Optional<BatchReport> findByIdAndUserId(UUID id, Long merchantId);
+    Optional<BatchReport> findByIdAndMerchantId(UUID id, Long merchantId);
 
     List<BatchReport> findByStatusInOrderByUpdatedAtAsc(Collection<String> statuses);
 }
