@@ -1,5 +1,6 @@
-package com.ael.algoryqrservice.qrservice.integration.odeal.service;
+package com.ael.algoryqrservice.qrservice.integration.service.odeal;
 
+import com.ael.algoryqrservice.qrservice.integration.service.odeal.OdealTestService;
 import com.ael.algoryqrservice.qrservice.integration.odeal.client.OdealClient;
 import com.ael.algoryqrservice.qrservice.integration.odeal.config.OdealProperties;
 import com.fasterxml.jackson.databind.JsonNode;

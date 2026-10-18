@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.coupon;
 
+import com.ael.algoryqrservice.qrservice.coupon.service.CouponRedemptionService;
 import com.ael.algoryqrservice.qrservice.coupon.domain.CouponQuote;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Coupon;
@@ -80,7 +81,7 @@ class CouponRedemptionServiceTest {
         when(couponRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
         Purchase purchase = Purchase.builder()
                 .id(99L)
-                .userId(7L)
+                .merchantId(7L)
                 .couponId(1L)
                 .listPrice(new BigDecimal("200.00"))
                 .discountAmount(new BigDecimal("20.00"))
@@ -101,7 +102,7 @@ class CouponRedemptionServiceTest {
         coupon.setStatus(CouponStatus.RESERVED);
         coupon.setReservedPurchaseId(99L);
         when(couponRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
-        Purchase purchase = Purchase.builder().id(99L).userId(7L).couponId(1L).build();
+        Purchase purchase = Purchase.builder().id(99L).merchantId(7L).couponId(1L).build();
 
         service.release(purchase);
 

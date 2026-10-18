@@ -89,6 +89,13 @@ public class StaffBillService {
         );
     }
 
+    @Transactional
+    public TableBillDtos.BillResponse cancelBill(Long billId, TableBillDtos.CancelBillRequest request) {
+        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        TableBill bill = requireBill(billId, staff);
+        return tableBillService.cancelBill(bill.getMenuId(), billId, staff, request);
+    }
+
     private RestaurantTable requireTable(Long tableId, MerchantStaff staff) {
         RestaurantTable table = restaurantTableRepository.findById(tableId)
                 .filter(item -> !item.isDeleted())

@@ -14,7 +14,7 @@ class PaymentEventMetadataTest {
     void from_whenInstallmentFieldsMissing_thenDefaultToOneTimeShape() {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("purchaseId", 19L);
-        metadata.put("userId", 1L);
+        metadata.put("merchantId", 1L);
         metadata.put("packageId", 2L);
         metadata.put("packageCode", "PRO_PACKAGE");
         metadata.put("purchaseConversationId", "qr-purchase-19-e6d5b588");

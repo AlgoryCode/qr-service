@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.NutritionFactsService;
 import com.ael.algoryqrservice.qrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionNutrientEntry;

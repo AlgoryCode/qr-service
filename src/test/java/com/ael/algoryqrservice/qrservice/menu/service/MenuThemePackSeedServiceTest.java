@@ -1,5 +1,7 @@
-package com.ael.algoryqrservice.qrservice.service;
+package com.ael.algoryqrservice.qrservice.menu.service;
 
+import com.ael.algoryqrservice.qrservice.product.service.ProductImageStorageService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuThemePackSeedService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

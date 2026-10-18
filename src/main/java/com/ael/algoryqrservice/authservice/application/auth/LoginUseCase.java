@@ -101,6 +101,9 @@ public class LoginUseCase {
         }
 
         loginAttemptGuard.reset(key);
+        if (subject.branchId() == null) {
+            throw new BadRequestException("Personel bir şubeye atanmamış");
+        }
         merchantPackageGate.assertOpen(subject);
         log.info(
                 "Staff login succeeded merchantId={} subjectId={} clientIp={}",

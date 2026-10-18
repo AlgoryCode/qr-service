@@ -1,13 +1,15 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductPairingService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCategoryService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.MenuCategory;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductPairing;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductPairingRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductPairingRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

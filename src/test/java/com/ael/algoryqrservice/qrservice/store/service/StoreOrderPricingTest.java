@@ -4,7 +4,7 @@ import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductOption;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductOptionGroup;
-import com.ael.algoryqrservice.qrservice.service.MenuProductOptionService;
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductOptionService;
 import com.ael.algoryqrservice.qrservice.store.model.Merchant;
 import com.ael.algoryqrservice.qrservice.store.model.StoreDeliveryType;
 import com.ael.algoryqrservice.qrservice.store.model.StorePaymentMethod;

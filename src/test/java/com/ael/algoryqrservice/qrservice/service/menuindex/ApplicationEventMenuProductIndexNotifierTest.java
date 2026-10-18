@@ -1,6 +1,10 @@
 package com.ael.algoryqrservice.qrservice.service.menuindex;
 
-import com.ael.algoryqrservice.qrservice.messaging.dto.MenuProductDocumentMessage;
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductIndexEvents;
+
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductDocumentFactory;
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.ApplicationEventMenuProductIndexNotifier;
+import com.ael.algoryqrservice.qrservice.product.dto.MenuProductDocumentMessage;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

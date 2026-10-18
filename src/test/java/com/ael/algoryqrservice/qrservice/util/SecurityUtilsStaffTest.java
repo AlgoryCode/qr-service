@@ -3,7 +3,7 @@ package com.ael.algoryqrservice.qrservice.util;
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import com.ael.algoryqrservice.qrservice.client.AuthMerchantClient;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
-import com.ael.algoryqrservice.qrservice.repository.CustomerRepository;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository.CustomerRepository;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.security.JwtAccessPrincipal;

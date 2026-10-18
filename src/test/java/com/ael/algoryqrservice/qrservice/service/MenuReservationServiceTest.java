@@ -1,8 +1,9 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.MenuReservationService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuReservation;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuReservationStatus;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuReservationRepository;
@@ -144,7 +145,7 @@ class MenuReservationServiceTest {
 
     @Test
     void updateForOwner_whenPendingToActive_thenOk() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
         MenuReservation existing = reservation(1L, MenuReservationStatus.PENDING);
         when(menuReservationRepository.findById(1L)).thenReturn(Optional.of(existing));
@@ -163,7 +164,7 @@ class MenuReservationServiceTest {
 
     @Test
     void updateForOwner_whenEditReservationAt_thenOk() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
         MenuReservation existing = reservation(1L, MenuReservationStatus.ACTIVE);
         when(menuReservationRepository.findById(1L)).thenReturn(Optional.of(existing));
@@ -182,7 +183,7 @@ class MenuReservationServiceTest {
 
     @Test
     void listForOwner_whenQueryProvided_thenDelegates() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
         when(menuReservationRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(reservation(3L, MenuReservationStatus.PENDING))));
@@ -207,7 +208,7 @@ class MenuReservationServiceTest {
 
     @Test
     void updateForOwner_whenNotOwner_thenForbidden() {
-        when(securityUtils.getCurrentUserId()).thenReturn(99L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(99L);
         when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
 
         assertThatThrownBy(() -> menuReservationService.updateForOwner(
@@ -223,7 +224,7 @@ class MenuReservationServiceTest {
     private Menu publicMenu() {
         return Menu.builder()
                 .menuId(10L)
-                .userId(9L)
+                .merchantId(9L)
                 .qrId(1L)
                 .themeId("soft")
                 .businessName("Test")

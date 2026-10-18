@@ -1,21 +1,22 @@
 package com.ael.algoryqrservice.qrservice.service;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.qrservice.integration.service.IntegrationPublishService;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.client.UberEatsClient;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.client.UberEatsClientException;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.mapper.UberEatsPayloadMapper;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnectionStatus;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.dto.UberEatsDtos;
-import com.ael.algoryqrservice.qrservice.integration.ubereats.service.UberEatsConnectionService;
+import com.ael.algoryqrservice.qrservice.integration.service.ubereats.UberEatsConnectionService;
 import com.ael.algoryqrservice.qrservice.product.model.IntegrationPendingProduct;
 import com.ael.algoryqrservice.qrservice.model.enums.IntegrationJobStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.IntegrationPublishTarget;
-import com.ael.algoryqrservice.qrservice.repository.IntegrationPendingProductRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.IntegrationPendingProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
-import com.ael.algoryqrservice.qrservice.service.entitlement.FeatureUsageSyncRegistry;
-import com.ael.algoryqrservice.qrservice.service.menuindex.MenuProductIndexNotifier;
+import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductIndexNotifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,9 +49,7 @@ class IntegrationPublishServiceTest {
     @Mock
     private MenuSubCategoryRepository menuSubCategoryRepository;
     @Mock
-    private EntitlementService entitlementService;
-    @Mock
-    private FeatureUsageSyncRegistry usageSyncRegistry;
+    private ProductUsageGateway productUsageGateway;
     @Mock
     private MenuProductIndexNotifier menuProductIndexNotifier;
     @Mock
@@ -67,8 +66,7 @@ class IntegrationPublishServiceTest {
                 pendingProductRepository,
                 menuProductRepository,
                 menuSubCategoryRepository,
-                entitlementService,
-                usageSyncRegistry,
+                productUsageGateway,
                 menuProductIndexNotifier,
                 uberEatsConnectionService,
                 uberEatsClient,
@@ -100,7 +98,7 @@ class IntegrationPublishServiceTest {
         when(pendingProductRepository.findById(pendingId)).thenReturn(Optional.of(pending));
         when(uberEatsConnectionService.requireConnectedForUser(7L)).thenReturn(
                 UberEatsConnection.builder()
-                        .userId(7L)
+                        .merchantId(7L)
                         .restaurantId("store-1")
                         .status(UberEatsConnectionStatus.CONNECTED)
                         .build()
@@ -121,7 +119,6 @@ class IntegrationPublishServiceTest {
         verify(pendingProductRepository).save(captor.capture());
         assertThat(captor.getValue().getApprovalStatus()).isEqualTo(IntegrationJobStatus.PUBLISHED);
         assertThat(captor.getValue().getErrorMessage()).isNull();
-        verify(usageSyncRegistry, never()).synchronize(any(), eq(CatalogProducts.MENU_PRODUCT));
     }
 
     @Test
@@ -145,7 +142,7 @@ class IntegrationPublishServiceTest {
         when(pendingProductRepository.findById(pendingId)).thenReturn(Optional.of(pending));
         when(uberEatsConnectionService.requireConnectedForUser(7L)).thenReturn(
                 UberEatsConnection.builder()
-                        .userId(7L)
+                        .merchantId(7L)
                         .restaurantId("store-1")
                         .status(UberEatsConnectionStatus.CONNECTED)
                         .build()

@@ -1,8 +1,9 @@
 package com.ael.algoryqrservice.qrservice.service;
 
-import com.ael.algoryqrservice.qrservice.config.GoogleOAuthProperties;
-import com.ael.algoryqrservice.qrservice.model.enums.GoogleAuthErrorCode;
-import com.ael.algoryqrservice.qrservice.model.enums.GoogleAuthIntent;
+import com.ael.algoryqrservice.authservice.service.GoogleAuthRedirectService;
+import com.ael.algoryqrservice.authservice.config.GoogleOAuthProperties;
+import com.ael.algoryqrservice.authservice.application.auth.GoogleAuthErrorCode;
+import com.ael.algoryqrservice.authservice.application.auth.GoogleAuthIntent;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,9 @@ class GoogleAuthRedirectServiceTest {
     void setUp() {
         service = new GoogleAuthRedirectService(new GoogleOAuthProperties(
                 "http://localhost:3000/api/auth/google/callback",
-                Duration.ofMinutes(2)
+                Duration.ofMinutes(2),
+                null,
+                null
         ));
     }
 
@@ -58,31 +61,4 @@ class GoogleAuthRedirectServiceTest {
         );
     }
 
-    @Test
-    void targetsThisCallback_whenSameApiCallback_thenTrue() {
-        when(request.getServerName()).thenReturn("localhost");
-
-        assertThat(service.targetsThisCallback(
-                request,
-                "http://localhost:8055/google-auth/callback?error=account_not_found&intent=login"
-        )).isTrue();
-    }
-
-    @Test
-    void targetsThisCallback_whenLegacyApiCallback_thenTrue() {
-        when(request.getServerName()).thenReturn("localhost");
-
-        assertThat(service.targetsThisCallback(
-                request,
-                "http://localhost:8055/auth/google/callback?error=account_not_found&intent=login"
-        )).isTrue();
-    }
-
-    @Test
-    void targetsThisCallback_whenFrontendCallback_thenFalse() {
-        assertThat(service.targetsThisCallback(
-                request,
-                "http://localhost:3000/api/auth/google/callback?error=account_not_found&intent=login"
-        )).isFalse();
-    }
 }

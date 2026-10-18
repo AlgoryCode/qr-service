@@ -58,7 +58,7 @@ class PrintJobServiceImplTest {
     void enqueueKitchenTicket_whenPrintDisabledAndNoDevice_thenSkip() {
         when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
                 .id(4L)
-                .userId(7L)
+                .merchantId(7L)
                 .name("Sube")
                 .printKitchenEnabled(false)
                 .build()));
@@ -75,7 +75,7 @@ class PrintJobServiceImplTest {
     void enqueueKitchenTicket_whenPreferredBranchHasDevice_thenKeepPreferredBranch() {
         when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
                 .id(4L)
-                .userId(7L)
+                .merchantId(7L)
                 .name("Sube")
                 .printKitchenEnabled(false)
                 .build()));
@@ -102,7 +102,7 @@ class PrintJobServiceImplTest {
     void enqueueKitchenTicket_whenIdempotent_thenReturnExisting() {
         when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
                 .id(4L)
-                .userId(7L)
+                .merchantId(7L)
                 .name("Sube")
                 .printKitchenEnabled(true)
                 .deleted(false)
@@ -126,7 +126,7 @@ class PrintJobServiceImplTest {
     void enqueueKitchenTicket_whenEnabled_thenPersistPending() {
         when(branchRepository.findById(4L)).thenReturn(Optional.of(Branch.builder()
                 .id(4L)
-                .userId(7L)
+                .merchantId(7L)
                 .name("Sube")
                 .printKitchenEnabled(true)
                 .deleted(false)

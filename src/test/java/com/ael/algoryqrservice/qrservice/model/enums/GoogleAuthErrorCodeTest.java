@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.model.enums;
 
+import com.ael.algoryqrservice.authservice.application.auth.GoogleAuthErrorCode;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,9 +30,9 @@ class GoogleAuthErrorCodeTest {
     }
 
     @Test
-    void fromMessage_whenSessionMissing_thenMapToOauthFailed() {
+    void fromMessage_whenSessionMissing_thenMapToGoogleAuthFailed() {
         assertThat(GoogleAuthErrorCode.fromMessage(
                 "Google kimlik doğrulama oturumu bulunamadı"
-        )).isEqualTo(GoogleAuthErrorCode.OAUTH_FAILED);
+        )).isEqualTo(GoogleAuthErrorCode.GOOGLE_AUTH_FAILED);
     }
 }

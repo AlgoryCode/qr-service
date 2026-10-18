@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.billing.paymentrequestmapper.service.PaymentRequestMapper;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentCardVerificationRequest;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentThreeDsRequest;
@@ -13,11 +14,11 @@ import com.ael.algoryqrservice.qrservice.model.Product;
 import com.ael.algoryqrservice.qrservice.model.Purchase;
 import com.ael.algoryqrservice.qrservice.model.PurchaseItem;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.PaymentCardDto;
-import com.ael.algoryqrservice.qrservice.model.dto.PurchaseRequest;
+import com.ael.algoryqrservice.qrservice.billing.dto.PaymentCardDto;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseRequest;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingAddressType;
 import com.ael.algoryqrservice.qrservice.catalog.CatalogPackages;
-import com.ael.algoryqrservice.qrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.qrservice.model.enums.PaymentMode;
 import com.ael.algoryqrservice.qrservice.model.enums.PaymentStyle;
@@ -115,7 +116,7 @@ class PaymentRequestMapperTest {
         assertThat(result.getBillingAddress().getContactName()).isEqualTo("Musteri");
         assertThat(result.getBuyer().getIdentityNumber()).isEqualTo("12345678901");
         assertThat(result.getBuyer().getGsmNumber()).isEqualTo("5551112233");
-        assertThat(result.getSourceMetadata().get("userId")).isEqualTo(7L);
+        assertThat(result.getSourceMetadata().get("merchantId")).isEqualTo(7L);
     }
 
     @Test
@@ -207,7 +208,7 @@ class PaymentRequestMapperTest {
         assertThat(result.getPaymentGroup()).isEqualTo("SUBSCRIPTION");
         assertThat(result.getConversationId()).isEqualTo("conversation");
         assertThat(result.getBuyer().getIdentityNumber()).isEqualTo("12345678901");
-        assertThat(result.getSourceMetadata().get("userId")).isEqualTo(7L);
+        assertThat(result.getSourceMetadata().get("merchantId")).isEqualTo(7L);
     }
 
     @Test
@@ -441,50 +442,6 @@ class PaymentRequestMapperTest {
         assertThat(result.getSourceMetadata().get("planChange")).isEqualTo(true);
         assertThat(result.getSourceMetadata().get("planChangeDifference")).isEqualTo(true);
         assertThat(result.getSourceMetadata().get("totalAmount")).isEqualTo(new BigDecimal("80.00"));
-    }
-
-    @Test
-    void toCardVerificationRequest_whenValid_thenForceNominalMetadataAndNoBasket() {
-        BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
-                .name("Ada").surname("Lovelace").country("TR").city("İstanbul")
-                .address("Adres").postcode("34000").tckn("12345678901").phone("5551112233").build();
-        User user = User.builder().id(7L).firstName("Ada").lastName("Lovelace")
-                .email("ada@example.com").phone("5551112233").build();
-
-        PaymentCardVerificationRequest result = mapper.toCardVerificationRequest(
-                user, snapshot, "127.0.0.1", new AppProperties(), "qr-card-verification-7-abcdef12"
-        );
-
-        assertThat(result.getConversationId()).isEqualTo("qr-card-verification-7-abcdef12");
-        assertThat(result.getSourceReferenceId()).isEqualTo("7");
-        assertThat(result.getCurrency()).isEqualTo("TRY");
-        assertThat(result.getLocale()).isEqualTo("tr");
-        assertThat(result.getBuyer().getIdentityNumber()).isEqualTo("12345678901");
-        assertThat(result.getBillingAddress().getCity()).isEqualTo("İstanbul");
-    }
-
-    @Test
-    void toCardVerificationRequest_whenIdentityMissing_thenUseDefaultIdentity() {
-        BillingSnapshot snapshot = BillingSnapshot.builder().type(BillingAddressType.INDIVIDUAL)
-                .phone("5551112233").build();
-        User user = User.builder().id(7L).firstName("Ada").lastName("Lovelace")
-                .email("ada@example.com").build();
-
-        PaymentCardVerificationRequest result = mapper.toCardVerificationRequest(
-                user, snapshot, "127.0.0.1", new AppProperties(), "conv"
-        );
-
-        assertThat(result.getBuyer().getIdentityNumber()).isEqualTo(IdentityNumbers.DEFAULT);
-    }
-
-    @Test
-    void buildCardVerificationConversationId_whenCalledTwice_thenReturnUniqueValuesWithUserPrefix() {
-        String first = mapper.buildCardVerificationConversationId(7L);
-        String second = mapper.buildCardVerificationConversationId(7L);
-
-        assertThat(first).matches("^qrcardv7\\d{14}[a-f0-9]{4}$");
-        assertThat(second).matches("^qrcardv7\\d{14}[a-f0-9]{4}$");
-        assertThat(first).isNotEqualTo(second);
     }
 
     @Test

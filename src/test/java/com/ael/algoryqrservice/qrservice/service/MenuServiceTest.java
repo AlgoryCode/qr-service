@@ -1,5 +1,20 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.ServesPeopleSupport;
+import com.ael.algoryqrservice.qrservice.qr.service.QrGenerationService;
+import com.ael.algoryqrservice.qrservice.product.service.ProductImageStorageService;
+import com.ael.algoryqrservice.qrservice.menu.service.NutritionFactsService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuTaxonomyService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuQrSoftDeleteService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuPublicIdGenerator;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuPublicAccessService;
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductPairingService;
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductOptionService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCategoryService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCatalogCloneService;
+import com.ael.algoryqrservice.qrservice.menu.service.ChefAvatarService;
+import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 import com.ael.algoryqrservice.qrservice.config.AppProperties;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
@@ -7,13 +22,13 @@ import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.model.MenuTag;
-import com.ael.algoryqrservice.qrservice.model.Qr;
+import com.ael.algoryqrservice.qrservice.qr.model.Qr;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.qrservice.model.dto.CampaignDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.ProductImageDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.QrRequest;
-import com.ael.algoryqrservice.qrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.qrservice.campaign.dto.CampaignDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.product.dto.ProductImageDtos;
+import com.ael.algoryqrservice.qrservice.qr.dto.QrRequest;
+import com.ael.algoryqrservice.qrservice.menu.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuPublicAccessDisabledReason;
 import com.ael.algoryqrservice.qrservice.model.enums.NutritionBasis;
@@ -21,15 +36,15 @@ import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionNutrientEntry;
 import com.ael.algoryqrservice.qrservice.model.User;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.repository.QrRepository;
+import com.ael.algoryqrservice.qrservice.qr.repository.QrRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import com.ael.algoryqrservice.qrservice.service.campaign.CampaignService;
-import com.ael.algoryqrservice.qrservice.service.entitlement.FeatureUsageSyncRegistry;
-import com.ael.algoryqrservice.qrservice.service.menuindex.MenuProductIndexNotifier;
+import com.ael.algoryqrservice.qrservice.campaign.service.CampaignService;
+import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductIndexNotifier;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -90,9 +105,7 @@ class MenuServiceTest {
     @Mock
     private ChefAvatarService chefAvatarService;
     @Mock
-    private EntitlementService entitlementService;
-    @Mock
-    private FeatureUsageSyncRegistry usageSyncRegistry;
+    private ProductUsageGateway productUsageGateway;
     @Mock
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
     @Mock
@@ -101,8 +114,6 @@ class MenuServiceTest {
     private MenuProductIndexNotifier menuProductIndexNotifier;
     @Mock
     private BranchService branchService;
-    @Mock
-    private BranchQuotaService branchQuotaService;
     @Mock
     private BranchRepository branchRepository;
     @Mock
@@ -119,7 +130,7 @@ class MenuServiceTest {
 
     @BeforeEach
     void stubCurrentUser() {
-        org.mockito.Mockito.lenient().when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        org.mockito.Mockito.lenient().when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         org.mockito.Mockito.lenient().when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
         org.mockito.Mockito.lenient().when(menuProductPairingService.load(any()))
                 .thenReturn(emptyPairings());
@@ -139,7 +150,7 @@ class MenuServiceTest {
 
     @Test
     void createMenuForQr_whenSloganAndProductsProvided_thenPersistAll() {
-        Qr qr = Qr.builder().qrId(42L).userId(7L).build();
+        Qr qr = Qr.builder().qrId(42L).merchantId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
         details.put("branchId", 3L);
@@ -181,7 +192,6 @@ class MenuServiceTest {
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
         when(nutritionFactsService.parseFromRaw(nutrition)).thenReturn(parsedNutrition);
         when(menuProductRepository.save(any(MenuProduct.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        doNothing().when(entitlementService).assertMenuProductCreationAllowed(7L, 1);
 
         Menu saved = menuService.createMenuForQr(qr, request);
 
@@ -204,7 +214,7 @@ class MenuServiceTest {
 
     @Test
     void createMenuForQr_whenProductMissingSubCategoryId_thenThrow() {
-        Qr qr = Qr.builder().qrId(42L).userId(7L).build();
+        Qr qr = Qr.builder().qrId(42L).merchantId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
         details.put("branchId", 3L);
@@ -226,7 +236,7 @@ class MenuServiceTest {
 
     @Test
     void createMenuForQr_whenSourceMenuIdProvided_thenDelegateToCatalogClone() {
-        Qr qr = Qr.builder().qrId(50L).userId(7L).build();
+        Qr qr = Qr.builder().qrId(50L).merchantId(7L).build();
         Map<String, Object> details = new HashMap<>();
         details.put("themeId", "soft");
         details.put("branchId", 3L);
@@ -254,9 +264,9 @@ class MenuServiceTest {
 
     @Test
     void createProduct_whenChefRecommendedTrue_thenSetFlagAndTag() {
-        Menu menu = Menu.builder().menuId(10L).userId(7L).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         when(menuCategoryService.requireSubCategory(any(), eq(16L)))
                 .thenReturn(MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
         when(menuTaxonomyService.findTagBySlug(MenuTaxonomyService.CHEF_RECOMMENDED_TAG_SLUG))
@@ -301,7 +311,7 @@ class MenuServiceTest {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
@@ -320,7 +330,7 @@ class MenuServiceTest {
 
     @Test
     void createProduct_whenNutritionMissing_thenThrow() {
-        Menu menu = Menu.builder().menuId(10L).userId(7L).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
 
         MenuDtos.MenuProductRequest request = MenuDtos.MenuProductRequest.builder()
@@ -338,7 +348,7 @@ class MenuServiceTest {
 
     @Test
     void createProduct_whenSubCategoryIdMissing_thenThrow() {
-        Menu menu = Menu.builder().menuId(10L).userId(7L).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
 
         MenuDtos.MenuProductRequest request = MenuDtos.MenuProductRequest.builder()
@@ -368,7 +378,7 @@ class MenuServiceTest {
                 .available(true)
                 .nutrition(existing)
                 .build();
-        Menu menu = Menu.builder().menuId(10L).userId(7L).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).build();
         NutritionFacts patch = NutritionFacts.builder().salt(new BigDecimal("1.4")).build();
         NutritionFacts merged = sampleNutrition();
         merged.setSalt(new BigDecimal("1.4"));
@@ -413,7 +423,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
@@ -437,7 +447,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
@@ -448,7 +458,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
@@ -469,7 +479,7 @@ class MenuServiceTest {
         verify(menuPublicAccessService).syncForMerchant(7L);
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
         assertThat(response.getMenu().getPublicId()).isEqualTo("pub-test");
-        assertThat(response.getMenu().getPublicUrl()).isEqualTo("https://example.com/menu/pub-test");
+        assertThat(response.getMenu().getPublicUrl()).isEqualTo("https://example.com/pub-test");
     }
 
     @Test
@@ -478,7 +488,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
@@ -514,7 +524,7 @@ class MenuServiceTest {
 
     @Test
     void listProducts_whenMoreThanPageSize_thenReturnHasNext() {
-        Menu menu = Menu.builder().menuId(10L).userId(7L).active(true).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).active(true).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
         when(menuCategoryService.loadSubCategoryMap(any())).thenReturn(Map.of());
         when(menuCategoryService.loadCategoryMap(any())).thenReturn(Map.of());
@@ -554,7 +564,7 @@ class MenuServiceTest {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .active(true)
                 .publicAccessEnabled(true)
                 .build();
@@ -593,7 +603,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
@@ -646,7 +656,7 @@ class MenuServiceTest {
         Menu menu = Menu.builder()
                 .menuId(10L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("soft")
                 .businessName("Kafe")
                 .active(true)
@@ -703,9 +713,9 @@ class MenuServiceTest {
 
     @Test
     void createProduct_whenAllergenIdsProvided_thenHydrateAllergens() {
-        Menu menu = Menu.builder().menuId(10L).userId(7L).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         when(menuCategoryService.requireSubCategory(any(), eq(16L)))
                 .thenReturn(MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
@@ -746,9 +756,9 @@ class MenuServiceTest {
 
     @Test
     void createProduct_whenInvalidAllergenId_thenBadRequest() {
-        Menu menu = Menu.builder().menuId(10L).userId(7L).build();
+        Menu menu = Menu.builder().menuId(10L).merchantId(7L).build();
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         when(menuCategoryService.requireSubCategory(any(), eq(16L)))
                 .thenReturn(MenuSubCategory.builder().id(16L).menuCategoryId(5L).slug("et_yemekleri").name("Et").sortOrder(1).build());
         when(menuTaxonomyService.findTagBySlug(any())).thenReturn(Optional.empty());
@@ -773,7 +783,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("lilas-doux")
                 .businessName("IYB")
                 .active(true)
@@ -803,7 +813,7 @@ class MenuServiceTest {
                 .menuId(10L)
                 .qrId(2L)
                 .publicId("pub-test")
-                .userId(7L)
+                .merchantId(7L)
                 .themeId("lilas-doux")
                 .businessName("IYB")
                 .coverUrl("https://cdn/menus/10/cover/a.png")

@@ -1,10 +1,11 @@
 package com.ael.algoryqrservice.qrservice.controller;
 
-import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.BillingAddressDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.BillingAddressPageResponse;
+import com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController;
+
+import com.ael.algoryqrservice.qrservice.billing.dto.BillingAddressDtos;
+import com.ael.algoryqrservice.qrservice.billing.dto.BillingAddressPageResponse;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingAddressType;
-import com.ael.algoryqrservice.qrservice.service.BillingAddressService;
+import com.ael.algoryqrservice.qrservice.billing.service.BillingAddressService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,7 @@ class BillingAddressControllerTest {
     void list_whenAuthenticated_thenUseCurrentUserOwnershipBoundary() {
         BillingAddressService service = mock(BillingAddressService.class);
         SecurityUtils securityUtils = mock(SecurityUtils.class);
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         BillingAddressDtos.Response response = sampleResponse(4L, true);
         BillingAddressPageResponse page = BillingAddressPageResponse.builder()
                 .content(List.of(response))
@@ -41,7 +42,7 @@ class BillingAddressControllerTest {
     void get_whenAuthenticated_thenDelegateWithCurrentUser() {
         BillingAddressService service = mock(BillingAddressService.class);
         SecurityUtils securityUtils = mock(SecurityUtils.class);
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         BillingAddressDtos.Response response = sampleResponse(4L, true);
         when(service.get(7L, 4L)).thenReturn(response);
         BillingAddressController controller = new BillingAddressController(service, securityUtils);
@@ -56,7 +57,7 @@ class BillingAddressControllerTest {
     void makeDefault_whenAuthenticated_thenDelegateWithCurrentUser() {
         BillingAddressService service = mock(BillingAddressService.class);
         SecurityUtils securityUtils = mock(SecurityUtils.class);
-        when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(7L).build());
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         BillingAddressDtos.Response response = sampleResponse(4L, true);
         when(service.makeDefault(7L, 4L)).thenReturn(response);
         BillingAddressController controller = new BillingAddressController(service, securityUtils);

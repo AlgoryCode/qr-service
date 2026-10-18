@@ -1,9 +1,10 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.branch.service.RestaurantAreaService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.RestaurantArea;
-import com.ael.algoryqrservice.qrservice.model.dto.RestaurantAreaDtos;
+import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantAreaDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantAreaRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
@@ -44,10 +45,10 @@ class RestaurantAreaServiceTest {
     void owner() {
         Menu menu = new Menu();
         menu.setMenuId(8L);
-        menu.setUserId(3L);
+        menu.setMerchantId(3L);
         menu.setDeleted(false);
         when(menuRepository.findById(8L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUserId()).thenReturn(3L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(3L);
     }
 
     @Test

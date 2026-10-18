@@ -1,12 +1,15 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.account.service.SessionContextAssembler;
+
+import com.ael.algoryqrservice.qrservice.account.service.SessionContextService;
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.qrservice.client.PackageView;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.qrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.SessionContextResponse;
+import com.ael.algoryqrservice.qrservice.account.dto.SessionContextResponse;
 import com.ael.algoryqrservice.qrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.model.enums.UserRole;
@@ -16,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -38,7 +40,7 @@ class SessionContextServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private ObjectProvider<FulfillmentServiceClient> fulfillmentClients;
+    private com.ael.algoryqrservice.qrservice.client.AuthMerchantClient authMerchantClient;
     @Mock
     private FulfillmentServiceClient fulfillmentClient;
 
@@ -46,9 +48,8 @@ class SessionContextServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SessionContextService(userRepository, fulfillmentClients, new SessionContextAssembler());
+        service = new SessionContextService(userRepository, authMerchantClient, fulfillmentClient, new SessionContextAssembler());
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user()));
-        when(fulfillmentClients.getIfAvailable()).thenReturn(fulfillmentClient);
     }
 
     @Test

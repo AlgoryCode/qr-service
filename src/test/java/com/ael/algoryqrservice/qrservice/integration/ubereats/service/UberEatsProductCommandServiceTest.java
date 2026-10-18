@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.integration.ubereats.service;
 
+import com.ael.algoryqrservice.qrservice.integration.service.ubereats.UberEatsProductCommandService;
+import com.ael.algoryqrservice.qrservice.integration.service.ubereats.UberEatsConnectionService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.client.UberEatsClient;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.mapper.UberEatsPayloadMapper;

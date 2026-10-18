@@ -2,7 +2,7 @@ package com.ael.algoryqrservice.qrservice.coupon;
 
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Coupon;
-import com.ael.algoryqrservice.qrservice.model.dto.CouponDtos;
+import com.ael.algoryqrservice.qrservice.billing.dto.CouponDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.CouponDiscountType;
 import com.ael.algoryqrservice.qrservice.model.enums.CouponStatus;
 import com.ael.algoryqrservice.qrservice.repository.CouponLogRepository;

@@ -1,10 +1,16 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.product.service.ProductImageStorageService;
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductPairingService;
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductOptionService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCategoryService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCatalogCloneService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.service.entitlement.FeatureUsageSyncRegistry;
+import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.store.model.Merchant;
 import com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository;
 import org.junit.jupiter.api.Test;
@@ -46,9 +52,7 @@ class MenuCatalogCloneServiceTest {
     @Mock
     private ProductImageStorageService productImageStorageService;
     @Mock
-    private EntitlementService entitlementService;
-    @Mock
-    private FeatureUsageSyncRegistry usageSyncRegistry;
+    private ProductUsageGateway productUsageGateway;
     @Mock
     private MerchantRepository merchantRepository;
 
@@ -57,8 +61,8 @@ class MenuCatalogCloneServiceTest {
 
     @Test
     void cloneInto_whenSourceHasProducts_thenCopyCatalog() {
-        Menu target = Menu.builder().menuId(99L).userId(7L).build();
-        Menu source = Menu.builder().menuId(12L).userId(7L).active(true).deleted(false).build();
+        Menu target = Menu.builder().menuId(99L).merchantId(7L).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(7L).active(true).deleted(false).build();
         MenuProduct sourceProduct = MenuProduct.builder()
                 .productId(100L)
                 .menuId(12L)
@@ -88,7 +92,7 @@ class MenuCatalogCloneServiceTest {
         int copied = menuCatalogCloneService.cloneInto(target, 12L, 7L);
 
         assertThat(copied).isEqualTo(1);
-        verify(entitlementService).assertMenuProductCreationAllowed(7L, 1);
+        verify(productUsageGateway).use(7L, CatalogProducts.MENU_PRODUCT, 1);
 
         ArgumentCaptor<MenuProduct> productCaptor = ArgumentCaptor.forClass(MenuProduct.class);
         verify(menuProductRepository, times(1)).saveAndFlush(productCaptor.capture());
@@ -107,7 +111,7 @@ class MenuCatalogCloneServiceTest {
     @Test
     void mirrorOptionsToStoreCatalog_whenMerchantHasMatchingProduct_thenOverwrite() {
         Merchant merchant = Merchant.builder().catalogMenuId(99L).build();
-        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.of(merchant));
+        when(merchantRepository.findByOwnerMerchantIdAndDeletedFalse(7L)).thenReturn(Optional.of(merchant));
         when(menuProductRepository.findByMenuIdAndNameIgnoreCaseAndDeletedFalse(99L, "Latte"))
                 .thenReturn(List.of(MenuProduct.builder().productId(500L).name("Latte").build()));
 
@@ -119,7 +123,7 @@ class MenuCatalogCloneServiceTest {
     @Test
     void mirrorOptionsToStoreCatalog_whenSourceIsStoreCatalog_thenSkip() {
         Merchant merchant = Merchant.builder().catalogMenuId(12L).build();
-        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.of(merchant));
+        when(merchantRepository.findByOwnerMerchantIdAndDeletedFalse(7L)).thenReturn(Optional.of(merchant));
 
         menuCatalogCloneService.mirrorOptionsToStoreCatalog(7L, 12L, 100L, "Latte");
 
@@ -128,8 +132,8 @@ class MenuCatalogCloneServiceTest {
 
     @Test
     void cloneInto_whenSourceMenuNotOwned_thenThrow() {
-        Menu target = Menu.builder().menuId(99L).userId(7L).build();
-        Menu source = Menu.builder().menuId(12L).userId(99L).active(true).deleted(false).build();
+        Menu target = Menu.builder().menuId(99L).merchantId(7L).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(99L).active(true).deleted(false).build();
         when(menuRepository.findById(12L)).thenReturn(Optional.of(source));
 
         assertThatThrownBy(() -> menuCatalogCloneService.cloneInto(target, 12L, 7L))
@@ -139,8 +143,8 @@ class MenuCatalogCloneServiceTest {
 
     @Test
     void cloneInto_whenSourceMenuInactive_thenThrow() {
-        Menu target = Menu.builder().menuId(99L).userId(7L).build();
-        Menu source = Menu.builder().menuId(12L).userId(7L).active(false).deleted(false).build();
+        Menu target = Menu.builder().menuId(99L).merchantId(7L).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(7L).active(false).deleted(false).build();
         when(menuRepository.findById(12L)).thenReturn(Optional.of(source));
 
         assertThatThrownBy(() -> menuCatalogCloneService.cloneInto(target, 12L, 7L))
@@ -150,20 +154,20 @@ class MenuCatalogCloneServiceTest {
 
     @Test
     void cloneInto_whenSourceHasNoProducts_thenSkipTaxonomyClone() {
-        Menu target = Menu.builder().menuId(99L).userId(7L).build();
-        Menu source = Menu.builder().menuId(12L).userId(7L).active(true).deleted(false).build();
+        Menu target = Menu.builder().menuId(99L).merchantId(7L).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(7L).active(true).deleted(false).build();
         when(menuRepository.findById(12L)).thenReturn(Optional.of(source));
         when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
                 .thenReturn(List.of());
 
         assertThat(menuCatalogCloneService.cloneInto(target, 12L, 7L)).isZero();
-        verifyNoInteractions(menuCategoryService, menuProductPairingService, menuProductOptionService, usageSyncRegistry);
+        verifyNoInteractions(menuCategoryService, menuProductPairingService, menuProductOptionService, productUsageGateway);
     }
 
     @Test
     void cloneInto_whenSubCategoryMissingInTarget_thenThrow() {
-        Menu target = Menu.builder().menuId(99L).userId(7L).build();
-        Menu source = Menu.builder().menuId(12L).userId(7L).active(true).deleted(false).build();
+        Menu target = Menu.builder().menuId(99L).merchantId(7L).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(7L).active(true).deleted(false).build();
         MenuProduct orphan = MenuProduct.builder()
                 .productId(100L)
                 .menuId(12L)
@@ -185,7 +189,7 @@ class MenuCatalogCloneServiceTest {
 
     @Test
     void countCloneableProducts_whenSourceOwned_thenReturnCount() {
-        Menu source = Menu.builder().menuId(12L).userId(7L).active(true).deleted(false).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(7L).active(true).deleted(false).build();
         when(menuRepository.findById(12L)).thenReturn(Optional.of(source));
         when(menuProductRepository.findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(12L))
                 .thenReturn(List.of(MenuProduct.builder().productId(1L).build()));
@@ -195,8 +199,8 @@ class MenuCatalogCloneServiceTest {
 
     @Test
     void cloneFromTemplate_whenOwnedByTemplateUser_thenCopiesImageUrl() {
-        Menu target = Menu.builder().menuId(99L).userId(7L).build();
-        Menu source = Menu.builder().menuId(12L).userId(1L).active(true).deleted(false).build();
+        Menu target = Menu.builder().menuId(99L).merchantId(7L).build();
+        Menu source = Menu.builder().menuId(12L).merchantId(1L).active(true).deleted(false).build();
         MenuProduct sourceProduct = MenuProduct.builder()
                 .productId(100L)
                 .menuId(12L)

@@ -1,29 +1,34 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.analytics.service.WaiterPerformanceReportService;
+import com.ael.algoryqrservice.qrservice.analytics.service.MenuFixedExpenseService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuFeedbackService;
+import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
+import com.ael.algoryqrservice.qrservice.analytics.service.AnalyticsService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.qrservice.model.MenuAnalyticsEvent;
 import com.ael.algoryqrservice.qrservice.model.MenuAnalyticsSession;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
-import com.ael.algoryqrservice.qrservice.model.TableBillItem;
-import com.ael.algoryqrservice.qrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBillItem;
+import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuAnalyticsEventType;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsOrderRepository;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuAnalyticsSessionRepository;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductVisitRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductVisitRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuVisitRepository;
@@ -308,7 +313,7 @@ class AnalyticsServiceTest {
                         .build()));
         when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
-        when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
+        when(uberEatsConnectionRepository.findByMerchantId(ownerId)).thenReturn(Optional.empty());
 
         TableBill bill = TableBill.builder().id(20L).menuId(menuId).currency("TRY").build();
         TableBillItem ayran = TableBillItem.builder()
@@ -367,8 +372,8 @@ class AnalyticsServiceTest {
 
         UberEatsConnection connection = new UberEatsConnection();
         connection.setId(42L);
-        connection.setUserId(ownerId);
-        when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.of(connection));
+        connection.setMerchantId(ownerId);
+        when(uberEatsConnectionRepository.findByMerchantId(ownerId)).thenReturn(Optional.of(connection));
         var order = com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsOrder.builder()
                 .id(1L)
                 .connectionId(42L)
@@ -462,7 +467,7 @@ class AnalyticsServiceTest {
         second.setBranchId(branchId);
         second.setBusinessName("Aksam");
         when(branchService.requireOwnedForMerchant(branchId, ownerId))
-                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+                .thenReturn(Branch.builder().id(branchId).merchantId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L, 6L)), any(), any())).thenReturn(10L);
         when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(
@@ -516,7 +521,7 @@ class AnalyticsServiceTest {
         Menu second = publicMenu(6L, ownerId);
         second.setBranchId(branchId);
         when(branchService.requireOwnedForMerchant(branchId, ownerId))
-                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+                .thenReturn(Branch.builder().id(branchId).merchantId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(3L);
         when(eventRepository.countByMenuIdInAndEventTypeAndOccurredAtBetween(any(), any(), any(), any())).thenReturn(0L);
@@ -553,7 +558,7 @@ class AnalyticsServiceTest {
         Long ownerId = 9L;
         Long branchId = 2L;
         when(branchService.requireOwnedForMerchant(branchId, ownerId))
-                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+                .thenReturn(Branch.builder().id(branchId).merchantId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(publicMenu(5L, ownerId)));
 
         assertThatThrownBy(() -> service.getBranchReport(
@@ -573,14 +578,14 @@ class AnalyticsServiceTest {
         Menu second = publicMenu(6L, ownerId);
         second.setBranchId(branchId);
         when(branchService.requireOwnedForMerchant(branchId, ownerId))
-                .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
+                .thenReturn(Branch.builder().id(branchId).merchantId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))
                 .thenReturn(List.of());
         when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
         when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L, 6L))).thenReturn(BigDecimal.ZERO);
-        when(uberEatsConnectionRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
+        when(uberEatsConnectionRepository.findByMerchantId(ownerId)).thenReturn(Optional.empty());
         TableBill bill = TableBill.builder().id(20L).menuId(5L).currency("TRY").build();
         TableBillItem item = TableBillItem.builder()
                 .id(1L).productId(1L).productName("Ayran").quantity(1).paidQuantity(1).build();
@@ -598,7 +603,7 @@ class AnalyticsServiceTest {
     private Menu publicMenu(Long menuId, Long ownerId) {
         return Menu.builder()
                 .menuId(menuId)
-                .userId(ownerId)
+                .merchantId(ownerId)
                 .qrId(1L)
                 .themeId("soft")
                 .businessName("Test")

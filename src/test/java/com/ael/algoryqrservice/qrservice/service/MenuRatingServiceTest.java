@@ -1,8 +1,9 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.MenuRatingService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuRating;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuRatingRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import org.junit.jupiter.api.Test;

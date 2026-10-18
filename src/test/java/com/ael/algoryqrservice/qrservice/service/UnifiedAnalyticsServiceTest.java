@@ -1,10 +1,14 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.analytics.service.UnifiedAnalyticsService;
+import com.ael.algoryqrservice.qrservice.analytics.service.UnifiedAnalyticsAggregates;
+import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
+import com.ael.algoryqrservice.qrservice.analytics.service.AnalyticsService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
-import com.ael.algoryqrservice.qrservice.model.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

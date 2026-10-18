@@ -4,7 +4,6 @@ import com.ael.algoryqrservice.authservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.SessionEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.SessionJpaRepository;
 import com.ael.algoryqrservice.authservice.util.ClientInfo;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class TokenUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(TokenUseCase.class);
@@ -24,6 +22,20 @@ public class TokenUseCase {
     private final SubjectLoader subjectLoader;
     private final AuthResponseAssembler assembler;
     private final MerchantPackageGate merchantPackageGate;
+
+    public TokenUseCase(
+            SessionJpaRepository sessionRepository,
+            SessionIssuer sessionIssuer,
+            SubjectLoader subjectLoader,
+            AuthResponseAssembler assembler,
+            MerchantPackageGate merchantPackageGate
+    ) {
+        this.sessionRepository = sessionRepository;
+        this.sessionIssuer = sessionIssuer;
+        this.subjectLoader = subjectLoader;
+        this.assembler = assembler;
+        this.merchantPackageGate = merchantPackageGate;
+    }
 
     @AuthTransactional
     public Map<String, Object> create(AuthSubject subject, ClientInfo clientInfo) {

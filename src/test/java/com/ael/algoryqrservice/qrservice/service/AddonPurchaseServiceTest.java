@@ -1,6 +1,13 @@
 package com.ael.algoryqrservice.qrservice.service;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseLogService;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseFulfillmentService;
+import com.ael.algoryqrservice.qrservice.billing.service.entitlement.PurchaseExpiryService;
+import com.ael.algoryqrservice.qrservice.billing.paymentrequestmapper.service.PaymentRequestMapper;
+import com.ael.algoryqrservice.qrservice.billing.service.PackagePricingService;
+import com.ael.algoryqrservice.qrservice.billing.service.BillingAddressService;
+import com.ael.algoryqrservice.qrservice.billing.service.AddonPurchaseService;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
@@ -8,13 +15,13 @@ import com.ael.algoryqrservice.qrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.qrservice.model.Product;
 import com.ael.algoryqrservice.qrservice.model.Purchase;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.AddonPurchaseRequest;
-import com.ael.algoryqrservice.qrservice.model.dto.PurchaseInitiateResponse;
+import com.ael.algoryqrservice.qrservice.billing.dto.AddonPurchaseRequest;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseInitiateResponse;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingAddressType;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseType;
-import com.ael.algoryqrservice.qrservice.repository.ProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.ProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.PurchaseItemRepository;
 import com.ael.algoryqrservice.qrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.qrservice.util.AppTime;
@@ -67,7 +74,7 @@ class AddonPurchaseServiceTest {
     @Mock
     private com.ael.algoryqrservice.qrservice.config.PaymentClientProperties paymentClientProperties;
     @Mock
-    private com.ael.algoryqrservice.qrservice.service.entitlement.PurchaseExpiryService purchaseExpiryService;
+    private PurchaseExpiryService purchaseExpiryService;
 
     @InjectMocks
     private AddonPurchaseService addonPurchaseService;
@@ -99,7 +106,7 @@ class AddonPurchaseServiceTest {
                 .build();
         Purchase host = Purchase.builder()
                 .id(3L)
-                .userId(9L)
+                .merchantId(9L)
                 .packageId(22L)
                 .packageCode("PRO_PACKAGE")
                 .purchaseType(PurchaseType.PAID)
@@ -108,7 +115,7 @@ class AddonPurchaseServiceTest {
                 .startsAt(LocalDateTime.of(2026, 8, 1, 0, 0))
                 .expiresAt(LocalDateTime.of(2027, 8, 24, 0, 0))
                 .build();
-        when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
+        when(purchaseRepository.findByMerchantIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
         when(productRepository.findByCode(CatalogProducts.SMART_ASSISTANT)).thenReturn(Optional.of(product));
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
@@ -121,7 +128,7 @@ class AddonPurchaseServiceTest {
         AddonPurchaseRequest request = new AddonPurchaseRequest();
         request.setProductCode(CatalogProducts.QR_MENU);
         request.setBillingAddressId(1L);
-        when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
+        when(purchaseRepository.findByMerchantIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of());
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
                 .isInstanceOf(BadRequestException.class)
@@ -135,7 +142,7 @@ class AddonPurchaseServiceTest {
         request.setBillingAddressId(1L);
         Purchase addon = Purchase.builder()
                 .id(5L)
-                .userId(9L)
+                .merchantId(9L)
                 .packageId(3L)
                 .packageCode(CatalogProducts.QR_MENU)
                 .purchaseType(PurchaseType.ADD_ON)
@@ -143,7 +150,7 @@ class AddonPurchaseServiceTest {
                 .startsAt(LocalDateTime.of(2026, 8, 1, 0, 0))
                 .expiresAt(LocalDateTime.of(2027, 8, 24, 0, 0))
                 .build();
-        when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(addon));
+        when(purchaseRepository.findByMerchantIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(addon));
 
         assertThatThrownBy(() -> addonPurchaseService.purchase(user(), request, "127.0.0.1"))
                 .isInstanceOf(BadRequestException.class)
@@ -167,7 +174,7 @@ class AddonPurchaseServiceTest {
                 .build();
         Purchase host = Purchase.builder()
                 .id(3L)
-                .userId(9L)
+                .merchantId(9L)
                 .packageId(22L)
                 .packageCode("PRO_PACKAGE")
                 .purchaseType(PurchaseType.PAID)
@@ -203,7 +210,7 @@ class AddonPurchaseServiceTest {
         checkoutFormResponse.setPaymentPageUrl("https://paytr.com/pay");
 
         when(productRepository.findByCode(CatalogProducts.QR_MENU)).thenReturn(Optional.of(product));
-        when(purchaseRepository.findByUserIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
+        when(purchaseRepository.findByMerchantIdAndStatus(9L, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
         when(billingAddressService.resolveSnapshot(9L, 1L, null)).thenReturn(billingSnapshot);
         when(packagePricingService.calculateProduct(product, 1)).thenReturn(line);
         when(paymentRequestMapper.newPaymentAttemptId(9L)).thenReturn("conv-addon-1");

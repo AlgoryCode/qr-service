@@ -1,22 +1,23 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.integration.service.IntegrationExportService;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.client.UberEatsClient;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.mapper.UberEatsPayloadMapper;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnection;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnectionStatus;
-import com.ael.algoryqrservice.qrservice.integration.ubereats.service.UberEatsConnectionService;
+import com.ael.algoryqrservice.qrservice.integration.service.ubereats.UberEatsConnectionService;
 import com.ael.algoryqrservice.qrservice.messaging.IntegrationMessagePublisher;
 import com.ael.algoryqrservice.qrservice.model.IntegrationJob;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuCategory;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
-import com.ael.algoryqrservice.qrservice.model.dto.IntegrationPendingProductDtos;
+import com.ael.algoryqrservice.qrservice.integration.dto.IntegrationPendingProductDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.IntegrationDirection;
 import com.ael.algoryqrservice.qrservice.model.enums.IntegrationJobStatus;
 import com.ael.algoryqrservice.qrservice.repository.IntegrationJobRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuCategoryRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -84,15 +85,15 @@ class IntegrationExportServiceTest {
     void exportToUberEats_whenMenuHasProducts_thenEnqueuesExportSnapshot() {
         Menu menu = Menu.builder()
                 .menuId(10L)
-                .userId(5L)
+                .merchantId(5L)
                 .businessName("Cafe")
                 .deleted(false)
                 .build();
-        when(securityUtils.getCurrentUserId()).thenReturn(5L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(5L);
         when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
         when(uberEatsConnectionService.requireConnected()).thenReturn(
                 UberEatsConnection.builder()
-                        .userId(5L)
+                        .merchantId(5L)
                         .restaurantId("r-1")
                         .status(UberEatsConnectionStatus.CONNECTED)
                         .build()

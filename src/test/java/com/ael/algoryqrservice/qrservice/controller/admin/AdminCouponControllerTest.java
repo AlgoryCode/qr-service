@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.qrservice.controller.admin;
 
+import com.ael.algoryqrservice.adminservice.presentation.controller.AdminCouponController;
+
 import com.ael.algoryqrservice.qrservice.coupon.CouponUseCases;
-import com.ael.algoryqrservice.qrservice.model.DashboardUser;
-import com.ael.algoryqrservice.qrservice.model.dto.CouponDtos;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.DashboardUser;
+import com.ael.algoryqrservice.qrservice.billing.dto.CouponDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.CouponDiscountType;
 import com.ael.algoryqrservice.qrservice.model.enums.CouponStatus;
-import com.ael.algoryqrservice.qrservice.util.DashboardSecurityUtils;
+import com.ael.algoryqrservice.adminservice.application.DashboardSecurityUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

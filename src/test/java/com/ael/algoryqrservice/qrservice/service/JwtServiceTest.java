@@ -1,12 +1,14 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
+
 import com.ael.algoryqrservice.qrservice.catalog.CatalogPackages;
-import com.ael.algoryqrservice.qrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.config.JwtProperties;
 import com.ael.algoryqrservice.qrservice.model.dto.UserAccessProfile;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
-import com.ael.algoryqrservice.qrservice.model.enums.DashboardRole;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.enums.DashboardRole;
 import com.ael.algoryqrservice.qrservice.model.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
@@ -17,35 +19,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
-
-    @Test
-    void generateAccessToken_whenProfileProvided_thenIncludePackageProductAndScopeClaims() {
-        JwtProperties properties = new JwtProperties();
-        properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
-        JwtService jwtService = new JwtService(properties);
-        UserAccessProfile profile = new UserAccessProfile(
-                CatalogPackages.PRO_PACKAGE,
-                List.of(CatalogProducts.QR_CREATE, CatalogProducts.SMART_ASSISTANT),
-                List.of(CatalogScopes.QR_CREATE_OWNER, CatalogScopes.SMART_ASSISTANT_OWNER)
-        );
-
-        String token = jwtService.generateAccessToken(
-                "user@example.com",
-                UUID.randomUUID(),
-                42L,
-                UserRole.USER,
-                AuthProvider.GOOGLE,
-                profile
-        );
-
-        Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
-        assertThat(claims.get("activePackage")).isEqualTo("PRO_PACKAGE");
-        assertThat(jwtService.extractProducts(claims)).containsExactly("QR_CREATE", "SMART_ASSISTANT");
-        assertThat(jwtService.extractScopes(claims)).containsExactly("QR_CREATE_OWNER", "SMART_ASSISTANT_OWNER");
-        assertThat(claims.get("provider")).isEqualTo("GOOGLE");
-        assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_APP);
-        assertThat(jwtService.isDashboardPrincipal(claims)).isFalse();
-    }
 
     @Test
     void generateDashboardAccessToken_whenAdmin_thenIncludeAdminRoleAndDashboardPrincipal() {
@@ -64,53 +37,7 @@ class JwtServiceTest {
         assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_DASHBOARD);
         assertThat(jwtService.isDashboardPrincipal(claims)).isTrue();
         assertThat(jwtService.extractRoles(claims)).containsExactly("ROLE_ADMIN");
-        assertThat(claims.get("userId")).isEqualTo(7);
+        assertThat(jwtService.extractDashboardUserId(claims)).isEqualTo(7L);
     }
 
-    @Test
-    void generateCustomerAccessToken_whenCustomer_thenIncludeCustomerPrincipalAndRole() {
-        JwtProperties properties = new JwtProperties();
-        properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
-        JwtService jwtService = new JwtService(properties);
-
-        String token = jwtService.generateCustomerAccessToken(
-                "customer@example.com",
-                UUID.randomUUID(),
-                99L,
-                AuthProvider.BASIC
-        );
-
-        Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
-        assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_CUSTOMER);
-        assertThat(jwtService.isCustomerPrincipal(claims)).isTrue();
-        assertThat(jwtService.isDashboardPrincipal(claims)).isFalse();
-        assertThat(jwtService.extractRoles(claims)).containsExactly("ROLE_CUSTOMER");
-        assertThat(claims.get("userId")).isEqualTo(99);
-        assertThat(claims.get("provider")).isEqualTo("BASIC");
-        assertThat(claims.get("typ")).isEqualTo("access");
-    }
-
-    @Test
-    void generateAccessToken_whenProviderIsNull_thenDefaultToBasic() {
-        JwtProperties properties = new JwtProperties();
-        properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
-        JwtService jwtService = new JwtService(properties);
-        UserAccessProfile profile = new UserAccessProfile(
-                CatalogPackages.FREE_PACKAGE,
-                List.of(CatalogProducts.QR_CREATE),
-                List.of(CatalogScopes.QR_CREATE_OWNER)
-        );
-
-        String token = jwtService.generateAccessToken(
-                "user@example.com",
-                UUID.randomUUID(),
-                42L,
-                UserRole.USER,
-                null,
-                profile
-        );
-
-        Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
-        assertThat(claims.get("provider")).isEqualTo("BASIC");
-    }
 }

@@ -2,7 +2,7 @@ package com.ael.algoryqrservice.qrservice.integration.odeal.controller;
 
 import com.ael.algoryqrservice.qrservice.exception.GlobalExceptionHandler;
 import com.ael.algoryqrservice.qrservice.integration.odeal.model.dto.OdealTestDtos;
-import com.ael.algoryqrservice.qrservice.integration.odeal.service.OdealTestService;
+import com.ael.algoryqrservice.qrservice.integration.service.odeal.OdealTestService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

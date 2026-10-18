@@ -1,11 +1,12 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductRatingService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductRating;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRatingRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRatingRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

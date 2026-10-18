@@ -1,14 +1,16 @@
 package com.ael.algoryqrservice.qrservice.controller;
 
+import com.ael.algoryqrservice.qrservice.billing.controller.PurchaseController;
+
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.PurchaseInitiateResponse;
-import com.ael.algoryqrservice.qrservice.model.dto.PurchaseRequest;
-import com.ael.algoryqrservice.qrservice.model.dto.UserEntitlementResponse;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseInitiateResponse;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseRequest;
+import com.ael.algoryqrservice.qrservice.billing.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
-import com.ael.algoryqrservice.qrservice.service.AddonPurchaseService;
-import com.ael.algoryqrservice.qrservice.service.ExternalPackageViewService;
-import com.ael.algoryqrservice.qrservice.service.PurchaseLogService;
-import com.ael.algoryqrservice.qrservice.service.PurchaseService;
+import com.ael.algoryqrservice.qrservice.billing.service.AddonPurchaseService;
+import com.ael.algoryqrservice.qrservice.billing.service.ExternalPackageViewService;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseLogService;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -59,7 +61,7 @@ class PurchaseControllerCouponTest {
     void getMyEntitlements_whenFulfillmentReturnsRows_thenReturnOk() {
         SecurityUtils securityUtils = mock(SecurityUtils.class);
         ExternalPackageViewService externalPackageView = mock(ExternalPackageViewService.class);
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         UserEntitlementResponse entitlement = UserEntitlementResponse.builder()
                 .productCode("QR_CREATE")
                 .remainingQuantity(3)

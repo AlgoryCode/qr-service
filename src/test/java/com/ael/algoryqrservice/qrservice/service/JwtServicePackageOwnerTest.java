@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import com.ael.algoryqrservice.qrservice.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
@@ -22,9 +23,9 @@ class JwtServicePackageOwnerTest {
     }
 
     @Test
-    void extractPackageOwnerId_whenMerchant_thenUseUserId() {
+    void extractPackageOwnerId_whenMerchant_thenUseMerchantId() {
         Claims claims = subject(JwtService.SUBJECT_MERCHANT);
-        when(claims.get("userId")).thenReturn(7L);
+        when(claims.get("merchantId")).thenReturn(7L);
 
         assertThat(jwtService.extractPackageOwnerId(claims)).isEqualTo(7L);
         assertThat(jwtService.isAuthServiceSubject(claims)).isTrue();

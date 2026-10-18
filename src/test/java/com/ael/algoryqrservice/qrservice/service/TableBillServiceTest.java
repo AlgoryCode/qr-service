@@ -1,28 +1,33 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.order.service.TableSessionService;
+import com.ael.algoryqrservice.billservice.application.TableBillService;
+import com.ael.algoryqrservice.qrservice.order.service.OrderAuditService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.qrservice.model.MenuOrderItem;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
-import com.ael.algoryqrservice.qrservice.model.TableBillItem;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBillItem;
 import com.ael.algoryqrservice.qrservice.model.TableSession;
-import com.ael.algoryqrservice.qrservice.model.dto.TableBillDtos;
+import com.ael.algoryqrservice.billservice.dto.TableBillDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillPaymentMethod;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionType;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillItemRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillItemRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillRepository;
 import com.ael.algoryqrservice.qrservice.repository.TableSessionRepository;
+import com.ael.algoryqrservice.staffservice.application.StaffCommissionService;
+import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -68,9 +73,11 @@ class TableBillServiceTest {
     @Mock
     private MerchantStaffRepository merchantStaffRepository;
     @Mock
-    private WaiterCommissionService waiterCommissionService;
+    private StaffCommissionService waiterCommissionService;
     @Mock
     private MenuOrderRepository menuOrderRepository;
+    @Mock
+    private BranchRepository branchRepository;
     @Mock
     private OrderAuditService orderAuditService;
     @Mock
@@ -189,6 +196,10 @@ class TableBillServiceTest {
         MenuOrder otherBill = MenuOrder.builder().id(34L).menuId(1L).tableId(5L).billId(99L)
                 .status(MenuOrderStatus.PREPARING).build();
         MenuOrder otherTable = MenuOrder.builder().id(31L).menuId(1L).tableId(9L).status(MenuOrderStatus.READY).build();
+        when(menuRepository.findById(1L)).thenReturn(Optional.of(
+                com.ael.algoryqrservice.qrservice.model.Menu.builder().menuId(1L).branchId(3L).build()));
+        when(branchRepository.findById(3L)).thenReturn(Optional.of(
+                com.ael.algoryqrservice.qrservice.model.Branch.builder().id(3L).kitchenEnabled(true).build()));
         when(menuOrderRepository.findByMenuIdAndTableIdAndStatusInOrderBySubmittedAtDesc(
                 eq(1L), eq(5L), eq(List.of(MenuOrderStatus.CONFIRMED, MenuOrderStatus.PREPARING, MenuOrderStatus.READY))))
                 .thenReturn(List.of(sameTable, confirmed, preparing, otherBill, otherTable));

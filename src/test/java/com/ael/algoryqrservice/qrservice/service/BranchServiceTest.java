@@ -1,14 +1,18 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.product.service.ProductImageStorageService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuQrSoftDeleteService;
+import com.ael.algoryqrservice.qrservice.order.service.KitchenCloseGuard;
+import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
-import com.ael.algoryqrservice.qrservice.model.Qr;
-import com.ael.algoryqrservice.qrservice.model.dto.BranchDtos;
+import com.ael.algoryqrservice.qrservice.qr.model.Qr;
+import com.ael.algoryqrservice.qrservice.branch.dto.BranchDtos;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.repository.QrRepository;
+import com.ael.algoryqrservice.qrservice.qr.repository.QrRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +43,9 @@ class BranchServiceTest {
     @Mock
     private MenuQrSoftDeleteService menuQrSoftDeleteService;
     @Mock
-    private BranchQuotaService branchQuotaService;
+    private com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient fulfillmentClient;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.security.ProductUsageGateway productUsageGateway;
     @Mock
     private ProductImageStorageService productImageStorageService;
     @Mock
@@ -52,11 +58,11 @@ class BranchServiceTest {
 
     @Test
     void delete_whenMenusExist_thenSoftDeletesMenusThenBranch() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").build();
-        Menu menu = Menu.builder().menuId(4L).userId(7L).qrId(90L).branchId(15L).build();
-        Qr qr = Qr.builder().qrId(90L).userId(7L).build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").build();
+        Menu menu = Menu.builder().menuId(4L).merchantId(7L).qrId(90L).branchId(15L).build();
+        Qr qr = Qr.builder().qrId(90L).merchantId(7L).build();
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of(menu));
         when(qrRepository.findById(90L)).thenReturn(Optional.of(qr));
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -70,9 +76,9 @@ class BranchServiceTest {
 
     @Test
     void delete_whenNoMenus_thenSoftDeletesBranchOnly() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").build();
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -84,7 +90,7 @@ class BranchServiceTest {
 
     @Test
     void create_whenQuotaAllows_thenSavesBranch() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> {
             Branch branch = invocation.getArgument(0);
             branch.setId(15L);
@@ -101,14 +107,14 @@ class BranchServiceTest {
         assertThat(response.getId()).isEqualTo(15L);
         assertThat(response.getName()).isEqualTo("Kadıköy");
         assertThat(response.isKitchenEnabled()).isFalse();
-        verify(branchQuotaService).assertCanCreateBranch(7L);
+        verify(productUsageGateway).use(7L, com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts.QR_BRANCH, 1);
     }
 
     @Test
     void enableKitchen_whenOwned_thenTurnsKitchenOn() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(false).build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").kitchenEnabled(false).build();
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
 
@@ -120,10 +126,10 @@ class BranchServiceTest {
 
     @Test
     void update_whenClosingKitchenWithActiveOrders_thenRejects() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(true).build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
-        doThrow(new BadRequestException(KitchenCloseGuard.ACTIVE_ORDERS_MESSAGE))
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").kitchenEnabled(true).build();
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        doThrow(new BadRequestException("Aktif olan siparişleriniz var, mutfağı kapatamazsınız"))
                 .when(kitchenCloseGuard).requireNoActiveOrders(branch);
 
         assertThatThrownBy(() -> branchService.update(15L, BranchDtos.UpdateRequest.builder()
@@ -137,9 +143,9 @@ class BranchServiceTest {
 
     @Test
     void update_whenClosingKitchenWithoutActiveOrders_thenTurnsKitchenOff() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(true).build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").kitchenEnabled(true).build();
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
 
@@ -151,9 +157,9 @@ class BranchServiceTest {
 
     @Test
     void update_whenCourierEnabled_thenPersistsCourier() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").courierEnabled(false).build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").courierEnabled(false).build();
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(15L, 7L)).thenReturn(Optional.of(branch));
         when(branchRepository.save(any(Branch.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(15L, MenuChannel.QR)).thenReturn(List.of());
 
@@ -167,25 +173,23 @@ class BranchServiceTest {
 
     @Test
     void applyPhotoToAllBranches_whenSourceHasPhoto_thenCopies() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         Branch source = Branch.builder()
                 .id(1L)
-                .userId(7L)
+                .merchantId(7L)
                 .name("A")
                 .photoUrl("https://cdn/a.png")
                 .photoKey("branches/1/photo/a.png")
                 .build();
         Branch other = Branch.builder()
                 .id(2L)
-                .userId(7L)
+                .merchantId(7L)
                 .name("B")
                 .build();
-        when(branchRepository.findByIdAndUserIdAndDeletedFalse(1L, 7L)).thenReturn(java.util.Optional.of(source));
-        when(branchRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(List.of(source, other));
-        when(branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(7L)).thenReturn(List.of(source, other));
-        when(menuRepository.findByUserIdAndChannelAndDeletedFalseOrderByMenuIdAsc(7L, MenuChannel.QR)).thenReturn(List.of());
-        when(branchQuotaService.branchQuota(7L)).thenReturn(BranchDtos.Quota.builder().canCreate(false).build());
-        when(branchQuotaService.menuQuota(7L)).thenReturn(BranchDtos.MenuQuota.builder().build());
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(1L, 7L)).thenReturn(java.util.Optional.of(source));
+        when(branchRepository.findByMerchantIdAndDeletedFalse(7L)).thenReturn(List.of(source, other));
+        when(branchRepository.findByMerchantIdAndDeletedFalseOrderByIdDesc(7L)).thenReturn(List.of(source, other));
+        when(menuRepository.findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(7L, MenuChannel.QR)).thenReturn(List.of());
 
         branchService.applyPhotoToAllBranches(1L);
 

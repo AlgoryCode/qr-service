@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.stock.service.StockConsumptionService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.qrservice.model.MenuOrderItem;
@@ -150,7 +151,7 @@ class StockConsumptionServiceTest {
     }
 
     private Menu menu(Long branchId) {
-        return Menu.builder().menuId(3L).branchId(branchId).userId(1L).build();
+        return Menu.builder().menuId(3L).branchId(branchId).merchantId(1L).build();
     }
 
     private StockRecipeLine recipe(String perSale) {
@@ -164,7 +165,7 @@ class StockConsumptionServiceTest {
     private StockIngredient ingredient(String quantity) {
         return StockIngredient.builder()
                 .id(4L)
-                .userId(1L)
+                .merchantId(1L)
                 .branchId(9L)
                 .name("Un")
                 .unit(StockUnit.KG)
