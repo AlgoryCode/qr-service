@@ -2,7 +2,10 @@ package com.ael.algoryqrservice.adminservice.presentation.controller;
 
 import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
 import com.ael.algoryqrservice.adminservice.application.AdminUserCredentialService;
+import com.ael.algoryqrservice.adminservice.application.AdminUserImpersonationService;
 import com.ael.algoryqrservice.adminservice.application.AdminUserService;
+import com.ael.algoryqrservice.qrservice.util.ClientInfo;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +27,7 @@ public class AdminUserController {
 
     private final AdminUserService adminUserService;
     private final AdminUserCredentialService adminUserCredentialService;
+    private final AdminUserImpersonationService adminUserImpersonationService;
 
     @GetMapping
     public ResponseEntity<AdminUserDtos.UserPageResponse> listUsers(
@@ -56,5 +60,15 @@ public class AdminUserController {
     @PostMapping("/{id}/password-resets")
     public ResponseEntity<AdminUserDtos.PasswordResetResponse> resetPassword(@PathVariable Long id) {
         return ResponseEntity.ok(adminUserCredentialService.resetPassword(id));
+    }
+
+    @PostMapping("/{id}/impersonation-sessions")
+    public ResponseEntity<AdminUserDtos.ImpersonateResponse> impersonate(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest
+    ) {
+        return ResponseEntity.ok(
+                adminUserImpersonationService.impersonate(id, ClientInfo.from(httpRequest))
+        );
     }
 }
