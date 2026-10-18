@@ -4,7 +4,7 @@ import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
 import com.ael.algoryqrservice.adminservice.application.AdminUserCredentialService;
 import com.ael.algoryqrservice.adminservice.application.AdminUserImpersonationService;
 import com.ael.algoryqrservice.adminservice.application.AdminUserService;
-import com.ael.algoryqrservice.qrservice.util.ClientInfo;
+import com.ael.algoryqrservice.authservice.util.ClientInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
