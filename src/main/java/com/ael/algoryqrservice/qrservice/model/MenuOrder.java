@@ -37,10 +37,10 @@ public class MenuOrder {
     @Column(name = "menu_id", nullable = false)
     private Long menuId;
 
-    @Column(name = "table_id", nullable = false)
+    @Column(name = "table_id")
     private Long tableId;
 
-    @Column(name = "table_session_id", nullable = false, columnDefinition = "uuid")
+    @Column(name = "table_session_id", columnDefinition = "uuid")
     private UUID tableSessionId;
 
     @Column(name = "customer_id")

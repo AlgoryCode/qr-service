@@ -117,10 +117,10 @@ class PurchaseServiceCancelTest {
         assertThat(purchase.getCancellationReason()).isEqualTo(PurchaseCancellationReason.MANUAL);
         assertThat(purchase.getExpiresAt()).isBeforeOrEqualTo(LocalDateTime.now().plusSeconds(1));
         verify(entitlementWriter).revokeForCancelledPurchase(purchase);
-        verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
+        verify(menuPublicAccessService).deactivateActiveMenusForMerchant(20L);
         verify(purchaseFulfillmentService).cancelOpenFulfillments(10L);
         verify(packageActivationService).ensureSubscriptionState(20L);
-        verify(menuPublicAccessService).syncForUser(20L);
+        verify(menuPublicAccessService).syncForMerchant(20L);
         verify(paymentServiceClient, never()).cancelSubscription(any(), any());
     }
 
@@ -292,7 +292,7 @@ class PurchaseServiceCancelTest {
         assertThat(captor.getValue().getStatus()).isEqualTo(PurchaseStatus.CANCELLED);
         assertThat(captor.getValue().getCancellationReason()).isEqualTo(PurchaseCancellationReason.MANUAL);
         verify(entitlementWriter, never()).revokeForCancelledPurchase(any());
-        verify(menuPublicAccessService, never()).deactivateActiveMenusForUser(any());
+        verify(menuPublicAccessService, never()).deactivateActiveMenusForMerchant(any());
         verify(purchaseFulfillmentService).cancelOpenFulfillments(eq(10L));
         verify(packageActivationService).ensureSubscriptionState(20L);
     }

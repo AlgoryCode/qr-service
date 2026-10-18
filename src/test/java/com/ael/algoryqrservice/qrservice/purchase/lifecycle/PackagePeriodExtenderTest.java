@@ -69,7 +69,7 @@ class PackagePeriodExtenderTest {
         assertThat(result.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
         verify(fulfillmentGrantService).extendPurchasePeriod(purchase);
         verify(entitlementWriter).synchronizePeriod(purchase);
-        verify(menuPublicAccessService).syncForUser(7L);
+        verify(menuPublicAccessService).syncForMerchant(7L);
         verify(purchaseLogService).log(eq(10L), eq(7L), eq(PurchaseLogAction.PURCHASE_EXTENDED), anyString());
     }
 

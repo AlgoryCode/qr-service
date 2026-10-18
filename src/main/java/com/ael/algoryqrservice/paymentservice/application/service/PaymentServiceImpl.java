@@ -1016,10 +1016,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private String metadataMerchantId(Map<String, Object> metadata) {
         String merchantId = metadataValue(metadata, "merchantId", null);
-        if (merchantId != null && !merchantId.isBlank()) {
-            return merchantId;
-        }
-        return metadataValue(metadata, "userId", null);
+        return merchantId;
     }
 
     private Map<String, Object> buildSourceMetadata(PaymentTransaction transaction) {

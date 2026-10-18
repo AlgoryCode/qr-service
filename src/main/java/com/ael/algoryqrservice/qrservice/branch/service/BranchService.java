@@ -209,7 +209,7 @@ public class BranchService {
     }
 
     @Transactional(readOnly = true)
-    public Branch requireOwnedForUser(Long branchId, Long merchantId) {
+    public Branch requireOwnedForMerchant(Long branchId, Long merchantId) {
         return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçerli bir şube seçin"));
     }

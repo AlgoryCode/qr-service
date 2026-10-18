@@ -553,7 +553,7 @@ class FulfillmentLifecycleScenarioTest {
         assertThat(grace.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.SUSPENDED);
         assertThat(grace.getSubscriptionStatusReason()).isEqualTo("grace_period_expired");
         verify(fulfillmentQueuePublisher, never()).publishRevoked(any());
-        verify(menuPublicAccessService).syncForUser(MERCHANT_ID);
+        verify(menuPublicAccessService).syncForMerchant(MERCHANT_ID);
     }
 
     @Test
@@ -585,7 +585,7 @@ class FulfillmentLifecycleScenarioTest {
         assertThat(purchase.getExpiresAt()).isAfter(LocalDateTime.now());
         verify(fulfillmentQueuePublisher).publishGranted(purchase);
         verify(fulfillmentClient, never()).createPackage(anyLong(), anyString(), anyInt(), anyList(), anyList());
-        verify(menuPublicAccessService).syncForUser(MERCHANT_ID);
+        verify(menuPublicAccessService).syncForMerchant(MERCHANT_ID);
         assertThat(sessionAccessService.resolve(MERCHANT_ID).decision()).isEqualTo(AccessDecision.REQUIRE_PURCHASE);
 
         when(fulfillmentClient.findPackage(MERCHANT_ID))
@@ -667,7 +667,7 @@ class FulfillmentLifecycleScenarioTest {
         order.verify(fulfillmentQueuePublisher).publishRevoked(due);
         order.verify(purchaseRepository).save(due);
         verify(eventPublisher).publishEvent(any(PurchasesExpiredEvent.class));
-        verify(menuPublicAccessService).syncForUsers(List.of(MERCHANT_ID));
+        verify(menuPublicAccessService).syncForMerchants(List.of(MERCHANT_ID));
     }
 
     @Test
@@ -689,7 +689,7 @@ class FulfillmentLifecycleScenarioTest {
                 new WritableTransactionGuard()
         );
 
-        expiry.expireDueForUser(MERCHANT_ID);
+        expiry.expireDueForMerchant(MERCHANT_ID);
 
         assertThat(due.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(fulfillmentQueuePublisher, never()).publishRevoked(any());

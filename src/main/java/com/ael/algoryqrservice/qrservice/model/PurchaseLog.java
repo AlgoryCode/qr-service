@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_purchase_log", indexes = {
-        @Index(name = "idx_purchase_log_user_id", columnList = "merchant_id"),
+        @Index(name = "idx_purchase_log_merchant_id", columnList = "merchant_id"),
         @Index(name = "idx_purchase_log_purchase_id", columnList = "purchase_id")
 })
 @Getter

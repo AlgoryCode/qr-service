@@ -111,7 +111,7 @@ public class MenuService {
         String businessName = requireNonBlank(stringValue(details.get("businessName")), "businessName zorunludur");
         Long branchId = longValue(details.get("branchId"));
         if (branchId != null) {
-            branchService.requireOwnedForUser(branchId, qr.getMerchantId());
+            branchService.requireOwnedForMerchant(branchId, qr.getMerchantId());
         }
 
         Menu menu = Menu.builder()
@@ -137,7 +137,7 @@ public class MenuService {
         } else {
             createProductsFromDetails(menu, details.get("products"));
         }
-        menuPublicAccessService.syncForUser(menu.getMerchantId());
+        menuPublicAccessService.syncForMerchant(menu.getMerchantId());
         return menu;
     }
 
@@ -795,7 +795,7 @@ public class MenuService {
             return toMenuProfile(menu, buildPublicUrl(menu), null);
         }
         if (branchId != null) {
-            branchService.requireOwnedForUser(branchId, menu.getMerchantId());
+            branchService.requireOwnedForMerchant(branchId, menu.getMerchantId());
         }
         menu.setBranchId(branchId);
         menuRepository.save(menu);
@@ -1299,7 +1299,7 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü yayında değil");
         }
         if (!menu.isPublicAccessEnabled()) {
-            menuPublicAccessService.syncForUser(menu.getMerchantId());
+            menuPublicAccessService.syncForMerchant(menu.getMerchantId());
             Menu latest = menuRepository.findById(menu.getMenuId()).orElse(menu);
             if (!latest.isPublicAccessEnabled()) {
                 throw new ForbiddenException(

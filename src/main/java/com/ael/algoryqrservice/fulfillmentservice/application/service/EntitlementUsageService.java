@@ -30,7 +30,7 @@ public class EntitlementUsageService {
 
     @Transactional(readOnly = true)
     public List<ListedEntitlement> listActive(Long merchantId) {
-        List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(merchantId);
+        List<UserEntitlement> entitlements = entitlementPort.findActiveByMerchantId(merchantId);
         Map<Long, CatalogProduct> products = productPort.findByIds(productIds(entitlements));
         return entitlements.stream()
                 .map(entitlement -> new ListedEntitlement(entitlement, productCode(entitlement, products)))
@@ -39,7 +39,7 @@ public class EntitlementUsageService {
 
     @Transactional(readOnly = true)
     public ProductAccessView productAccess(Long merchantId, String productCode) {
-        Optional<ActivePackage> active = fulfillmentRepository.findActiveByUserId(merchantId);
+        Optional<ActivePackage> active = fulfillmentRepository.findActiveByMerchantId(merchantId);
         if (active.isEmpty()) {
             return ProductAccessView.denied(null);
         }
@@ -86,11 +86,11 @@ public class EntitlementUsageService {
     }
 
     private Optional<UserEntitlement> match(Long merchantId, String productCode) {
-        if (fulfillmentRepository.findActiveByUserId(merchantId).isEmpty()) {
+        if (fulfillmentRepository.findActiveByMerchantId(merchantId).isEmpty()) {
             return Optional.empty();
         }
         Optional<CatalogProduct> product = productPort.findByCode(productCode);
-        return entitlementPort.findActiveByUserId(merchantId).stream()
+        return entitlementPort.findActiveByMerchantId(merchantId).stream()
                 .filter(entitlement -> matches(entitlement, productCode, product))
                 .findFirst();
     }

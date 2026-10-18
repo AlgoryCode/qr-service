@@ -111,12 +111,7 @@ public record PaymentEventMetadata(
     }
 
     private static Long merchantId(Map<String, Object> metadata, String eventMerchantId) {
-        Object legacy = metadata.get("userId");
-        String fallback = eventMerchantId;
-        if ((fallback == null || fallback.isBlank()) && legacy != null) {
-            fallback = String.valueOf(legacy);
-        }
-        return longValue(metadata, "merchantId", fallback);
+        return longValue(metadata, "merchantId", eventMerchantId);
     }
 
     private static String first(String first, String second) {

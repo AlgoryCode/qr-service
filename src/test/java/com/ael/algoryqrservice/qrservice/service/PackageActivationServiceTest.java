@@ -67,8 +67,8 @@ class PackageActivationServiceTest {
         Optional<Purchase> result = packageActivationService.ensureSubscriptionState(USER_ID);
 
         assertThat(result).contains(paid);
-        verify(purchaseExpiryService).expireDueForUser(USER_ID);
-        verify(menuPublicAccessService).syncForUser(USER_ID);
+        verify(purchaseExpiryService).expireDueForMerchant(USER_ID);
+        verify(menuPublicAccessService).syncForMerchant(USER_ID);
     }
 
     @Test
@@ -79,7 +79,7 @@ class PackageActivationServiceTest {
         Optional<Purchase> result = packageActivationService.ensureSubscriptionState(USER_ID);
 
         assertThat(result).isEmpty();
-        verify(menuPublicAccessService).syncForUser(USER_ID);
+        verify(menuPublicAccessService).syncForMerchant(USER_ID);
     }
 
     @Test
@@ -100,15 +100,15 @@ class PackageActivationServiceTest {
 
         packageActivationService.syncSubscriptionStateForUsers(List.of(USER_ID, USER_ID));
 
-        verify(menuPublicAccessService).syncForUser(USER_ID);
+        verify(menuPublicAccessService).syncForMerchant(USER_ID);
     }
 
     @Test
     void syncSubscriptionStateForUsers_whenEmpty_thenDoNothing() {
         packageActivationService.syncSubscriptionStateForUsers(List.of());
 
-        verify(purchaseExpiryService, never()).expireDueForUser(any());
-        verify(menuPublicAccessService, never()).syncForUser(any());
+        verify(purchaseExpiryService, never()).expireDueForMerchant(any());
+        verify(menuPublicAccessService, never()).syncForMerchant(any());
     }
 
     @Test
@@ -127,7 +127,7 @@ class PackageActivationServiceTest {
             assertThat(superseded.getId()).isEqualTo(1L);
             assertThat(superseded.getStatus()).isEqualTo(PurchaseStatus.SUPERSEDED);
         });
-        verify(menuPublicAccessService).syncForUser(USER_ID);
+        verify(menuPublicAccessService).syncForMerchant(USER_ID);
     }
 
     @Test
@@ -137,7 +137,7 @@ class PackageActivationServiceTest {
         packageActivationService.activatePurchasedPackage(addon);
 
         verify(purchaseRepository, never()).saveAll(any());
-        verify(menuPublicAccessService).syncForUser(USER_ID);
+        verify(menuPublicAccessService).syncForMerchant(USER_ID);
     }
 
     private static Purchase activePurchase(Long id, String packageCode, PurchaseType type) {

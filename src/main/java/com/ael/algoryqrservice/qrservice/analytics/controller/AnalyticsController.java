@@ -65,7 +65,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(unifiedAnalyticsService.getBranchSummary(
                 branchId, menuId, ownerId, effectiveFrom, effectiveTo));
@@ -80,7 +80,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(unifiedAnalyticsService.getBranchFull(
                 branchId, menuId, ownerId, effectiveFrom, effectiveTo));
@@ -95,7 +95,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(analyticsService.getBranchReport(
                 branchId, menuId, ownerId, effectiveFrom, effectiveTo));
     }
@@ -109,7 +109,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(analyticsService.getBranchRevenueReport(
                 branchId, menuId, ownerId, effectiveFrom, effectiveTo));
@@ -124,7 +124,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(analyticsService.getBranchWaiterPerformanceReport(
                 branchId, menuId, ownerId, effectiveFrom, effectiveTo));
@@ -138,7 +138,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(analyticsService.getMenuReport(menuId, ownerId, effectiveFrom, effectiveTo));
     }
 
@@ -150,7 +150,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(analyticsService.getMenuRevenueReport(menuId, ownerId, effectiveFrom, effectiveTo));
     }
@@ -163,7 +163,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         requireOrderAnalyticsScope(ownerId);
         return ResponseEntity.ok(
                 analyticsService.getMerchantStaffPerformanceReport(menuId, ownerId, effectiveFrom, effectiveTo)
@@ -173,7 +173,7 @@ public class AnalyticsController {
     @GetMapping("/smart-reports/quota")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<SmartReportDtos.SmartReportQuotaResponse> getSmartReportQuota() {
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(smartReportService.getQuota(ownerId));
     }
 
@@ -183,7 +183,7 @@ public class AnalyticsController {
             @RequestParam(required = false, defaultValue = "completed") String status,
             Pageable pageable
     ) {
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(smartReportService.listJobs(ownerId, status, pageable));
     }
 
@@ -192,7 +192,7 @@ public class AnalyticsController {
     public ResponseEntity<SmartReportDtos.SmartReportDetailResponse> getSmartReport(
             @PathVariable UUID jobId
     ) {
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(smartReportService.getJobDetail(ownerId, jobId));
     }
 
@@ -229,7 +229,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(analyticsService.getMenuAnalytics(menuId, ownerId, effectiveFrom, effectiveTo));
     }
 
@@ -242,7 +242,7 @@ public class AnalyticsController {
     ) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(29);
         LocalDate effectiveTo = to != null ? to : LocalDate.now();
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(analyticsService.getProductAnalytics(menuId, productId, ownerId, effectiveFrom, effectiveTo));
     }
 

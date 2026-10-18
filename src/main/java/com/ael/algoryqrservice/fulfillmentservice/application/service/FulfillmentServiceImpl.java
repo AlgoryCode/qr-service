@@ -157,7 +157,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     @Override
     @Transactional(readOnly = true)
     public Optional<ActivePackage> findActivePackage(Long merchantId) {
-        return fulfillmentRepository.findActiveByUserId(merchantId)
+        return fulfillmentRepository.findActiveByMerchantId(merchantId)
                 .filter(active -> active.status() == PackageStatus.ACTIVE);
     }
 
@@ -172,7 +172,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     @Transactional(readOnly = true)
     public ActivePackageView requireActivePackageView(Long merchantId) {
         ActivePackage active = requireActivePackage(merchantId);
-        List<UserEntitlement> entitlements = entitlementPort.findActiveByUserId(merchantId);
+        List<UserEntitlement> entitlements = entitlementPort.findActiveByMerchantId(merchantId);
         String packageName = resolvePackageName(active);
         return new ActivePackageView(
                 active.id(),
@@ -209,7 +209,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     @Override
     @Transactional(readOnly = true)
     public List<UserEntitlement> listActiveEntitlements(Long merchantId) {
-        return entitlementPort.findActiveByUserId(merchantId);
+        return entitlementPort.findActiveByMerchantId(merchantId);
     }
 
     private void grantPackageEntitlements(

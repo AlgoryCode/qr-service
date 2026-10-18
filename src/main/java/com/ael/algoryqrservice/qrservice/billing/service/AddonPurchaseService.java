@@ -87,7 +87,7 @@ public class AddonPurchaseService {
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchaseCart(User user, AddonCartPurchaseRequest request, String clientIp) {
-        purchaseExpiryService.expireDueForUser(user.getId());
+        purchaseExpiryService.expireDueForMerchant(user.getId());
         Purchase host = findHostPurchase(user.getId());
         List<ResolvedLine> lines = resolveLines(request.getModules());
         BillingPeriod billingPeriod = BillingPeriodResolver.resolve(host);

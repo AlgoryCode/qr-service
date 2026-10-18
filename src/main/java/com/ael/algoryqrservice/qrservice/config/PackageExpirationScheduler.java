@@ -56,7 +56,7 @@ public class PackageExpirationScheduler {
             purchaseRepository.save(purchase);
             log.warn("Subscription suspended after grace period. purchaseId={} graceEndsAt={}",
                     purchase.getId(), purchase.getSubscriptionGraceEndsAt());
-            menuPublicAccessService.syncForUser(purchase.getMerchantId());
+            menuPublicAccessService.syncForMerchant(purchase.getMerchantId());
         }
     }
 

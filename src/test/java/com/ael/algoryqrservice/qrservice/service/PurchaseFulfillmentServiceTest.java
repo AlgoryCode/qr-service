@@ -210,7 +210,7 @@ class PurchaseFulfillmentServiceTest {
         assertThat(purchase.getExpiresAt()).isEqualTo(purchase.getStartsAt().plusDays(31));
         verify(packageActivationService).activatePurchasedPackage(purchase);
         verify(entitlementWriter).synchronizePeriod(purchase);
-        verify(menuPublicAccessService).syncForUser(2L);
+        verify(menuPublicAccessService).syncForMerchant(2L);
     }
 
     @Test
@@ -229,7 +229,7 @@ class PurchaseFulfillmentServiceTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.ACTIVE);
         verify(purchaseRepository, never()).save(any());
-        verify(menuPublicAccessService).syncForUser(2L);
+        verify(menuPublicAccessService).syncForMerchant(2L);
     }
 
     @Test
@@ -252,6 +252,6 @@ class PurchaseFulfillmentServiceTest {
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(entitlementWriter).synchronizePeriod(purchase);
         verify(packageActivationService).ensureSubscriptionState(2L);
-        verify(menuPublicAccessService).syncForUser(2L);
+        verify(menuPublicAccessService).syncForMerchant(2L);
     }
 }

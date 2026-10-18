@@ -23,7 +23,7 @@ public class FeatureQrController {
 
     @PostMapping("/qrs")
     public ResponseEntity<?> createQr(@RequestBody QrRequest req) throws IOException, WriterException {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(qrService.createQR(req, merchantId));
     }
 }

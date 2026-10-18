@@ -168,7 +168,7 @@ public class UnifiedAnalyticsService {
     }
 
     private Collection<Long> resolveMenuIds(Long branchId, Long menuId, Long ownerId) {
-        var branch = branchService.requireOwnedForUser(branchId, ownerId);
+        var branch = branchService.requireOwnedForMerchant(branchId, ownerId);
         List<Menu> menus = menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR);
         if (menuId == null) {
             return menus.stream().map(Menu::getMenuId).toList();

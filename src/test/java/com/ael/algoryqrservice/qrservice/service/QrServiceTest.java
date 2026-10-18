@@ -82,23 +82,23 @@ class QrServiceTest {
     private QrService qrService;
 
     @Test
-    void getUserQrs_whenTokenUserDiffersFromAccount_thenListsAccountQrs() {
+    void getMerchantQrs_whenTokenUserDiffersFromAccount_thenListsAccountQrs() {
         Long accountUserId = 7L;
         Long tokenUserId = 99L;
         Qr linkQr = qr(3L, accountUserId, "link", Map.of("url", "https://example.com"));
 
         when(securityUtils.getCurrentUser()).thenReturn(User.builder().id(accountUserId).build());
-        when(securityUtils.matchesTokenUser(tokenUserId)).thenReturn(true);
+        when(securityUtils.matchesTokenMerchant(tokenUserId)).thenReturn(true);
         when(qrRepository.findByUserIdAndDeletedFalseOrderByCreatedAtDesc(accountUserId)).thenReturn(List.of(linkQr));
         when(purchaseSelectionPolicy.activePurchaseId(accountUserId)).thenReturn(10L);
 
-        QrListPageResponse response = qrService.getUserQrs(tokenUserId, false, 0, 5, QrListScope.ALL);
+        QrListPageResponse response = qrService.getMerchantQrs(tokenUserId, false, 0, 5, QrListScope.ALL);
 
         assertThat(response.getContent()).extracting(QrListResponse::getQrId).containsExactly(linkQr.getQrId());
     }
 
     @Test
-    void getUserQrs_whenMenuQrExists_thenExcludedFromList() {
+    void getMerchantQrs_whenMenuQrExists_thenExcludedFromList() {
         Long userId = 7L;
         Qr activeMenuQr = qr(1L, userId, "menu", Map.of("themeId", "classic", "businessName", "Aktif"));
         activeMenuQr.setActive(true);
@@ -112,7 +112,7 @@ class QrServiceTest {
 
         when(purchaseSelectionPolicy.activePurchaseId(userId)).thenReturn(10L);
 
-        QrListPageResponse response = qrService.getUserQrs(userId, false, 0, 5, QrListScope.ALL);
+        QrListPageResponse response = qrService.getMerchantQrs(userId, false, 0, 5, QrListScope.ALL);
 
         assertThat(response.getContent())
                 .extracting(QrListResponse::getQrId)
@@ -324,7 +324,7 @@ class QrServiceTest {
     }
 
     @Test
-    void getUserQrs_whenScopeCurrent_thenReturnOnlyActivePackageQrs() {
+    void getMerchantQrs_whenScopeCurrent_thenReturnOnlyActivePackageQrs() {
         Long userId = 7L;
         Qr currentQr = qr(1L, userId, "link", Map.of("url", "https://current.example.com"));
         currentQr.setPurchaseId(10L);
@@ -340,7 +340,7 @@ class QrServiceTest {
                 com.ael.algoryqrservice.qrservice.model.Purchase.builder().id(99L).packageName("Pro").build()
         ));
 
-        QrListPageResponse response = qrService.getUserQrs(userId, false, 0, 5, QrListScope.CURRENT);
+        QrListPageResponse response = qrService.getMerchantQrs(userId, false, 0, 5, QrListScope.CURRENT);
 
         assertThat(response.getContent())
                 .extracting(QrListResponse::getQrId)

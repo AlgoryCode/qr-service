@@ -68,12 +68,7 @@ public class FulfillmentCommandFactory {
     }
 
     private static Long requireMerchantId(Map<String, Object> metadata, String eventMerchantId) {
-        Object legacy = metadata.get("userId");
-        String fallback = eventMerchantId;
-        if (!StringUtils.hasText(fallback) && legacy != null) {
-            fallback = String.valueOf(legacy);
-        }
-        return requireLong(metadata, "merchantId", fallback);
+        return requireLong(metadata, "merchantId", eventMerchantId);
     }
 
     private static Long requireLong(Map<String, Object> metadata, String key, String fallback) {

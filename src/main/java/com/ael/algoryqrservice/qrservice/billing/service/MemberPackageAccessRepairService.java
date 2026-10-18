@@ -161,7 +161,7 @@ public class MemberPackageAccessRepairService {
 
         @Transactional
         void syncMenuPublicAccessAfterRepair(Long merchantId) {
-            menuPublicAccessService.syncForUser(merchantId);
+            menuPublicAccessService.syncForMerchant(merchantId);
         }
 
         private static LocalDate resolvePeriodStart(Purchase purchase) {

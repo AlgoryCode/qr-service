@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .requestMatchers("/internal/credentials/**").permitAll()
                         .requestMatchers("/internal/staff/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/internal/merchant/*", "/internal/merchants/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/internal/merchant/*/access-profile").permitAll()
                         .requestMatchers(HttpMethod.POST, "/internal/merchant/*/soft-delete", "/internal/merchants/*/soft-delete")
                             .permitAll()
                         .requestMatchers(HttpMethod.GET, "/internal/merchant/*/package", "/internal/users/*/package").permitAll()

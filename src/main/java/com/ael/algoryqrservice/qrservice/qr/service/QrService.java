@@ -68,7 +68,7 @@ public class QrService {
         if (qrType == Type.MENU) {
             Long branchId = resolveBranchId(req);
             if (branchId != null) {
-                branchService.requireOwnedForUser(branchId, merchantId);
+                branchService.requireOwnedForMerchant(branchId, merchantId);
             }
             applyPurchase(req, productUsageGateway.use(merchantId, CatalogProducts.QR_MENU, 1));
         } else {
@@ -104,18 +104,18 @@ public class QrService {
         return createQR(req, existingQr.getMerchantId());
     }
 
-    public QrListPageResponse getUserQrs(
+    public QrListPageResponse getMerchantQrs(
             Long merchantId,
             boolean includeImage,
             int page,
             int size,
             QrListScope scope
     ) {
-        Long currentUserId = securityUtils.getCurrentUser().getId();
-        if (!currentUserId.equals(merchantId) && !securityUtils.matchesTokenUser(merchantId)) {
+        Long currentMerchantId = securityUtils.getCurrentMerchantId();
+        if (!currentMerchantId.equals(merchantId) && !securityUtils.matchesTokenMerchant(merchantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Başka kullanıcının QR kayıtlarına erişilemez");
         }
-        merchantId = currentUserId;
+        merchantId = currentMerchantId;
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
         List<Qr> qrs = qrRepository.findByMerchantIdAndDeletedFalseOrderByCreatedAtDesc(merchantId);
@@ -354,8 +354,8 @@ public class QrService {
     }
 
     private void requireOwnership(Qr qr) {
-        Long currentUserId = securityUtils.getCurrentUser().getId();
-        if (!currentUserId.equals(qr.getMerchantId())) {
+        Long currentMerchantId = securityUtils.getCurrentMerchantId();
+        if (!currentMerchantId.equals(qr.getMerchantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu QR kaydına erişim yetkiniz yok");
         }
     }

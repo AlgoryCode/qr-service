@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/internal/auth")
+@RequestMapping("/internal/merchant")
 @RequiredArgsConstructor
 public class InternalAuthSupportController {
 
     private final UserAccessProfileService userAccessProfileService;
 
-    @GetMapping("/users/{merchantId}/access-profile")
+    @GetMapping("/{merchantId}/access-profile")
     public ResponseEntity<UserAccessProfile> accessProfile(@PathVariable Long merchantId) {
         return ResponseEntity.ok(userAccessProfileService.resolve(merchantId));
     }

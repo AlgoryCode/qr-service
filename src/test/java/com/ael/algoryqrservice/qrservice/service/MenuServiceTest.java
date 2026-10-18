@@ -188,7 +188,7 @@ class MenuServiceTest {
         assertThat(saved.getBusinessName()).isEqualTo("Kafe İstanbul");
         assertThat(saved.getSlogan()).isEqualTo("Lezzetin adresi");
         assertThat(saved.getMenuId()).isEqualTo(99L);
-        verify(menuPublicAccessService).syncForUser(7L);
+        verify(menuPublicAccessService).syncForMerchant(7L);
         verify(nutritionFactsService).validateForCreate(parsedNutrition);
 
         ArgumentCaptor<MenuProduct> productCaptor = ArgumentCaptor.forClass(MenuProduct.class);
@@ -428,7 +428,7 @@ class MenuServiceTest {
                     ForbiddenException forbidden = (ForbiddenException) ex;
                     assertThat(forbidden.getCode()).isEqualTo(ForbiddenException.MENU_OWNER_PACKAGE_INACTIVE);
                 });
-        verify(menuPublicAccessService).syncForUser(7L);
+        verify(menuPublicAccessService).syncForMerchant(7L);
     }
 
     @Test
@@ -466,7 +466,7 @@ class MenuServiceTest {
 
         MenuDtos.PublicMenuResponse response = menuService.getMerchantMenu("pub-test");
 
-        verify(menuPublicAccessService).syncForUser(7L);
+        verify(menuPublicAccessService).syncForMerchant(7L);
         assertThat(response.getMenu().getBusinessName()).isEqualTo("Kafe");
         assertThat(response.getMenu().getPublicId()).isEqualTo("pub-test");
         assertThat(response.getMenu().getPublicUrl()).isEqualTo("https://example.com/menu/pub-test");

@@ -20,7 +20,7 @@ public class MerchantLoginPackageLookup {
         if (merchantId == null || merchantId <= 0) {
             return Optional.empty();
         }
-        return fulfillmentRepository.findActiveByUserId(merchantId)
+        return fulfillmentRepository.findActiveByMerchantId(merchantId)
                 .filter(active -> active.status() == PackageStatus.ACTIVE);
     }
 }
