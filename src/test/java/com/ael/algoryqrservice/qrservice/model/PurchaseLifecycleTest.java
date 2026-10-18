@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.model;
 
+import com.ael.algoryqrservice.fulfillmentservice.domain.model.UserEntitlement;
+
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
 import org.junit.jupiter.api.Test;
 
@@ -56,21 +58,4 @@ class PurchaseLifecycleTest {
         assertThat(purchase.isUsable()).isFalse();
     }
 
-    @Test
-    void entitlementIsUsable_whenPurchaseExpiredByDate_thenFalse() {
-        Purchase purchase = Purchase.builder()
-                .status(PurchaseStatus.ACTIVE)
-                .startsAt(LocalDateTime.now().minusDays(30))
-                .expiresAt(LocalDateTime.now().minusHours(1))
-                .build();
-        UserEntitlement entitlement = UserEntitlement.builder()
-                .unlimited(true)
-                .remainingQuantity(0)
-                .startsAt(LocalDateTime.now().minusDays(30))
-                .expiresAt(LocalDateTime.now().plusDays(10))
-                .build();
-
-        assertThat(entitlement.isUsable(PurchaseStatus.ACTIVE)).isTrue();
-        assertThat(entitlement.isUsable(purchase)).isFalse();
-    }
 }

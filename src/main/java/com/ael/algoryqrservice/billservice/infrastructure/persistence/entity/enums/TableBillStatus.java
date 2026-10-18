@@ -3,5 +3,6 @@ package com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.en
 public enum TableBillStatus {
     EMPTY,
     OPEN,
-    CLOSED
+    CLOSED,
+    CANCELLED
 }

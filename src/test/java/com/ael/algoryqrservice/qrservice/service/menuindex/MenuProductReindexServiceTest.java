@@ -1,11 +1,13 @@
 package com.ael.algoryqrservice.qrservice.service.menuindex;
 
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductReindexService;
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductDocumentFactory;
 import com.ael.algoryqrservice.qrservice.client.AiServiceClient;
 import com.ael.algoryqrservice.qrservice.client.dto.MenuProductReindexDtos;
 import com.ael.algoryqrservice.qrservice.config.AiServiceProperties;
-import com.ael.algoryqrservice.qrservice.messaging.dto.MenuProductDocumentMessage;
+import com.ael.algoryqrservice.qrservice.product.dto.MenuProductDocumentMessage;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

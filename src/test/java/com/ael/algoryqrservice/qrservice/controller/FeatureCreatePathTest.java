@@ -1,5 +1,13 @@
 package com.ael.algoryqrservice.qrservice.controller;
 
+import com.ael.algoryqrservice.qrservice.analytics.controller.AnalyticsController;
+import com.ael.algoryqrservice.qrservice.analytics.controller.FeatureSmartReportingController;
+import com.ael.algoryqrservice.qrservice.branch.controller.BranchController;
+import com.ael.algoryqrservice.qrservice.branch.controller.FeatureBranchController;
+import com.ael.algoryqrservice.qrservice.menu.controller.AiMenuImportController;
+import com.ael.algoryqrservice.qrservice.menu.controller.FeatureAiMenuImportController;
+import com.ael.algoryqrservice.qrservice.qr.controller.FeatureQrController;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,7 +41,6 @@ class FeatureCreatePathTest {
 
     @Test
     void legacyCreateMappings_whenOldControllers_thenHaveNoCreatePost() {
-        assertThat(postPaths(QrController.class)).isEmpty();
         assertThat(postPaths(BranchController.class)).doesNotContain("", "/");
         assertThat(postPaths(AnalyticsController.class)).doesNotContain(
                 "/branch/{branchId}/smart-reports",

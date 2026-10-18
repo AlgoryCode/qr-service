@@ -15,6 +15,7 @@ import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.Tab
 import com.ael.algoryqrservice.qrservice.model.TableSession;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.billservice.dto.TableBillDtos;
+import com.ael.algoryqrservice.qrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderAuditAction;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
@@ -49,6 +50,7 @@ import java.util.stream.Collectors;
 import com.ael.algoryqrservice.staffservice.application.StaffCommissionService;
 import com.ael.algoryqrservice.qrservice.order.service.OrderAuditService;
 import com.ael.algoryqrservice.qrservice.order.service.TableSessionService;
+import com.ael.algoryqrservice.qrservice.stock.service.StockConsumptionService;
 
 @Service
 @RequiredArgsConstructor
@@ -69,6 +71,7 @@ public class TableBillService {
     private final MenuOrderRepository menuOrderRepository;
     private final BranchRepository branchRepository;
     private final OrderAuditService orderAuditService;
+    private final StockConsumptionService stockConsumptionService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -460,6 +463,82 @@ public class TableBillService {
 
         TableBill saved = finalizeBillClose(bill, waiter, paymentMethod, resolvedTipAmount, now);
         return toBillResponse(saved, null);
+    }
+
+    @Transactional
+    public TableBillDtos.BillResponse cancelBill(
+            Long menuId,
+            Long billId,
+            MerchantStaff waiter,
+            TableBillDtos.CancelBillRequest request
+    ) {
+        TableBill bill = requireOpenBill(menuId, billId);
+        if (hasCollectedPayment(bill)) {
+            throw new BadRequestException("Ödeme alınmış adisyon iptal edilemez");
+        }
+
+        List<MenuOrder> orders = menuOrderRepository.findByBillId(billId);
+        for (MenuOrder order : orders) {
+            if (order.getStatus() == MenuOrderStatus.PAID) {
+                throw new BadRequestException("Ödenmiş siparişi olan adisyon iptal edilemez");
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        CancelReason reason = request != null && request.getReason() != null
+                ? request.getReason()
+                : CancelReason.OTHER;
+        String reasonNote = request != null ? trimToNull(request.getReasonNote()) : null;
+        for (MenuOrder order : orders) {
+            if (order.getStatus() == MenuOrderStatus.CANCELLED || order.getStatus() == MenuOrderStatus.REJECTED) {
+                continue;
+            }
+            order.setStatus(MenuOrderStatus.CANCELLED);
+            order.setCancelledAt(now);
+            order.setRejectedAt(now);
+            order.setCancelledByStaffId(waiter.getId());
+            order.setCancelReason(reason);
+            order.setCancelReasonNote(reasonNote);
+            order.setUpdatedAt(now);
+            MenuOrder savedOrder = menuOrderRepository.save(order);
+            stockConsumptionService.reverseMenuOrder(savedOrder);
+            orderAuditService.record(savedOrder, OrderAuditAction.CANCELLED, waiter.getId(), "{\"source\":\"bill-cancel\"}");
+        }
+
+        if (bill.getItems() != null) {
+            for (TableBillItem item : new ArrayList<>(bill.getItems())) {
+                if (item.getPaidQuantity() > 0) {
+                    throw new BadRequestException("Ödenmiş kalemi olan adisyon iptal edilemez");
+                }
+                bill.removeItem(item);
+                tableBillItemRepository.delete(item);
+            }
+        }
+
+        recalculateTotal(bill);
+        bill.setStatus(TableBillStatus.CANCELLED);
+        bill.setClosedByStaffId(waiter.getId());
+        bill.setClosedAt(now);
+        bill.setPaymentMethod(null);
+        bill.setUpdatedAt(now);
+        TableBill saved = tableBillRepository.save(bill);
+        revokeSessionsForTable(bill.getTableId());
+        return toBillResponse(saved, null);
+    }
+
+    private boolean hasCollectedPayment(TableBill bill) {
+        if (!billPaymentRepository.findByBillIdOrderByPaidAtAsc(bill.getId()).isEmpty()) {
+            return true;
+        }
+        if (bill.getItems() == null) {
+            return false;
+        }
+        for (TableBillItem item : bill.getItems()) {
+            if (item.getPaidQuantity() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void payAllRemainingItems(

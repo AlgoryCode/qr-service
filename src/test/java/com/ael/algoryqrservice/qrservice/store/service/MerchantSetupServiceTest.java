@@ -2,13 +2,13 @@ package com.ael.algoryqrservice.qrservice.store.service;
 
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
-import com.ael.algoryqrservice.qrservice.model.Qr;
+import com.ael.algoryqrservice.qrservice.qr.model.Qr;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.service.MenuCatalogCloneService;
-import com.ael.algoryqrservice.qrservice.service.MenuPublicIdGenerator;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCatalogCloneService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuPublicIdGenerator;
 import com.ael.algoryqrservice.qrservice.store.model.dto.StoreDtos;
 import com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -52,12 +52,12 @@ class MerchantSetupServiceTest {
 
     @Test
     void prefill_whenUserHasBranchMenus_thenListsThoseMenus() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
-        Branch kadikoy = Branch.builder().id(15L).userId(7L).name("Kadıköy").build();
-        Branch besiktas = Branch.builder().id(16L).userId(7L).name("Beşiktaş").build();
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        Branch kadikoy = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").build();
+        Branch besiktas = Branch.builder().id(16L).merchantId(7L).name("Beşiktaş").build();
         Menu kadikoyMenu = Menu.builder()
                 .menuId(4L)
-                .userId(7L)
+                .merchantId(7L)
                 .branchId(15L)
                 .channel(MenuChannel.QR)
                 .businessName("Kebapçı")
@@ -65,17 +65,17 @@ class MerchantSetupServiceTest {
                 .build();
         Menu storeMenu = Menu.builder()
                 .menuId(9L)
-                .userId(7L)
+                .merchantId(7L)
                 .channel(MenuChannel.STORE)
                 .businessName("Paket")
                 .active(true)
                 .build();
-        when(branchRepository.findByUserIdAndDeletedFalseOrderByIdDesc(7L)).thenReturn(List.of(kadikoy, besiktas));
-        when(menuRepository.findActiveMenusWithQrByUserId(7L)).thenReturn(List.of(
+        when(branchRepository.findByMerchantIdAndDeletedFalseOrderByIdDesc(7L)).thenReturn(List.of(kadikoy, besiktas));
+        when(menuRepository.findActiveMenusWithQrByMerchantId(7L)).thenReturn(List.of(
                 new Object[]{kadikoyMenu, Qr.builder().qrId(90L).build()},
                 new Object[]{storeMenu, Qr.builder().qrId(91L).build()}
         ));
-        when(merchantRepository.existsByUserIdAndDeletedFalse(7L)).thenReturn(false);
+        when(merchantRepository.existsByOwnerMerchantIdAndDeletedFalse(7L)).thenReturn(false);
         when(menuProductRepository.countByMenuIdAndDeletedFalse(4L)).thenReturn(12L);
 
         StoreDtos.SetupPrefillResponse response = merchantSetupService.prefill();

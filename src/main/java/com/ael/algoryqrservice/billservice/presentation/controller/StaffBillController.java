@@ -87,6 +87,14 @@ public class StaffBillController {
         return ResponseEntity.ok(staffBillService.closeBill(billId, request));
     }
 
+    @PostMapping("/cancel")
+    public ResponseEntity<TableBillDtos.BillResponse> cancelBill(
+            @PathVariable Long billId,
+            @RequestBody(required = false) TableBillDtos.CancelBillRequest request
+    ) {
+        return ResponseEntity.ok(staffBillService.cancelBill(billId, request));
+    }
+
     @PostMapping("/adjustments")
     public ResponseEntity<TableBillDtos.AdjustmentResponse> createAdjustment(
             @PathVariable Long billId,

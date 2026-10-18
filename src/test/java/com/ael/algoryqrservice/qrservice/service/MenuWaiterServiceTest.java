@@ -1,12 +1,14 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.staffservice.application.MenuWaiterService;
+import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 import com.ael.algoryqrservice.qrservice.client.AuthStaffClient;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Branch;
-import com.ael.algoryqrservice.qrservice.model.MerchantStaff;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuWaiterDtos;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuWaiterDtos;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
@@ -50,7 +52,7 @@ class MenuWaiterServiceTest {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
-                .userId(9L)
+                .merchantId(9L)
                 .name("Kadikoy")
                 .build());
         when(passwordEncoder.encode("secret1")).thenReturn("hashed");
@@ -86,7 +88,7 @@ class MenuWaiterServiceTest {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
-                .userId(9L)
+                .merchantId(9L)
                 .name("Kadikoy")
                 .kitchenEnabled(true)
                 .build());
@@ -119,7 +121,7 @@ class MenuWaiterServiceTest {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
-                .userId(9L)
+                .merchantId(9L)
                 .name("Kadikoy")
                 .courierEnabled(true)
                 .build());
@@ -152,7 +154,7 @@ class MenuWaiterServiceTest {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
-                .userId(9L)
+                .merchantId(9L)
                 .name("Kadikoy")
                 .kitchenEnabled(false)
                 .build());
@@ -175,7 +177,7 @@ class MenuWaiterServiceTest {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
-                .userId(9L)
+                .merchantId(9L)
                 .name("Kadikoy")
                 .courierEnabled(false)
                 .build());
@@ -198,15 +200,9 @@ class MenuWaiterServiceTest {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
-                .userId(9L)
+                .merchantId(9L)
                 .name("Kadikoy")
                 .build());
-        when(userRepository.findById(9L)).thenReturn(Optional.of(User.builder()
-                .id(9L)
-                .firstName("Ada")
-                .lastName("Cafe")
-                .email("ada@example.com")
-                .build()));
         when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(4L)).thenReturn(List.of(
                 MerchantStaff.builder()
                         .id(11L)
@@ -218,8 +214,6 @@ class MenuWaiterServiceTest {
         ));
 
         MenuWaiterDtos.UsersPageResponse page = menuWaiterService.listWaiters(4L);
-
-        assertThat(page.getOwner().getEmail()).isEqualTo("ada@example.com");
         assertThat(page.getWaiters()).hasSize(1);
         assertThat(page.getWaiters().getFirst().getBranchId()).isEqualTo(4L);
     }

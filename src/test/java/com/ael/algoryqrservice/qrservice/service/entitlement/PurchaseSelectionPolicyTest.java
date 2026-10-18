@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.qrservice.service.entitlement;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogProducts;
+import com.ael.algoryqrservice.qrservice.billing.service.entitlement.PurchaseSelectionPolicy;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.model.PlanPackage;
 import com.ael.algoryqrservice.qrservice.model.Purchase;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
@@ -44,7 +45,7 @@ class PurchaseSelectionPolicyTest {
     void activePurchaseId_whenAddonAndPaidExist_thenReturnPaid() {
         Purchase paid = purchase(10L, PurchaseType.PAID, "ULTIMATE_PACKAGE");
         Purchase addon = purchase(20L, PurchaseType.ADD_ON, CatalogProducts.QR_BRANCH);
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
+        when(purchaseRepository.findByMerchantIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
                 .thenReturn(List.of(paid, addon));
         when(planPackageRepository.findAllById(List.of(4L)))
                 .thenReturn(List.of(PlanPackage.builder().id(4L).priority(300).build()));
@@ -54,7 +55,7 @@ class PurchaseSelectionPolicyTest {
 
     @Test
     void activePurchaseId_whenOnlyAddonsExist_thenReturnNull() {
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
+        when(purchaseRepository.findByMerchantIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
                 .thenReturn(List.of(purchase(20L, PurchaseType.ADD_ON, CatalogProducts.QR_BRANCH)));
 
         assertThat(purchaseSelectionPolicy.activePurchaseId(USER_ID)).isNull();
@@ -74,7 +75,7 @@ class PurchaseSelectionPolicyTest {
         Purchase paid = purchase(102L, PurchaseType.PAID, "ULTIMATE_PACKAGE");
         paid.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23));
         paid.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23));
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
+        when(purchaseRepository.findByMerchantIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
 
         assertThat(purchaseSelectionPolicy.usablePurchases(USER_ID)).containsExactly(paid);
     }
@@ -88,7 +89,7 @@ class PurchaseSelectionPolicyTest {
         Purchase paid = purchase(102L, PurchaseType.PAID, "ULTIMATE_PACKAGE");
         paid.setStartsAt(LocalDateTime.of(2026, 8, 15, 11, 42, 23));
         paid.setExpiresAt(LocalDateTime.of(2026, 9, 14, 11, 42, 23));
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
+        when(purchaseRepository.findByMerchantIdAndStatus(USER_ID, PurchaseStatus.ACTIVE)).thenReturn(List.of(paid));
 
         assertThat(purchaseSelectionPolicy.usablePurchases(USER_ID)).isEmpty();
     }
@@ -97,7 +98,7 @@ class PurchaseSelectionPolicyTest {
     void usableAddons_whenMixedPurchases_thenReturnAddonsOnly() {
         Purchase paid = purchase(10L, PurchaseType.PAID, "ULTIMATE_PACKAGE");
         Purchase addon = purchase(20L, PurchaseType.ADD_ON, CatalogProducts.QR_BRANCH);
-        when(purchaseRepository.findByUserIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
+        when(purchaseRepository.findByMerchantIdAndStatus(USER_ID, PurchaseStatus.ACTIVE))
                 .thenReturn(List.of(paid, addon));
 
         assertThat(purchaseSelectionPolicy.usableAddons(USER_ID)).containsExactly(addon);
@@ -106,7 +107,7 @@ class PurchaseSelectionPolicyTest {
     private Purchase purchase(Long id, PurchaseType type, String packageCode) {
         return Purchase.builder()
                 .id(id)
-                .userId(USER_ID)
+                .merchantId(USER_ID)
                 .packageId(4L)
                 .packageCode(packageCode)
                 .purchaseType(type)

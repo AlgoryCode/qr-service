@@ -1,15 +1,17 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.account.service.UserAccessProfileService;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseService;
+import com.ael.algoryqrservice.adminservice.application.AdminUserService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.AdminUserDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.UserAccessProfile;
+import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
+import com.ael.algoryqrservice.qrservice.account.dto.UserAccessProfile;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
-import com.ael.algoryqrservice.qrservice.repository.QrRepository;
+import com.ael.algoryqrservice.qrservice.qr.repository.QrRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
-import com.ael.algoryqrservice.qrservice.trial.TrialUseCases;
-import com.ael.algoryqrservice.qrservice.trial.domain.TrialSnapshot;
+import com.ael.algoryqrservice.qrservice.client.AuthCredentialClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,11 +41,7 @@ class AdminUserServiceTest {
     @Mock
     MenuRepository menuRepository;
     @Mock
-    SessionService sessionService;
-    @Mock
-    TrialUseCases trialUseCases;
-    @Mock
-    EmailVerificationService emailVerificationService;
+    AuthCredentialClient authCredentialClient;
 
     AdminUserService service;
 
@@ -55,9 +53,7 @@ class AdminUserServiceTest {
                 purchaseService,
                 qrRepository,
                 menuRepository,
-                sessionService,
-                trialUseCases,
-                emailVerificationService
+                authCredentialClient
         );
     }
 
@@ -73,7 +69,7 @@ class AdminUserServiceTest {
         assertThat(user.getEmail()).isEqualTo("yeni@example.com");
         assertThat(user.isEmailVerified()).isFalse();
         assertThat(result.getEmailVerified()).isFalse();
-        verify(emailVerificationService).sendForUser(user);
+        verify(authCredentialClient).reissueEmailCode(7L, "yeni@example.com");
     }
 
     @Test
@@ -84,7 +80,7 @@ class AdminUserServiceTest {
 
         service.updateUser(7L, updateRequest("user@example.com"));
 
-        verify(emailVerificationService, never()).sendForUser(user);
+        verify(authCredentialClient, never()).reissueEmailCode(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString());
         assertThat(user.isEmailVerified()).isTrue();
     }
 
@@ -102,7 +98,7 @@ class AdminUserServiceTest {
         assertThatThrownBy(() -> service.updateUser(7L, updateRequest("yeni@example.com")))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Google");
-        verify(emailVerificationService, never()).sendForUser(user);
+        verify(authCredentialClient, never()).reissueEmailCode(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -125,9 +121,8 @@ class AdminUserServiceTest {
     private void stubDetail(User user) {
         when(userAccessProfileService.resolve(7L)).thenReturn(new UserAccessProfile(null, List.of(), List.of()));
         when(purchaseService.getUserPurchases(7L)).thenReturn(List.of());
-        when(trialUseCases.snapshot(7L)).thenReturn(TrialSnapshot.neverStarted());
-        when(qrRepository.countByUserIdAndDeletedFalse(7L)).thenReturn(0L);
-        when(menuRepository.countActiveLiveMenusForUser(7L)).thenReturn(0L);
+        when(qrRepository.countByMerchantIdAndDeletedFalse(7L)).thenReturn(0L);
+        when(menuRepository.countActiveLiveMenusForMerchant(7L)).thenReturn(0L);
     }
 
     private static User basicUser() {

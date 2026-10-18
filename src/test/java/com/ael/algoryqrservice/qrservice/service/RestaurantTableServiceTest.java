@@ -1,8 +1,10 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.branch.service.RestaurantTableService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.qrservice.model.dto.RestaurantTableDtos;
+import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantTableDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantAreaRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
@@ -47,10 +49,10 @@ class RestaurantTableServiceTest {
     void owner() {
         Menu menu = new Menu();
         menu.setMenuId(8L);
-        menu.setUserId(3L);
+        menu.setMerchantId(3L);
         menu.setDeleted(false);
         when(menuRepository.findById(8L)).thenReturn(Optional.of(menu));
-        when(securityUtils.getCurrentUserId()).thenReturn(3L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(3L);
         lenient().when(menuService.buildPublicUrl(any())).thenReturn("https://example.com/menu");
     }
 

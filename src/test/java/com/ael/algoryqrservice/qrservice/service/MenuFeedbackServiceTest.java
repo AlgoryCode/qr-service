@@ -1,13 +1,14 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.MenuFeedbackService;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductRating;
 import com.ael.algoryqrservice.qrservice.model.MenuRating;
-import com.ael.algoryqrservice.qrservice.model.dto.AnalyticsDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRatingRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRatingRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRatingRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -50,7 +51,7 @@ class MenuFeedbackServiceTest {
 
     @Test
     void listFeedback_whenTypeMenu_thenMapsItems() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         when(menuRepository.findById(5L)).thenReturn(Optional.of(ownedMenu()));
         MenuRating rating = MenuRating.builder()
                 .id(1L)
@@ -121,7 +122,7 @@ class MenuFeedbackServiceTest {
     private Menu ownedMenu() {
         return Menu.builder()
                 .menuId(5L)
-                .userId(9L)
+                .merchantId(9L)
                 .qrId(1L)
                 .themeId("soft")
                 .businessName("Test")

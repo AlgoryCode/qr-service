@@ -1,14 +1,15 @@
 package com.ael.algoryqrservice.qrservice.service.menuindex;
 
-import com.ael.algoryqrservice.qrservice.messaging.dto.MenuProductDocumentMessage;
+import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductDocumentFactory;
+import com.ael.algoryqrservice.qrservice.product.dto.MenuProductDocumentMessage;
 import com.ael.algoryqrservice.qrservice.model.MenuAllergen;
 import com.ael.algoryqrservice.qrservice.model.MenuCategory;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.qrservice.model.MenuTag;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
-import com.ael.algoryqrservice.qrservice.service.MenuCategoryService;
-import com.ael.algoryqrservice.qrservice.service.MenuTaxonomyService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCategoryService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuTaxonomyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

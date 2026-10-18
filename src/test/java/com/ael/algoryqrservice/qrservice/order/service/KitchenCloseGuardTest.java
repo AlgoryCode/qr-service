@@ -1,9 +1,12 @@
-package com.ael.algoryqrservice.qrservice.service;
+package com.ael.algoryqrservice.qrservice.order.service;
 
+import com.ael.algoryqrservice.qrservice.order.service.KitchenYemekSepetiService;
+import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsService;
+import com.ael.algoryqrservice.qrservice.order.service.KitchenCloseGuard;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuOrderDtos;
+import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
@@ -47,7 +50,7 @@ class KitchenCloseGuardTest {
     @InjectMocks
     private KitchenCloseGuard guard;
 
-    private final Branch branch = Branch.builder().id(15L).userId(7L).name("Kadıköy").kitchenEnabled(true).build();
+    private final Branch branch = Branch.builder().id(15L).merchantId(7L).name("Kadıköy").kitchenEnabled(true).build();
 
     @BeforeEach
     void setUp() {
@@ -67,7 +70,7 @@ class KitchenCloseGuardTest {
     @Test
     void rejectsWhenStoreOrderBelongsToBranch() {
         when(menuOrderRepository.existsByMenuIdInAndStatusIn(anyList(), anyCollection())).thenReturn(false);
-        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.of(Merchant.builder().id(3L).build()));
+        when(merchantRepository.findByOwnerMerchantIdAndDeletedFalse(7L)).thenReturn(Optional.of(Merchant.builder().id(3L).build()));
         when(storeOrderRepository.existsForBranch(eq(3L), eq(15L), anyCollection())).thenReturn(true);
 
         assertThatThrownBy(() -> guard.requireNoActiveOrders(branch)).isInstanceOf(BadRequestException.class);
@@ -76,7 +79,7 @@ class KitchenCloseGuardTest {
     @Test
     void allowsWhenIntegrationOrdersBelongToAnotherBranch() {
         when(menuOrderRepository.existsByMenuIdInAndStatusIn(anyList(), anyCollection())).thenReturn(false);
-        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.empty());
+        when(merchantRepository.findByOwnerMerchantIdAndDeletedFalse(7L)).thenReturn(Optional.empty());
         when(kitchenUberEatsService.listActiveForBranch(7L, 15L)).thenReturn(List.of());
         when(kitchenYemekSepetiService.listActiveForBranch(7L, 15L)).thenReturn(List.of());
 
@@ -86,7 +89,7 @@ class KitchenCloseGuardTest {
     @Test
     void rejectsWhenIntegrationOrderIsInThisBranchKitchen() {
         when(menuOrderRepository.existsByMenuIdInAndStatusIn(anyList(), anyCollection())).thenReturn(false);
-        when(merchantRepository.findByUserIdAndDeletedFalse(7L)).thenReturn(Optional.empty());
+        when(merchantRepository.findByOwnerMerchantIdAndDeletedFalse(7L)).thenReturn(Optional.empty());
         when(kitchenUberEatsService.listActiveForBranch(7L, 15L))
                 .thenReturn(List.of(mock(MenuOrderDtos.OrderResponse.class)));
 

@@ -1,15 +1,17 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.platform.service.NotificationPublisherService;
+import com.ael.algoryqrservice.adminservice.application.AdminUserCredentialService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.model.dto.AdminUserDtos;
+import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
+import com.ael.algoryqrservice.qrservice.client.AuthCredentialClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,11 +35,9 @@ class AdminUserCredentialServiceTest {
     @Mock
     PasswordEncoder passwordEncoder;
     @Mock
-    SessionService sessionService;
-    @Mock
     NotificationPublisherService notificationPublisherService;
     @Mock
-    EmailVerificationService emailVerificationService;
+    AuthCredentialClient authCredentialClient;
 
     AdminUserCredentialService service;
 
@@ -46,9 +46,8 @@ class AdminUserCredentialServiceTest {
         service = new AdminUserCredentialService(
                 userRepository,
                 passwordEncoder,
-                sessionService,
                 notificationPublisherService,
-                emailVerificationService
+                authCredentialClient
         );
     }
 
@@ -63,7 +62,6 @@ class AdminUserCredentialServiceTest {
         assertThat(result.getTemporaryPassword()).hasSize(12);
         assertThat(result.isEmailed()).isTrue();
         assertThat(user.getPassword()).isEqualTo("hashed");
-        verify(sessionService).revokeAllActiveSessions(7L);
         verify(notificationPublisherService).publishTemporaryPassword(
                 eq("user@example.com"),
                 eq("Ada"),
@@ -82,7 +80,6 @@ class AdminUserCredentialServiceTest {
         assertThat(result.getTemporaryPassword()).isNotBlank();
         assertThat(result.isEmailed()).isFalse();
         verify(notificationPublisherService, never()).publishTemporaryPassword(anyString(), anyString(), anyString());
-        verify(sessionService).revokeAllActiveSessions(7L);
     }
 
     @Test
@@ -113,7 +110,6 @@ class AdminUserCredentialServiceTest {
         assertThatThrownBy(() -> service.resetPassword(7L))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Google");
-        verify(sessionService, never()).revokeAllActiveSessions(7L);
     }
 
     @Test
@@ -131,9 +127,7 @@ class AdminUserCredentialServiceTest {
 
         service.sendEmailVerification(7L);
 
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(emailVerificationService).sendForAdmin(captor.capture());
-        assertThat(captor.getValue().getId()).isEqualTo(7L);
+        verify(authCredentialClient).sendEmailCode(7L);
     }
 
     private static User basicUser(boolean verified) {

@@ -1,10 +1,13 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.MenuService;
+import com.ael.algoryqrservice.qrservice.menu.service.MenuCategoryService;
+import com.ael.algoryqrservice.qrservice.menu.service.AiMenuImportService;
 import com.ael.algoryqrservice.qrservice.client.AiServiceClient;
 import com.ael.algoryqrservice.qrservice.client.dto.AiMenuImportClientDtos;
 import com.ael.algoryqrservice.qrservice.model.Menu;
-import com.ael.algoryqrservice.qrservice.model.dto.AiMenuImportDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.AiMenuImportDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
@@ -50,10 +53,10 @@ class AiMenuImportServiceTest {
     @Test
     void createJob_whenOwnedMenu_thenProxiesToAiService() {
         UUID jobId = UUID.randomUUID();
-        when(securityUtils.getCurrentUserId()).thenReturn(userId);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(userId);
         when(menuRepository.findById(menuId)).thenReturn(Optional.of(Menu.builder()
                 .menuId(menuId)
-                .userId(userId)
+                .merchantId(userId)
                 .deleted(false)
                 .build()));
         when(aiServiceClient.createMenuImportJob(any())).thenReturn(
@@ -73,24 +76,24 @@ class AiMenuImportServiceTest {
                 ArgumentCaptor.forClass(AiMenuImportClientDtos.CreateRequest.class);
         verify(aiServiceClient).createMenuImportJob(captor.capture());
         assertThat(captor.getValue().getMenuId()).isEqualTo(menuId);
-        assertThat(captor.getValue().getUserId()).isEqualTo(userId);
+        assertThat(captor.getValue().getMerchantId()).isEqualTo(userId);
         assertThat(captor.getValue().getImageUrls()).containsExactly("https://cdn.example/a.jpg");
     }
 
     @Test
     void getJob_whenMenuMismatch_thenForbidden() {
         UUID jobId = UUID.randomUUID();
-        when(securityUtils.getCurrentUserId()).thenReturn(userId);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(userId);
         when(menuRepository.findById(menuId)).thenReturn(Optional.of(Menu.builder()
                 .menuId(menuId)
-                .userId(userId)
+                .merchantId(userId)
                 .deleted(false)
                 .build()));
         when(aiServiceClient.getMenuImportJob(jobId)).thenReturn(
                 AiMenuImportClientDtos.JobResponse.builder()
                         .jobId(jobId)
                         .menuId(99L)
-                        .userId(userId)
+                        .merchantId(userId)
                         .status("queued")
                         .build()
         );
@@ -104,7 +107,7 @@ class AiMenuImportServiceTest {
     void publishProducts_whenValid_thenCreatesProduct() {
         when(menuRepository.findById(menuId)).thenReturn(Optional.of(Menu.builder()
                 .menuId(menuId)
-                .userId(userId)
+                .merchantId(userId)
                 .deleted(false)
                 .build()));
         when(menuService.createProductForOwner(eq(menuId), eq(userId), any())).thenReturn(
@@ -114,7 +117,7 @@ class AiMenuImportServiceTest {
         AiMenuImportDtos.PublishResponse response = service.publishProducts(
                 AiMenuImportDtos.PublishRequest.builder()
                         .menuId(menuId)
-                        .userId(userId)
+                        .merchantId(userId)
                         .products(List.of(
                                 AiMenuImportDtos.PublishProduct.builder()
                                         .name("Lahmacun")

@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.MenuThemeService;
 import com.ael.algoryqrservice.qrservice.catalog.CatalogThemes;
 import com.ael.algoryqrservice.qrservice.model.MenuTheme;
 import com.ael.algoryqrservice.qrservice.model.UserThemeAssignment;
@@ -42,11 +43,11 @@ class MenuThemeServiceDefaultThemeTest {
     void ensureDefaultThemeAssigned_whenNoAssignments_thenAssignLuxury() {
         MenuTheme luxury = MenuTheme.builder().id(30L).code(CatalogThemes.DEFAULT_THEME_CODE).active(true).build();
         when(userRepository.existsById(7L)).thenReturn(true);
-        when(userThemeAssignmentRepository.findByUserId(7L)).thenReturn(List.of()).thenReturn(List.of(
-                UserThemeAssignment.builder().userId(7L).themeId(30L).build()
+        when(userThemeAssignmentRepository.findByMerchantId(7L)).thenReturn(List.of()).thenReturn(List.of(
+                UserThemeAssignment.builder().merchantId(7L).themeId(30L).build()
         ));
         when(menuThemeRepository.findByCodeIn(any())).thenReturn(List.of(luxury));
-        when(userThemeAssignmentRepository.existsByUserIdAndThemeId(7L, 30L)).thenReturn(false);
+        when(userThemeAssignmentRepository.existsByMerchantIdAndThemeId(7L, 30L)).thenReturn(false);
         when(menuThemeRepository.findByIdInAndActiveTrueOrderBySortOrderAscIdAsc(Set.of(30L)))
                 .thenReturn(List.of(luxury));
 
@@ -55,14 +56,14 @@ class MenuThemeServiceDefaultThemeTest {
         ArgumentCaptor<UserThemeAssignment> captor = ArgumentCaptor.forClass(UserThemeAssignment.class);
         verify(userThemeAssignmentRepository).save(captor.capture());
         assertThat(captor.getValue().getThemeId()).isEqualTo(30L);
-        assertThat(captor.getValue().getUserId()).isEqualTo(7L);
+        assertThat(captor.getValue().getMerchantId()).isEqualTo(7L);
     }
 
     @Test
     void ensureDefaultThemeAssigned_whenAlreadyAssigned_thenSkip() {
         when(userRepository.existsById(7L)).thenReturn(true);
-        when(userThemeAssignmentRepository.findByUserId(7L)).thenReturn(List.of(
-                UserThemeAssignment.builder().userId(7L).themeId(11L).build()
+        when(userThemeAssignmentRepository.findByMerchantId(7L)).thenReturn(List.of(
+                UserThemeAssignment.builder().merchantId(7L).themeId(11L).build()
         ));
         when(menuThemeRepository.findByIdInAndActiveTrueOrderBySortOrderAscIdAsc(Set.of(11L)))
                 .thenReturn(List.of(MenuTheme.builder().id(11L).code("soft").active(true).build()));

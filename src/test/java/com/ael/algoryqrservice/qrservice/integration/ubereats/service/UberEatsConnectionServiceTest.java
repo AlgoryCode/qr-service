@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.integration.ubereats.service;
 
+import com.ael.algoryqrservice.qrservice.integration.service.ubereats.UberEatsConnectionService;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.client.UberEatsClient;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.crypto.UberEatsCredentialEncryptor;
@@ -59,8 +60,8 @@ class UberEatsConnectionServiceTest {
 
     @Test
     void upsert_whenNoBranch_thenStoresUserScopedConnection() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
-        when(connectionRepository.findByUserId(9L)).thenReturn(Optional.empty());
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(connectionRepository.findByMerchantId(9L)).thenReturn(Optional.empty());
         when(encryptor.encrypt("key")).thenReturn("enc-key");
         when(encryptor.encrypt("secret")).thenReturn("enc-secret");
         when(encryptor.decrypt("enc-key")).thenReturn("key");
@@ -90,7 +91,7 @@ class UberEatsConnectionServiceTest {
 
         ArgumentCaptor<UberEatsConnection> captor = ArgumentCaptor.forClass(UberEatsConnection.class);
         verify(connectionRepository).save(captor.capture());
-        assertThat(captor.getValue().getUserId()).isEqualTo(9L);
+        assertThat(captor.getValue().getMerchantId()).isEqualTo(9L);
         assertThat(captor.getValue().getStatus()).isEqualTo(UberEatsConnectionStatus.CONNECTED);
         assertThat(response.getRestaurantName()).isEqualTo("Mexican Doner");
         assertThat(response.getSellerId()).isEqualTo("6730477");
@@ -98,17 +99,17 @@ class UberEatsConnectionServiceTest {
 
     @Test
     void getMine_whenMissing_thenNotFound() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
-        when(connectionRepository.findByUserId(9L)).thenReturn(Optional.empty());
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(connectionRepository.findByMerchantId(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> connectionService.getMine()).isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void disconnect_whenExists_thenMarksDisconnected() {
-        when(securityUtils.getCurrentUserId()).thenReturn(9L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
         UberEatsConnection connection = UberEatsConnection.builder()
                 .id(3L)
-                .userId(9L)
+                .merchantId(9L)
                 .sellerId("6730477")
                 .apiKeyEncrypted("enc-key")
                 .apiSecretEncrypted("enc-secret")
@@ -116,7 +117,7 @@ class UberEatsConnectionServiceTest {
                 .restaurantName("Mexican Doner")
                 .status(UberEatsConnectionStatus.CONNECTED)
                 .build();
-        when(connectionRepository.findByUserId(9L)).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByMerchantId(9L)).thenReturn(Optional.of(connection));
         when(connectionRepository.save(any(UberEatsConnection.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(encryptor.decrypt("enc-key")).thenReturn("key");
         when(encryptor.mask("key")).thenReturn("k***");

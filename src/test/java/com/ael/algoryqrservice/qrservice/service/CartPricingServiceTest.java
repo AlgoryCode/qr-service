@@ -1,15 +1,18 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.billing.service.PackagePricingService;
+
+import com.ael.algoryqrservice.qrservice.order.service.CartPricingService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.PlanPackage;
 import com.ael.algoryqrservice.qrservice.model.PlanPackageAddon;
 import com.ael.algoryqrservice.qrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.qrservice.model.Product;
-import com.ael.algoryqrservice.qrservice.model.dto.PurchaseModuleLineRequest;
+import com.ael.algoryqrservice.qrservice.billing.dto.PurchaseModuleLineRequest;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
 import com.ael.algoryqrservice.qrservice.model.enums.ProductBillingType;
 import com.ael.algoryqrservice.qrservice.repository.PlanPackageAddonRepository;
-import com.ael.algoryqrservice.qrservice.repository.ProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

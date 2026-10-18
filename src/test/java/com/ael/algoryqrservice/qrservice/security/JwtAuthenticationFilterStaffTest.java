@@ -1,6 +1,6 @@
 package com.ael.algoryqrservice.qrservice.security;
 
-import com.ael.algoryqrservice.qrservice.service.JwtService;
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
@@ -32,11 +32,11 @@ class JwtAuthenticationFilterStaffTest {
         when(jwtService.extractPrincipalType(claims)).thenReturn(JwtService.PRINCIPAL_APP);
         when(jwtService.extractSubjectType(claims)).thenReturn(JwtService.SUBJECT_STAFF);
         when(jwtService.extractMerchantId(claims)).thenReturn(118L);
-        when(jwtService.extractUserId(claims)).thenReturn(57L);
+        when(jwtService.extractStaffId(claims)).thenReturn(57L);
         when(jwtService.extractRoles(claims)).thenReturn(List.of("ROLE_KITCHEN"));
         when(jwtService.extractBranchId(claims)).thenReturn(37L);
 
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, org.mockito.Mockito.mock(com.ael.algoryqrservice.adminservice.application.DashboardSessionService.class));
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer token");
         FilterChain chain = (servletRequest, servletResponse) -> {
@@ -44,7 +44,7 @@ class JwtAuthenticationFilterStaffTest {
             assertThat(authentication).isNotNull();
             assertThat(authentication.getDetails()).isInstanceOf(JwtAccessPrincipal.class);
             JwtAccessPrincipal principal = (JwtAccessPrincipal) authentication.getDetails();
-            assertThat(principal.userId()).isEqualTo(57L);
+            assertThat(principal.staffId()).isEqualTo(57L);
             assertThat(principal.merchantId()).isEqualTo(118L);
             assertThat(principal.branchId()).isEqualTo(37L);
             assertThat(principal.isWaiter()).isTrue();

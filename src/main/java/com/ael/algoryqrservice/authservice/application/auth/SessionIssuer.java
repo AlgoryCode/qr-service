@@ -152,6 +152,9 @@ public class SessionIssuer {
             Long merchantId = subject.merchantId() != null ? subject.merchantId() : subject.subjectId();
             builder.claim("merchantId", merchantId);
         } else if (AuthSubject.TYPE_STAFF.equals(subject.subjectType())) {
+            if (subject.branchId() == null) {
+                throw new UnauthorizedException("Personel bir şubeye atanmamış");
+            }
             builder.claim("staffId", subject.subjectId());
             if (subject.merchantId() != null) {
                 builder.claim("merchantId", subject.merchantId());

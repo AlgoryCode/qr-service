@@ -45,7 +45,8 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
                 merchantId,
                 keepFulfillmentId,
                 FulfillmentStatus.SUPERSEDED,
-                FulfillmentStatus.ACTIVE
+                FulfillmentStatus.ACTIVE,
+                Instant.now()
         );
     }
 

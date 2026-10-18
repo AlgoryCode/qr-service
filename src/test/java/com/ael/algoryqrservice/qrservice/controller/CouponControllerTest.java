@@ -1,7 +1,9 @@
 package com.ael.algoryqrservice.qrservice.controller;
 
+import com.ael.algoryqrservice.qrservice.billing.controller.CouponController;
+
 import com.ael.algoryqrservice.qrservice.coupon.CouponUseCases;
-import com.ael.algoryqrservice.qrservice.model.dto.CouponDtos;
+import com.ael.algoryqrservice.qrservice.billing.dto.CouponDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.CouponDiscountType;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;

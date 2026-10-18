@@ -1,15 +1,19 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.ServesPeopleSupport;
+
+import com.ael.algoryqrservice.qrservice.menu.service.NutritionFactsService;
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductSeedService;
 import com.ael.algoryqrservice.qrservice.config.AppProperties;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.qrservice.model.MenuTag;
-import com.ael.algoryqrservice.qrservice.model.dto.MenuProductSeedDtos;
+import com.ael.algoryqrservice.qrservice.product.dto.MenuProductSeedDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.qrservice.repository.MenuAllergenRepository;
-import com.ael.algoryqrservice.qrservice.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuTagRepository;

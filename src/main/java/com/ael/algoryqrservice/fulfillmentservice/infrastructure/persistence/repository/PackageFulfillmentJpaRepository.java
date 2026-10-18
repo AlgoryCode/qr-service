@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface PackageFulfillmentJpaRepository extends JpaRepository<PackageFulfillmentEntity, Long> {
@@ -20,13 +21,14 @@ public interface PackageFulfillmentJpaRepository extends JpaRepository<PackageFu
     @Modifying
     @Query("""
             update PackageFulfillmentEntity f
-            set f.status = :status, f.updatedAt = CURRENT_TIMESTAMP
+            set f.status = :status, f.updatedAt = :updatedAt
             where f.merchantId = :merchantId and f.id <> :keepId and f.status = :activeStatus
             """)
     int supersedeOthers(
             @Param("merchantId") Long merchantId,
             @Param("keepId") Long keepId,
             @Param("status") FulfillmentStatus status,
-            @Param("activeStatus") FulfillmentStatus activeStatus
+            @Param("activeStatus") FulfillmentStatus activeStatus,
+            @Param("updatedAt") Instant updatedAt
     );
 }

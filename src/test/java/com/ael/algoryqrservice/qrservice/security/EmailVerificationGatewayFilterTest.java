@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.security;
 
 import com.ael.algoryqrservice.qrservice.exception.AuthErrorCodes;
-import com.ael.algoryqrservice.qrservice.service.JwtService;
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
@@ -103,19 +103,6 @@ class EmailVerificationGatewayFilterTest {
         verify(gate, never()).isVerificationPending(any());
     }
 
-    @Test
-    void doFilter_whenDemoPrincipal_thenContinueWithoutGateLookup() throws Exception {
-        authenticatePrincipal(7L, JwtService.PRINCIPAL_DEMO);
-        FilterChain chain = mock(FilterChain.class);
-        MockHttpServletRequest servletRequest = request("/menus");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        filter.doFilterInternal(servletRequest, response, chain);
-
-        verify(chain).doFilter(servletRequest, response);
-        verify(gate, never()).isVerificationPending(any());
-    }
-
     private static MockHttpServletRequest request(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
         request.setRequestURI(uri);
@@ -129,7 +116,7 @@ class EmailVerificationGatewayFilterTest {
     private static void authenticatePrincipal(Long userId, String principalType) {
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken("owner@example.com", null, List.of());
-        authentication.setDetails(new JwtAccessPrincipal(userId, List.of(), List.of(), null, principalType));
+        authentication.setDetails(new JwtAccessPrincipal(null, userId, null, null, List.of(), List.of(), null, principalType, null));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

@@ -1,11 +1,12 @@
 package com.ael.algoryqrservice.qrservice.service.entitlement;
 
+import com.ael.algoryqrservice.qrservice.billing.service.entitlement.PurchaseExpiryService;
 import com.ael.algoryqrservice.qrservice.event.PurchasesExpiredEvent;
 import com.ael.algoryqrservice.qrservice.model.Purchase;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseType;
 import com.ael.algoryqrservice.qrservice.repository.PurchaseRepository;
-import com.ael.algoryqrservice.qrservice.service.PurchaseLogService;
+import com.ael.algoryqrservice.qrservice.billing.service.PurchaseLogService;
 import com.ael.algoryqrservice.qrservice.util.WritableTransactionGuard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +55,7 @@ class PurchaseExpiryServiceTest {
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().userIds()).containsExactly(USER_ID);
+        assertThat(eventCaptor.getValue().merchantIds()).containsExactly(USER_ID);
     }
 
     @Test
@@ -72,7 +73,7 @@ class PurchaseExpiryServiceTest {
     void expireDueForMerchant_whenDueExists_thenExpireAndAnnounceOnce() {
         Purchase purchase = activeTrial();
         when(writableTransactionGuard.allowsWrites(any(), eq(USER_ID))).thenReturn(true);
-        when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(
+        when(purchaseRepository.findByMerchantIdAndStatusAndExpiresAtBefore(
                 eq(USER_ID), eq(PurchaseStatus.ACTIVE), any(LocalDateTime.class)
         )).thenReturn(List.of(purchase));
 
@@ -88,14 +89,14 @@ class PurchaseExpiryServiceTest {
 
         purchaseExpiryService.expireDueForMerchant(USER_ID);
 
-        verify(purchaseRepository, never()).findByUserIdAndStatusAndExpiresAtBefore(any(), any(), any());
+        verify(purchaseRepository, never()).findByMerchantIdAndStatusAndExpiresAtBefore(any(), any(), any());
         verify(eventPublisher, never()).publishEvent(any(PurchasesExpiredEvent.class));
     }
 
     private Purchase activeTrial() {
         return Purchase.builder()
                 .id(10L)
-                .userId(USER_ID)
+                .merchantId(USER_ID)
                 .packageName("Pro")
                 .purchaseType(PurchaseType.PAID)
                 .status(PurchaseStatus.ACTIVE)

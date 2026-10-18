@@ -1,4 +1,6 @@
-package com.ael.algoryqrservice.qrservice.service;
+package com.ael.algoryqrservice.qrservice.platform.service;
+
+import com.ael.algoryqrservice.qrservice.platform.service.IpGeoLookupService;
 
 import org.junit.jupiter.api.Test;
 

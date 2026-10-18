@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.billservice.dto;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.BillAdjustmentType;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
+import com.ael.algoryqrservice.qrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -119,6 +120,17 @@ public final class TableBillDtos {
 
         @DecimalMin(value = "0.01")
         private BigDecimal tipAmount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CancelBillRequest {
+        private CancelReason reason;
+
+        @Size(max = 1000)
+        private String reasonNote;
     }
 
     @Data

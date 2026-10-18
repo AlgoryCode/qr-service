@@ -1,9 +1,10 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.billing.service.UserAccountingService;
 import com.ael.algoryqrservice.qrservice.access.AccessSession;
 import com.ael.algoryqrservice.qrservice.access.SessionAccessService;
 import com.ael.algoryqrservice.qrservice.model.UserAccountingEntry;
-import com.ael.algoryqrservice.qrservice.model.dto.UserAccountingDtos;
+import com.ael.algoryqrservice.qrservice.billing.dto.UserAccountingDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.qrservice.model.enums.AccountingEntryType;
 import com.ael.algoryqrservice.qrservice.model.enums.AccountingSourceType;
@@ -12,8 +13,8 @@ import com.ael.algoryqrservice.qrservice.repository.MenuOrderItemRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillItemRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillItemRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserAccountingEntryRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,7 +61,7 @@ class UserAccountingServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(securityUtils.getCurrentUserId()).thenReturn(7L);
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
         when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(AccessDecision.ALLOW, null, null, null));
     }
 
@@ -70,7 +71,7 @@ class UserAccountingServiceTest {
 
         UserAccountingEntry billSale = UserAccountingEntry.builder()
                 .id(42L)
-                .userId(7L)
+                .merchantId(7L)
                 .entryType(AccountingEntryType.GELIR)
                 .title("Adisyon - Masa 3")
                 .amount(new BigDecimal("150.00"))
@@ -86,7 +87,7 @@ class UserAccountingServiceTest {
 
         UserAccountingEntry manualEntry = UserAccountingEntry.builder()
                 .id(11L)
-                .userId(7L)
+                .merchantId(7L)
                 .entryType(AccountingEntryType.GIDER)
                 .title("Kira")
                 .amount(new BigDecimal("5000.00"))
@@ -97,10 +98,10 @@ class UserAccountingServiceTest {
                 .updatedAt(closedAt.minusDays(1))
                 .build();
 
-        when(menuRepository.findMenuIdsByUserIdAndChannel(7L, MenuChannel.QR)).thenReturn(List.of(5L));
+        when(menuRepository.findMenuIdsByMerchantIdAndChannel(7L, MenuChannel.QR)).thenReturn(List.of(5L));
         when(menuRepository.findById(5L)).thenReturn(Optional.of(com.ael.algoryqrservice.qrservice.model.Menu.builder()
                 .menuId(5L)
-                .userId(7L)
+                .merchantId(7L)
                 .businessName("Test Cafe")
                 .build()));
         when(userAccountingEntryRepository.findAll(any(Specification.class)))
@@ -133,7 +134,7 @@ class UserAccountingServiceTest {
 
     @Test
     void listForCurrentUser_whenGiderFilter_thenReturnsOnlyMatching() {
-        when(menuRepository.findMenuIdsByUserIdAndChannel(7L, MenuChannel.QR)).thenReturn(List.of(5L));
+        when(menuRepository.findMenuIdsByMerchantIdAndChannel(7L, MenuChannel.QR)).thenReturn(List.of(5L));
         when(userAccountingEntryRepository.findAll(any(Specification.class))).thenReturn(List.of());
 
         UserAccountingDtos.EntryPageResponse response = userAccountingService.listForCurrentUser(

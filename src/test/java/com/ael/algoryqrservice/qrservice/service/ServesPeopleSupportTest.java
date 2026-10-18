@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.ServesPeopleSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 

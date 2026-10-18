@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsMapper;
+
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsOrder;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;

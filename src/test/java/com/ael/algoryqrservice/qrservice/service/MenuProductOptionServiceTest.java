@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.product.service.MenuProductOptionService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductOption;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProductOptionGroup;
@@ -10,7 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.ael.algoryqrservice.qrservice.repository.MenuProductOptionGroupRepository;
+import com.ael.algoryqrservice.qrservice.product.repository.MenuProductOptionGroupRepository;
 
 import java.math.BigDecimal;
 import java.util.List;

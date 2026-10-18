@@ -1,11 +1,12 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.billing.service.BillingAddressService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.model.BillingAddress;
 import com.ael.algoryqrservice.qrservice.model.BillingSnapshot;
-import com.ael.algoryqrservice.qrservice.model.dto.BillingAddressDtos;
-import com.ael.algoryqrservice.qrservice.model.dto.BillingAddressPageResponse;
+import com.ael.algoryqrservice.qrservice.billing.dto.BillingAddressDtos;
+import com.ael.algoryqrservice.qrservice.billing.dto.BillingAddressPageResponse;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingAddressType;
 import com.ael.algoryqrservice.qrservice.repository.BillingAddressRepository;
 import org.junit.jupiter.api.Test;
@@ -29,11 +30,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class BillingAddressServiceTest {
     @Mock BillingAddressRepository repository;
-    @InjectMocks BillingAddressService service;
+    @InjectMocks
+    BillingAddressService service;
 
     @Test
     void get_whenAddressOwnedByAnotherUser_thenNotFound() {
-        when(repository.findByIdAndUserId(4L, 7L)).thenReturn(Optional.empty());
+        when(repository.findByIdAndMerchantId(4L, 7L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(7L, 4L))
                 .isInstanceOf(NotFoundException.class)
@@ -43,7 +45,7 @@ class BillingAddressServiceTest {
     @Test
     void get_whenOwned_thenReturnResponse() {
         BillingAddress address = sampleCorporate(4L, 7L, true);
-        when(repository.findByIdAndUserId(4L, 7L)).thenReturn(Optional.of(address));
+        when(repository.findByIdAndMerchantId(4L, 7L)).thenReturn(Optional.of(address));
 
         BillingAddressDtos.Response response = service.get(7L, 4L);
 
@@ -54,7 +56,7 @@ class BillingAddressServiceTest {
 
     @Test
     void resolveSnapshot_whenAddressOwnedByAnotherUser_thenNotFound() {
-        when(repository.findByIdAndUserId(4L, 7L)).thenReturn(Optional.empty());
+        when(repository.findByIdAndMerchantId(4L, 7L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.resolveSnapshot(7L, 4L, null))
                 .isInstanceOf(NotFoundException.class)
@@ -73,7 +75,7 @@ class BillingAddressServiceTest {
     @Test
     void resolveSnapshot_whenOwnedAddressChangesLater_thenSnapshotRemainsImmutable() {
         BillingAddress address = sampleCorporate(4L, 7L, false);
-        when(repository.findByIdAndUserId(4L, 7L)).thenReturn(Optional.of(address));
+        when(repository.findByIdAndMerchantId(4L, 7L)).thenReturn(Optional.of(address));
 
         BillingSnapshot snapshot = service.resolveSnapshot(7L, 4L, null);
         address.setAddress("Adres 2");
@@ -86,7 +88,7 @@ class BillingAddressServiceTest {
     @Test
     void resolveDefaultSnapshot_whenDefaultExists_thenUseIt() {
         BillingAddress defaultAddress = sampleCorporate(4L, 7L, true);
-        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(defaultAddress));
+        when(repository.findByMerchantIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(defaultAddress));
 
         BillingSnapshot snapshot = service.resolveDefaultSnapshot(7L);
 
@@ -97,8 +99,8 @@ class BillingAddressServiceTest {
     @Test
     void resolveDefaultSnapshot_whenNoDefaultButOtherExists_thenFallBackToFirst() {
         BillingAddress other = sampleCorporate(2L, 7L, false);
-        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
-        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L))
+        when(repository.findByMerchantIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
+        when(repository.findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(7L))
                 .thenReturn(List.of(other));
 
         BillingSnapshot snapshot = service.resolveDefaultSnapshot(7L);
@@ -108,8 +110,8 @@ class BillingAddressServiceTest {
 
     @Test
     void resolveDefaultSnapshot_whenNoAddressExists_thenThrowBadRequest() {
-        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
-        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L))
+        when(repository.findByMerchantIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
+        when(repository.findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(7L))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> service.resolveDefaultSnapshot(7L))
@@ -120,7 +122,7 @@ class BillingAddressServiceTest {
     @Test
     void create_whenFirstAddress_thenMakeDefault() {
         BillingAddressDtos.Request request = individualRequest(false);
-        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
+        when(repository.findByMerchantIdAndDefaultAddressTrue(7L)).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         BillingAddressDtos.Response response = service.create(7L, request);
@@ -132,8 +134,8 @@ class BillingAddressServiceTest {
     void makeDefault_whenOwned_thenClearPreviousAndSetActive() {
         BillingAddress previous = sampleCorporate(1L, 7L, true);
         BillingAddress next = sampleCorporate(2L, 7L, false);
-        when(repository.findByIdAndUserId(2L, 7L)).thenReturn(Optional.of(next));
-        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(previous));
+        when(repository.findByIdAndMerchantId(2L, 7L)).thenReturn(Optional.of(next));
+        when(repository.findByMerchantIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(previous));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         BillingAddressDtos.Response response = service.makeDefault(7L, 2L);
@@ -149,7 +151,7 @@ class BillingAddressServiceTest {
     void list_whenAddressesExist_thenPreserveRepositoryOrder() {
         BillingAddress active = sampleCorporate(2L, 7L, true);
         BillingAddress other = sampleCorporate(1L, 7L, false);
-        when(repository.findByUserIdOrderByDefaultAddressDescCreatedAtDesc(7L, PageRequest.of(0, 5)))
+        when(repository.findByMerchantIdOrderByDefaultAddressDescCreatedAtDesc(7L, PageRequest.of(0, 5)))
                 .thenReturn(new PageImpl<>(List.of(active, other), PageRequest.of(0, 5), 2));
 
         BillingAddressPageResponse result = service.list(7L, 0, 5);
@@ -162,7 +164,7 @@ class BillingAddressServiceTest {
     void create_whenMarkedDefault_thenClearPreviousDefault() {
         BillingAddress previous = sampleCorporate(1L, 7L, true);
         BillingAddressDtos.Request request = individualRequest(true);
-        when(repository.findByUserIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(previous));
+        when(repository.findByMerchantIdAndDefaultAddressTrue(7L)).thenReturn(Optional.of(previous));
         when(repository.save(any())).thenAnswer(invocation -> {
             BillingAddress saved = invocation.getArgument(0);
             if (saved.getId() == null) {
@@ -181,7 +183,7 @@ class BillingAddressServiceTest {
     }
 
     private static BillingAddress sampleCorporate(Long id, Long userId, boolean defaultAddress) {
-        return BillingAddress.builder().id(id).userId(userId)
+        return BillingAddress.builder().id(id).merchantId(userId)
                 .type(BillingAddressType.CORPORATE).title("Ofis").legalName("Algory")
                 .vkn("1234567890").taxOffice("Merkez").country("TR").city("İstanbul")
                 .district("Kadıköy").address("Adres 1").postcode("34000")

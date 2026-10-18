@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.util;
 
 import com.ael.algoryqrservice.qrservice.model.User;
-import com.ael.algoryqrservice.qrservice.repository.CustomerRepository;
-import com.ael.algoryqrservice.qrservice.repository.MerchantStaffRepository;
+import com.ael.algoryqrservice.customerservice.infrastructure.persistence.repository.CustomerRepository;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.security.JwtAccessPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,20 +39,11 @@ class SecurityUtilsAccountUserTest {
     }
 
     @Test
-    void getCurrentUserId_whenEmailAccountDiffersFromToken_thenReturnsAccountId() {
-        when(userRepository.findByEmail("owner@example.com"))
-                .thenReturn(Optional.of(User.builder().id(7L).build()));
+    void getCurrentMerchantId_whenTokenHasMerchantId_thenReturnsTokenMerchantId() {
         authenticate(99L, "owner@example.com");
 
-        assertThat(securityUtils.getCurrentUserId()).isEqualTo(7L);
-    }
-
-    @Test
-    void getCurrentUserId_whenEmailAccountMissing_thenReturnsTokenId() {
-        when(userRepository.findByEmail("owner@example.com")).thenReturn(Optional.empty());
-        authenticate(99L, "owner@example.com");
-
-        assertThat(securityUtils.getCurrentUserId()).isEqualTo(99L);
+        assertThat(securityUtils.getCurrentMerchantId()).isEqualTo(99L);
+        verifyNoInteractions(userRepository, merchantStaffRepository);
     }
 
     private void authenticate(Long tokenUserId, String email) {
@@ -60,7 +52,7 @@ class SecurityUtilsAccountUserTest {
                 null,
                 List.of()
         );
-        authentication.setDetails(new JwtAccessPrincipal(tokenUserId, List.of(), List.of(), null));
+        authentication.setDetails(new JwtAccessPrincipal(null, tokenUserId, null, null, List.of(), List.of(), null, null, null));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

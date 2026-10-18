@@ -1,11 +1,14 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.account.service.JwtService;
+import com.ael.algoryqrservice.adminservice.application.DashboardSessionService;
+import com.ael.algoryqrservice.adminservice.application.DashboardAuthService;
 import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
-import com.ael.algoryqrservice.qrservice.model.DashboardUser;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.DashboardUser;
 import com.ael.algoryqrservice.qrservice.model.dto.AuthResponse;
 import com.ael.algoryqrservice.qrservice.model.dto.LoginRequest;
-import com.ael.algoryqrservice.qrservice.model.enums.DashboardRole;
-import com.ael.algoryqrservice.qrservice.repository.DashboardUserRepository;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.enums.DashboardRole;
+import com.ael.algoryqrservice.adminservice.infrastructure.persistence.repository.DashboardUserRepository;
 import com.ael.algoryqrservice.qrservice.util.ClientInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

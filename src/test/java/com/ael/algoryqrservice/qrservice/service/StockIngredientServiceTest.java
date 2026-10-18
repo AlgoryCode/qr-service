@@ -1,6 +1,8 @@
 package com.ael.algoryqrservice.qrservice.service;
 
-import com.ael.algoryqrservice.qrservice.model.dto.StockDtos;
+import com.ael.algoryqrservice.qrservice.stock.service.StockIngredientService;
+import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
+import com.ael.algoryqrservice.qrservice.stock.dto.StockDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.StockUnit;
 import com.ael.algoryqrservice.qrservice.repository.StockIngredientRepository;
 import com.ael.algoryqrservice.qrservice.repository.StockMovementRepository;
@@ -51,8 +53,8 @@ class StockIngredientServiceTest {
 
     @Test
     void get_whenIngredientNotOwned_thenNotFound() {
-        when(securityUtils.getCurrentUserId()).thenReturn(1L);
-        when(ingredientRepository.findByIdAndUserIdAndDeletedFalse(4L, 1L)).thenReturn(Optional.empty());
+        when(securityUtils.getCurrentMerchantId()).thenReturn(1L);
+        when(ingredientRepository.findByIdAndMerchantIdAndDeletedFalse(4L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> stockIngredientService.get(4L))
                 .isInstanceOf(ResponseStatusException.class)

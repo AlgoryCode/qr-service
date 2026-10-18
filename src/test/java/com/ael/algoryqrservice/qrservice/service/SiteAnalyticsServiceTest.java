@@ -1,8 +1,10 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.analytics.service.SiteAnalyticsService;
+import com.ael.algoryqrservice.qrservice.platform.service.IpGeoLookupService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.SiteVisit;
-import com.ael.algoryqrservice.qrservice.model.dto.SiteAnalyticsDtos;
+import com.ael.algoryqrservice.qrservice.analytics.dto.SiteAnalyticsDtos;
 import com.ael.algoryqrservice.qrservice.repository.SiteVisitRepository;
 import com.ael.algoryqrservice.qrservice.util.AppTime;
 import com.ael.algoryqrservice.qrservice.util.ClientInfo;

@@ -1,5 +1,8 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.billing.externalpackageresponsemapper.service.ExternalPackageResponseMapper;
+import com.ael.algoryqrservice.qrservice.billing.service.ExternalPackageViewService;
+
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.qrservice.client.PackageView;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalActivePackageResponse;
@@ -7,7 +10,6 @@ import com.ael.algoryqrservice.qrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.qrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.qrservice.model.enums.PurchaseType;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,7 +27,7 @@ class ExternalPackageViewServiceTest {
         FulfillmentServiceClient client = mock(FulfillmentServiceClient.class);
         when(client.findPackage(7L)).thenReturn(new PackageView("ACTIVE", activePackage()));
         when(client.listEntitlements(7L)).thenReturn(List.of(entitlement()));
-        ExternalPackageViewService service = new ExternalPackageViewService(provider(client), new ExternalPackageResponseMapper());
+        ExternalPackageViewService service = new ExternalPackageViewService(client, new ExternalPackageResponseMapper());
 
         assertThat(service.purchases(7L)).hasValueSatisfying(purchases ->
                 assertThat(purchases).singleElement().satisfies(purchase -> {
@@ -50,18 +52,10 @@ class ExternalPackageViewServiceTest {
     }
 
     @Test
-    void purchases_whenClientMissing_thenEmpty() {
-        ExternalPackageViewService service = new ExternalPackageViewService(provider(null), new ExternalPackageResponseMapper());
-
-        assertThat(service.purchases(7L)).isEmpty();
-        assertThat(service.session(7L)).isEmpty();
-    }
-
-    @Test
     void session_whenPackageAbsent_thenRequirePurchase() {
         FulfillmentServiceClient client = mock(FulfillmentServiceClient.class);
         when(client.findPackage(7L)).thenReturn(new PackageView("INACTIVE", null));
-        ExternalPackageViewService service = new ExternalPackageViewService(provider(client), new ExternalPackageResponseMapper());
+        ExternalPackageViewService service = new ExternalPackageViewService(client, new ExternalPackageResponseMapper());
 
         assertThat(service.session(7L)).get().satisfies(session ->
                 assertThat(session.decision()).isEqualTo(AccessDecision.REQUIRE_PURCHASE)
@@ -107,12 +101,5 @@ class ExternalPackageViewServiceTest {
                 null,
                 "QR_CREATE"
         );
-    }
-
-    @SuppressWarnings("unchecked")
-    private ObjectProvider<FulfillmentServiceClient> provider(FulfillmentServiceClient client) {
-        ObjectProvider<FulfillmentServiceClient> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(client);
-        return provider;
     }
 }

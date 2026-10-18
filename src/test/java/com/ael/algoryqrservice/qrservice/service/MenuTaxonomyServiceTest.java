@@ -1,8 +1,9 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.qrservice.menu.service.MenuTaxonomyService;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.MenuAllergen;
-import com.ael.algoryqrservice.qrservice.model.dto.TaxonomyDtos;
+import com.ael.algoryqrservice.qrservice.menu.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuAllergenRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuTagRepository;
 import org.junit.jupiter.api.Test;
