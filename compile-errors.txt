@@ -1,0 +1,257 @@
+﻿mvn : WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+At C:\Users\Tarik\AppData\Local\Temp\ps-script-b38f68cf-b2ce-479c-a326-23382443d1cb.ps1:85 char:50
++ ... Desktop\Services\qr-service"; mvn -q -DskipTests compile 2>&1 | Out-F ...
++                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: A term...has been called:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by lombok.permit.Permit
+WARNING: Please consider reporting this to the maintainers of class lombok.permit.Permit
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[ERROR] COMPILATION ERROR : 
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/client/FulfillmentServiceClient.java:[44,65] cannot find symbol
+  symbol:   variable userId
+  location: class com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/fulfillmentservice/application/FulfillmentPaymentBridge.java:[81,22] cannot find symbol
+  symbol:   method getMerchantId()
+  location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/fulfillmentservice/application/service/FulfillmentCommandFactory.java:[34,54] cannot find symbol
+  symbol:   method merchantId()
+  location: variable event of type com.ael.algoryqrservice.fulfillmentservice.domain.model.PaymentCompletedEvent
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/paymentservice/application/PaymentModuleQrEventBridge.java:[34,32] cannot find symbol
+  symbol:   method getMerchantId()
+  location: variable event of type com.ael.algoryqrservice.paymentservice.domain.model.PaymentCompletedEvent
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/paymentservice/application/service/PaymentServiceImpl.java:[972,17] cannot find symbol
+  symbol:   method merchantId(java.lang.String)
+  location: class com.ael.algoryqrservice.paymentservice.domain.model.PaymentCompletedEvent.PaymentCompletedEventBuilder
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[36,43] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[40,49] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[44,58] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[52,84] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/service/PurchaseService.java:[689,14] cannot find symbol
+  symbol:   method setMerchantId(java.lang.String)
+  location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/service/PurchaseService.java:[1705,79] cannot find symbol
+  symbol:   variable userId
+  location: class com.ael.algoryqrservice.qrservice.billing.service.PurchaseService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/messaging/fulfillment/FulfillmentQueuePublisher.java:[35,22] cannot find symbol
+  symbol:   method getMerchantId()
+  location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/coupon/service/CouponRedemptionService.java:[82,15] cannot find symbol
+  symbol:   method setUsedByUserId(java.lang.Long)
+  location: variable coupon of type com.ael.algoryqrservice.qrservice.model.Coupon
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/dto/PaymentEventMetadata.java:[29,52] cannot find symbol
+  symbol:   method getMerchantId()
+  location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/util/WritableTransactionGuard.java:[25,93] cannot find symbol
+  symbol:   variable userId
+  location: class com.ael.algoryqrservice.qrservice.util.WritableTransactionGuard
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/menu/service/MenuService.java:[590,37] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByProductIdDesc(java.lang.Long)
+  location: variable menuProductRepository of type com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/menu/service/MenuCatalogCloneService.java:[101,47] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/BranchService.java:[48,49] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByIdDesc(java.lang.Long)
+  location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/BranchService.java:[166,46] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/order/service/KitchenCloseGuard.java:[70,49] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/coupon/CouponUseCases.java:[143,41] cannot find symbol
+  symbol:   method getUsedByUserId()
+  location: variable coupon of type com.ael.algoryqrservice.qrservice.model.Coupon
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/platform/service/PlatformFeedbackService.java:[154,22] invalid method reference
+  cannot find symbol
+    symbol:   method getUserId()
+    location: class com.ael.algoryqrservice.qrservice.model.PlatformFeedback
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[25,29] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[30,28] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[36,31] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[44,31] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[49,36] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[54,24] cannot find symbol
+  symbol:   method merchantId()
+  location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/RestaurantLayoutService.java:[57,63] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(java.lang.Long)
+  location: variable restaurantTableRepository of type com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/RestaurantLayoutService.java:[181,46] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/RestaurantTableService.java:[503,41] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(java.lang.Long)
+  location: variable restaurantTableRepository of type com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/config/PackageExpirationScheduler.java:[42,64] invalid method reference
+  cannot find symbol
+    symbol:   method getUserId()
+    location: class com.ael.algoryqrservice.qrservice.model.Purchase
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/model/dto/PaymentEventMetadata.java:[29,52] cannot find symbol
+  symbol:   method getMerchantId()
+  location: variable event of type com.ael.algoryqrservice.qrservice.model.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/order/service/WaiterCourierOrderService.java:[117,34] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/print/service/PrintJobServiceImpl.java:[196,32] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByIdDesc(java.lang.Long)
+  location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/qr/service/QrService.java:[121,36] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByCreatedAtDesc(java.lang.Long)
+  location: variable qrRepository of type com.ael.algoryqrservice.qrservice.qr.repository.QrRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/store/service/MerchantService.java:[27,34] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/store/service/MerchantService.java:[33,34] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+  location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/store/service/MerchantSetupService.java:[49,49] cannot find symbol
+  symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByIdDesc(java.lang.Long)
+  location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project algoryqr-service: Compilation failure: Compilation failure: 
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/client/FulfillmentServiceClient.java:[44,65] cannot find symbol
+[ERROR]   symbol:   variable userId
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/fulfillmentservice/application/FulfillmentPaymentBridge.java:[81,22] cannot find symbol
+[ERROR]   symbol:   method getMerchantId()
+[ERROR]   location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/fulfillmentservice/application/service/FulfillmentCommandFactory.java:[34,54] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: variable event of type com.ael.algoryqrservice.fulfillmentservice.domain.model.PaymentCompletedEvent
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/paymentservice/application/PaymentModuleQrEventBridge.java:[34,32] cannot find symbol
+[ERROR]   symbol:   method getMerchantId()
+[ERROR]   location: variable event of type com.ael.algoryqrservice.paymentservice.domain.model.PaymentCompletedEvent
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/paymentservice/application/service/PaymentServiceImpl.java:[972,17] cannot find symbol
+[ERROR]   symbol:   method merchantId(java.lang.String)
+[ERROR]   location: class com.ael.algoryqrservice.paymentservice.domain.model.PaymentCompletedEvent.PaymentCompletedEventBuilder
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[36,43] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[40,49] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[44,58] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/account/service/AccountFacadeService.java:[52,84] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.account.service.AccountFacadeService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/service/PurchaseService.java:[689,14] cannot find symbol
+[ERROR]   symbol:   method setMerchantId(java.lang.String)
+[ERROR]   location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/service/PurchaseService.java:[1705,79] cannot find symbol
+[ERROR]   symbol:   variable userId
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.service.PurchaseService
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/messaging/fulfillment/FulfillmentQueuePublisher.java:[35,22] cannot find symbol
+[ERROR]   symbol:   method getMerchantId()
+[ERROR]   location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/coupon/service/CouponRedemptionService.java:[82,15] cannot find symbol
+[ERROR]   symbol:   method setUsedByUserId(java.lang.Long)
+[ERROR]   location: variable coupon of type com.ael.algoryqrservice.qrservice.model.Coupon
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/dto/PaymentEventMetadata.java:[29,52] cannot find symbol
+[ERROR]   symbol:   method getMerchantId()
+[ERROR]   location: variable event of type com.ael.algoryqrservice.qrservice.billing.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/util/WritableTransactionGuard.java:[25,93] cannot find symbol
+[ERROR]   symbol:   variable userId
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.util.WritableTransactionGuard
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/menu/service/MenuService.java:[590,37] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByProductIdDesc(java.lang.Long)
+[ERROR]   location: variable menuProductRepository of type com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/menu/service/MenuCatalogCloneService.java:[101,47] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/BranchService.java:[48,49] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByIdDesc(java.lang.Long)
+[ERROR]   location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/BranchService.java:[166,46] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/order/service/KitchenCloseGuard.java:[70,49] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/coupon/CouponUseCases.java:[143,41] cannot find symbol
+[ERROR]   symbol:   method getUsedByUserId()
+[ERROR]   location: variable coupon of type com.ael.algoryqrservice.qrservice.model.Coupon
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/platform/service/PlatformFeedbackService.java:[154,22] invalid method reference
+[ERROR]   cannot find symbol
+[ERROR]     symbol:   method getUserId()
+[ERROR]     location: class com.ael.algoryqrservice.qrservice.model.PlatformFeedback
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[25,29] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[30,28] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[36,31] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[44,31] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[49,36] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/billing/controller/BillingAddressController.java:[54,24] cannot find symbol
+[ERROR]   symbol:   method merchantId()
+[ERROR]   location: class com.ael.algoryqrservice.qrservice.billing.controller.BillingAddressController
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/RestaurantLayoutService.java:[57,63] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(java.lang.Long)
+[ERROR]   location: variable restaurantTableRepository of type com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/RestaurantLayoutService.java:[181,46] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/branch/service/RestaurantTableService.java:[503,41] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByTableNumberAscNameAsc(java.lang.Long)
+[ERROR]   location: variable restaurantTableRepository of type com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/config/PackageExpirationScheduler.java:[42,64] invalid method reference
+[ERROR]   cannot find symbol
+[ERROR]     symbol:   method getUserId()
+[ERROR]     location: class com.ael.algoryqrservice.qrservice.model.Purchase
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/model/dto/PaymentEventMetadata.java:[29,52] cannot find symbol
+[ERROR]   symbol:   method getMerchantId()
+[ERROR]   location: variable event of type com.ael.algoryqrservice.qrservice.model.dto.PaymentCompletedEventDto
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/order/service/WaiterCourierOrderService.java:[117,34] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/print/service/PrintJobServiceImpl.java:[196,32] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByIdDesc(java.lang.Long)
+[ERROR]   location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/qr/service/QrService.java:[121,36] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByCreatedAtDesc(java.lang.Long)
+[ERROR]   location: variable qrRepository of type com.ael.algoryqrservice.qrservice.qr.repository.QrRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/store/service/MerchantService.java:[27,34] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/store/service/MerchantService.java:[33,34] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalse(java.lang.Long)
+[ERROR]   location: variable merchantRepository of type com.ael.algoryqrservice.qrservice.store.repository.MerchantRepository
+[ERROR] /C:/Users/Tarik/Desktop/Services/qr-service/src/main/java/com/ael/algoryqrservice/qrservice/store/service/MerchantSetupService.java:[49,49] cannot find symbol
+[ERROR]   symbol:   method findByOwnerMerchantIdAndDeletedFalseOrderByIdDesc(java.lang.Long)
+[ERROR]   location: variable branchRepository of type com.ael.algoryqrservice.qrservice.repository.BranchRepository
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

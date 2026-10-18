@@ -477,7 +477,7 @@ public class TableBillService {
             throw new BadRequestException("Ödeme alınmış adisyon iptal edilemez");
         }
 
-        List<MenuOrder> orders = menuOrderRepository.findByBillId(billId);
+        List<MenuOrder> orders = menuOrderRepositoryw.findByBillId(billId);
         for (MenuOrder order : orders) {
             if (order.getStatus() == MenuOrderStatus.PAID) {
                 throw new BadRequestException("Ödenmiş siparişi olan adisyon iptal edilemez");
