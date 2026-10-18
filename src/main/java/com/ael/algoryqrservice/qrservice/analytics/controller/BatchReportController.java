@@ -27,14 +27,14 @@ public class BatchReportController {
     @GetMapping
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<Page<BatchReportDtos.BatchReportListItem>> listReports(Pageable pageable) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(batchReportService.listReports(merchantId, pageable));
     }
 
     @GetMapping("/{batchId}")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<BatchReportDtos.BatchReportDetail> getReport(@PathVariable UUID batchId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(batchReportService.getReport(merchantId, batchId));
     }
 }

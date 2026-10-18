@@ -48,7 +48,7 @@ class MenuWaiterServiceTest {
     @Test
     void createWaiter_whenBranchOwned_thenPersistsBranchId() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+        when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")
@@ -84,7 +84,7 @@ class MenuWaiterServiceTest {
     @Test
     void createWaiter_whenKitchenRole_thenPersistsKitchen() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+        when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")
@@ -117,7 +117,7 @@ class MenuWaiterServiceTest {
     @Test
     void createWaiter_whenCourierRole_thenPersistsCourier() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+        when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")
@@ -150,7 +150,7 @@ class MenuWaiterServiceTest {
     @Test
     void createWaiter_whenKitchenRoleWithoutKitchen_thenRejects() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+        when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")
@@ -173,7 +173,7 @@ class MenuWaiterServiceTest {
     @Test
     void createWaiter_whenCourierRoleWithoutCourier_thenRejects() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+        when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")
@@ -196,7 +196,7 @@ class MenuWaiterServiceTest {
     @Test
     void listWaiters_whenBranchOwned_thenReturnsWaiters() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(branchService.requireOwnedForUser(4L, 9L)).thenReturn(Branch.builder()
+        when(branchService.requireOwnedForMerchant(4L, 9L)).thenReturn(Branch.builder()
                 .id(4L)
                 .userId(9L)
                 .name("Kadikoy")

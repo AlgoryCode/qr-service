@@ -143,7 +143,7 @@ class MenuPublicAccessServiceTest {
     }
 
     @Test
-    void syncForUser_whenAllowed_thenEnableMenus() {
+    void syncForMerchant_whenAllowed_thenEnableMenus() {
         when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
                 AccessDecision.ALLOW,
                 CatalogPackages.ULTIMATE_TRIAL_PACKAGE,
@@ -153,25 +153,25 @@ class MenuPublicAccessServiceTest {
         when(packageProductCatalog.containsProduct(CatalogPackages.ULTIMATE_TRIAL_PACKAGE, CatalogProducts.QR_MENU))
                 .thenReturn(true);
 
-        service.syncForUser(7L);
+        service.syncForMerchant(7L);
 
         verify(menuRepository).updatePublicAccessByUserId(7L, true, null);
     }
 
     @Test
-    void syncForUser_whenNullUser_thenSkip() {
-        service.syncForUser(null);
+    void syncForMerchant_whenNullUser_thenSkip() {
+        service.syncForMerchant(null);
         verify(menuRepository, never()).updatePublicAccessByUserId(any(), anyBoolean(), any());
         verify(menuRepository, never()).updatePublicAccessByUserId(any(), anyBoolean(), isNull());
     }
 
     @Test
-    void syncForUser_whenPackageInactive_thenDisableWithReason() {
+    void syncForMerchant_whenPackageInactive_thenDisableWithReason() {
         when(sessionAccessService.resolve(7L)).thenReturn(AccessSession.of(
                 AccessDecision.REQUIRE_PURCHASE, null, null, null
         ));
 
-        service.syncForUser(7L);
+        service.syncForMerchant(7L);
 
         verify(menuRepository).updatePublicAccessByUserId(
                 eq(7L),

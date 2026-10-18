@@ -33,8 +33,8 @@ public class EntitlementAdapter implements EntitlementPort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserEntitlement> findActiveByUserId(Long merchantId) {
-        return userEntitlementJpaRepository.findActiveByUserId(merchantId, PackageStatus.ACTIVE, Instant.now())
+    public List<UserEntitlement> findActiveByMerchantId(Long merchantId) {
+        return userEntitlementJpaRepository.findActiveByMerchantId(merchantId, PackageStatus.ACTIVE, Instant.now())
                 .stream()
                 .map(this::toDomain)
                 .toList();

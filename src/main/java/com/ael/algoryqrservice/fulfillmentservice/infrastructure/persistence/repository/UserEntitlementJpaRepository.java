@@ -18,7 +18,7 @@ public interface UserEntitlementJpaRepository extends JpaRepository<UserEntitlem
               and e.status = :status
               and (e.expiresAt is null or e.expiresAt > :now)
             """)
-    List<UserEntitlementEntity> findActiveByUserId(
+    List<UserEntitlementEntity> findActiveByMerchantId(
             @Param("merchantId") Long merchantId,
             @Param("status") PackageStatus status,
             @Param("now") Instant now

@@ -158,7 +158,7 @@ class UnifiedAnalyticsServiceTest {
 
     private void stubScope() {
         Branch branch = Branch.builder().id(1L).name("Merkez").build();
-        when(branchService.requireOwnedForUser(1L, 9L)).thenReturn(branch);
+        when(branchService.requireOwnedForMerchant(1L, 9L)).thenReturn(branch);
         Menu menu = Menu.builder().menuId(5L).businessName("Lokanta").branchId(1L).build();
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(1L, MenuChannel.QR)).thenReturn(List.of(menu));
     }

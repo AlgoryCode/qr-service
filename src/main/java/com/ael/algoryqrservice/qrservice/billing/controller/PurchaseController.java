@@ -89,31 +89,31 @@ public class PurchaseController {
 
     @GetMapping("/my/logs")
     public ResponseEntity<List<PurchaseLogResponse>> getMyPurchaseLogs() {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseLogService.getUserLogs(merchantId));
     }
 
     @GetMapping("/{purchaseId}/summary")
     public ResponseEntity<PurchaseSummaryResponse> getPurchaseSummary(@PathVariable Long purchaseId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.getPurchaseSummary(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/cancel")
     public ResponseEntity<PurchaseResponse> cancelMyPurchase(@PathVariable Long purchaseId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.cancelMyPurchase(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/cancel-at-period-end")
     public ResponseEntity<PurchaseResponse> cancelAtPeriodEnd(@PathVariable Long purchaseId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.cancelAtPeriodEnd(purchaseId, merchantId));
     }
 
     @PostMapping("/{purchaseId}/resume-renewal")
     public ResponseEntity<PurchaseResponse> resumeRenewal(@PathVariable Long purchaseId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.resumeRenewal(purchaseId, merchantId));
     }
 
@@ -133,7 +133,7 @@ public class PurchaseController {
             @PathVariable Long purchaseId,
             HttpServletRequest httpServletRequest
     ) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.cancelWithRefund(
                 purchaseId,
                 merchantId,
@@ -143,13 +143,13 @@ public class PurchaseController {
 
     @GetMapping("/{purchaseId}/installments")
     public ResponseEntity<List<PurchaseFulfillmentResponse>> getPurchaseInstallments(@PathVariable Long purchaseId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(purchaseService.getPurchaseInstallments(purchaseId, merchantId));
     }
 
     @GetMapping("/{purchaseId}/logs")
     public ResponseEntity<List<PurchaseLogResponse>> getPurchaseLogs(@PathVariable Long purchaseId) {
-        Long merchantId = securityUtils.getCurrentUser().getId();
+        Long merchantId = securityUtils.getCurrentMerchantId();
         purchaseService.findUserPurchase(purchaseId, merchantId);
         return ResponseEntity.ok(purchaseLogService.getPurchaseLogs(purchaseId));
     }

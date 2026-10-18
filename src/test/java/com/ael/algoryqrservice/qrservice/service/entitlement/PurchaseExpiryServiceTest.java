@@ -69,24 +69,24 @@ class PurchaseExpiryServiceTest {
     }
 
     @Test
-    void expireDueForUser_whenDueExists_thenExpireAndAnnounceOnce() {
+    void expireDueForMerchant_whenDueExists_thenExpireAndAnnounceOnce() {
         Purchase purchase = activeTrial();
         when(writableTransactionGuard.allowsWrites(any(), eq(USER_ID))).thenReturn(true);
         when(purchaseRepository.findByUserIdAndStatusAndExpiresAtBefore(
                 eq(USER_ID), eq(PurchaseStatus.ACTIVE), any(LocalDateTime.class)
         )).thenReturn(List.of(purchase));
 
-        purchaseExpiryService.expireDueForUser(USER_ID);
+        purchaseExpiryService.expireDueForMerchant(USER_ID);
 
         assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.EXPIRED);
         verify(eventPublisher).publishEvent(any(PurchasesExpiredEvent.class));
     }
 
     @Test
-    void expireDueForUser_whenTransactionIsReadOnly_thenSkipEntirely() {
+    void expireDueForMerchant_whenTransactionIsReadOnly_thenSkipEntirely() {
         when(writableTransactionGuard.allowsWrites(any(), eq(USER_ID))).thenReturn(false);
 
-        purchaseExpiryService.expireDueForUser(USER_ID);
+        purchaseExpiryService.expireDueForMerchant(USER_ID);
 
         verify(purchaseRepository, never()).findByUserIdAndStatusAndExpiresAtBefore(any(), any(), any());
         verify(eventPublisher, never()).publishEvent(any(PurchasesExpiredEvent.class));

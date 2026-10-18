@@ -41,7 +41,7 @@ public class PurchaseExpiryService {
     }
 
     @Transactional
-    public void expireDueForUser(Long merchantId) {
+    public void expireDueForMerchant(Long merchantId) {
         if (merchantId == null || !writableTransactionGuard.allowsWrites("purchase expiry", merchantId)) {
             return;
         }

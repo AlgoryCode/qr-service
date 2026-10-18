@@ -22,7 +22,7 @@ public class UserAccessProfileService {
 
     @Transactional
     public UserAccessProfile resolve(Long merchantId) {
-        purchaseExpiryService.expireDueForUser(merchantId);
+        purchaseExpiryService.expireDueForMerchant(merchantId);
         PackageView view = fulfillmentServiceClient.findPackage(merchantId);
         if (!"ACTIVE".equals(view.status()) || view.body() == null) {
             return EMPTY_PROFILE;

@@ -54,7 +54,7 @@ public class MenuPublicAccessService {
     }
 
     @Transactional
-    public void deactivateActiveMenusForUser(Long merchantId) {
+    public void deactivateActiveMenusForMerchant(Long merchantId) {
         if (merchantId == null) {
             return;
         }
@@ -62,7 +62,7 @@ public class MenuPublicAccessService {
     }
 
     @Transactional
-    public void syncForUser(Long merchantId) {
+    public void syncForMerchant(Long merchantId) {
         if (merchantId == null) {
             return;
         }
@@ -76,7 +76,7 @@ public class MenuPublicAccessService {
             return;
         }
         for (Long merchantId : merchantIds) {
-            syncForUser(merchantId);
+            syncForMerchant(merchantId);
         }
     }
 

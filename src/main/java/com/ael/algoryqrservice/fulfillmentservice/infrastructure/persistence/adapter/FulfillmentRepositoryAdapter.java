@@ -50,7 +50,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
     }
 
     @Override
-    public Optional<ActivePackage> findActiveByUserId(Long merchantId) {
+    public Optional<ActivePackage> findActiveByMerchantId(Long merchantId) {
         return activePackageJpaRepository.findByMerchantId(merchantId).map(this::toDomain);
     }
 

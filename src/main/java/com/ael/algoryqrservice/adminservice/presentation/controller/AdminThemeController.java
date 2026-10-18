@@ -36,13 +36,13 @@ public class AdminThemeController {
         return ResponseEntity.ok(menuThemeService.listCatalog(includeInactive));
     }
 
-    @GetMapping("/users/{merchantId}/themes")
+    @GetMapping("/merchants/{merchantId}/themes")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> listUserThemes(@PathVariable Long merchantId) {
         return ResponseEntity.ok(menuThemeService.listAssignedThemes(merchantId));
     }
 
     /** Adds themes to the member's allowed set (idempotent). */
-    @PostMapping("/users/{merchantId}/themes")
+    @PostMapping("/merchants/{merchantId}/themes")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> assignThemes(
             @PathVariable Long merchantId,
             @Valid @RequestBody ThemeDtos.AssignThemesRequest request
@@ -52,7 +52,7 @@ public class AdminThemeController {
     }
 
     /** Replaces the member's allowed theme set. Empty list clears all assignments. */
-    @PutMapping("/users/{merchantId}/themes")
+    @PutMapping("/merchants/{merchantId}/themes")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> replaceThemes(
             @PathVariable Long merchantId,
             @Valid @RequestBody ThemeDtos.ReplaceThemesRequest request
@@ -61,7 +61,7 @@ public class AdminThemeController {
         return ResponseEntity.ok(menuThemeService.replaceThemes(merchantId, request.getThemeCodes(), adminId));
     }
 
-    @DeleteMapping("/users/{merchantId}/themes/{themeCode}")
+    @DeleteMapping("/merchants/{merchantId}/themes/{themeCode}")
     public ResponseEntity<List<ThemeDtos.ThemeResponse>> revokeTheme(
             @PathVariable Long merchantId,
             @PathVariable String themeCode

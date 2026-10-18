@@ -55,7 +55,7 @@ class EntitlementServiceTest {
         assertThat(entitlementService.hasScope(USER_ID, CatalogScopes.QR_MENU_OWNER)).isTrue();
 
         verify(maintenanceService, never()).repairUser(USER_ID);
-        verify(purchaseExpiryService, never()).expireDueForUser(USER_ID);
+        verify(purchaseExpiryService, never()).expireDueForMerchant(USER_ID);
     }
 
     @Test
@@ -66,7 +66,7 @@ class EntitlementServiceTest {
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining(CatalogScopes.QR_MENU_OWNER);
 
-        verify(purchaseExpiryService).expireDueForUser(USER_ID);
+        verify(purchaseExpiryService).expireDueForMerchant(USER_ID);
         verify(maintenanceService).repairUser(USER_ID);
     }
 
@@ -176,7 +176,7 @@ class EntitlementServiceTest {
     void release_whenAmountIsNotPositive_thenDoNothing() {
         entitlementService.release(USER_ID, CatalogProducts.QR_MENU, 0);
 
-        verify(purchaseExpiryService, never()).expireDueForUser(USER_ID);
+        verify(purchaseExpiryService, never()).expireDueForMerchant(USER_ID);
         verify(productRepository, never()).findByCode(CatalogProducts.QR_MENU);
     }
 

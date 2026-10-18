@@ -17,7 +17,7 @@ public interface FulfillmentRepositoryPort {
 
     void supersedeOtherFulfillments(Long merchantId, Long keepFulfillmentId);
 
-    Optional<ActivePackage> findActiveByUserId(Long merchantId);
+    Optional<ActivePackage> findActiveByMerchantId(Long merchantId);
 
     ActivePackage upsertActivePackage(ActivePackage activePackage);
 

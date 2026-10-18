@@ -535,7 +535,7 @@ class PurchaseServicePaymentEventTest {
         assertThat(purchase.getRefundedAt()).isNotNull();
         verify(paymentServiceClient).cancelSubscription(20L, "sub-1");
         verify(entitlementWriter).revokeForCancelledPurchase(purchase);
-        verify(menuPublicAccessService).deactivateActiveMenusForUser(20L);
+        verify(menuPublicAccessService).deactivateActiveMenusForMerchant(20L);
         verify(paymentEventInboxRepository).save(any());
     }
 

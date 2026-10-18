@@ -107,12 +107,6 @@ public class SecurityUtils {
                 .isPresent();
     }
 
-    /** @deprecated Use {@link #matchesTokenMerchant(Long)} */
-    @Deprecated(forRemoval = true)
-    public boolean matchesTokenUser(Long merchantId) {
-        return matchesTokenMerchant(merchantId);
-    }
-
     private Long resolveMerchantAccountId(Long fallbackId, String loginEmail) {
         if (loginEmail != null && !loginEmail.isBlank()) {
             Optional<Long> authMerchantId = authMerchantClient.findActiveMerchantIdByEmail(loginEmail);

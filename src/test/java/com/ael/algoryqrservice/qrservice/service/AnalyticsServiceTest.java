@@ -461,7 +461,7 @@ class AnalyticsServiceTest {
         Menu second = publicMenu(6L, ownerId);
         second.setBranchId(branchId);
         second.setBusinessName("Aksam");
-        when(branchService.requireOwnedForUser(branchId, ownerId))
+        when(branchService.requireOwnedForMerchant(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L, 6L)), any(), any())).thenReturn(10L);
@@ -515,7 +515,7 @@ class AnalyticsServiceTest {
         first.setBusinessName("Ogle");
         Menu second = publicMenu(6L, ownerId);
         second.setBranchId(branchId);
-        when(branchService.requireOwnedForUser(branchId, ownerId))
+        when(branchService.requireOwnedForMerchant(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(sessionRepository.countByMenuIdInAndPeriod(eq(List.of(5L)), any(), any())).thenReturn(3L);
@@ -552,7 +552,7 @@ class AnalyticsServiceTest {
     void getBranchReport_whenMenuNotInBranch_thenNotFound() {
         Long ownerId = 9L;
         Long branchId = 2L;
-        when(branchService.requireOwnedForUser(branchId, ownerId))
+        when(branchService.requireOwnedForMerchant(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(publicMenu(5L, ownerId)));
 
@@ -572,7 +572,7 @@ class AnalyticsServiceTest {
         first.setBranchId(branchId);
         Menu second = publicMenu(6L, ownerId);
         second.setBranchId(branchId);
-        when(branchService.requireOwnedForUser(branchId, ownerId))
+        when(branchService.requireOwnedForMerchant(branchId, ownerId))
                 .thenReturn(Branch.builder().id(branchId).userId(ownerId).name("Kadikoy").build());
         when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(first, second));
         when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(5L, 6L)))

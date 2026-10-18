@@ -727,7 +727,7 @@ public class PurchaseService {
 
     @Transactional
     public List<PurchaseResponse> getUserPurchases(Long merchantId) {
-        purchaseExpiryService.expireDueForUser(merchantId);
+        purchaseExpiryService.expireDueForMerchant(merchantId);
         return purchaseRepository.findByMerchantIdOrderByPurchasedAtDesc(merchantId).stream()
                 .map(this::toResponse)
                 .toList();
@@ -735,7 +735,7 @@ public class PurchaseService {
 
     @Transactional
     public SubscriptionOverviewResponse getMySubscriptionOverview(Long merchantId) {
-        purchaseExpiryService.expireDueForUser(merchantId);
+        purchaseExpiryService.expireDueForMerchant(merchantId);
         SubscriptionOverviewResponse overview = externalPackageView.overview(merchantId)
                 .orElseThrow(() -> new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor"));
         if (overview.getActivePackage() != null) {
@@ -756,7 +756,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseSummaryResponse getPurchaseSummary(Long purchaseId, Long merchantId) {
-        purchaseExpiryService.expireDueForUser(merchantId);
+        purchaseExpiryService.expireDueForMerchant(merchantId);
         Purchase purchase = findUserPurchase(purchaseId, merchantId);
         return toSummary(purchase);
     }
@@ -782,7 +782,7 @@ public class PurchaseService {
         requireExpirable(purchase.getStatus());
         remoteSubscriptionCanceller.cancelIfNeeded(purchase);
         purchaseExpiryService.expire(purchase);
-        menuPublicAccessService.syncForUser(purchase.getMerchantId());
+        menuPublicAccessService.syncForMerchant(purchase.getMerchantId());
         return toResponse(purchaseRepository.findById(purchaseId).orElseThrow());
     }
 
@@ -1146,7 +1146,7 @@ public class PurchaseService {
         }
 
         fulfillmentQueuePublisher.publishRevoked(purchase);
-        menuPublicAccessService.deactivateActiveMenusForUser(purchase.getMerchantId());
+        menuPublicAccessService.deactivateActiveMenusForMerchant(purchase.getMerchantId());
         cancelRemoteSubscriptionBestEffort(purchase);
         purchaseRepository.save(purchase);
     }
@@ -1239,10 +1239,10 @@ public class PurchaseService {
                 || refundedAmount != null;
         if (needsCleanup) {
             fulfillmentQueuePublisher.publishRevoked(purchase);
-            menuPublicAccessService.deactivateActiveMenusForUser(merchantId);
+            menuPublicAccessService.deactivateActiveMenusForMerchant(merchantId);
         }
         purchaseFulfillmentService.cancelOpenFulfillments(purchase.getId());
-        menuPublicAccessService.syncForUser(merchantId);
+        menuPublicAccessService.syncForMerchant(merchantId);
 
         String detail = purchase.getPackageName() + " paketi kullanıcı tarafından iptal edildi";
         if (refundedAmount != null) {
@@ -1672,7 +1672,7 @@ public class PurchaseService {
                 fulfillmentQueuePublisher.publishGranted(addon);
             }
         }
-        menuPublicAccessService.syncForUser(purchase.getMerchantId());
+        menuPublicAccessService.syncForMerchant(purchase.getMerchantId());
         purchaseLogService.log(
                 purchase.getId(),
                 purchase.getMerchantId(),

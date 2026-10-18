@@ -10,7 +10,7 @@ public interface EntitlementPort {
 
     UserEntitlement save(UserEntitlement entitlement);
 
-    List<UserEntitlement> findActiveByUserId(Long merchantId);
+    List<UserEntitlement> findActiveByMerchantId(Long merchantId);
 
     void supersedeOtherEntitlements(Long merchantId, Long keepFulfillmentId);
 }

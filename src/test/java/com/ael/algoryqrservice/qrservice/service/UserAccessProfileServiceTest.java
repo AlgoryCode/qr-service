@@ -77,7 +77,7 @@ class UserAccessProfileServiceTest {
         assertThat(profile.activePackage()).isEqualTo(CatalogPackages.ULTIMATE_TRIAL_PACKAGE);
         assertThat(profile.products()).containsExactly(CatalogProducts.QR_CREATE, CatalogProducts.QR_MENU);
         assertThat(profile.scopes()).containsExactly(CatalogScopes.QR_CREATE_OWNER, CatalogScopes.QR_MENU_OWNER);
-        verify(purchaseExpiryService).expireDueForUser(USER_ID);
+        verify(purchaseExpiryService).expireDueForMerchant(USER_ID);
         verify(packageActivationService).ensureSubscriptionState(USER_ID);
         verify(entitlementMaintenanceService).repairUser(USER_ID);
     }
@@ -126,7 +126,7 @@ class UserAccessProfileServiceTest {
         assertThat(profile.activePackage()).isNull();
         assertThat(profile.products()).isEmpty();
         assertThat(profile.scopes()).isEmpty();
-        verify(purchaseExpiryService).expireDueForUser(USER_ID);
+        verify(purchaseExpiryService).expireDueForMerchant(USER_ID);
         verify(fulfillmentDetailRepository, never()).findAllActiveByUserId(any(), any());
     }
 

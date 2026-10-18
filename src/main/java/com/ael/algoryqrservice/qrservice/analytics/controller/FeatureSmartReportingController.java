@@ -29,7 +29,7 @@ public class FeatureSmartReportingController {
             @PathVariable Long branchId,
             @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
     ) {
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         SmartReportDtos.SmartReportAccepted accepted = smartReportService.enqueueForBranch(
                 branchId,
                 ownerId,
@@ -47,7 +47,7 @@ public class FeatureSmartReportingController {
             @PathVariable Long menuId,
             @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
     ) {
-        Long ownerId = securityUtils.getCurrentUser().getId();
+        Long ownerId = securityUtils.getCurrentMerchantId();
         SmartReportDtos.SmartReportAccepted accepted = smartReportService.enqueue(
                 menuId,
                 ownerId,

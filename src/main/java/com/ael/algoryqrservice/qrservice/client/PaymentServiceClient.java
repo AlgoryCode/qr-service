@@ -93,7 +93,7 @@ public class PaymentServiceClient {
     }
 
     public PaymentCheckoutFormResponse initializeCheckoutForm(Long merchantId, PaymentCheckoutFormRequest request) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         InitializeCheckoutFormCommand command = qrPaymentClientMapper.toInitializeCheckoutFormCommand(merchantId, request);
         CheckoutFormResultDto result = paymentService.initializeCheckoutForm(command);
         PaymentCheckoutFormResponse response = new PaymentCheckoutFormResponse();
@@ -108,7 +108,7 @@ public class PaymentServiceClient {
             Long merchantId,
             PaymentCardVerificationRequest request
     ) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         StoreCardCommand command = paymentPresentationMapper.toStoreCardCommand(
                 String.valueOf(merchantId),
                 qrPaymentClientMapper.toCardVerificationInitRequest(request)
@@ -126,7 +126,7 @@ public class PaymentServiceClient {
     }
 
     public List<BillingPaymentDtos.PaymentMethod> getPaymentMethods(Long merchantId) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         return paymentMethodService.list(String.valueOf(merchantId), PageRequest.of(0, 50)).stream()
                 .map(billingResponseMapper::toPaymentMethod)
                 .toList();
@@ -141,7 +141,7 @@ public class PaymentServiceClient {
             String expireMonth,
             String expireYear
     ) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         PaymentMethodResponse response = paymentMethodService.create(
                 String.valueOf(merchantId),
                 qrPaymentClientMapper.toCreatePaymentMethodRequest(
@@ -157,7 +157,7 @@ public class PaymentServiceClient {
     }
 
     public void deletePaymentMethod(Long merchantId, String paymentMethodId) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         paymentMethodService.delete(String.valueOf(merchantId), Long.valueOf(paymentMethodId));
     }
 
@@ -222,7 +222,7 @@ public class PaymentServiceClient {
             Object shippingAddress,
             Object billingAddress
     ) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         SubscriptionResponse response = subscriptionService.bootstrap(
                 String.valueOf(merchantId),
                 serviceName,
@@ -242,7 +242,7 @@ public class PaymentServiceClient {
     }
 
     public BillingPaymentDtos.Subscription cancelSubscription(Long merchantId, String subscriptionId) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         return billingResponseMapper.toSubscription(
                 subscriptionService.cancel(String.valueOf(merchantId), subscriptionId)
         );
@@ -332,7 +332,7 @@ public class PaymentServiceClient {
     }
 
     private PaymentResultDto pay(Long merchantId, PaymentThreeDsRequest request) {
-        requireUserId(merchantId);
+        requireMerchantId(merchantId);
         CreatePaymentCommand command = qrPaymentClientMapper.toCreatePaymentCommand(merchantId, request);
         return paymentService.createDirectPayment(command);
     }
@@ -344,7 +344,7 @@ public class PaymentServiceClient {
         return response;
     }
 
-    private static void requireUserId(Long merchantId) {
+    private static void requireMerchantId(Long merchantId) {
         if (merchantId == null) {
             throw new PaymentServiceException("Ödeme için kullanıcı kimliği zorunludur");
         }
@@ -355,9 +355,6 @@ public class PaymentServiceClient {
             return null;
         }
         Object raw = request.getSourceMetadata().get("merchantId");
-        if (raw == null) {
-            raw = request.getSourceMetadata().get("userId");
-        }
         if (raw instanceof Number number) {
             return number.longValue();
         }

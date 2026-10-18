@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/store/me")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.ONLINE_ORDER_OWNER)
-public class MerchantController {
+public class StoreMerchantController {
 
     private final MerchantService merchantService;
 
