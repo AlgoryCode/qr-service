@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.authservice.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -80,5 +81,14 @@ public class AuthSecurityConfig {
                 )
                 .addFilterBefore(authJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<AuthJwtAuthenticationFilter> authJwtAuthenticationFilterRegistration(
+            AuthJwtAuthenticationFilter filter
+    ) {
+        FilterRegistrationBean<AuthJwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

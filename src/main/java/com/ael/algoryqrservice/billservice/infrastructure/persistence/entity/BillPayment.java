@@ -1,6 +1,6 @@
-package com.ael.algoryqrservice.qrservice.model;
+package com.ael.algoryqrservice.billservice.infrastructure.persistence.entity;
 
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;

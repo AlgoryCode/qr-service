@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "themeId": "lilas-doux",
+  "branch": {
+    "address": "Caferağa Mah. Moda Cad. No:42 Kadıköy / İstanbul",
+    "phone": "+90 216 555 01 42",
+    "email": "demo@algorycafe.local"
+  },
+  "categories": [
+    {
+      "slug": "iyb_waffle_tatli",
+      "name": "İyb Waffle & Tatlı",
+      "sortOrder": 1,
+      "subs": [
+        { "slug": "iyb_klasik_waffle", "name": "Klasik Waffle", "sortOrder": 1 },
+        { "slug": "iyb_ozel_waffle", "name": "Özel Waffle", "sortOrder": 2 },
+        { "slug": "iyb_icecek", "name": "İçecekler", "sortOrder": 3 }
+      ]
+    },
+    {
+      "slug": "aya_roof_bar",
+      "name": "Aya Roof Bar",
+      "sortOrder": 2,
+      "subs": [
+        { "slug": "aya_kokteyl", "name": "Kokteyller", "sortOrder": 1 },
+        { "slug": "aya_sarap", "name": "Şarap & Prosecco", "sortOrder": 2 },
+        { "slug": "aya_atistirmalik", "name": "Atıştırmalık", "sortOrder": 3 }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "name": "Belçika Waffle",
+      "description": "Taze meyveli, çikolata soslu klasik waffle",
+      "price": 285,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_klasik_waffle",
+      "sortOrder": 1,
+      "available": true
+    },
+    {
+      "name": "Bubble Waffle",
+      "description": "Bubble waffle, dondurma ve karamel",
+      "price": 320,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_ozel_waffle",
+      "sortOrder": 2,
+      "available": true
+    },
+    {
+      "name": "Nutella Waffle",
+      "description": "Nutella, fındık kırığı ve muz",
+      "price": 295,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_klasik_waffle",
+      "sortOrder": 3,
+      "available": true
+    },
+    {
+      "name": "Lotus Waffle",
+      "description": "Lotus kreması ve bisküvi",
+      "price": 310,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_ozel_waffle",
+      "sortOrder": 4,
+      "available": true
+    },
+    {
+      "name": "Filtre Kahve",
+      "description": "Single origin filtre kahve",
+      "price": 120,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_icecek",
+      "sortOrder": 5,
+      "available": true
+    },
+    {
+      "name": "Sıcak Çikolata",
+      "description": "Belçika çikolatalı sıcak içecek",
+      "price": 135,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_icecek",
+      "sortOrder": 6,
+      "available": true
+    },
+    {
+      "name": "Aya Roof Spritz",
+      "description": "Prosecco, Aperol, soda",
+      "price": 420,
+      "currency": "TRY",
+      "subCategorySlug": "aya_kokteyl",
+      "sortOrder": 7,
+      "available": true
+    },
+    {
+      "name": "Istanbul Mule",
+      "description": "Votka, lime, ginger beer",
+      "price": 450,
+      "currency": "TRY",
+      "subCategorySlug": "aya_kokteyl",
+      "sortOrder": 8,
+      "available": true
+    },
+    {
+      "name": "Roof Old Fashioned",
+      "description": "Bourbon, angostura, portakal kabuğu",
+      "price": 520,
+      "currency": "TRY",
+      "subCategorySlug": "aya_kokteyl",
+      "sortOrder": 9,
+      "available": true
+    },
+    {
+      "name": "Prosecco Kadeh",
+      "description": "Soğuk servis prosecco",
+      "price": 380,
+      "currency": "TRY",
+      "subCategorySlug": "aya_sarap",
+      "sortOrder": 10,
+      "available": true
+    },
+    {
+      "name": "Kırmızı Şarap Kadeh",
+      "description": "Seçkin kırmızı şarap",
+      "price": 410,
+      "currency": "TRY",
+      "subCategorySlug": "aya_sarap",
+      "sortOrder": 11,
+      "available": true
+    },
+    {
+      "name": "Trüf Cips",
+      "description": "Parmesan ve trüf yağı",
+      "price": 240,
+      "currency": "TRY",
+      "subCategorySlug": "aya_atistirmalik",
+      "sortOrder": 12,
+      "available": true
+    },
+    {
+      "name": "Mezze Tabağı",
+      "description": "Humus, muhammara, zeytinyağlılar",
+      "price": 390,
+      "currency": "TRY",
+      "subCategorySlug": "aya_atistirmalik",
+      "sortOrder": 13,
+      "available": true
+    },
+    {
+      "name": "Cheesecake",
+      "description": "Frambuaz soslu New York cheesecake",
+      "price": 220,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_ozel_waffle",
+      "sortOrder": 14,
+      "available": true
+    },
+    {
+      "name": "Limonata",
+      "description": "Ev yapımı limonata",
+      "price": 95,
+      "currency": "TRY",
+      "subCategorySlug": "iyb_icecek",
+      "sortOrder": 15,
+      "available": true
+    }
+  ]
+}

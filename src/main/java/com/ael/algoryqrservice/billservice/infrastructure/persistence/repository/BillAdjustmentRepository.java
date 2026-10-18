@@ -1,7 +1,7 @@
-package com.ael.algoryqrservice.qrservice.repository;
+package com.ael.algoryqrservice.billservice.infrastructure.persistence.repository;
 
-import com.ael.algoryqrservice.qrservice.model.BillAdjustment;
-import com.ael.algoryqrservice.qrservice.model.enums.BillAdjustmentType;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillAdjustment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.BillAdjustmentType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

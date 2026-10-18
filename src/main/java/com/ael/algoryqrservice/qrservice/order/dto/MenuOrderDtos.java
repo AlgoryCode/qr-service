@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import com.ael.algoryqrservice.qrservice.campaign.dto.CampaignDtos;
-import com.ael.algoryqrservice.qrservice.model.enums.BillAdjustmentType;
 import com.ael.algoryqrservice.qrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderSource;
 
@@ -79,33 +78,12 @@ public final class MenuOrderDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class BillAdjustmentRequest {
-        @NotNull
-        private Long billId;
-
-        private Long orderId;
-
-        @NotNull
-        private com.ael.algoryqrservice.qrservice.model.enums.BillAdjustmentType adjustmentType;
-
-        @NotNull
-        @Min(0)
-        private BigDecimal amount;
-
-        @Size(max = 64)
-        private String reason;
-
-        @Size(max = 1000)
-        private String reasonNote;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class WaiterCreateOrderRequest {
-        @NotNull
+        /** Boşsa sipariş masaya bağlanmaz. */
         private Long tableId;
+
+        /** Masa yokken menü. Şubede tek menü varsa boş bırakılabilir. */
+        private Long menuId;
 
         @NotNull
         @Valid

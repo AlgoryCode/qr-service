@@ -40,8 +40,11 @@ public class StaffOrderController {
     }
 
     @GetMapping("/catalog")
-    public ResponseEntity<MenuWaiterDtos.CatalogResponse> listCatalog(@RequestParam Long tableId) {
-        return ResponseEntity.ok(menuWaiterOrderService.listCatalog(tableId));
+    public ResponseEntity<MenuWaiterDtos.CatalogResponse> listCatalog(
+            @RequestParam(required = false) Long tableId,
+            @RequestParam(required = false) Long menuId
+    ) {
+        return ResponseEntity.ok(menuWaiterOrderService.listCatalog(tableId, menuId));
     }
 
     @PostMapping

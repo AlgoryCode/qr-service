@@ -3,7 +3,7 @@ package com.ael.algoryqrservice.qrservice.model.dto;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

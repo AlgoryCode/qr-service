@@ -1,6 +1,6 @@
-package com.ael.algoryqrservice.qrservice.repository;
+package com.ael.algoryqrservice.billservice.infrastructure.persistence.repository;
 
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -10,7 +10,7 @@ import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.RestaurantArea;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuWaiterDtos;
@@ -18,7 +18,7 @@ import com.ael.algoryqrservice.qrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderAuditAction;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderSource;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
@@ -51,7 +51,7 @@ import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsService;
 import com.ael.algoryqrservice.qrservice.order.service.KitchenYemekSepetiService;
 import com.ael.algoryqrservice.qrservice.order.service.MenuOrderService;
 import com.ael.algoryqrservice.qrservice.order.service.OrderAuditService;
-import com.ael.algoryqrservice.qrservice.order.service.TableBillService;
+import com.ael.algoryqrservice.billservice.application.TableBillService;
 
 @Service
 @RequiredArgsConstructor
@@ -283,11 +283,16 @@ public class MenuWaiterOrderService {
         }
         order.setUpdatedAt(LocalDateTime.now());
 
-        TableBill bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), waiter.getId());
-        order.setBillId(bill.getId());
+        TableBill bill = null;
+        if (order.getTableId() != null) {
+            bill = tableBillService.getOrOpenBill(order.getMenuId(), order.getTableId(), waiter.getId());
+            order.setBillId(bill.getId());
+        }
         MenuOrder saved = menuOrderRepository.save(order);
-        tableBillService.addItemsFromOrder(bill, saved, waiter.getId());
-        waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
+        if (bill != null) {
+            tableBillService.addItemsFromOrder(bill, saved, waiter.getId());
+        }
+        waiterCommissionService.recordOrderCommissions(waiter, saved, bill == null ? null : bill.getId());
         menuOrderRepository.save(saved);
         orderAuditService.record(saved, OrderAuditAction.CONFIRMED, waiter.getId(), null);
         stockConsumptionService.consumeMenuOrder(saved);
@@ -484,14 +489,16 @@ public class MenuWaiterOrderService {
     }
 
     @Transactional(readOnly = true)
-    public MenuWaiterDtos.CatalogResponse listCatalog(Long tableId) {
+    public MenuWaiterDtos.CatalogResponse listCatalog(Long tableId, Long menuId) {
         MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
-        RestaurantTable table = requireTableForWaiter(tableId, waiter);
-        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(table.getMenuId());
-        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(table.getMenuId());
+        Long resolvedMenuId = tableId != null
+                ? requireTableForWaiter(tableId, waiter).getMenuId()
+                : resolveMenuId(waiter, menuId);
+        Map<Long, MenuSubCategory> subMap = menuCategoryService.loadSubCategoryMap(resolvedMenuId);
+        Map<Long, MenuCategory> mainMap = menuCategoryService.loadCategoryMap(resolvedMenuId);
 
         List<MenuProduct> menuProducts = menuProductRepository
-                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(table.getMenuId());
+                .findByMenuIdAndDeletedFalseOrderBySortOrderAscProductIdAsc(resolvedMenuId);
         Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
                 menuProductOptionService.loadByProductIds(
                         menuProducts.stream().map(MenuProduct::getProductId).toList()
@@ -512,11 +519,13 @@ public class MenuWaiterOrderService {
     @Transactional
     public MenuOrderDtos.OrderResponse createOrder(MenuOrderDtos.WaiterCreateOrderRequest request) {
         MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
-        if (request == null || request.getTableId() == null) {
-            throw new BadRequestException("Masa zorunludur");
+        if (request == null) {
+            throw new BadRequestException("Sipariş kalemleri zorunludur");
         }
-        RestaurantTable table = requireTableForWaiter(request.getTableId(), waiter);
-        return menuOrderService.placeWaiterOrder(table.getMenuId(), waiter.getId(), request);
+        Long menuId = request.getTableId() != null
+                ? requireTableForWaiter(request.getTableId(), waiter).getMenuId()
+                : resolveMenuId(waiter, request.getMenuId());
+        return menuOrderService.placeWaiterOrder(menuId, waiter.getId(), request);
     }
 
     @Transactional(readOnly = true)
@@ -530,6 +539,20 @@ public class MenuWaiterOrderService {
                 .stream()
                 .map(menuOrderService::toOrderResponse)
                 .toList();
+    }
+
+    private Long resolveMenuId(MerchantStaff waiter, Long menuId) {
+        if (menuId != null) {
+            return waiterAccessService.requireMenuInWaiterBranch(menuId, waiter).getMenuId();
+        }
+        List<Menu> menus = waiterAccessService.menusForWaiter(waiter);
+        if (menus.isEmpty()) {
+            throw new BadRequestException("Bu şubede menü bulunamadı");
+        }
+        if (menus.size() > 1) {
+            throw new BadRequestException("Menü seçimi zorunludur");
+        }
+        return menus.get(0).getMenuId();
     }
 
     private RestaurantTable requireTableForWaiter(Long tableId, MerchantStaff waiter) {

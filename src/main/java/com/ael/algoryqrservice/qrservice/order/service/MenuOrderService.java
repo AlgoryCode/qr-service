@@ -11,7 +11,7 @@ import com.ael.algoryqrservice.qrservice.product.model.MenuProductOptionGroup;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
 import com.ael.algoryqrservice.qrservice.product.model.SelectedMenuOption;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
 import com.ael.algoryqrservice.qrservice.model.TableSession;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
@@ -51,7 +51,7 @@ import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsMapper;
 import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsService;
 import com.ael.algoryqrservice.qrservice.order.service.KitchenYemekSepetiService;
 import com.ael.algoryqrservice.qrservice.order.service.OrderAuditService;
-import com.ael.algoryqrservice.qrservice.order.service.TableBillService;
+import com.ael.algoryqrservice.billservice.application.TableBillService;
 import com.ael.algoryqrservice.qrservice.order.service.TableSessionService;
 
 @Service
@@ -116,29 +116,33 @@ public class MenuOrderService {
             throw new BadRequestException("Sipariş kalemleri zorunludur");
         }
 
-        RestaurantTable table = restaurantTableRepository.findByIdAndMenuId(request.getTableId(), menuId)
-                .filter(item -> !item.isDeleted())
-                .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
-        if (!table.isActive()) {
-            throw new BadRequestException("Masa aktif değil");
-        }
-
         MerchantStaff waiter = merchantStaffRepository.findById(staffId)
                 .orElseThrow(() -> new NotFoundException("Garson bulunamadı"));
 
-        TableBill bill = tableBillService.getOrOpenBill(menuId, table.getId(), staffId);
-        if (request.getCoverCount() != null && request.getCoverCount() > 0) {
-            bill.setCoverCount(request.getCoverCount());
-            tableBillService.saveBill(bill);
+        RestaurantTable table = null;
+        TableBill bill = null;
+        TableSession session = null;
+        if (request.getTableId() != null) {
+            table = restaurantTableRepository.findByIdAndMenuId(request.getTableId(), menuId)
+                    .filter(item -> !item.isDeleted())
+                    .orElseThrow(() -> new NotFoundException("Masa bulunamadı"));
+            if (!table.isActive()) {
+                throw new BadRequestException("Masa aktif değil");
+            }
+            bill = tableBillService.getOrOpenBill(menuId, table.getId(), staffId);
+            if (request.getCoverCount() != null && request.getCoverCount() > 0) {
+                bill.setCoverCount(request.getCoverCount());
+                tableBillService.saveBill(bill);
+            }
+            session = tableBillService.resolveBillSession(bill);
         }
-        TableSession session = tableBillService.resolveBillSession(bill);
 
         LocalDateTime now = LocalDateTime.now();
         MenuOrder order = MenuOrder.builder()
                 .menuId(menuId)
-                .tableId(table.getId())
-                .tableSessionId(session.getId())
-                .billId(bill.getId())
+                .tableId(table == null ? null : table.getId())
+                .tableSessionId(session == null ? null : session.getId())
+                .billId(bill == null ? null : bill.getId())
                 .status(MenuOrderStatus.CONFIRMED)
                 .orderSource(OrderSource.WAITER)
                 .staffId(staffId)
@@ -157,8 +161,10 @@ public class MenuOrderService {
         applyCartItems(order, menuId, request.getItems());
         MenuOrder saved = menuOrderRepository.save(order);
         stockConsumptionService.consumeMenuOrder(saved);
-        tableBillService.addItemsFromOrder(bill, saved, staffId);
-        waiterCommissionService.recordOrderCommissions(waiter, saved, bill.getId());
+        if (bill != null) {
+            tableBillService.addItemsFromOrder(bill, saved, staffId);
+        }
+        waiterCommissionService.recordOrderCommissions(waiter, saved, bill == null ? null : bill.getId());
         menuOrderRepository.save(saved);
         orderAuditService.record(saved, OrderAuditAction.CREATED, staffId, null);
         campaignEvaluationService.onOrderConfirmed(saved);
@@ -651,9 +657,11 @@ public class MenuOrderService {
     }
 
     public MenuOrderDtos.OrderResponse toOrderResponse(MenuOrder order) {
-        String tableName = restaurantTableRepository.findById(order.getTableId())
-                .map(RestaurantTable::getName)
-                .orElse(null);
+        String tableName = order.getTableId() == null
+                ? "Masa yok"
+                : restaurantTableRepository.findById(order.getTableId())
+                        .map(RestaurantTable::getName)
+                        .orElse(null);
 
         String waiterName = null;
         if (order.getStaffId() != null) {

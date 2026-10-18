@@ -1,6 +1,6 @@
 package com.ael.algoryqrservice.staffservice.presentation.controller;
 
-import com.ael.algoryqrservice.qrservice.order.dto.TableBillDtos;
+import com.ael.algoryqrservice.staffservice.dto.StaffCommissionDtos;
 import com.ael.algoryqrservice.staffservice.application.MenuWaiterCommissionQueryService;
 import com.ael.algoryqrservice.staffservice.application.StaffAccessService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -24,14 +24,14 @@ public class StaffCommissionController {
     private final SecurityUtils securityUtils;
 
     @GetMapping("/today")
-    public ResponseEntity<TableBillDtos.TodayCommissionSummary> getToday() {
+    public ResponseEntity<StaffCommissionDtos.TodayCommissionSummary> getToday() {
         waiterAccessService.requireWaiterStaff();
         Long staffId = securityUtils.getCurrentWaiterId();
         return ResponseEntity.ok(menuWaiterCommissionQueryService.getTodaySummary(staffId));
     }
 
     @GetMapping("/history")
-    public ResponseEntity<TableBillDtos.CommissionHistoryResponse> getHistory(
+    public ResponseEntity<StaffCommissionDtos.CommissionHistoryResponse> getHistory(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") int page,

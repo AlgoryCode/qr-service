@@ -6,9 +6,9 @@ import com.ael.algoryqrservice.qrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
 import com.ael.algoryqrservice.qrservice.model.WaiterCommissionRecord;
-import com.ael.algoryqrservice.qrservice.order.dto.TableBillDtos;
+import com.ael.algoryqrservice.staffservice.dto.StaffCommissionDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionRecordType;
 import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
@@ -218,7 +218,7 @@ public class StaffCommissionService {
     }
 
     @Transactional(readOnly = true)
-    public TableBillDtos.TodayCommissionSummary getTodaySummary(Long staffId) {
+    public StaffCommissionDtos.TodayCommissionSummary getTodaySummary(Long staffId) {
         LocalDateTime[] range = todayRange();
         List<WaiterCommissionRecord> records = commissionRecordRepository
                 .findByStaffIdAndCreatedAtBetweenOrderByCreatedAtDesc(staffId, range[0], range[1]);
@@ -242,11 +242,11 @@ public class StaffCommissionService {
         }
 
         BigDecimal total = percentTotal.add(fixedTableCloseTotal).add(fixedItemAddTotal);
-        List<TableBillDtos.CommissionRecordResponse> recordResponses = records.stream()
+        List<StaffCommissionDtos.CommissionRecordResponse> recordResponses = records.stream()
                 .map(this::toRecordResponse)
                 .toList();
 
-        return TableBillDtos.TodayCommissionSummary.builder()
+        return StaffCommissionDtos.TodayCommissionSummary.builder()
                 .totalAmount(total)
                 .currency(currency)
                 .percentOrderTotal(percentTotal)
@@ -258,7 +258,7 @@ public class StaffCommissionService {
     }
 
     @Transactional(readOnly = true)
-    public TableBillDtos.CommissionHistoryResponse getHistory(
+    public StaffCommissionDtos.CommissionHistoryResponse getHistory(
             Long staffId,
             LocalDate from,
             LocalDate to,
@@ -284,7 +284,7 @@ public class StaffCommissionService {
                         PageRequest.of(safePage, safeSize)
                 );
 
-        return TableBillDtos.CommissionHistoryResponse.builder()
+        return StaffCommissionDtos.CommissionHistoryResponse.builder()
                 .records(result.getContent().stream().map(this::toRecordResponse).toList())
                 .page(result.getNumber())
                 .size(result.getSize())
@@ -302,8 +302,8 @@ public class StaffCommissionService {
                 .toList();
     }
 
-    private TableBillDtos.CommissionRecordResponse toRecordResponse(WaiterCommissionRecord record) {
-        return TableBillDtos.CommissionRecordResponse.builder()
+    private StaffCommissionDtos.CommissionRecordResponse toRecordResponse(WaiterCommissionRecord record) {
+        return StaffCommissionDtos.CommissionRecordResponse.builder()
                 .id(record.getId())
                 .billId(record.getBillId())
                 .orderId(record.getOrderId())
@@ -322,11 +322,11 @@ public class StaffCommissionService {
         return new LocalDateTime[]{today.atStartOfDay(), today.atTime(LocalTime.MAX)};
     }
 
-    public TableBillDtos.CommissionRecordResponse toRecordResponse(
+    public StaffCommissionDtos.CommissionRecordResponse toRecordResponse(
             WaiterCommissionRecord record,
             String tableName
     ) {
-        return TableBillDtos.CommissionRecordResponse.builder()
+        return StaffCommissionDtos.CommissionRecordResponse.builder()
                 .id(record.getId())
                 .billId(record.getBillId())
                 .orderId(record.getOrderId())

@@ -34,15 +34,11 @@ public class StaffAccessService {
     private final RestaurantAreaRepository restaurantAreaRepository;
     private final SecurityUtils securityUtils;
 
-    /** JWT staffId + aktif kayıt; rol/şube token eşleşmesi kontrol edilmez. */
+    /** JWT staffId ile personel satırı. Aktiflik login ve refresh'te bakılır. */
     public MerchantStaff requireCurrentStaff() {
         Long staffId = securityUtils.getCurrentStaffId();
-        MerchantStaff staff = merchantStaffRepository.findById(staffId)
+        return merchantStaffRepository.findById(staffId)
                 .orElseThrow(() -> new NotFoundException("Personel bulunamadı"));
-        if (!staff.isActive()) {
-            throw new ForbiddenException("Hesap pasif");
-        }
-        return staff;
     }
 
     public MerchantStaff requireCurrentWaiter() {

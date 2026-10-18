@@ -90,22 +90,10 @@ public class TableSessionService {
         return restaurantTableRepository
                 .findFirstByMenuIdAndNameIgnoreCaseAndActiveTrueAndDeletedFalse(menu.getMenuId(), WALK_IN_TABLE_NAME)
                 .or(() -> restaurantTableRepository.findFirstByMenuIdAndActiveTrueAndDeletedFalseOrderByTableNumberAscNameAsc(menu.getMenuId()))
-                .orElseGet(() -> {
-                    LocalDateTime now = LocalDateTime.now();
-                    String publicToken = generateToken();
-                    RestaurantTable created = RestaurantTable.builder()
-                            .menuId(menu.getMenuId())
-                            .name(WALK_IN_TABLE_NAME)
-                            .tableNumber(null)
-                            .publicToken(publicToken)
-                            .qrImageBase64(null)
-                            .active(true)
-                            .deleted(false)
-                            .createdAt(now)
-                            .updatedAt(now)
-                            .build();
-                    return restaurantTableRepository.save(created);
-                });
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Lütfen işletmenizle iletişime geçiniz."
+                ));
     }
 
     @Transactional

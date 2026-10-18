@@ -2,7 +2,7 @@ package com.ael.algoryqrservice.staffservice.application;
 
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
@@ -10,7 +10,7 @@ import com.ael.algoryqrservice.qrservice.model.WorkShift;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.staffservice.dto.WorkShiftDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.WorkShiftStatus;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.WorkShiftRepository;

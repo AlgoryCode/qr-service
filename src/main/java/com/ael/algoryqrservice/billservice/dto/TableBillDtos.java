@@ -1,8 +1,9 @@
-package com.ael.algoryqrservice.qrservice.model.dto;
+package com.ael.algoryqrservice.billservice.dto;
 
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillPaymentMethod;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
-import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionRecordType;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.BillAdjustmentType;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
+import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -197,45 +198,39 @@ public final class TableBillDtos {
     }
 
     @Data
-    @Builder(toBuilder = true)
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CommissionRecordResponse {
-        private Long id;
-        private Long billId;
+    public static class CreateAdjustmentRequest {
         private Long orderId;
-        private WaiterCommissionRecordType recordType;
-        private BigDecimal baseAmount;
-        private BigDecimal commissionValueSnapshot;
-        private BigDecimal amount;
-        private String currency;
-        private String tableName;
-        private LocalDateTime createdAt;
-    }
 
-    @Data
-    @Builder(toBuilder = true)
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TodayCommissionSummary {
-        private BigDecimal totalAmount;
-        private String currency;
-        private BigDecimal percentOrderTotal;
-        private BigDecimal fixedTableCloseTotal;
-        private BigDecimal fixedItemAddTotal;
-        private int recordCount;
-        private List<CommissionRecordResponse> records;
+        @NotNull
+        private BillAdjustmentType adjustmentType;
+
+        @NotNull
+        @DecimalMin(value = "0")
+        private BigDecimal amount;
+
+        @Size(max = 64)
+        private String reason;
+
+        @Size(max = 1000)
+        private String reasonNote;
     }
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CommissionHistoryResponse {
-        private List<CommissionRecordResponse> records;
-        private int page;
-        private int size;
-        private long totalElements;
-        private int totalPages;
+    public static class AdjustmentResponse {
+        private Long id;
+        private Long billId;
+        private Long orderId;
+        private Long staffId;
+        private BillAdjustmentType adjustmentType;
+        private BigDecimal amount;
+        private String reason;
+        private String reasonNote;
+        private LocalDateTime createdAt;
     }
 }
