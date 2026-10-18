@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.model.User;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
-import com.ael.algoryqrservice.qrservice.util.ClientInfo;
+import com.ael.algoryqrservice.authservice.util.ClientInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
