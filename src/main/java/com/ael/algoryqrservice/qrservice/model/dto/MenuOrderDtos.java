@@ -82,7 +82,7 @@ public final class MenuOrderDtos {
         private Long orderId;
 
         @NotNull
-        private com.ael.algoryqrservice.qrservice.model.enums.BillAdjustmentType adjustmentType;
+        private com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.BillAdjustmentType adjustmentType;
 
         @NotNull
         @Min(0)

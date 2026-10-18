@@ -1,24 +1,24 @@
 package com.ael.algoryqrservice.qrservice.analytics.service;
 
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
 import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
-import com.ael.algoryqrservice.qrservice.model.enums.BillAdjustmentType;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.BillAdjustmentType;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderSource;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.WorkShiftStatus;
-import com.ael.algoryqrservice.qrservice.repository.BillAdjustmentRepository;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillAdjustmentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuAnalyticsSessionRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillItemRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillItemRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillRepository;
 import com.ael.algoryqrservice.qrservice.repository.WorkShiftRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -237,7 +237,9 @@ public class UnifiedAnalyticsAggregates {
             Long tableId = entry.getKey();
             TableAcc a = entry.getValue();
             RestaurantTable table = tables.get(tableId);
-            String name = table != null ? table.getName() : "Masa #" + tableId;
+            String name = tableId == null
+                    ? "Masa yok"
+                    : (table != null ? table.getName() : "Masa #" + tableId);
             BigDecimal avgCheck = a.closedBills == 0
                     ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                     : a.revenue.divide(BigDecimal.valueOf(a.closedBills), 2, RoundingMode.HALF_UP);

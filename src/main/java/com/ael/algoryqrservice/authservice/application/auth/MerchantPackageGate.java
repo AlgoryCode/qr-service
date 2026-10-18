@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
-import com.ael.algoryqrservice.authservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.authservice.infrastructure.client.PackageState;
 import com.ael.algoryqrservice.fulfillmentservice.application.service.MerchantLoginPackageLookup;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.ActivePackage;
@@ -31,11 +30,7 @@ public class MerchantPackageGate {
         if (merchantId == null) {
             return PackageState.none();
         }
-        PackageState state = findPackageState(merchantId);
-        if (state.inactive()) {
-            throw new ForbiddenException("PACKAGE_INACTIVE", "Paket aktif değil");
-        }
-        return state;
+        return findPackageState(merchantId);
     }
 
     private PackageState findPackageState(Long merchantId) {

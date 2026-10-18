@@ -1,9 +1,6 @@
 package com.ael.algoryqrservice.staffservice.presentation.controller;
 
-import com.ael.algoryqrservice.qrservice.model.BillAdjustment;
-import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.staffservice.dto.WorkShiftDtos;
-import com.ael.algoryqrservice.qrservice.order.service.BillAdjustmentService;
 import com.ael.algoryqrservice.staffservice.application.WorkShiftService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class StaffOpsController {
 
     private final WorkShiftService workShiftService;
-    private final BillAdjustmentService billAdjustmentService;
 
     @GetMapping("/shifts/current")
     public ResponseEntity<WorkShiftDtos.ShiftResponse> currentShift() {
@@ -41,12 +37,5 @@ public class StaffOpsController {
             @Valid @RequestBody WorkShiftDtos.CloseShiftRequest request
     ) {
         return ResponseEntity.ok(workShiftService.closeShift(shiftId, request));
-    }
-
-    @PostMapping("/bill-adjustments")
-    public ResponseEntity<BillAdjustment> createAdjustment(
-            @Valid @RequestBody MenuOrderDtos.BillAdjustmentRequest request
-    ) {
-        return ResponseEntity.ok(billAdjustmentService.create(request));
     }
 }

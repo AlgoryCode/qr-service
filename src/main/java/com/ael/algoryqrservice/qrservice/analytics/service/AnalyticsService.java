@@ -3,7 +3,7 @@ package com.ael.algoryqrservice.qrservice.analytics.service;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsOrderRepository;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuAnalyticsEvent;
@@ -16,9 +16,9 @@ import com.ael.algoryqrservice.qrservice.model.MenuSubCategory;
 import com.ael.algoryqrservice.qrservice.model.MenuVisit;
 import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuAnalyticsEventType;
-import com.ael.algoryqrservice.qrservice.model.TableBillItem;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillPaymentMethod;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBillItem;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuAnalyticsEventRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuAnalyticsSessionRepository;
@@ -988,7 +988,7 @@ public class AnalyticsService {
     }
 
     private ReportScope resolveBranchScope(Long branchId, Long menuId, Long ownerId) {
-        Branch branch = branchService.requireOwnedForUser(branchId, ownerId);
+        Branch branch = branchService.requireOwnedForMerchant(branchId, ownerId);
         List<Menu> menus = menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR);
         if (menuId != null) {
             Menu menu = menus.stream()

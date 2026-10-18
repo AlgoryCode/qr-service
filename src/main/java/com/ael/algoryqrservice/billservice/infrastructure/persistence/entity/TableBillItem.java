@@ -1,4 +1,4 @@
-package com.ael.algoryqrservice.qrservice.model;
+package com.ael.algoryqrservice.billservice.infrastructure.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

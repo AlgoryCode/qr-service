@@ -1,7 +1,7 @@
-package com.ael.algoryqrservice.qrservice.repository;
+package com.ael.algoryqrservice.billservice.infrastructure.persistence.repository;
 
-import com.ael.algoryqrservice.qrservice.model.TableBill;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 

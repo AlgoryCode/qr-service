@@ -1,14 +1,14 @@
 package com.ael.algoryqrservice.qrservice.analytics.service;
 
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
-import com.ael.algoryqrservice.qrservice.model.TableBillItem;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBillItem;
 import com.ael.algoryqrservice.qrservice.model.WaiterCommissionRecord;
 import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillRepository;
 import com.ael.algoryqrservice.qrservice.repository.WaiterCommissionRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

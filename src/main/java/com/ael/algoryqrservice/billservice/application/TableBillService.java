@@ -1,8 +1,8 @@
-package com.ael.algoryqrservice.qrservice.order.service;
+package com.ael.algoryqrservice.billservice.application;
 
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
-import com.ael.algoryqrservice.qrservice.model.BillPayment;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
@@ -10,24 +10,24 @@ import com.ael.algoryqrservice.qrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.RestaurantTable;
-import com.ael.algoryqrservice.qrservice.model.TableBill;
-import com.ael.algoryqrservice.qrservice.model.TableBillItem;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBill;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.TableBillItem;
 import com.ael.algoryqrservice.qrservice.model.TableSession;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
-import com.ael.algoryqrservice.qrservice.order.dto.TableBillDtos;
+import com.ael.algoryqrservice.billservice.dto.TableBillDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderAuditAction;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillPaymentMethod;
-import com.ael.algoryqrservice.qrservice.model.enums.TableBillStatus;
-import com.ael.algoryqrservice.qrservice.repository.BillPaymentRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantTableRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillItemRepository;
-import com.ael.algoryqrservice.qrservice.repository.TableBillRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillItemRepository;
+import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.TableBillRepository;
 import com.ael.algoryqrservice.qrservice.repository.TableSessionRepository;
 import com.ael.algoryqrservice.qrservice.event.BillClosedEvent;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import com.ael.algoryqrservice.staffservice.application.StaffCommissionService;
@@ -565,10 +566,9 @@ public class TableBillService {
     }
 
     @Transactional(readOnly = true)
-    public TableBillDtos.BillResponse getOpenBillForTable(Long menuId, Long tableId) {
-        TableBill bill = tableBillRepository.findByMenuIdAndTableIdAndStatus(menuId, tableId, TableBillStatus.OPEN)
-                .orElseThrow(() -> new NotFoundException("Açık adisyon bulunamadı"));
-        return toBillResponse(bill, null);
+    public Optional<TableBillDtos.BillResponse> findOpenBillForTable(Long menuId, Long tableId) {
+        return tableBillRepository.findByMenuIdAndTableIdAndStatus(menuId, tableId, TableBillStatus.OPEN)
+                .map(bill -> toBillResponse(bill, null));
     }
 
     @Transactional(readOnly = true)
