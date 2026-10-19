@@ -50,16 +50,57 @@ public class PrintOrderEnqueueService {
         if (menu == null) {
             return;
         }
-        JsonNode payload = objectMapper.valueToTree(response);
-        ObjectNode node = (ObjectNode) payload;
-        node.put("channelLabel", channelLabel(order.getOrderSource() == null
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("ticketKind", "BILGI_FISI");
+        payload.put("channelLabel", channelLabel(order.getOrderSource() == null
                 ? null
                 : order.getOrderSource().name()));
-        node.put("ticketKind", "BILGI_FISI");
+        payload.put("id", order.getId());
+        payload.put("orderNo", String.valueOf(order.getId()));
         if (menu.getBranchId() != null) {
-            node.put("branchId", menu.getBranchId());
+            payload.put("branchId", menu.getBranchId());
         }
-        attachBranchHeader(node, menu.getBranchId());
+        if (response != null) {
+            putText(payload, "tableName", response.getTableName());
+            putText(payload, "customerName", response.getCustomerName());
+            putText(payload, "waiterName", response.getWaiterName());
+            putText(payload, "note", response.getNote());
+            putText(payload, "waiterNote", response.getWaiterNote());
+            putText(payload, "kitchenNote", response.getKitchenNote());
+            putText(payload, "currency", response.getCurrency() == null ? "TRY" : response.getCurrency());
+            putAmount(payload, "totalAmount", response.getTotalAmount());
+            if (response.getSubmittedAt() != null) {
+                payload.put("submittedAt", response.getSubmittedAt().toString());
+            } else if (response.getCreatedAt() != null) {
+                payload.put("submittedAt", response.getCreatedAt().toString());
+            }
+            ArrayNode items = payload.putArray("items");
+            if (response.getItems() != null) {
+                for (MenuOrderDtos.OrderItemResponse item : response.getItems()) {
+                    if (item == null) {
+                        continue;
+                    }
+                    ObjectNode line = items.addObject();
+                    line.put("productName", item.getProductName() == null ? "Urun" : item.getProductName());
+                    line.put("quantity", item.getQuantity());
+                    putAmount(line, "unitPrice", item.getUnitPrice());
+                    putAmount(line, "lineTotal", item.getLineTotal());
+                    putText(line, "note", item.getNote());
+                    ArrayNode options = line.putArray("selectedOptions");
+                    if (item.getSelectedOptions() != null) {
+                        for (MenuOrderDtos.SelectedOptionResponse option : item.getSelectedOptions()) {
+                            if (option == null || option.getOptionName() == null || option.getOptionName().isBlank()) {
+                                continue;
+                            }
+                            ObjectNode opt = options.addObject();
+                            opt.put("optionName", option.getOptionName());
+                            putAmount(opt, "priceDelta", option.getPriceDelta());
+                        }
+                    }
+                }
+            }
+        }
+        attachBranchHeader(payload, menu.getBranchId());
         printJobService.enqueueKitchenTicket(
                 menu.getMerchantId(),
                 menu.getBranchId(),
