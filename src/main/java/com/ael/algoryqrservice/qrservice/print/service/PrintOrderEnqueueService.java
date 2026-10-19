@@ -1,18 +1,24 @@
 package com.ael.algoryqrservice.qrservice.print.service;
 
+import com.ael.algoryqrservice.qrservice.integration.ubereats.mapper.UberEatsPayloadMapper;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsOrder;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.dto.UberEatsDtos;
+import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.mapper.YemekSepetiPayloadMapper;
 import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model.YemekSepetiOrder;
 import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model.dto.YemekSepetiDtos;
+import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.qrservice.print.model.PrintSourceType;
+import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsMapper;
 import com.ael.algoryqrservice.qrservice.store.model.Merchant;
+import com.ael.algoryqrservice.qrservice.store.model.StoreDeliveryType;
 import com.ael.algoryqrservice.qrservice.store.model.StoreOrder;
 import com.ael.algoryqrservice.qrservice.store.model.StoreOrderItem;
+import com.ael.algoryqrservice.qrservice.store.model.StorePaymentMethod;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -22,8 +28,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import com.ael.algoryqrservice.qrservice.model.enums.OrderSource;
-import com.ael.algoryqrservice.qrservice.print.service.PrintJobService;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +37,9 @@ public class PrintOrderEnqueueService {
 
     private final PrintJobService printJobService;
     private final MenuRepository menuRepository;
+    private final BranchRepository branchRepository;
+    private final UberEatsPayloadMapper uberEatsPayloadMapper;
+    private final YemekSepetiPayloadMapper yemekSepetiPayloadMapper;
     private final ObjectMapper objectMapper;
 
     public void enqueueMenuOrder(MenuOrder order, MenuOrderDtos.OrderResponse response) {
@@ -42,12 +51,15 @@ public class PrintOrderEnqueueService {
             return;
         }
         JsonNode payload = objectMapper.valueToTree(response);
-        ((ObjectNode) payload).put("channelLabel", channelLabel(order.getOrderSource() == null
+        ObjectNode node = (ObjectNode) payload;
+        node.put("channelLabel", channelLabel(order.getOrderSource() == null
                 ? null
                 : order.getOrderSource().name()));
+        node.put("ticketKind", "BILGI_FISI");
         if (menu.getBranchId() != null) {
-            ((ObjectNode) payload).put("branchId", menu.getBranchId());
+            node.put("branchId", menu.getBranchId());
         }
+        attachBranchHeader(node, menu.getBranchId());
         printJobService.enqueueKitchenTicket(
                 menu.getMerchantId(),
                 menu.getBranchId(),
@@ -69,15 +81,20 @@ public class PrintOrderEnqueueService {
         MenuOrderDtos.OrderResponse kitchen = KitchenUberEatsMapper.toKitchenOrder(order, items);
         ObjectNode payload = objectMapper.valueToTree(kitchen);
         payload.put("channelLabel", "Uber Eats");
+        payload.put("ticketKind", "BILGI_FISI");
         if (branchId != null) {
             payload.put("branchId", branchId);
         }
-        if (order.getDeliveryAddress() != null) {
-            payload.put("deliveryAddress", order.getDeliveryAddress());
+        putText(payload, "deliveryAddress", order.getDeliveryAddress());
+        putText(payload, "customerPhone", order.getCustomerPhone());
+        JsonNode raw = readRaw(order.getRawPayload());
+        String orderNo = raw == null ? null : uberEatsPayloadMapper.orderNumber(raw);
+        putText(payload, "orderNo", firstNonBlank(orderNo, order.getExternalOrderId()));
+        if (raw != null) {
+            putText(payload, "deliveryType", uberEatsPayloadMapper.deliveryType(raw));
+            putText(payload, "paymentMethod", uberEatsPayloadMapper.paymentMethod(raw));
         }
-        if (order.getCustomerPhone() != null) {
-            payload.put("customerPhone", order.getCustomerPhone());
-        }
+        attachBranchHeader(payload, branchId);
         printJobService.enqueueKitchenTicket(
                 merchantId,
                 branchId,
@@ -121,15 +138,20 @@ public class PrintOrderEnqueueService {
         );
         ObjectNode payload = objectMapper.valueToTree(kitchen);
         payload.put("channelLabel", "Yemeksepeti");
+        payload.put("ticketKind", "BILGI_FISI");
         if (branchId != null) {
             payload.put("branchId", branchId);
         }
-        if (order.getDeliveryAddress() != null) {
-            payload.put("deliveryAddress", order.getDeliveryAddress());
+        putText(payload, "deliveryAddress", order.getDeliveryAddress());
+        putText(payload, "customerPhone", order.getCustomerPhone());
+        JsonNode raw = readRaw(order.getRawPayload());
+        String orderNo = raw == null ? null : yemekSepetiPayloadMapper.orderNumber(raw);
+        putText(payload, "orderNo", firstNonBlank(orderNo, order.getExternalOrderId()));
+        if (raw != null) {
+            putText(payload, "deliveryType", yemekSepetiPayloadMapper.deliveryType(raw));
+            putText(payload, "paymentMethod", yemekSepetiPayloadMapper.paymentMethod(raw));
         }
-        if (order.getCustomerPhone() != null) {
-            payload.put("customerPhone", order.getCustomerPhone());
-        }
+        attachBranchHeader(payload, branchId);
         printJobService.enqueueKitchenTicket(
                 merchantId,
                 branchId,
@@ -147,18 +169,22 @@ public class PrintOrderEnqueueService {
         payload.put("id", order.getId());
         payload.put("orderNo", order.getOrderNo());
         payload.put("channelLabel", "Online Siparis");
-        payload.put("tableName", order.getDeliveryType() == null ? "Online" : order.getDeliveryType().name());
+        payload.put("ticketKind", "BILGI_FISI");
         payload.put("customerName", order.getCustomerName());
         payload.put("customerPhone", order.getCustomerPhone());
         payload.put("note", order.getNote());
-        payload.put("totalAmount", order.getTotalAmount() == null ? 0 : order.getTotalAmount().doubleValue());
+        payload.put("totalAmount", nullSafe(order.getTotalAmount()));
         payload.put("currency", order.getCurrency());
+        putText(payload, "paymentMethod", paymentLabel(order.getPaymentMethod()));
+        putText(payload, "deliveryType", deliveryLabel(order.getDeliveryType()));
+        putAmount(payload, "subtotal", order.getSubtotal());
+        putAmount(payload, "deliveryFee", order.getDeliveryFee());
+        putAmount(payload, "discountAmount", order.getDiscountAmount());
         if (merchant.getBranchId() != null) {
             payload.put("branchId", merchant.getBranchId());
         }
-        if (order.getAddressText() != null) {
-            payload.put("deliveryAddress", order.getAddressText());
-        }
+        putText(payload, "deliveryAddress", storeDeliveryAddress(order));
+        attachStoreBusiness(payload, merchant);
         ArrayNode items = payload.putArray("items");
         if (order.getItems() != null) {
             for (StoreOrderItem item : order.getItems()) {
@@ -179,6 +205,71 @@ public class PrintOrderEnqueueService {
         );
     }
 
+    private void attachBranchHeader(ObjectNode payload, Long branchId) {
+        if (branchId == null) {
+            return;
+        }
+        branchRepository.findById(branchId).ifPresent(branch -> attachBranch(payload, branch));
+    }
+
+    private static void attachBranch(ObjectNode payload, Branch branch) {
+        putText(payload, "businessName", branch.getName());
+        putText(payload, "businessAddress", branch.getAddress());
+        putText(payload, "businessPhone", branch.getPhone());
+    }
+
+    private static void attachStoreBusiness(ObjectNode payload, Merchant merchant) {
+        putText(payload, "businessName", merchant.getBusinessName());
+        putText(payload, "legalName", merchant.getLegalName());
+        putText(payload, "taxOffice", merchant.getTaxOffice());
+        putText(payload, "taxNumber", merchant.getTaxNumber());
+        putText(payload, "businessPhone", merchant.getPhone());
+        putText(payload, "businessAddress", joinParts(merchant.getAddress(), merchant.getDistrict(), merchant.getCity()));
+    }
+
+    private static String storeDeliveryAddress(StoreOrder order) {
+        return joinParts(
+                order.getAddressText(),
+                order.getDistrict(),
+                order.getCity(),
+                labeled("Bina", order.getBuildingNo()),
+                labeled("Kat", order.getFloorNo()),
+                labeled("Kapı", order.getDoorNo()),
+                order.getDirections()
+        );
+    }
+
+    private JsonNode readRaw(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(raw);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String paymentLabel(StorePaymentMethod method) {
+        if (method == null) {
+            return null;
+        }
+        return switch (method) {
+            case CASH_ON_DELIVERY -> "Nakit";
+            case CARD_ON_DELIVERY -> "Kredi kartı";
+        };
+    }
+
+    private static String deliveryLabel(StoreDeliveryType type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type) {
+            case DELIVERY -> "Teslimat";
+            case PICKUP -> "Gel-al";
+        };
+    }
+
     private static String channelLabel(String source) {
         if (source == null) {
             return "Siparis";
@@ -190,6 +281,45 @@ public class PrintOrderEnqueueService {
             case "YEMEKSEPETI" -> "Yemeksepeti";
             default -> source;
         };
+    }
+
+    private static void putAmount(ObjectNode node, String field, BigDecimal value) {
+        if (value == null) {
+            return;
+        }
+        node.put(field, value.doubleValue());
+    }
+
+    private static void putText(ObjectNode node, String field, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        node.put(field, value.trim());
+    }
+
+    private static String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary.trim();
+        }
+        if (fallback != null && !fallback.isBlank()) {
+            return fallback.trim();
+        }
+        return null;
+    }
+
+    private static String labeled(String label, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return label + " " + value.trim();
+    }
+
+    private static String joinParts(String... parts) {
+        String joined = Stream.of(parts)
+                .filter(part -> part != null && !part.isBlank())
+                .map(String::trim)
+                .collect(Collectors.joining(", "));
+        return joined.isBlank() ? null : joined;
     }
 
     private static double nullSafe(BigDecimal value) {
