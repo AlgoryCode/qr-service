@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/internal/integrations")
+@RequestMapping("/api/v1/internal/integrations")
 @RequiredArgsConstructor
 public class InternalIntegrationController {
 

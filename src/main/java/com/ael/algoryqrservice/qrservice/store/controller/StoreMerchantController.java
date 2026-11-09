@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/store/me")
+@RequestMapping("/api/v1/store/me")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.ONLINE_ORDER_OWNER)
 public class StoreMerchantController {

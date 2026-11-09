@@ -5,6 +5,7 @@ import com.ael.algoryqrservice.qrservice.model.enums.CancelReason;
 import com.ael.algoryqrservice.qrservice.model.enums.OrderSource;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
@@ -125,6 +126,7 @@ public class MenuOrder {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @BatchSize(size = 100)
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<MenuOrderItem> items = new ArrayList<>();

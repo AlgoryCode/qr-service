@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/customer/account")
+@RequestMapping("/api/v1/customer/account")
 @RequiredArgsConstructor
 public class CustomerAccountController {
 

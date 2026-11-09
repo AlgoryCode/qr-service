@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/internal/credentials")
+@RequestMapping("/api/v1/internal/credentials")
 @RequiredArgsConstructor
 public class InternalCredentialController {
 

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping({"/staff/commissions", "/waiter/commissions"})
+@RequestMapping("/api/v1/staff/commissions")
 @RequiredArgsConstructor
 public class StaffCommissionController {
 

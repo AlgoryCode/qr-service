@@ -9,7 +9,8 @@ import java.util.Optional;
 
 public interface YemekSepetiConnectionRepository extends JpaRepository<YemekSepetiConnection, Long> {
 
-    Optional<YemekSepetiConnection> findByMerchantId(Long merchantId);
+    /** A merchant has one connection per branch, plus possibly one without a branch (see V168). */
+    Optional<YemekSepetiConnection> findByMerchantIdAndBranchId(Long merchantId, Long branchId);
 
     List<YemekSepetiConnection> findByMerchantIdOrderByUpdatedAtDesc(Long merchantId);
 

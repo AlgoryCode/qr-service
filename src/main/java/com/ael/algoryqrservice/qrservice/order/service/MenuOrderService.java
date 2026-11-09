@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.Customer;
 import com.ael.algoryqrservice.qrservice.model.Menu;
+import com.ael.algoryqrservice.qrservice.orderflow.service.OrderFlowLookup;
 import com.ael.algoryqrservice.qrservice.model.MenuOrder;
 import com.ael.algoryqrservice.qrservice.model.MenuOrderItem;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
@@ -33,7 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.ael.algoryqrservice.qrservice.campaign.dto.CampaignDtos;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,8 +44,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import com.ael.algoryqrservice.qrservice.product.service.MenuProductOptionService;
 import com.ael.algoryqrservice.qrservice.stock.service.StockConsumptionService;
@@ -75,6 +80,8 @@ public class MenuOrderService {
     private final KitchenYemekSepetiService kitchenYemekSepetiService;
     private final PrintOrderEnqueueService printOrderEnqueueService;
     private final StockConsumptionService stockConsumptionService;
+    private final OrderFlowLookup orderFlowLookup;
+    private final KitchenRoutingService kitchenRoutingService;
 
     @Transactional
     public MenuOrderDtos.OrderResponse getOrCreateDraft(String tableSessionToken) {
@@ -137,28 +144,74 @@ public class MenuOrderService {
             session = tableBillService.resolveBillSession(bill);
         }
 
+        // "Adisyona ekle" her kalemi doğrudan servis edilmiş yazar; "Mutfağa gönder" mutfak açıkken kalemleri mutfağa
+        // yollar, "mutfağa gitmez" kategorilerdekiler yine doğrudan adisyona düşer. İki sipariş de aynı adisyondadır.
+        Set<Long> productIds = request.getItems().stream()
+                .map(MenuOrderDtos.CartItemRequest::getProductId)
+                .collect(Collectors.toSet());
+        boolean addToBillOnly = Boolean.FALSE.equals(request.getSendToKitchen());
+        if (Boolean.TRUE.equals(request.getSendToKitchen()) && !kitchenRoutingService.kitchenEnabled(menuId)) {
+            throw new BadRequestException("Mutfak özelliği kapalı; siparişi adisyona ekleyebilirsiniz");
+        }
+        // Kitchen and "mutfağa gitmez" items always land in separate orders, also on "Adisyona ekle": a later
+        // "Mutfağa gönder" on that order must then not drag the drinks into the kitchen.
+        Set<Long> directIds = kitchenRoutingService.directProductIds(menuId, productIds);
+        List<MenuOrderDtos.CartItemRequest> kitchenItems = request.getItems().stream()
+                .filter(item -> !directIds.contains(item.getProductId()))
+                .toList();
+        List<MenuOrderDtos.CartItemRequest> directItems = request.getItems().stream()
+                .filter(item -> directIds.contains(item.getProductId()))
+                .toList();
+
+        MenuOrderDtos.OrderResponse kitchenResponse = kitchenItems.isEmpty()
+                ? null
+                : persistWaiterOrder(menuId, waiter, table, session, bill, kitchenItems, request, addToBillOnly, true);
+        MenuOrderDtos.OrderResponse directResponse = directItems.isEmpty()
+                ? null
+                : persistWaiterOrder(menuId, waiter, table, session, bill, directItems, request, true, kitchenResponse == null);
+        return kitchenResponse != null ? kitchenResponse : directResponse;
+    }
+
+    /**
+     * Garson siparişinin bir parçasını kaydeder. {@code direct} parça mutfağa gitmez: servis edilmiş olarak açılır ve
+     * mutfak fişi basılmaz. Sipariş notu yalnızca mutfağa giden parçaya (yoksa doğrudan parçaya) yazılır.
+     */
+    private MenuOrderDtos.OrderResponse persistWaiterOrder(
+            Long menuId,
+            MerchantStaff waiter,
+            RestaurantTable table,
+            TableSession session,
+            TableBill bill,
+            List<MenuOrderDtos.CartItemRequest> items,
+            MenuOrderDtos.WaiterCreateOrderRequest request,
+            boolean direct,
+            boolean carriesNote
+    ) {
+        Long staffId = waiter.getId();
         LocalDateTime now = LocalDateTime.now();
         MenuOrder order = MenuOrder.builder()
                 .menuId(menuId)
                 .tableId(table == null ? null : table.getId())
                 .tableSessionId(session == null ? null : session.getId())
                 .billId(bill == null ? null : bill.getId())
-                .status(MenuOrderStatus.CONFIRMED)
+                .status(direct ? MenuOrderStatus.SERVED : MenuOrderStatus.CONFIRMED)
                 .orderSource(OrderSource.WAITER)
                 .staffId(staffId)
                 .createdByStaffId(staffId)
-                .note(trimToNull(request.getNote()))
-                .waiterNote(trimToNull(request.getWaiterNote()))
+                .note(carriesNote ? trimToNull(request.getNote()) : null)
+                .waiterNote(carriesNote ? trimToNull(request.getWaiterNote()) : null)
                 .totalAmount(BigDecimal.ZERO)
                 .currency("TRY")
                 .submittedAt(now)
                 .confirmedAt(now)
+                .readyAt(direct ? now : null)
+                .servedAt(direct ? now : null)
                 .createdAt(now)
                 .updatedAt(now)
                 .items(new ArrayList<>())
                 .build();
 
-        applyCartItems(order, menuId, request.getItems());
+        applyCartItems(order, menuId, items);
         MenuOrder saved = menuOrderRepository.save(order);
         stockConsumptionService.consumeMenuOrder(saved);
         if (bill != null) {
@@ -166,12 +219,15 @@ public class MenuOrderService {
         }
         waiterCommissionService.recordOrderCommissions(waiter, saved, bill == null ? null : bill.getId());
         menuOrderRepository.save(saved);
-        orderAuditService.record(saved, OrderAuditAction.CREATED, staffId, null);
+        orderAuditService.record(saved, OrderAuditAction.CREATED, staffId, direct ? "{\"skipKitchen\":true}" : null);
         campaignEvaluationService.onOrderConfirmed(saved);
         MenuOrderDtos.OrderResponse response = toOrderResponse(saved);
-        printOrderEnqueueService.enqueueMenuOrder(saved, response);
+        if (!direct) {
+            printOrderEnqueueService.enqueueMenuOrder(saved, response);
+        }
         return response;
     }
+
 
     @Transactional
     public MenuOrderDtos.OrderResponse submit(Long menuId, String tableSessionToken, UUID analyticsSessionId) {
@@ -182,6 +238,10 @@ public class MenuOrderService {
 
         if (order.getItems() == null || order.getItems().isEmpty()) {
             throw new BadRequestException("Sepet boş olamaz");
+        }
+        Long branchId = menuRepository.findById(order.getMenuId()).map(Menu::getBranchId).orElse(null);
+        if (orderFlowLookup.requiresTableApproval(branchId)) {
+            return submitForApproval(order, analyticsSessionId);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -212,6 +272,30 @@ public class MenuOrderService {
         return submit(menuId, tableSessionToken, null);
     }
 
+    /**
+     * Şubenin akışında garson onayı varsa QR siparişi "Onay bekliyor" olarak kalır; hesaba, stoğa ve mutfak
+     * yazıcısına garson onayladığında ({@code MenuWaiterOrderService#confirm}) düşer.
+     */
+    private MenuOrderDtos.OrderResponse submitForApproval(MenuOrder order, UUID analyticsSessionId) {
+        LocalDateTime now = LocalDateTime.now();
+        order.setStatus(MenuOrderStatus.SUBMITTED);
+        order.setOrderSource(OrderSource.QR);
+        order.setSubmittedAt(now);
+        order.setUpdatedAt(now);
+        if (analyticsSessionId != null) {
+            order.setAnalyticsSessionId(analyticsSessionId);
+        }
+        securityUtils.findCurrentCustomerId().ifPresent(order::setCustomerId);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.CREATED, null, "{\"source\":\"QR\",\"approval\":true}");
+        return toOrderResponse(saved);
+    }
+
+    /** Onay bekleyen bir sipariş onaylandığında mutfak fişini basar. */
+    public void enqueuePrint(MenuOrder order) {
+        printOrderEnqueueService.enqueueMenuOrder(order, toOrderResponse(order));
+    }
+
     @Transactional(readOnly = true)
     public MenuOrderDtos.OrderResponse getOrder(Long menuId, String tableSessionToken, Long orderId) {
         TableSession session = requireSessionForMenu(menuId, tableSessionToken);
@@ -222,30 +306,41 @@ public class MenuOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> merchantList(Long menuId, String status) {
+        return merchantList(menuId, status, null);
+    }
+
+    /**
+     * @param days when set, "ALL" lists only orders submitted in the last [days] days (today counts as one);
+     *             without it a busy menu's whole history comes back, which mobile clients can't load.
+     */
+    @Transactional(readOnly = true)
+    public List<MenuOrderDtos.OrderResponse> merchantList(Long menuId, String status, Integer days) {
         Menu menu = requireOwnedMenu(menuId);
         List<MenuOrderDtos.OrderResponse> listed;
         if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status.trim())) {
-            listed = new ArrayList<>(menuOrderRepository
-                    .findByMenuIdAndStatusInOrderBySubmittedAtDesc(
+            List<MenuOrderStatus> listedStatuses = List.of(
+                    MenuOrderStatus.CONFIRMED,
+                    MenuOrderStatus.PREPARING,
+                    MenuOrderStatus.READY,
+                    MenuOrderStatus.SERVED,
+                    MenuOrderStatus.PAID,
+                    MenuOrderStatus.SUBMITTED,
+                    MenuOrderStatus.CANCELLED
+            );
+            List<MenuOrder> orders = days == null || days <= 0
+                    ? menuOrderRepository.findByMenuIdAndStatusInOrderBySubmittedAtDesc(menuId, listedStatuses)
+                    : menuOrderRepository.findByMenuIdAndStatusInAndSubmittedAtGreaterThanEqualOrderBySubmittedAtDesc(
                             menuId,
-                            List.of(
-                                    MenuOrderStatus.CONFIRMED,
-                                    MenuOrderStatus.PREPARING,
-                                    MenuOrderStatus.READY,
-                                    MenuOrderStatus.SERVED,
-                                    MenuOrderStatus.PAID,
-                                    MenuOrderStatus.SUBMITTED,
-                                    MenuOrderStatus.CANCELLED
-                            )
-                    )
-                    .stream()
-                    .map(this::toOrderResponse)
-                    .toList());
+                            listedStatuses,
+                            LocalDate.now().minusDays(days - 1L).atStartOfDay()
+                    );
+            listed = new ArrayList<>(toOrderResponses(menuId, orders));
         } else {
             MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
-            listed = new ArrayList<>(menuOrderRepository.findByMenuIdAndStatusOrderBySubmittedAtDesc(menuId, orderStatus).stream()
-                    .map(this::toOrderResponse)
-                    .toList());
+            listed = new ArrayList<>(toOrderResponses(
+                    menuId,
+                    menuOrderRepository.findByMenuIdAndStatusOrderBySubmittedAtDesc(menuId, orderStatus)
+            ));
         }
         listed.addAll(kitchenUberEatsService.listManagedForOwner(menu.getMerchantId()));
         listed.addAll(kitchenYemekSepetiService.listManagedForOwner(menu.getMerchantId()));
@@ -662,23 +757,57 @@ public class MenuOrderService {
                 : restaurantTableRepository.findById(order.getTableId())
                         .map(RestaurantTable::getName)
                         .orElse(null);
+        String waiterName = order.getStaffId() == null
+                ? null
+                : merchantStaffRepository.findById(order.getStaffId())
+                        .map(MerchantStaff::getDisplayName)
+                        .orElse(null);
+        Customer customer = order.getCustomerId() == null
+                ? null
+                : customerRepository.findById(order.getCustomerId()).orElse(null);
+        return buildOrderResponse(order, tableName, waiterName, customer, campaignEvaluationService.summarizeOrder(order));
+    }
 
-        String waiterName = null;
-        if (order.getStaffId() != null) {
-            waiterName = merchantStaffRepository.findById(order.getStaffId())
-                    .map(MerchantStaff::getDisplayName)
-                    .orElse(null);
-        }
+    /** Converts a whole list with one lookup per kind of related row instead of several per order. */
+    private List<MenuOrderDtos.OrderResponse> toOrderResponses(Long menuId, List<MenuOrder> orders) {
+        Map<Long, String> tableNames = new HashMap<>();
+        restaurantTableRepository.findAllById(idsOf(orders, MenuOrder::getTableId))
+                .forEach(table -> tableNames.put(table.getId(), table.getName()));
+        Map<Long, String> waiterNames = new HashMap<>();
+        merchantStaffRepository.findAllById(idsOf(orders, MenuOrder::getStaffId))
+                .forEach(staff -> waiterNames.put(staff.getId(), staff.getDisplayName()));
+        Map<Long, Customer> customers = new HashMap<>();
+        customerRepository.findAllById(idsOf(orders, MenuOrder::getCustomerId))
+                .forEach(customer -> customers.put(customer.getId(), customer));
+        Map<Long, CampaignDtos.OrderCampaignSummary> summaries = campaignEvaluationService.summarizeOrders(menuId, orders);
+        return orders.stream()
+                .map(order -> buildOrderResponse(
+                        order,
+                        order.getTableId() == null ? "Masa yok" : tableNames.get(order.getTableId()),
+                        waiterNames.get(order.getStaffId()),
+                        customers.get(order.getCustomerId()),
+                        summaries.get(order.getId())
+                ))
+                .toList();
+    }
 
+    private static Set<Long> idsOf(List<MenuOrder> orders, Function<MenuOrder, Long> id) {
+        return orders.stream().map(id).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private MenuOrderDtos.OrderResponse buildOrderResponse(
+            MenuOrder order,
+            String tableName,
+            String waiterName,
+            Customer customer,
+            CampaignDtos.OrderCampaignSummary campaignSummary
+    ) {
         String customerName = null;
         String customerEmail = null;
-        if (order.getCustomerId() != null) {
-            Customer customer = customerRepository.findById(order.getCustomerId()).orElse(null);
-            if (customer != null) {
-                String displayName = customer.getDisplayName();
-                customerName = displayName == null || displayName.isBlank() ? null : displayName;
-                customerEmail = customer.getEmail();
-            }
+        if (customer != null) {
+            String displayName = customer.getDisplayName();
+            customerName = displayName == null || displayName.isBlank() ? null : displayName;
+            customerEmail = customer.getEmail();
         }
 
         List<MenuOrderDtos.OrderItemResponse> items = order.getItems() == null
@@ -731,7 +860,7 @@ public class MenuOrderService {
                 .cancelReasonNote(order.getCancelReasonNote())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
-                .campaignSummary(campaignEvaluationService.summarizeOrder(order))
+                .campaignSummary(campaignSummary)
                 .build();
     }
 

@@ -38,12 +38,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -215,9 +217,24 @@ public class TableBillService {
             Long itemId,
             int quantity
     ) {
+        return updateItemQuantity(menuId, billId, itemId, quantity, null);
+    }
+
+    @Transactional
+    public TableBillDtos.BillResponse updateItemQuantity(
+            Long menuId,
+            Long billId,
+            Long itemId,
+            int quantity,
+            Long staffId
+    ) {
         TableBill bill = requireOpenBill(menuId, billId);
         TableBillItem item = tableBillItemRepository.findByIdAndBillId(itemId, billId)
                 .orElseThrow(() -> new NotFoundException("Adisyon kalemi bulunamadı"));
+        int removed = item.getQuantity() - Math.max(quantity, 0);
+        if (removed > 0) {
+            requireRemovableAfterPayments(bill, item, removed);
+        }
 
         if (quantity <= 0) {
             if (item.getPaidQuantity() > 0) {
@@ -233,6 +250,9 @@ public class TableBillService {
             item.setLineTotal(item.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
             item.setUpdatedAt(LocalDateTime.now());
         }
+        if (removed > 0) {
+            shrinkSourceOrder(item, removed, staffId);
+        }
 
         recalculateTotal(bill);
         bill.setUpdatedAt(LocalDateTime.now());
@@ -242,6 +262,96 @@ public class TableBillService {
     @Transactional
     public TableBillDtos.BillResponse removeItem(Long menuId, Long billId, Long itemId) {
         return updateItemQuantity(menuId, billId, itemId, 0);
+    }
+
+    @Transactional
+    public TableBillDtos.BillResponse removeItem(Long menuId, Long billId, Long itemId, Long staffId) {
+        return updateItemQuantity(menuId, billId, itemId, 0, staffId);
+    }
+
+    /**
+     * Money already taken must stay covered by the bill. "Kişi başı" shares were computed from the old total, so once
+     * one is paid nothing comes off; after item or amount payments only what keeps the total above them can.
+     */
+    private void requireRemovableAfterPayments(TableBill bill, TableBillItem item, int removed) {
+        if (!loadSplitPayments(bill.getId()).isEmpty()) {
+            throw new BadRequestException("Kişi başı ödeme alınmış adisyondan ürün çıkarılamaz");
+        }
+        BigDecimal total = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal newTotal = total.subtract(item.getUnitPrice().multiply(BigDecimal.valueOf(removed)));
+        BigDecimal collected = computeItemPaidTotal(bill).add(sumAmountPayments(bill.getId()));
+        if (newTotal.compareTo(collected) < 0) {
+            throw new BadRequestException("Bu ürün çıkarılırsa adisyon alınan ödemenin altına düşer");
+        }
+    }
+
+    /**
+     * Keeps the order behind a bill line in step when pieces come off the bill, so the waiter's "Mutfağa gönder" and
+     * the order lists don't carry them any more. An order left with nothing is cancelled and its stock given back;
+     * a partly shrunk order keeps its stock movements, which are posted per order and can't be split.
+     */
+    private void shrinkSourceOrder(TableBillItem billItem, int removed, Long staffId) {
+        if (billItem.getSourceOrderId() == null) {
+            return;
+        }
+        MenuOrder order = menuOrderRepository.findById(billItem.getSourceOrderId()).orElse(null);
+        if (order == null || order.getItems() == null
+                || order.getStatus() == MenuOrderStatus.CANCELLED || order.getStatus() == MenuOrderStatus.REJECTED) {
+            return;
+        }
+        List<MenuOrderItem> matching = order.getItems().stream()
+                .filter(orderItem -> Objects.equals(orderItem.getProductId(), billItem.getProductId())
+                        && Objects.equals(trimToNull(orderItem.getNote()), trimToNull(billItem.getNote())))
+                .toList();
+        int available = matching.stream().mapToInt(MenuOrderItem::getQuantity).sum();
+        int applied = Math.min(removed, available);
+        if (applied <= 0) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int orderQuantity = order.getItems().stream().mapToInt(MenuOrderItem::getQuantity).sum();
+        if (applied >= orderQuantity) {
+            // Everything came off the bill: cancel instead of emptying, so the order still shows what it was.
+            order.setStatus(MenuOrderStatus.CANCELLED);
+            order.setCancelledAt(now);
+            order.setRejectedAt(now);
+            order.setCancelledByStaffId(staffId);
+            order.setCancelReason(CancelReason.OTHER);
+            order.setCancelReasonNote("Adisyondan çıkarıldı");
+            order.setUpdatedAt(now);
+            MenuOrder saved = menuOrderRepository.save(order);
+            stockConsumptionService.reverseMenuOrder(saved);
+            orderAuditService.record(saved, OrderAuditAction.CANCELLED, staffId, "{\"source\":\"bill-item-removed\"}");
+            return;
+        }
+
+        int left = applied;
+        for (MenuOrderItem orderItem : matching) {
+            if (left == 0) {
+                break;
+            }
+            int take = Math.min(left, orderItem.getQuantity());
+            int newQuantity = orderItem.getQuantity() - take;
+            if (newQuantity == 0) {
+                order.getItems().remove(orderItem);
+            } else {
+                // Scales the line total so option surcharges stay in it.
+                orderItem.setLineTotal(orderItem.getLineTotal()
+                        .multiply(BigDecimal.valueOf(newQuantity))
+                        .divide(BigDecimal.valueOf(orderItem.getQuantity()), 2, RoundingMode.HALF_UP));
+                orderItem.setQuantity(newQuantity);
+            }
+            left -= take;
+        }
+        order.setTotalAmount(order.getItems().stream()
+                .map(MenuOrderItem::getLineTotal)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        order.setUpdatedAt(now);
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.ITEM_REMOVED, staffId,
+                "{\"source\":\"bill-item-removed\",\"productId\":" + billItem.getProductId() + ",\"quantity\":" + applied + "}");
     }
 
     @Transactional
@@ -260,6 +370,9 @@ public class TableBillService {
 
         TableBill bill = requireOpenBill(menuId, billId);
         LocalDateTime now = LocalDateTime.now();
+        BigDecimal amountPaid = sumAmountPayments(bill.getId());
+        BigDecimal remainingBefore = computeRemaining(bill);
+        BigDecimal selectedTotal = BigDecimal.ZERO;
 
         for (TableBillDtos.PayBillItemLine line : request.getItems()) {
             if (line.getItemId() == null || line.getQuantityToPay() == null || line.getQuantityToPay() <= 0) {
@@ -275,6 +388,11 @@ public class TableBillService {
             BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
             BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(line.getQuantityToPay()))
                     .setScale(2, RoundingMode.HALF_UP);
+            selectedTotal = selectedTotal.add(amount);
+            // Amount payments already covered part of the bill; the items may only take what is left.
+            if (amountPaid.signum() > 0 && selectedTotal.compareTo(remainingBefore) > 0) {
+                throw new BadRequestException("Seçilen ürünlerin tutarı kalan tutardan (" + remainingBefore + ") fazla");
+            }
 
             item.setPaidQuantity(item.getPaidQuantity() + line.getQuantityToPay());
             item.setUpdatedAt(now);
@@ -296,7 +414,8 @@ public class TableBillService {
         bill.setUpdatedAt(now);
         TableBill saved = tableBillRepository.save(bill);
 
-        if (isFullyPaid(saved)) {
+        if (isFullyPaid(saved) || computeRemaining(saved).signum() <= 0) {
+            settleItemsWithoutPayment(saved, now);
             BigDecimal tipAmount = resolveTipAmount(request.getTipReceived(), request.getTipAmount());
             if (tipAmount != null) {
                 recordTipPayment(saved, waiter, request.getPaymentMethod(), tipAmount, now);
@@ -340,12 +459,8 @@ public class TableBillService {
             throw new BadRequestException("Bu pay zaten ödendi");
         }
 
-        BigDecimal itemPaidTotal = computeItemPaidTotal(bill);
         BigDecimal splitPaidTotal = sumSplitPaymentAmounts(existingSplitPayments);
-        BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
-        BigDecimal currentRemaining = totalAmount.subtract(itemPaidTotal).subtract(splitPaidTotal)
-                .max(BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal currentRemaining = computeRemaining(bill);
 
         if (currentRemaining.compareTo(BigDecimal.ZERO) <= 0 && existingSplitPayments.isEmpty()) {
             throw new BadRequestException("Kalan tutar bulunmuyor");
@@ -374,7 +489,8 @@ public class TableBillService {
 
         int paidShareCount = existingSplitPayments.size() + 1;
         if (paidShareCount >= request.getPersonCount()) {
-            payAllRemainingItems(saved, waiter, request.getPaymentMethod(), now);
+            // The shares already hold the money; item payments on top would count it twice in the reports.
+            settleItemsWithoutPayment(saved, now);
             BigDecimal tipAmount = resolveTipAmount(request.getTipReceived(), request.getTipAmount());
             if (tipAmount != null) {
                 recordTipPayment(saved, waiter, request.getPaymentMethod(), tipAmount, now);
@@ -397,12 +513,8 @@ public class TableBillService {
         List<BillPayment> existingSplitPayments = loadSplitPayments(bill.getId());
         validateSplitPersonCountConsistency(existingSplitPayments, personCount);
 
-        BigDecimal itemPaidTotal = computeItemPaidTotal(bill);
         BigDecimal splitPaidTotal = sumSplitPaymentAmounts(existingSplitPayments);
-        BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
-        BigDecimal remainingTotal = totalAmount.subtract(itemPaidTotal).subtract(splitPaidTotal)
-                .max(BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal remainingTotal = computeRemaining(bill);
 
         BigDecimal splitBaseRemaining = remainingTotal.add(splitPaidTotal);
         BigDecimal[] shares = calculateEqualShares(splitBaseRemaining, personCount);
@@ -454,7 +566,16 @@ public class TableBillService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        payAllRemainingItems(bill, waiter, paymentMethod, now);
+        if (sumAmountPayments(bill.getId()).signum() > 0 || !splitPayments.isEmpty()) {
+            // Item payments would count the part amount or split payments already covered a second time in the reports.
+            BigDecimal remaining = computeRemaining(bill);
+            if (remaining.signum() > 0) {
+                recordAmountPayment(bill, waiter, paymentMethod, remaining, now);
+            }
+            settleItemsWithoutPayment(bill, now);
+        } else {
+            payAllRemainingItems(bill, waiter, paymentMethod, now);
+        }
 
         BigDecimal resolvedTipAmount = resolveTipAmount(tipReceived, tipAmount);
         if (resolvedTipAmount != null) {
@@ -463,6 +584,115 @@ public class TableBillService {
 
         TableBill saved = finalizeBillClose(bill, waiter, paymentMethod, resolvedTipAmount, now);
         return toBillResponse(saved, null);
+    }
+
+    /**
+     * A typed amount off the bill ("Kısmi öde · Tutar"). It is not tied to items; the payment that brings the
+     * remaining amount to zero closes the bill.
+     */
+    @Transactional
+    public TableBillDtos.BillResponse payAmount(
+            Long menuId,
+            Long billId,
+            MerchantStaff waiter,
+            TableBillDtos.PayBillAmountRequest request
+    ) {
+        if (request == null || request.getPaymentMethod() == null) {
+            throw new BadRequestException("Ödeme yöntemi seçilmelidir");
+        }
+        if (request.getAmount() == null || request.getAmount().compareTo(new BigDecimal("0.01")) < 0) {
+            throw new BadRequestException("Tutar 0,01 veya daha büyük olmalıdır");
+        }
+
+        TableBill bill = requireOpenBill(menuId, billId);
+        recalculateTotal(bill);
+        if (!loadSplitPayments(bill.getId()).isEmpty()) {
+            throw new BadRequestException("Hesap bölme devam ediyor, önce kalan payları alın");
+        }
+
+        BigDecimal amount = request.getAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal remaining = computeRemaining(bill);
+        if (amount.compareTo(remaining) > 0) {
+            throw new BadRequestException("Tutar kalan tutardan (" + remaining + ") fazla olamaz");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        recordAmountPayment(bill, waiter, request.getPaymentMethod(), amount, now);
+        bill.setUpdatedAt(now);
+        TableBill saved = tableBillRepository.save(bill);
+
+        if (amount.compareTo(remaining) == 0) {
+            settleItemsWithoutPayment(saved, now);
+            BigDecimal tipAmount = resolveTipAmount(request.getTipReceived(), request.getTipAmount());
+            if (tipAmount != null) {
+                recordTipPayment(saved, waiter, request.getPaymentMethod(), tipAmount, now);
+            }
+            saved = finalizeBillClose(saved, waiter, request.getPaymentMethod(), tipAmount, now);
+        }
+
+        return toBillResponse(saved, null);
+    }
+
+    /** Fixes the method of today's payments; reports and shift totals read payments live, so they follow. */
+    @Transactional
+    public TableBillDtos.BillResponse changePaymentMethod(
+            Long menuId,
+            Long billId,
+            TableBillDtos.ChangePaymentMethodRequest request
+    ) {
+        TableBill bill = tableBillRepository.findByIdAndMenuId(billId, menuId)
+                .orElseThrow(() -> new NotFoundException("Adisyon bulunamadı"));
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Long paymentId : request.getPaymentIds()) {
+            BillPayment payment = billPaymentRepository.findById(paymentId)
+                    .filter(item -> item.getBill().getId().equals(billId))
+                    .orElseThrow(() -> new NotFoundException("Ödeme bulunamadı"));
+            if (payment.getPaidAt() == null || !payment.getPaidAt().toLocalDate().equals(today)) {
+                throw new BadRequestException("Yalnızca bugün alınan ödemelerin yöntemi değiştirilebilir");
+            }
+            payment.setPaymentMethod(request.getPaymentMethod());
+            billPaymentRepository.save(payment);
+        }
+
+        if (bill.getStatus() == TableBillStatus.CLOSED) {
+            // The bill shows the method of its closing payment.
+            billPaymentRepository.findByBillIdOrderByPaidAtAsc(billId).stream()
+                    .filter(payment -> !payment.isTip())
+                    .reduce((first, second) -> second)
+                    .ifPresent(last -> bill.setPaymentMethod(last.getPaymentMethod()));
+        }
+        bill.setUpdatedAt(now);
+        return toBillResponse(tableBillRepository.save(bill), null);
+    }
+
+    /**
+     * Records a tip that came after the bill closed. It is a tip payment like the one taken at closing, so the
+     * waiter's earnings and the reports count it the same way; only bills closed today take one.
+     */
+    @Transactional
+    public TableBillDtos.BillResponse addTip(
+            Long menuId,
+            Long billId,
+            MerchantStaff waiter,
+            TableBillDtos.AddTipRequest request
+    ) {
+        TableBill bill = tableBillRepository.findByIdAndMenuId(billId, menuId)
+                .orElseThrow(() -> new NotFoundException("Adisyon bulunamadı"));
+        if (bill.getStatus() != TableBillStatus.CLOSED) {
+            throw new BadRequestException("Bahşiş, kapanmış adisyona eklenebilir; açık adisyonda ödemeyle birlikte girilir");
+        }
+        if (bill.getClosedAt() == null || !bill.getClosedAt().toLocalDate().equals(LocalDate.now())) {
+            throw new BadRequestException("Yalnızca bugün kapanan adisyona bahşiş eklenebilir");
+        }
+        BigDecimal amount = resolveTipAmount(true, request.getAmount());
+        LocalDateTime now = LocalDateTime.now();
+        recordTipPayment(bill, waiter, request.getPaymentMethod(), amount, now);
+        BigDecimal previous = bill.getTipAmount() != null ? bill.getTipAmount() : BigDecimal.ZERO;
+        bill.setTipAmount(previous.add(amount));
+        bill.setUpdatedAt(now);
+        return toBillResponse(tableBillRepository.save(bill), null);
     }
 
     @Transactional
@@ -574,6 +804,38 @@ public class TableBillService {
                     .createdAt(now)
                     .build();
             billPaymentRepository.save(payment);
+        }
+    }
+
+    private void recordAmountPayment(
+            TableBill bill,
+            MerchantStaff waiter,
+            TableBillPaymentMethod paymentMethod,
+            BigDecimal amount,
+            LocalDateTime now
+    ) {
+        billPaymentRepository.save(BillPayment.builder()
+                .bill(bill)
+                .staffId(waiter.getId())
+                .paymentMethod(paymentMethod)
+                .amount(amount)
+                .quantityPaid(0)
+                .tip(false)
+                .paidAt(now)
+                .createdAt(now)
+                .build());
+    }
+
+    /** Marks every item paid when the money was already taken as amount payments, so no payment row is added. */
+    private void settleItemsWithoutPayment(TableBill bill, LocalDateTime now) {
+        if (bill.getItems() == null) {
+            return;
+        }
+        for (TableBillItem item : bill.getItems()) {
+            if (item.getPaidQuantity() < item.getQuantity()) {
+                item.setPaidQuantity(item.getQuantity());
+                item.setUpdatedAt(now);
+            }
         }
     }
 
@@ -715,7 +977,10 @@ public class TableBillService {
 
         BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
         BigDecimal splitPaidTotal = sumSplitPaymentAmounts(loadSplitPayments(bill.getId()));
-        BigDecimal combinedPaidTotal = paidTotal.add(splitPaidTotal).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal amountPaidTotal = sumAmountPayments(bill.getId());
+        BigDecimal combinedPaidTotal = paidTotal.add(splitPaidTotal).add(amountPaidTotal)
+                .min(totalAmount)
+                .setScale(2, RoundingMode.HALF_UP);
         BigDecimal remainingTotal = totalAmount.subtract(combinedPaidTotal).max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -766,6 +1031,8 @@ public class TableBillService {
             }
         } else if (payment.getSplitShareNumber() != null && payment.getSplitPersonCount() != null) {
             itemSummary = "Pay " + payment.getSplitShareNumber() + "/" + payment.getSplitPersonCount();
+        } else if (!payment.isTip()) {
+            itemSummary = "Tutar ödemesi";
         }
 
         return TableBillDtos.BillPaymentResponse.builder()
@@ -799,6 +1066,29 @@ public class TableBillService {
         return billPaymentRepository.findByBillIdOrderByPaidAtAsc(billId).stream()
                 .filter(p -> p.getSplitShareNumber() != null && !p.isTip())
                 .toList();
+    }
+
+    /** Typed-amount payments: no item, no split share, not a tip. */
+    private BigDecimal sumAmountPayments(Long billId) {
+        if (billId == null) {
+            return BigDecimal.ZERO;
+        }
+        return billPaymentRepository.findByBillIdOrderByPaidAtAsc(billId).stream()
+                .filter(p -> p.getBillItem() == null && p.getSplitShareNumber() == null && !p.isTip())
+                .map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** What is still owed: total minus item, split and amount payments. */
+    private BigDecimal computeRemaining(TableBill bill) {
+        BigDecimal totalAmount = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
+        return totalAmount
+                .subtract(computeItemPaidTotal(bill))
+                .subtract(sumSplitPaymentAmounts(loadSplitPayments(bill.getId())))
+                .subtract(sumAmountPayments(bill.getId()))
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sumSplitPaymentAmounts(List<BillPayment> splitPayments) {

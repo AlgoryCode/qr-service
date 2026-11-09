@@ -18,13 +18,13 @@ public class AdminTaxonomyController {
 
     private final MenuTaxonomyService menuTaxonomyService;
 
-    @PostMapping("/admin/tags")
+    @PostMapping("/api/v1/admin/tags")
     @ResponseStatus(HttpStatus.CREATED)
     public TaxonomyDtos.TagResponse createTag(@RequestBody TaxonomyDtos.TagRequest request) {
         return menuTaxonomyService.createTag(request);
     }
 
-    @PutMapping("/admin/tags/{id}")
+    @PutMapping("/api/v1/admin/tags/{id}")
     public TaxonomyDtos.TagResponse updateTag(
             @PathVariable Long id,
             @RequestBody TaxonomyDtos.TagUpdateRequest request
@@ -32,19 +32,19 @@ public class AdminTaxonomyController {
         return menuTaxonomyService.updateTag(id, request);
     }
 
-    @DeleteMapping("/admin/tags/{id}")
+    @DeleteMapping("/api/v1/admin/tags/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteTag(@PathVariable Long id) {
         menuTaxonomyService.deleteTag(id);
     }
 
-    @PostMapping("/admin/allergens")
+    @PostMapping("/api/v1/admin/allergens")
     @ResponseStatus(HttpStatus.CREATED)
     public TaxonomyDtos.AllergenResponse createAllergen(@RequestBody TaxonomyDtos.AllergenRequest request) {
         return menuTaxonomyService.createAllergen(request);
     }
 
-    @PutMapping("/admin/allergens/{id}")
+    @PutMapping("/api/v1/admin/allergens/{id}")
     public TaxonomyDtos.AllergenResponse updateAllergen(
             @PathVariable Long id,
             @RequestBody TaxonomyDtos.AllergenUpdateRequest request
@@ -52,7 +52,7 @@ public class AdminTaxonomyController {
         return menuTaxonomyService.updateAllergen(id, request);
     }
 
-    @DeleteMapping("/admin/allergens/{id}")
+    @DeleteMapping("/api/v1/admin/allergens/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAllergen(@PathVariable Long id) {
         menuTaxonomyService.deleteAllergen(id);

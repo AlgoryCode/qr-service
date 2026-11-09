@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "yemeksepeti_connections", indexes = {
-        @Index(name = "uk_yemeksepeti_connections_user", columnList = "merchant_id", unique = true),
+        @Index(name = "idx_yemeksepeti_connections_merchant", columnList = "merchant_id"),
         @Index(name = "idx_yemeksepeti_connections_vendor", columnList = "vendor_id")
 })
 @Getter

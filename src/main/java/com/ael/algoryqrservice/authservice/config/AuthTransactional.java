@@ -19,4 +19,8 @@ public @interface AuthTransactional {
 
     @AliasFor(annotation = Transactional.class)
     Propagation propagation() default Propagation.REQUIRED;
+
+    /** Lets a method save state (e.g. a revoked session) and still answer with one of these exceptions. */
+    @AliasFor(annotation = Transactional.class)
+    Class<? extends Throwable>[] noRollbackFor() default {};
 }

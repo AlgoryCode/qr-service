@@ -50,13 +50,14 @@ public class UberEatsOrderService {
 
     @Transactional(readOnly = true)
     public UberEatsDtos.OrderPageResponse listOrders(
+            Long branchId,
             String status,
             LocalDate from,
             LocalDate to,
             int page,
             int size
     ) {
-        UberEatsConnection connection = connectionService.requireConnected();
+        UberEatsConnection connection = connectionService.requireConnected(branchId);
         int safeSize = Math.max(1, Math.min(size, 50));
         int safePage = Math.max(0, page);
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
@@ -81,10 +82,7 @@ public class UberEatsOrderService {
 
     @Transactional(readOnly = true)
     public UberEatsDtos.OrderResponse getOrder(Long orderId) {
-        UberEatsConnection connection = connectionService.requireConnected();
-        UberEatsOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
-                .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
-        return toResponse(order);
+        return toResponse(requireOwnedOrder(orderId));
     }
 
     @Transactional
@@ -153,8 +151,8 @@ public class UberEatsOrderService {
     }
 
     @Transactional
-    public UberEatsDtos.SyncOrdersResponse syncOrders(LocalDate from, LocalDate to) {
-        UberEatsConnection connection = connectionService.requireConnected();
+    public UberEatsDtos.SyncOrdersResponse syncOrders(Long branchId, LocalDate from, LocalDate to) {
+        UberEatsConnection connection = connectionService.requireConnected(branchId);
         InstantRange range = resolveSyncRange(from, to);
         int upserted = syncConnection(connection, range.start(), range.end());
         connection.setLastSyncedAt(LocalDateTime.now());
@@ -226,14 +224,22 @@ public class UberEatsOrderService {
         return saved;
     }
 
+    /** An order of any of the current merchant's connections; each branch has its own (see V168). */
+    private UberEatsOrder requireOwnedOrder(Long orderId) {
+        UberEatsOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
+        connectionService.requireConnectedById(order.getConnectionId());
+        return order;
+    }
+
     private UberEatsDtos.OrderResponse applyAction(
             Long orderId,
             OrderAction action,
             String localStatus
     ) {
-        UberEatsConnection connection = connectionService.requireConnected();
-        UberEatsOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
+        UberEatsOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
+        UberEatsConnection connection = connectionService.requireConnectedById(order.getConnectionId());
         action.apply(connectionService.decrypt(connection), order.getExternalOrderId());
         order.setPackageStatus(localStatus);
         return toResponse(orderRepository.save(order));

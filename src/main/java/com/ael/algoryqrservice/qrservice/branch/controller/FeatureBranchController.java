@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/features/QR_BRANCH")
+@RequestMapping("/api/v1/features/QR_BRANCH")
 @RequiredArgsConstructor
 public class FeatureBranchController {
 

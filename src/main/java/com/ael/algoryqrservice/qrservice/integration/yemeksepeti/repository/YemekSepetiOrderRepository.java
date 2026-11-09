@@ -35,4 +35,18 @@ public interface YemekSepetiOrderRepository
             @Param("connectionId") Long connectionId,
             @Param("statuses") Collection<String> statuses
     );
+
+    @Query("""
+            SELECT o
+            FROM YemekSepetiOrder o
+            WHERE o.connectionId = :connectionId
+              AND o.packageCreatedAt BETWEEN :from AND :to
+              AND LOWER(o.packageStatus) IN :statuses
+            """)
+    List<YemekSepetiOrder> findByConnectionAndStatuses(
+            @Param("connectionId") Long connectionId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("statuses") Collection<String> statuses
+    );
 }

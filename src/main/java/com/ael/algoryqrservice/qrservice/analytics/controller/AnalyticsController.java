@@ -32,7 +32,7 @@ import java.util.UUID;
 import com.ael.algoryqrservice.qrservice.model.User;
 
 @RestController
-@RequestMapping("/analytics")
+@RequestMapping("/api/v1/analytics")
 @RequiredArgsConstructor
 public class AnalyticsController {
 

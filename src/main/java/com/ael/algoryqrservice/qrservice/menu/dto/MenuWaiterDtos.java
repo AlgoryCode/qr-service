@@ -115,6 +115,12 @@ public final class MenuWaiterDtos {
     @AllArgsConstructor
     public static class StaffListResponse {
         private List<WaiterResponse> staff;
+        /** Yalnızca sayfalı istekte dolu (0 tabanlı). */
+        private Integer page;
+        private Integer size;
+        private Long totalElements;
+        private Integer totalPages;
+        private Boolean hasNext;
     }
 
     @Data
@@ -202,6 +208,8 @@ public final class MenuWaiterDtos {
         private Long mainCategoryId;
         private String mainCategoryName;
         private boolean commissionEligible;
+        /** Kategorisi "mutfağa gitmez" işaretli; mutfak açık olsa da doğrudan adisyona yazılır. */
+        private boolean skipKitchen;
         private List<MenuDtos.MenuProductOptionGroupResponse> optionGroups;
     }
 

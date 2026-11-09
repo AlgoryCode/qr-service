@@ -11,7 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/billing-addresses")
+@RequestMapping("/api/v1/billing-addresses")
 @RequiredArgsConstructor
 public class BillingAddressController {
     private final BillingAddressService service;

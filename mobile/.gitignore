@@ -1,0 +1,12 @@
+.gradle/
+build/
+.idea/
+.kotlin/
+local.properties
+*.iml
+xcuserdata/
+keystore.properties
+*.jks
+# The repo root ignores *.jar; the wrapper must still be committed.
+!gradle/wrapper/gradle-wrapper.jar
+test-accounts.local.md

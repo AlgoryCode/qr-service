@@ -25,12 +25,11 @@ public class EmailVerificationGatewayFilter extends OncePerRequestFilter {
 
     private static final List<String> ALLOWED_PREFIXES = List.of(
             "/auth/",
-            "/account/email-verification",
-            "/customer/",
-            "/staff/",
-            "/waiter-panel",
-            "/waiter/",
-            "/admin/",
+            "/api/v1/auth/",
+            "/api/v1/account/email-verification",
+            "/api/v1/customer/",
+            "/api/v1/staff/",
+            "/api/v1/admin/",
             "/google-auth/",
             "/google_auth/",
             "/oauth2/",

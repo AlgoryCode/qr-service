@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/staff/bills/{billId}")
+@RequestMapping("/api/v1/staff/bills/{billId}")
 @RequiredArgsConstructor
 public class StaffBillController {
 
@@ -69,6 +69,30 @@ public class StaffBillController {
             @Valid @RequestBody TableBillDtos.PayBillShareRequest request
     ) {
         return ResponseEntity.ok(staffBillService.payShare(billId, request));
+    }
+
+    @PostMapping("/payments/amount")
+    public ResponseEntity<TableBillDtos.BillResponse> payAmount(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.PayBillAmountRequest request
+    ) {
+        return ResponseEntity.ok(staffBillService.payAmount(billId, request));
+    }
+
+    @PatchMapping("/payments/method")
+    public ResponseEntity<TableBillDtos.BillResponse> changePaymentMethod(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.ChangePaymentMethodRequest request
+    ) {
+        return ResponseEntity.ok(staffBillService.changePaymentMethod(billId, request));
+    }
+
+    @PostMapping("/tip")
+    public ResponseEntity<TableBillDtos.BillResponse> addTip(
+            @PathVariable Long billId,
+            @Valid @RequestBody TableBillDtos.AddTipRequest request
+    ) {
+        return ResponseEntity.ok(staffBillService.addTip(billId, request));
     }
 
     @GetMapping("/split")

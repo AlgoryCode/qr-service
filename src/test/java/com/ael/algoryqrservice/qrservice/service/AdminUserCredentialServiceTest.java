@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.adminservice.dto.AdminUserDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.client.AuthCredentialClient;
+import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +40,8 @@ class AdminUserCredentialServiceTest {
     NotificationPublisherService notificationPublisherService;
     @Mock
     AuthCredentialClient authCredentialClient;
+    @Mock
+    TokenUseCase tokenUseCase;
 
     AdminUserCredentialService service;
 
@@ -46,6 +50,7 @@ class AdminUserCredentialServiceTest {
         service = new AdminUserCredentialService(
                 userRepository,
                 passwordEncoder,
+                tokenUseCase,
                 notificationPublisherService,
                 authCredentialClient
         );
@@ -62,6 +67,8 @@ class AdminUserCredentialServiceTest {
         assertThat(result.getTemporaryPassword()).hasSize(12);
         assertThat(result.isEmailed()).isTrue();
         assertThat(user.getPassword()).isEqualTo("hashed");
+        // A reset follows a lost or stolen account: every session of it ends.
+        verify(tokenUseCase).revokeAllExcept(eq("MERCHANT"), eq(user.getId()), isNull());
         verify(notificationPublisherService).publishTemporaryPassword(
                 eq("user@example.com"),
                 eq("Ada"),

@@ -50,13 +50,14 @@ public class YemekSepetiOrderService {
 
     @Transactional(readOnly = true)
     public YemekSepetiDtos.OrderPageResponse listOrders(
+            Long branchId,
             String status,
             LocalDate from,
             LocalDate to,
             int page,
             int size
     ) {
-        YemekSepetiConnection connection = connectionService.requireConnected();
+        YemekSepetiConnection connection = connectionService.requireConnected(branchId);
         int safeSize = Math.max(1, Math.min(size, 50));
         int safePage = Math.max(0, page);
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
@@ -140,8 +141,8 @@ public class YemekSepetiOrderService {
     }
 
     @Transactional
-    public YemekSepetiDtos.SyncOrdersResponse syncOrders(LocalDate from, LocalDate to) {
-        YemekSepetiConnection connection = connectionService.requireConnected();
+    public YemekSepetiDtos.SyncOrdersResponse syncOrders(Long branchId, LocalDate from, LocalDate to) {
+        YemekSepetiConnection connection = connectionService.requireConnected(branchId);
         InstantRange range = resolveSyncRange(from, to);
         int upserted = syncConnection(connection, range.start(), range.end());
         connection.setLastSyncedAt(LocalDateTime.now());
@@ -222,9 +223,9 @@ public class YemekSepetiOrderService {
             OrderAction action,
             String localStatus
     ) {
-        YemekSepetiConnection connection = connectionService.requireConnected();
-        YemekSepetiOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
+        YemekSepetiOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti siparişi bulunamadı"));
+        YemekSepetiConnection connection = connectionService.requireConnectedById(order.getConnectionId());
         action.apply(connectionService.decrypt(connection), order.getExternalOrderId());
         order.setPackageStatus(localStatus);
         return toResponse(orderRepository.save(order));

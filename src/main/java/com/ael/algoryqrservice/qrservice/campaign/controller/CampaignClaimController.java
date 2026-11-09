@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/campaign/claim")
+@RequestMapping("/api/v1/campaign/claim")
 @RequiredArgsConstructor
 public class CampaignClaimController {
 

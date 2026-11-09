@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/menu/products/{productId}/recipe")
+@RequestMapping("/api/v1/menu/products/{productId}/recipe")
 @RequiredArgsConstructor
 public class StockRecipeController {
 

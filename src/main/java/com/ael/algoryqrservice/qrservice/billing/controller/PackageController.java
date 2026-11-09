@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/packages")
+@RequestMapping("/api/v1/plan-packages")
 @RequiredArgsConstructor
 public class PackageController {
 

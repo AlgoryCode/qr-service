@@ -8,7 +8,7 @@ import com.ael.algoryqrservice.qrservice.model.MenuTheme;
 import com.ael.algoryqrservice.qrservice.model.UserThemeAssignment;
 import com.ael.algoryqrservice.qrservice.menu.dto.ThemeDtos;
 import com.ael.algoryqrservice.qrservice.repository.MenuThemeRepository;
-import com.ael.algoryqrservice.qrservice.repository.UserRepository;
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserThemeAssignmentRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class MenuThemeService {
 
     private final MenuThemeRepository menuThemeRepository;
     private final UserThemeAssignmentRepository userThemeAssignmentRepository;
-    private final UserRepository userRepository;
+    private final MerchantJpaRepository merchantRepository;
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
@@ -183,8 +183,9 @@ public class MenuThemeService {
         return resolved;
     }
 
+    /** Tema atamaları işletmeye ({@code tbl_merchant}) bağlıdır; eski {@code tbl_user} kaydı aranmaz. */
     private void requireExistingUser(Long merchantId) {
-        if (merchantId == null || !userRepository.existsById(merchantId)) {
+        if (merchantId == null || !merchantRepository.existsById(merchantId)) {
             throw new NotFoundException("Kullanıcı bulunamadı");
         }
     }

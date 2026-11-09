@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- White serving cloche on its tray, kept inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Knob -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M50,37a4,4 0,1 0,8 0a4,4 0,1 0,-8 0z" />
+    <!-- Dome -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M32,64A22,22 0,0 1,76 64Z" />
+    <!-- Tray -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M29,67h50a3,3 0,0 1,0 6h-50a3,3 0,0 1,0 -6z" />
+</vector>

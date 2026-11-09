@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConn
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnectionStatus;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.dto.UberEatsDtos;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsConnectionRepository;
+import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,11 +22,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,7 +64,7 @@ class UberEatsConnectionServiceTest {
     @Test
     void upsert_whenNoBranch_thenStoresUserScopedConnection() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(connectionRepository.findByMerchantId(9L)).thenReturn(Optional.empty());
+        when(connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(9L)).thenReturn(List.of());
         when(encryptor.encrypt("key")).thenReturn("enc-key");
         when(encryptor.encrypt("secret")).thenReturn("enc-secret");
         when(encryptor.decrypt("enc-key")).thenReturn("key");
@@ -87,7 +90,7 @@ class UberEatsConnectionServiceTest {
         request.setApiSecret("secret");
         request.setRestaurantId("r-1");
 
-        UberEatsDtos.ConnectionResponse response = connectionService.upsert(request);
+        UberEatsDtos.ConnectionResponse response = connectionService.upsert(request, null);
 
         ArgumentCaptor<UberEatsConnection> captor = ArgumentCaptor.forClass(UberEatsConnection.class);
         verify(connectionRepository).save(captor.capture());
@@ -100,8 +103,8 @@ class UberEatsConnectionServiceTest {
     @Test
     void getMine_whenMissing_thenNotFound() {
         when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
-        when(connectionRepository.findByMerchantId(9L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> connectionService.getMine()).isInstanceOf(NotFoundException.class);
+        when(connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(9L)).thenReturn(List.of());
+        assertThatThrownBy(() -> connectionService.getMine(null)).isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -117,14 +120,38 @@ class UberEatsConnectionServiceTest {
                 .restaurantName("Mexican Doner")
                 .status(UberEatsConnectionStatus.CONNECTED)
                 .build();
-        when(connectionRepository.findByMerchantId(9L)).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(9L)).thenReturn(List.of(connection));
         when(connectionRepository.save(any(UberEatsConnection.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(encryptor.decrypt("enc-key")).thenReturn("key");
         when(encryptor.mask("key")).thenReturn("k***");
 
-        UberEatsDtos.ConnectionResponse response = connectionService.disconnect();
+        UberEatsDtos.ConnectionResponse response = connectionService.disconnect(null);
 
         assertThat(response.getStatus()).isEqualTo(UberEatsConnectionStatus.DISCONNECTED);
         assertThat(connection.getStatus()).isEqualTo(UberEatsConnectionStatus.DISCONNECTED);
+    }
+
+    @Test
+    void upsert_whenBranchHasNoConnection_thenCreatesOneForThatBranch() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(5L, 9L)).thenReturn(Optional.of(new Branch()));
+        when(connectionRepository.findByMerchantIdAndBranchId(9L, 5L)).thenReturn(Optional.empty());
+        when(encryptor.encrypt("key")).thenReturn("enc-key");
+        when(encryptor.encrypt("secret")).thenReturn("enc-secret");
+        when(encryptor.decrypt("enc-key")).thenReturn("key");
+        when(encryptor.decrypt("enc-secret")).thenReturn("secret");
+        when(UberEatsClient.listRestaurants(any())).thenReturn(objectMapper.createObjectNode());
+        when(connectionRepository.save(any(UberEatsConnection.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UberEatsDtos.UpsertConnectionRequest request = new UberEatsDtos.UpsertConnectionRequest();
+        request.setSellerId("6730477");
+        request.setApiKey("key");
+        request.setApiSecret("secret");
+
+        UberEatsDtos.ConnectionResponse response = connectionService.upsert(request, 5L);
+
+        assertThat(response.getBranchId()).isEqualTo(5L);
+        assertThat(response.getStatus()).isEqualTo(UberEatsConnectionStatus.PENDING_RESTAURANT);
+        verify(connectionRepository, never()).findByMerchantIdOrderByUpdatedAtDesc(any());
     }
 }

@@ -38,9 +38,9 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final PrintDeviceAuthenticationFilter printDeviceAuthenticationFilter;
+    private final StaffPathGatewayFilter staffPathGatewayFilter;
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
-    private final DeprecatedStaffPathCompatFilter deprecatedStaffPathCompatFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -57,46 +57,47 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/menu/public/**").permitAll()
-                        .requestMatchers("/store/public/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/campaign/claim").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/menu/tags").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/menu/allergens").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/menu/chef-avatars").permitAll()
+                        .requestMatchers("/api/v1/menu/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/qr/public/*").permitAll()
+                        .requestMatchers("/api/v1/store/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/campaign/claim").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/menu/tags").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/menu/allergens").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/menu/chef-avatars").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/", "/healthcheck").permitAll()
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/packages/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/analytics/menu/*/events").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/analytics/menu/*/visit").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/analytics/menu/*/product/*/visit").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/analytics/site/visit").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/integrations/ubereats/webhooks/orders").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/integrations/yemek-sepeti/webhooks/orders").permitAll()
-                        .requestMatchers("/integrations/odeal/test/**").permitAll()
-                        .requestMatchers("/internal/integrations/**").permitAll()
-                        .requestMatchers("/internal/menu-import/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/plan-packages/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/analytics/menu/*/events").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/analytics/menu/*/visit").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/analytics/menu/*/product/*/visit").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/analytics/site/visit").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/integrations/ubereats/webhooks/orders").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/integrations/yemek-sepeti/webhooks/orders").permitAll()
+                        .requestMatchers("/api/v1/integrations/odeal/test/**").permitAll()
+                        .requestMatchers("/api/v1/internal/integrations/**").permitAll()
+                        .requestMatchers("/api/v1/internal/menu-import/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/google/callback", "/auth/google/callback")
                             .permitAll()
-                        .requestMatchers(HttpMethod.POST, "/dashboard/auth/login", "/dashboard/auth/refresh", "/dashboard/auth/logout")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/dashboard/auth/login", "/api/v1/dashboard/auth/refresh", "/api/v1/dashboard/auth/logout")
                             .permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/email-verification/resend", "/auth/email-verification/verify")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verification/resend", "/api/v1/auth/email-verification/verify")
                             .permitAll()
-                        .requestMatchers("/internal/auth/**").permitAll()
-                        .requestMatchers("/internal/credentials/**").permitAll()
-                        .requestMatchers("/internal/staff/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/internal/merchant/*", "/internal/merchants/*").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/internal/merchant/*/access-profile").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/internal/merchant/*/soft-delete", "/internal/merchants/*/soft-delete")
+                        .requestMatchers("/api/v1/internal/auth/**").permitAll()
+                        .requestMatchers("/api/v1/internal/credentials/**").permitAll()
+                        .requestMatchers("/api/v1/internal/staff/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/internal/merchant/*", "/api/v1/internal/merchants/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/internal/merchant/*/access-profile").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/internal/merchant/*/soft-delete", "/api/v1/internal/merchants/*/soft-delete")
                             .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/internal/merchant/*/package", "/internal/users/*/package").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/internal/merchant/*/package", "/internal/users/*/package").permitAll()
-                        .requestMatchers("/internal/notifications/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/print-agent/devices/pair").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/print-agent/devices/connect").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/internal/merchant/*/package", "/api/v1/internal/users/*/package").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/internal/merchant/*/package", "/api/v1/internal/users/*/package").permitAll()
+                        .requestMatchers("/api/v1/internal/notifications/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/print-agent/devices/pair").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/print-agent/devices/connect").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/print-agent/jobs/**", "/print-agent/devices/heartbeat")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/print-agent/jobs/**", "/api/v1/print-agent/devices/heartbeat")
                             .hasRole("PRINT_AGENT")
                         .anyRequest().authenticated()
                 )
@@ -104,11 +105,18 @@ public class SecurityConfig {
                 // Jwt must be registered first (Spring Security 7 requires anchor filters to have a known order).
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
-                .addFilterBefore(deprecatedStaffPathCompatFilter, PrintDeviceAuthenticationFilter.class)
-                .addFilterAfter(productAccessGatewayFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(staffPathGatewayFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(productAccessGatewayFilter, StaffPathGatewayFilter.class)
                 .addFilterAfter(emailVerificationGatewayFilter, ProductAccessGatewayFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<StaffPathGatewayFilter> staffPathGatewayFilterRegistration(StaffPathGatewayFilter filter) {
+        FilterRegistrationBean<StaffPathGatewayFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -125,15 +133,6 @@ public class SecurityConfig {
             EmailVerificationGatewayFilter filter
     ) {
         FilterRegistrationBean<EmailVerificationGatewayFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
-    }
-
-    @Bean
-    public FilterRegistrationBean<DeprecatedStaffPathCompatFilter> deprecatedStaffPathCompatFilterRegistration(
-            DeprecatedStaffPathCompatFilter filter
-    ) {
-        FilterRegistrationBean<DeprecatedStaffPathCompatFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

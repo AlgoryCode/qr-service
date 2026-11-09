@@ -66,4 +66,8 @@ public class Branch extends QrBaseModel {
     @Column(name = "print_kitchen_enabled", nullable = false)
     @Builder.Default
     private boolean printKitchenEnabled = false;
+
+    /** Şubenin sipariş akışı; boşsa eski davranış ({@link #kitchenEnabled}, {@link #courierEnabled}) geçerlidir. */
+    @Column(name = "order_flow_id")
+    private Long orderFlowId;
 }

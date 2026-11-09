@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/internal/merchant")
+@RequestMapping("/api/v1/internal/merchant")
 @RequiredArgsConstructor
 public class InternalAuthSupportController {
 

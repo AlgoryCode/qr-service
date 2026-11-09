@@ -26,58 +26,80 @@ public class StaffBillService {
 
     @Transactional(readOnly = true)
     public Optional<TableBillDtos.BillResponse> findOpenBillForTable(Long tableId) {
-        RestaurantTable table = requireTable(tableId, staffAccessService.requireCurrentStaff());
+        RestaurantTable table = requireTable(tableId, staffAccessService.requireWaiterStaff());
         return tableBillService.findOpenBillForTable(table.getMenuId(), tableId);
     }
 
     @Transactional(readOnly = true)
     public TableBillDtos.BillResponse getBill(Long billId) {
-        TableBill bill = requireBill(billId, staffAccessService.requireCurrentStaff());
+        TableBill bill = requireBill(billId, staffAccessService.requireWaiterStaff());
         return tableBillService.getBill(bill.getMenuId(), billId);
     }
 
     @Transactional
     public TableBillDtos.BillResponse addItems(Long billId, TableBillDtos.UpdateBillItemsRequest request) {
-        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
         TableBill bill = requireBill(billId, staff);
         return tableBillService.addItems(bill.getMenuId(), billId, request.getItems(), staff.getId());
     }
 
     @Transactional
     public TableBillDtos.BillResponse updateItemQuantity(Long billId, Long itemId, int quantity) {
-        TableBill bill = requireBill(billId, staffAccessService.requireCurrentStaff());
-        return tableBillService.updateItemQuantity(bill.getMenuId(), billId, itemId, quantity);
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
+        TableBill bill = requireBill(billId, staff);
+        return tableBillService.updateItemQuantity(bill.getMenuId(), billId, itemId, quantity, staff.getId());
     }
 
     @Transactional
     public TableBillDtos.BillResponse removeItem(Long billId, Long itemId) {
-        TableBill bill = requireBill(billId, staffAccessService.requireCurrentStaff());
-        return tableBillService.removeItem(bill.getMenuId(), billId, itemId);
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
+        TableBill bill = requireBill(billId, staff);
+        return tableBillService.removeItem(bill.getMenuId(), billId, itemId, staff.getId());
     }
 
     @Transactional
     public TableBillDtos.BillResponse payItems(Long billId, TableBillDtos.PayBillItemsRequest request) {
-        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
         TableBill bill = requireBill(billId, staff);
         return tableBillService.payItems(bill.getMenuId(), billId, staff, request);
     }
 
     @Transactional
     public TableBillDtos.BillResponse payShare(Long billId, TableBillDtos.PayBillShareRequest request) {
-        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
         TableBill bill = requireBill(billId, staff);
         return tableBillService.payShare(bill.getMenuId(), billId, staff, request);
     }
 
+    @Transactional
+    public TableBillDtos.BillResponse payAmount(Long billId, TableBillDtos.PayBillAmountRequest request) {
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
+        TableBill bill = requireBill(billId, staff);
+        return tableBillService.payAmount(bill.getMenuId(), billId, staff, request);
+    }
+
+    @Transactional
+    public TableBillDtos.BillResponse changePaymentMethod(Long billId, TableBillDtos.ChangePaymentMethodRequest request) {
+        TableBill bill = requireBill(billId, staffAccessService.requireWaiterStaff());
+        return tableBillService.changePaymentMethod(bill.getMenuId(), billId, request);
+    }
+
+    @Transactional
+    public TableBillDtos.BillResponse addTip(Long billId, TableBillDtos.AddTipRequest request) {
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
+        TableBill bill = requireBill(billId, staff);
+        return tableBillService.addTip(bill.getMenuId(), billId, staff, request);
+    }
+
     @Transactional(readOnly = true)
     public TableBillDtos.SplitPreviewResponse getSplitPreview(Long billId, int personCount) {
-        TableBill bill = requireBill(billId, staffAccessService.requireCurrentStaff());
+        TableBill bill = requireBill(billId, staffAccessService.requireWaiterStaff());
         return tableBillService.getSplitPreview(bill.getMenuId(), billId, personCount);
     }
 
     @Transactional
     public TableBillDtos.BillResponse closeBill(Long billId, TableBillDtos.CloseBillRequest request) {
-        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
         TableBill bill = requireBill(billId, staff);
         return tableBillService.closeBill(
                 bill.getMenuId(),
@@ -91,7 +113,7 @@ public class StaffBillService {
 
     @Transactional
     public TableBillDtos.BillResponse cancelBill(Long billId, TableBillDtos.CancelBillRequest request) {
-        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
         TableBill bill = requireBill(billId, staff);
         return tableBillService.cancelBill(bill.getMenuId(), billId, staff, request);
     }

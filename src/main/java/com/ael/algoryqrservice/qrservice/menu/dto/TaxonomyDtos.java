@@ -95,6 +95,8 @@ public final class TaxonomyDtos {
         private String name;
         private int sortOrder;
         private String imageUrl;
+        /** Ürünleri mutfak fişine düşmez, garson siparişinde doğrudan adisyona yazılır. */
+        private boolean skipKitchen;
         @Builder.Default
         private List<SubCategoryResponse> subs = new ArrayList<>();
     }
@@ -213,6 +215,13 @@ public final class TaxonomyDtos {
     public static class MainCategoryUpdateRequest {
         private String name;
         private Integer sortOrder;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class KitchenRoutingRequest {
+        private boolean skipKitchen;
     }
 
     @Data

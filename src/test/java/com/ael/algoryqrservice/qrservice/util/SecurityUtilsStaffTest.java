@@ -7,6 +7,8 @@ import com.ael.algoryqrservice.customerservice.infrastructure.persistence.reposi
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.security.JwtAccessPrincipal;
+import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -117,5 +120,22 @@ class SecurityUtilsStaffTest {
         when(merchantStaffRepository.findById(58L)).thenReturn(Optional.of(staff));
 
         assertThat(securityUtils.getCurrentWaiterBranchId()).isEqualTo(37L);
+    }
+
+    @Test
+    void getCurrentStaffId_whenSignedInAsOwner_thenForbiddenNotUnauthorized() {
+        JwtAccessPrincipal principal = new JwtAccessPrincipal(null, 86L, null, null, List.of(), List.of(), null, "MERCHANT", null);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                "mobiltest", null, List.of(new SimpleGrantedAuthority("ROLE_MERCHANT")));
+        authentication.setDetails(principal);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // A 401 would make the apps drop a valid session; the owner just isn't staff.
+        assertThatThrownBy(securityUtils::getCurrentStaffId).isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void getCurrentStaffId_whenNotSignedIn_thenUnauthorized() {
+        assertThatThrownBy(securityUtils::getCurrentStaffId).isInstanceOf(UnauthorizedException.class);
     }
 }

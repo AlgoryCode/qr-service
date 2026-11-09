@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/dashboard/auth")
+@RequestMapping("/api/v1/dashboard/auth")
 @RequiredArgsConstructor
 public class DashboardAuthController {
 

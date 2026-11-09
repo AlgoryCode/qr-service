@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.adminservice.application;
 
+import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
+import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
 import com.ael.algoryqrservice.qrservice.client.AuthCredentialClient;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
@@ -27,6 +29,7 @@ public class AdminUserCredentialService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenUseCase tokenUseCase;
     private final NotificationPublisherService notificationPublisherService;
     private final AuthCredentialClient authCredentialClient;
 
@@ -46,6 +49,8 @@ public class AdminUserCredentialService {
         String temporaryPassword = generatePassword();
         user.setPassword(passwordEncoder.encode(temporaryPassword));
         userRepository.save(user);
+        // A reset usually follows a lost or compromised account: every existing session ends.
+        tokenUseCase.revokeAllExcept(AuthSubject.TYPE_MERCHANT, user.getId(), null);
 
         boolean emailed = false;
         if (user.isEmailVerified()) {

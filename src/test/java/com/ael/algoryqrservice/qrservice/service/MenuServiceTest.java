@@ -832,4 +832,24 @@ class MenuServiceTest {
         assertThat(menu.getCoverKey()).isNull();
         verify(productImageStorageService).deleteQuietly("menus/10/cover/a.png");
     }
+
+    @Test
+    void listCatalogProducts_loadsSharedDataOnceForAllProducts() {
+        List<MenuProduct> products = List.of(
+                MenuProduct.builder().productId(1L).menuId(10L).name("A").build(),
+                MenuProduct.builder().productId(2L).menuId(10L).name("B").build(),
+                MenuProduct.builder().productId(3L).menuId(20L).name("C").build(),
+                MenuProduct.builder().productId(4L).name("Menüsüz").build());
+        when(menuProductRepository.findByMerchantIdAndDeletedFalseOrderByProductIdDesc(7L)).thenReturn(products);
+
+        List<MenuDtos.MenuProductResponse> response = menuService.listCatalogProducts();
+
+        assertThat(response).extracting(MenuDtos.MenuProductResponse::getProductId).containsExactly(1L, 2L, 3L, 4L);
+        verify(menuTaxonomyService, times(1)).loadTagMap();
+        verify(menuTaxonomyService, times(1)).loadAllergenMap();
+        verify(menuProductPairingService, times(1)).loadByProductIds(List.of(1L, 2L, 3L, 4L));
+        verify(menuProductOptionService, times(1)).loadByProductIds(List.of(1L, 2L, 3L, 4L));
+        verify(menuCategoryService, times(1)).loadSubCategoryMap(10L);
+        verify(menuCategoryService, times(1)).loadSubCategoryMap(20L);
+    }
 }

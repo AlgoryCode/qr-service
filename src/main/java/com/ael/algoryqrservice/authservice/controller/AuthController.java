@@ -123,6 +123,16 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    /** "Diğer cihazlardan çıkış yap": keeps this session, closes every other one of the account. */
+    @PostMapping("/sessions/revoke-others")
+    public ResponseEntity<Map<String, Object>> revokeOtherSessions(@AuthenticationPrincipal AuthPrincipal principal) {
+        if (principal == null || principal.sessionId() == null) {
+            throw new UnauthorizedException("Oturum bulunamadı");
+        }
+        int revoked = tokenUseCase.revokeOthers(principal.subjectType(), principal.resolveSubjectId(), principal.sessionId());
+        return ResponseEntity.ok(Map.of("revoked", revoked));
+    }
+
     @GetMapping("/access")
     public ResponseEntity<Map<String, Object>> access(@AuthenticationPrincipal AuthPrincipal principal) {
         AuthSubject subject = subjectLoader.load(principal.subjectType(), principal.resolveSubjectId())

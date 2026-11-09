@@ -23,7 +23,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/integrations/yemek-sepeti")
+@RequestMapping("/api/v1/integrations/yemek-sepeti")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
 public class YemekSepetiController {
@@ -37,15 +37,16 @@ public class YemekSepetiController {
     }
 
     @GetMapping("/connections/me")
-    public ResponseEntity<YemekSepetiDtos.ConnectionResponse> getConnection() {
-        return ResponseEntity.ok(connectionService.getMine());
+    public ResponseEntity<YemekSepetiDtos.ConnectionResponse> getConnection(@RequestParam(required = false) Long branchId) {
+        return ResponseEntity.ok(connectionService.getMine(branchId));
     }
 
     @PutMapping("/connections")
     public ResponseEntity<YemekSepetiDtos.ConnectionResponse> upsert(
-            @Valid @RequestBody YemekSepetiDtos.UpsertConnectionRequest request
+            @Valid @RequestBody YemekSepetiDtos.UpsertConnectionRequest request,
+            @RequestParam(required = false) Long branchId
     ) {
-        return ResponseEntity.ok(connectionService.upsert(request));
+        return ResponseEntity.ok(connectionService.upsert(request, branchId));
     }
 
     @PutMapping("/connections/me/branch")
@@ -56,13 +57,13 @@ public class YemekSepetiController {
     }
 
     @DeleteMapping("/connections/me")
-    public ResponseEntity<YemekSepetiDtos.ConnectionResponse> disconnect() {
-        return ResponseEntity.ok(connectionService.disconnect());
+    public ResponseEntity<YemekSepetiDtos.ConnectionResponse> disconnect(@RequestParam(required = false) Long branchId) {
+        return ResponseEntity.ok(connectionService.disconnect(branchId));
     }
 
     @GetMapping("/restaurants")
-    public ResponseEntity<List<YemekSepetiDtos.RestaurantResponse>> restaurants() {
-        YemekSepetiDtos.ConnectionResponse connection = connectionService.getMine();
+    public ResponseEntity<List<YemekSepetiDtos.RestaurantResponse>> restaurants(@RequestParam(required = false) Long branchId) {
+        YemekSepetiDtos.ConnectionResponse connection = connectionService.getMine(branchId);
         if (connection.getVendorId() == null || connection.getVendorId().isBlank()) {
             return ResponseEntity.ok(List.of());
         }
@@ -74,21 +75,23 @@ public class YemekSepetiController {
 
     @GetMapping("/orders")
     public ResponseEntity<YemekSepetiDtos.OrderPageResponse> orders(
+            @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(orderService.listOrders(status, from, to, page, size));
+        return ResponseEntity.ok(orderService.listOrders(branchId, status, from, to, page, size));
     }
 
     @PostMapping("/orders/sync")
     public ResponseEntity<YemekSepetiDtos.SyncOrdersResponse> syncOrders(
+            @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ResponseEntity.ok(orderService.syncOrders(from, to));
+        return ResponseEntity.ok(orderService.syncOrders(branchId, from, to));
     }
 
     @PostMapping("/orders/{orderId}/accept")

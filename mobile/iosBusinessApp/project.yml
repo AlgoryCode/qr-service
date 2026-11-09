@@ -1,0 +1,34 @@
+name: iosBusinessApp
+options:
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+targets:
+  iosBusinessApp:
+    type: application
+    platform: iOS
+    sources:
+      - iosApp
+    preBuildScripts:
+      - name: Compile Kotlin
+        basedOnDependencyAnalysis: false
+        script: |
+          cd "$SRCROOT/.."
+          if /usr/libexec/java_home -v 21 >/dev/null 2>&1; then
+            export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
+          fi
+          ./gradlew :businessApp:embedAndSignAppleFrameworkForXcode
+    settings:
+      base:
+        PRODUCT_NAME: AlgoryQRBusiness
+        PRODUCT_BUNDLE_IDENTIFIER: com.algoryqr.business
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: iosApp/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../businessApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS: ["$(inherited)", "-framework", "BusinessApp"]

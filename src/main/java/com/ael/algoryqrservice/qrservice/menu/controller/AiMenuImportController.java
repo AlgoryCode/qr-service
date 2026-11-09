@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/menus/{menuId}/ai-import")
+@RequestMapping("/api/v1/menus/{menuId}/ai-import")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.AI_MENU_IMPORT_OWNER)
 public class AiMenuImportController {

@@ -85,7 +85,7 @@ class OdealTestServiceTest {
 
     @Test
     void resolveAmount_whenDuplicateParamsWithInvalidBodyValue_thenUsesValidQueryValue() {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/integrations/odeal/test/basket/sample");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/integrations/odeal/test/basket/sample");
         request.addParameter("amount", "250");
         request.addParameter("amount", "abc");
 
@@ -94,7 +94,7 @@ class OdealTestServiceTest {
 
     @Test
     void resolvePaymentType_whenDuplicateParams_thenUsesFirstValidValue() {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/integrations/odeal/test/basket/sample");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/integrations/odeal/test/basket/sample");
         request.addParameter("paymentType", "CREDITCARD");
         request.addParameter("paymentType", "CREDITCARD");
 

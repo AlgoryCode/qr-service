@@ -81,7 +81,7 @@ public class SmartReportCompletionNotifier {
                 title,
                 event.getFromDate().format(PERIOD_FORMATTER),
                 event.getToDate().format(PERIOD_FORMATTER),
-                appUrl + "/dashboard/dijital-menu/akilli-raporlar/" + processId
+                appUrl + "/akilli-raporlar/" + processId
         );
     }
 

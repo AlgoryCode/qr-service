@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/branches")
+@RequestMapping("/api/v1/branches")
 @RequiredArgsConstructor
 public class BranchController {
 

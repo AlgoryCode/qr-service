@@ -52,8 +52,13 @@ public class AuthGlobalExceptionHandler {
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, String>> handleUnauthorized(UnauthorizedException ex) {
-        log.warn("Auth unauthorized: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", ex.getMessage()));
+        log.warn("Auth unauthorized: {} code={}", ex.getMessage(), ex.getCode());
+        Map<String, String> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        if (ex.getCode() != null) {
+            body.put("code", ex.getCode());
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
     @ExceptionHandler(ForbiddenException.class)

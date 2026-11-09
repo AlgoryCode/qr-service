@@ -16,7 +16,7 @@ import com.ael.algoryqrservice.qrservice.menu.controller.MenuController;
  * Kept separate from {@link MenuController} to avoid clashing with {@code /{menuId}} routes.
  */
 @RestController
-@RequestMapping("/menu")
+@RequestMapping("/api/v1/menu")
 @RequiredArgsConstructor
 public class MenuThemeController {
 

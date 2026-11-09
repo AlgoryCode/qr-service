@@ -43,14 +43,13 @@ public class KitchenYemekSepetiService {
     private final YemekSepetiClient yemekSepetiClient;
     private final ObjectMapper objectMapper;
 
-    /** Bağlantı başka şubeye atanmışsa bu şubenin mutfağında görünmez. */
+    /** Her şubenin kendi bağlantısı var; başka şubeye ait bağlantıların siparişleri bu mutfakta görünmez. */
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listActiveForBranch(Long merchantId, Long branchId) {
-        YemekSepetiConnection connection = connectedOrNull(merchantId);
-        if (connection == null || !BranchScope.serves(connection.getBranchId(), branchId)) {
-            return List.of();
-        }
-        return listActive(connection);
+        return connectionService.findConnectedForMerchant(merchantId).stream()
+                .filter(connection -> BranchScope.serves(connection.getBranchId(), branchId))
+                .flatMap(connection -> listActive(connection).stream())
+                .toList();
     }
 
     private List<MenuOrderDtos.OrderResponse> listActive(YemekSepetiConnection connection) {
@@ -74,27 +73,24 @@ public class KitchenYemekSepetiService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long merchantId) {
-        YemekSepetiConnection connection = connectedOrNull(merchantId);
-        if (connection == null) {
-            return List.of();
-        }
         LocalDate today = LocalDate.now(KitchenUberEatsMapper.ZONE);
-        return orderRepository
-                .findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
-                        connection.getId(),
-                        today.minusDays(31).atStartOfDay(),
-                        today.plusDays(1).atStartOfDay().minusNanos(1)
-                )
-                .stream()
-                .map(this::toKitchenOrder)
+        return connectionService.findConnectedForMerchant(merchantId).stream()
+                .flatMap(connection -> orderRepository
+                        .findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
+                                connection.getId(),
+                                today.minusDays(31).atStartOfDay(),
+                                today.plusDays(1).atStartOfDay().minusNanos(1)
+                        )
+                        .stream()
+                        .map(this::toKitchenOrder))
                 .toList();
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse markReady(Long merchantId, Long orderId) {
-        YemekSepetiConnection connection = connectionService.requireConnectedForUser(merchantId);
-        YemekSepetiOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
+        YemekSepetiOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti siparişi bulunamadı"));
+        YemekSepetiConnection connection = connectionService.requireConnectedForUser(merchantId, order.getConnectionId());
         String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
         if ("readyforpickup".equals(status) || "prepared".equals(status) || "ready".equals(status) || "dispatched".equals(status)) {
             return toKitchenOrder(order);
@@ -105,20 +101,6 @@ public class KitchenYemekSepetiService {
         yemekSepetiClient.markReady(connectionService.decrypt(connection), order.getExternalOrderId());
         order.setPackageStatus("READY_FOR_PICKUP");
         return toKitchenOrder(orderRepository.save(order));
-    }
-
-    private YemekSepetiConnection connectedOrNull(Long merchantId) {
-        if (merchantId == null) {
-            return null;
-        }
-        YemekSepetiConnection connection = connectionService.findByMerchantId(merchantId);
-        if (connection == null
-                || connection.getStatus() != YemekSepetiConnectionStatus.CONNECTED
-                || connection.getVendorId() == null
-                || connection.getVendorId().isBlank()) {
-            return null;
-        }
-        return connection;
     }
 
     private MenuOrderDtos.OrderResponse toKitchenOrder(YemekSepetiOrder order) {

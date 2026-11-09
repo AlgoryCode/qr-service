@@ -206,11 +206,20 @@ public class AnalyticsDtos {
     ) {
     }
 
+    /**
+     * {@code cashRevenue} / {@code cardRevenue}: o günün nakit ve kart tahsilatı (bahşiş hariç).
+     * Ödeme yöntemi kırılımı olmayan raporlarda null döner.
+     */
     public record DailyRevenuePoint(
             LocalDate date,
             BigDecimal revenue,
-            long orderCount
+            long orderCount,
+            BigDecimal cashRevenue,
+            BigDecimal cardRevenue
     ) {
+        public DailyRevenuePoint(LocalDate date, BigDecimal revenue, long orderCount) {
+            this(date, revenue, orderCount, null, null);
+        }
     }
 
     public record RevenueProduct(
@@ -244,11 +253,17 @@ public class AnalyticsDtos {
     ) {
     }
 
+    /** {@code cashRevenue} / {@code cardRevenue}: saatlik nakit ve kart tahsilatı (bahşiş hariç), yoksa null. */
     public record HourlyRevenuePoint(
             int hour,
             BigDecimal revenue,
-            long orderCount
+            long orderCount,
+            BigDecimal cashRevenue,
+            BigDecimal cardRevenue
     ) {
+        public HourlyRevenuePoint(int hour, BigDecimal revenue, long orderCount) {
+            this(hour, revenue, orderCount, null, null);
+        }
     }
 
     public record UnsoldProduct(
@@ -289,6 +304,7 @@ public class AnalyticsDtos {
             BigDecimal cardRevenue,
             BigDecimal tipRevenue,
             BigDecimal uberEatsRevenue,
+            BigDecimal yemeksepetiRevenue,
             BigDecimal grossRevenue,
             BigDecimal fixedExpenseTotal,
             BigDecimal netRevenue,

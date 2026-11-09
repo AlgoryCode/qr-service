@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/integrations")
+@RequestMapping("/api/v1/integrations")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
 public class IntegrationApprovalController {

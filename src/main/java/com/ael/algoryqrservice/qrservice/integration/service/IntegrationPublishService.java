@@ -16,6 +16,8 @@ import com.ael.algoryqrservice.qrservice.model.enums.NutritionBasis;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
 import com.ael.algoryqrservice.qrservice.product.repository.IntegrationPendingProductRepository;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.model.Menu;
+import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
@@ -47,6 +49,7 @@ public class IntegrationPublishService {
     private final UberEatsConnectionService uberEatsConnectionService;
     private final UberEatsClient uberEatsClient;
     private final UberEatsPayloadMapper payloadMapper;
+    private final MenuRepository menuRepository;
 
     @Transactional
     public void publish(UUID pendingProductId) {
@@ -83,7 +86,9 @@ public class IntegrationPublishService {
 
     private boolean publishUber(IntegrationPendingProduct pending) {
         try {
-            UberEatsConnection connection = uberEatsConnectionService.requireConnectedForUser(pending.getTenantId());
+            Long branchId = pending.getMenuId() == null ? null
+                    : menuRepository.findById(pending.getMenuId()).map(Menu::getBranchId).orElse(null);
+            UberEatsConnection connection = uberEatsConnectionService.requireConnectedForBranch(pending.getTenantId(), branchId);
             UberEatsDtos.Credentials credentials = uberEatsConnectionService.decrypt(connection);
             Map<String, Object> body = payloadMapper.toUpsertBody(pending.getProductData());
             if (body.get("name") == null) {

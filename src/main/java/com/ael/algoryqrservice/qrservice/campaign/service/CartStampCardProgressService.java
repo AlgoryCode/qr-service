@@ -33,14 +33,23 @@ public class CartStampCardProgressService {
         if (order == null || order.getMenuId() == null) {
             return List.of();
         }
+        return forOrder(order, activeCampaigns(order.getMenuId()));
+    }
+
+    public List<Campaign> activeCampaigns(Long menuId) {
         LocalDateTime now = LocalDateTime.now();
-        List<Campaign> campaigns = campaignRepository
-                .findByMenuIdAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThanEqual(
-                        order.getMenuId(),
-                        CampaignStatus.ACTIVE,
-                        now,
-                        now
-                );
+        return campaignRepository.findByMenuIdAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThanEqual(
+                menuId,
+                CampaignStatus.ACTIVE,
+                now,
+                now
+        );
+    }
+
+    public List<CampaignDtos.StampCardProgress> forOrder(MenuOrder order, List<Campaign> campaigns) {
+        if (order == null || order.getMenuId() == null) {
+            return List.of();
+        }
         List<CampaignDtos.StampCardProgress> lines = new ArrayList<>();
         for (Campaign campaign : campaigns) {
             if (!"STAMP_CARD".equals(campaign.getTemplateCode())) {

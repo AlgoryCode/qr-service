@@ -31,6 +31,13 @@ public class SessionEntity {
     @Column(name = "refresh_token_hash", nullable = false)
     private String refreshTokenHash;
 
+    /** The refresh token the last rotation replaced; accepted until {@link #previousRefreshValidUntil}. */
+    @Column(name = "previous_refresh_token_hash")
+    private String previousRefreshTokenHash;
+
+    @Column(name = "previous_refresh_valid_until")
+    private LocalDateTime previousRefreshValidUntil;
+
     @Column(name = "logged_in_at", nullable = false)
     private LocalDateTime loggedInAt;
 

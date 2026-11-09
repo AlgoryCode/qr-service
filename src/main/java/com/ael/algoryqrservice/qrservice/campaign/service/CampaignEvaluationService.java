@@ -208,6 +208,32 @@ public class CampaignEvaluationService {
     @Transactional(readOnly = true)
     public CampaignDtos.OrderCampaignSummary summarizeOrder(MenuOrder order) {
         if (order == null || order.getItems() == null) {
+            return summarizeOrder(order, Set.of(), List.of());
+        }
+        return summarizeOrder(
+                order,
+                campaignService.activeCampaignProductIds(order.getMenuId()),
+                cartStampCardProgressService.activeCampaigns(order.getMenuId())
+        );
+    }
+
+    /** Summarizes many orders of one menu while reading that menu's active campaigns only once. */
+    public Map<Long, CampaignDtos.OrderCampaignSummary> summarizeOrders(Long menuId, List<MenuOrder> orders) {
+        Set<Long> campaignProductIds = campaignService.activeCampaignProductIds(menuId);
+        List<Campaign> activeCampaigns = cartStampCardProgressService.activeCampaigns(menuId);
+        Map<Long, CampaignDtos.OrderCampaignSummary> summaries = new HashMap<>();
+        for (MenuOrder order : orders) {
+            summaries.put(order.getId(), summarizeOrder(order, campaignProductIds, activeCampaigns));
+        }
+        return summaries;
+    }
+
+    private CampaignDtos.OrderCampaignSummary summarizeOrder(
+            MenuOrder order,
+            Set<Long> campaignProductIds,
+            List<Campaign> activeCampaigns
+    ) {
+        if (order == null || order.getItems() == null) {
             return CampaignDtos.OrderCampaignSummary.builder()
                     .campaignProductCount(0)
                     .guestOrder(order != null && order.getCustomerId() == null)
@@ -216,7 +242,6 @@ public class CampaignEvaluationService {
                     .stampCardProgress(List.of())
                     .build();
         }
-        Set<Long> campaignProductIds = campaignService.activeCampaignProductIds(order.getMenuId());
         int count = 0;
         for (MenuOrderItem item : order.getItems()) {
             if (campaignProductIds.contains(item.getProductId())) {
@@ -234,7 +259,7 @@ public class CampaignEvaluationService {
                 .guestOrder(guest)
                 .rewardEligible(count > 0)
                 .hint(hint)
-                .stampCardProgress(cartStampCardProgressService.forOrder(order))
+                .stampCardProgress(cartStampCardProgressService.forOrder(order, activeCampaigns))
                 .build();
     }
 

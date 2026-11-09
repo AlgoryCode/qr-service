@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/menus/{menuId}/fixed-expenses")
+@RequestMapping("/api/v1/menus/{menuId}/fixed-expenses")
 @RequiredArgsConstructor
 public class MenuFixedExpenseController {
 

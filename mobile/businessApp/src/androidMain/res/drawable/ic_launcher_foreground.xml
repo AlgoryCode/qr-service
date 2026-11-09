@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- White QR code: three finder squares and a few data modules, kept inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Finder patterns: white ring with a white centre, cut out with even-odd fill. -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M33,33h18v18h-18z M36,36v12h12v-12z M39,39h6v6h-6z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M57,33h18v18h-18z M60,36v12h12v-12z M63,39h6v6h-6z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M33,57h18v18h-18z M36,60v12h12v-12z M39,63h6v6h-6z" />
+    <!-- Data modules -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M57,57h5v5h-5z M65,57h5v5h-5z M61,61h5v5h-5z M70,62h5v5h-5z M57,66h5v5h-5z M65,70h5v5h-5z M70,70h5v5h-5z" />
+</vector>

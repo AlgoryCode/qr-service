@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/platform-feedback")
+@RequestMapping("/api/v1/platform-feedback")
 @RequiredArgsConstructor
 public class PlatformFeedbackController {
 

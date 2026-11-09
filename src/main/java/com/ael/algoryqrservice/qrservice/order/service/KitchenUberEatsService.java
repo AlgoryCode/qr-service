@@ -30,14 +30,13 @@ public class KitchenUberEatsService {
     private final UberEatsClient uberEatsClient;
     private final ObjectMapper objectMapper;
 
-    /** Bağlantı başka şubeye atanmışsa bu şubenin mutfağında görünmez. */
+    /** Her şubenin kendi bağlantısı var; başka şubeye ait bağlantıların siparişleri bu mutfakta görünmez. */
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listActiveForBranch(Long merchantId, Long branchId) {
-        UberEatsConnection connection = connectedOrNull(merchantId);
-        if (connection == null || !BranchScope.serves(connection.getBranchId(), branchId)) {
-            return List.of();
-        }
-        return listActive(connection);
+        return connectionService.findConnectedForMerchant(merchantId).stream()
+                .filter(connection -> BranchScope.serves(connection.getBranchId(), branchId))
+                .flatMap(connection -> listActive(connection).stream())
+                .toList();
     }
 
     private List<MenuOrderDtos.OrderResponse> listActive(UberEatsConnection connection) {
@@ -55,31 +54,28 @@ public class KitchenUberEatsService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long merchantId) {
-        UberEatsConnection connection = connectedOrNull(merchantId);
-        if (connection == null) {
-            return List.of();
-        }
         LocalDate today = LocalDate.now(KitchenUberEatsMapper.ZONE);
-        return orderRepository
-                .findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
-                        connection.getId(),
-                        today.minusDays(31).atStartOfDay(),
-                        today.plusDays(1).atStartOfDay().minusNanos(1)
-                )
-                .stream()
-                .filter(order -> {
-                    String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
-                    return !status.isEmpty() && !"created".equals(status) && !"unassigned".equals(status);
-                })
-                .map(this::toKitchenOrder)
+        return connectionService.findConnectedForMerchant(merchantId).stream()
+                .flatMap(connection -> orderRepository
+                        .findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
+                                connection.getId(),
+                                today.minusDays(31).atStartOfDay(),
+                                today.plusDays(1).atStartOfDay().minusNanos(1)
+                        )
+                        .stream()
+                        .filter(order -> {
+                            String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
+                            return !status.isEmpty() && !"created".equals(status) && !"unassigned".equals(status);
+                        })
+                        .map(this::toKitchenOrder))
                 .toList();
     }
 
     @Transactional
     public MenuOrderDtos.OrderResponse markReady(Long merchantId, Long orderId) {
-        UberEatsConnection connection = connectionService.requireConnectedForUser(merchantId);
-        UberEatsOrder order = orderRepository.findByIdAndConnectionId(orderId, connection.getId())
+        UberEatsOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats siparişi bulunamadı"));
+        UberEatsConnection connection = connectionService.requireConnectedForUser(merchantId, order.getConnectionId());
         String status = KitchenUberEatsMapper.normalizeStatus(order.getPackageStatus());
         if ("prepared".equals(status) || "ready".equals(status)) {
             return toKitchenOrder(order);
@@ -90,20 +86,6 @@ public class KitchenUberEatsService {
         uberEatsClient.markReady(connectionService.decrypt(connection), order.getExternalOrderId());
         order.setPackageStatus("Prepared");
         return toKitchenOrder(orderRepository.save(order));
-    }
-
-    private UberEatsConnection connectedOrNull(Long merchantId) {
-        if (merchantId == null) {
-            return null;
-        }
-        UberEatsConnection connection = connectionService.findByMerchantId(merchantId);
-        if (connection == null
-                || connection.getStatus() != UberEatsConnectionStatus.CONNECTED
-                || connection.getRestaurantId() == null
-                || connection.getRestaurantId().isBlank()) {
-            return null;
-        }
-        return connection;
     }
 
     private MenuOrderDtos.OrderResponse toKitchenOrder(UberEatsOrder order) {

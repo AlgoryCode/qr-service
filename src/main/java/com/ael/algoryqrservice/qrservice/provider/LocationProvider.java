@@ -7,11 +7,9 @@ import com.ael.algoryqrservice.qrservice.qr.service.QrGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
-public class LocationProvider implements QrProvider {
+public class LocationProvider implements QrProvider<QrRequest> {
     private final QrGenerationService qrGenerationService;
 
     @Override
@@ -27,26 +25,9 @@ public class LocationProvider implements QrProvider {
     @Override
     public QrResponse createQr(QrRequest request) {
         try {
-            String content = buildLocationContent(request.getDetails());
-            return qrGenerationService.toResponse(qrGenerationService.createAndSave(request, content));
+            return qrGenerationService.toResponse(qrGenerationService.createForType(request, getType()));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate location QR", e);
         }
-    }
-
-    public String buildLocationContent(Map<String, Object> details) {
-        String latitude = value(details.get("latitude"));
-        String longitude = value(details.get("longitude"));
-        String label = value(details.get("label"));
-
-        if (!label.isBlank()) {
-            return "geo:" + latitude + "," + longitude + "?q=" + latitude + "," + longitude + "(" + label + ")";
-        }
-
-        return "geo:" + latitude + "," + longitude;
-    }
-
-    private String value(Object obj) {
-        return obj == null ? "" : obj.toString();
     }
 }

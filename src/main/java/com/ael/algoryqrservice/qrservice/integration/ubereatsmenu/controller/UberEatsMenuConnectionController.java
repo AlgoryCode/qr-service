@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/integrations/ubereats-menu")
+@RequestMapping("/api/v1/integrations/ubereats-menu")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
 public class UberEatsMenuConnectionController {

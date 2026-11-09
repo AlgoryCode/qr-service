@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/integrations/odeal/test")
+@RequestMapping("/api/v1/integrations/odeal/test")
 @RequiredArgsConstructor
 public class OdealTestController {
 

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/accounting/entries")
+@RequestMapping("/api/v1/accounting/entries")
 @RequiredArgsConstructor
 public class UserAccountingController {
 

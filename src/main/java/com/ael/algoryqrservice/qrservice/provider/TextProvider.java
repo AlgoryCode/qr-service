@@ -7,11 +7,9 @@ import com.ael.algoryqrservice.qrservice.qr.service.QrGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
-public class TextProvider implements QrProvider{
+public class TextProvider implements QrProvider<QrRequest> {
     private final QrGenerationService qrGenerationService;
 
     @Override
@@ -27,18 +25,9 @@ public class TextProvider implements QrProvider{
     @Override
     public QrResponse createQr(QrRequest request) {
         try {
-            String content = buildTextContent(request.getDetails());
-            return qrGenerationService.toResponse(qrGenerationService.createAndSave(request, content));
+            return qrGenerationService.toResponse(qrGenerationService.createForType(request, getType()));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate text QR", e);
         }
-    }
-
-    public String buildTextContent(Map<String, Object> details) {
-        return value(details.get("text"));
-    }
-
-    private String value(Object obj) {
-        return obj == null ? "" : obj.toString();
     }
 }

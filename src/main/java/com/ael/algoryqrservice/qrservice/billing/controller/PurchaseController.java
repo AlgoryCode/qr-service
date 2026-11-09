@@ -26,7 +26,7 @@ import com.ael.algoryqrservice.qrservice.billing.dto.SubscriptionOverviewRespons
 import com.ael.algoryqrservice.qrservice.billing.dto.UserEntitlementResponse;
 
 @RestController
-@RequestMapping("/purchases")
+@RequestMapping("/api/v1/purchases")
 @RequiredArgsConstructor
 public class PurchaseController {
 

@@ -12,10 +12,12 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -27,6 +29,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class SessionIssuer {
+
+    /** How long a rotated-out refresh token is still accepted: enough for a client to retry a lost response. */
+    static final Duration REFRESH_GRACE = Duration.ofSeconds(60);
 
     private final SessionJpaRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
@@ -71,11 +76,29 @@ public class SessionIssuer {
 
     @AuthTransactional
     public IssuedTokens rotate(SessionEntity session, AuthSubject subject, ClientInfo clientInfo) {
+        return rotate(session, subject, clientInfo, false);
+    }
+
+    /**
+     * Issues a new pair for the session. Normally the replaced token becomes the one honoured for {@link #REFRESH_GRACE};
+     * a retry inside that window ([retryOfPrevious]) keeps the original previous token and window, so a client
+     * retrying a lost response neither extends the window nor demotes the token it is about to receive.
+     */
+    @AuthTransactional
+    public IssuedTokens rotate(SessionEntity session, AuthSubject subject, ClientInfo clientInfo, boolean retryOfPrevious) {
         String rawRefresh = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
+        // Built first: a subject that can no longer get a token must not leave a rotated-but-undelivered session.
+        TokenAccess access = tokenAccess(subject);
+        String accessToken = buildAccessToken(subject, session.getId(), access);
+
+        if (!retryOfPrevious) {
+            session.setPreviousRefreshTokenHash(session.getRefreshTokenHash());
+            session.setPreviousRefreshValidUntil(now.plus(REFRESH_GRACE));
+        }
         session.setRefreshTokenHash(passwordEncoder.encode(rawRefresh));
         session.setAccessExpiresAt(now.plusSeconds(jwtProperties.getAccessExpirationMs() / 1000));
-        session.setRefreshExpiresAt(now.plusSeconds(jwtProperties.getRefreshExpirationMs() / 1000));
+        session.setRefreshExpiresAt(slidingRefreshExpiry(session, now));
         session.setLastActivityAt(now);
         session.setIpAddress(clientInfo.ipAddress());
         session.setUserAgent(clientInfo.userAgent());
@@ -83,8 +106,6 @@ public class SessionIssuer {
         session.setDeviceType(clientInfo.deviceType());
         sessionRepository.save(session);
 
-        TokenAccess access = tokenAccess(subject);
-        String accessToken = buildAccessToken(subject, session.getId(), access);
         String refreshToken = formatRefreshToken(session.getId(), rawRefresh, session.getRefreshExpiresAt());
         return new IssuedTokens(
                 accessToken,
@@ -94,6 +115,20 @@ public class SessionIssuer {
                 isoOffset(session.getAccessExpiresAt()),
                 isoOffset(session.getRefreshExpiresAt())
         );
+    }
+
+    /** Each refresh extends the session, but never past {@code refresh-max-lifetime-ms} after sign-in. */
+    private LocalDateTime slidingRefreshExpiry(SessionEntity session, LocalDateTime now) {
+        LocalDateTime sliding = now.plusSeconds(jwtProperties.getRefreshExpirationMs() / 1000);
+        LocalDateTime signedIn = session.getLoggedInAt() != null ? session.getLoggedInAt() : now;
+        LocalDateTime cap = signedIn.plusSeconds(jwtProperties.getRefreshMaxLifetimeMs() / 1000);
+        return sliding.isAfter(cap) ? cap : sliding;
+    }
+
+    /** Revokes in its own transaction, so it sticks even when the caller then answers with an error. */
+    @AuthTransactional(propagation = Propagation.REQUIRES_NEW)
+    public void revokeNow(UUID sessionId) {
+        sessionRepository.findById(sessionId).ifPresent(this::revoke);
     }
 
     @AuthTransactional
@@ -125,6 +160,12 @@ public class SessionIssuer {
 
     public boolean matchesRefresh(SessionEntity session, String rawRefresh) {
         return passwordEncoder.matches(rawRefresh, session.getRefreshTokenHash());
+    }
+
+    /** The token the last rotation replaced, whether or not its grace window is still open. */
+    public boolean matchesPreviousRefresh(SessionEntity session, String rawRefresh) {
+        return session.getPreviousRefreshTokenHash() != null
+                && passwordEncoder.matches(rawRefresh, session.getPreviousRefreshTokenHash());
     }
 
     public String buildAccessToken(AuthSubject subject, UUID sessionId, List<String> scopes) {

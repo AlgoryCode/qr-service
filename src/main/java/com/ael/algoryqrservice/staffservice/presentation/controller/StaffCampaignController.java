@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/staff/campaigns", "/waiter/campaigns"})
+@RequestMapping("/api/v1/staff/campaigns")
 @RequiredArgsConstructor
 public class StaffCampaignController {
 

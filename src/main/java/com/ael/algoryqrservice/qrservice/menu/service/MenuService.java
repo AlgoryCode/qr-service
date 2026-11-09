@@ -587,9 +587,7 @@ public class MenuService {
     @Transactional(readOnly = true)
     public List<MenuDtos.MenuProductResponse> listCatalogProducts() {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return menuProductRepository.findByMerchantIdAndDeletedFalseOrderByProductIdDesc(merchantId).stream()
-                .map(this::toProductResponse)
-                .toList();
+        return mapCatalogProducts(menuProductRepository.findByMerchantIdAndDeletedFalseOrderByProductIdDesc(merchantId));
     }
 
     @Transactional
@@ -1223,11 +1221,10 @@ public class MenuService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menü bulunamadı");
         }
         Menu menu = (Menu) rows.getFirst()[0];
-        List<MenuDtos.MenuProductResponse> products = rows.stream()
+        List<MenuDtos.MenuProductResponse> products = mapProducts(rows.stream()
                 .map(row -> (MenuProduct) row[1])
                 .filter(product -> product != null)
-                .map(this::toProductResponse)
-                .toList();
+                .toList(), menu.getMenuId());
         return MenuDtos.MenuProductsByQrResponse.builder()
                 .menuId(menu.getMenuId())
                 .qrId(menu.getQrId())
@@ -1524,6 +1521,27 @@ public class MenuService {
                 .totalPages(productPage.getTotalPages())
                 .hasNext(productPage.hasNext())
                 .build();
+    }
+
+    /** Catalog products can span several menus, so category maps are merged once per menu rather than per product. */
+    private List<MenuDtos.MenuProductResponse> mapCatalogProducts(List<MenuProduct> products) {
+        Map<Long, MenuSubCategory> subMap = new HashMap<>();
+        Map<Long, MenuCategory> mainMap = new HashMap<>();
+        products.stream().map(MenuProduct::getMenuId).filter(Objects::nonNull).distinct().forEach(menuId -> {
+            subMap.putAll(menuCategoryService.loadSubCategoryMap(menuId));
+            mainMap.putAll(menuCategoryService.loadCategoryMap(menuId));
+        });
+        Map<Long, MenuTag> tagMap = menuTaxonomyService.loadTagMap();
+        Map<Long, MenuAllergen> allergenMap = menuTaxonomyService.loadAllergenMap();
+        List<Long> productIds = products.stream().map(MenuProduct::getProductId).toList();
+        Map<Long, MenuDtos.MenuProductPairingsResponse> pairingsByProduct =
+                menuProductPairingService.loadByProductIds(productIds);
+        Map<Long, List<MenuDtos.MenuProductOptionGroupResponse>> optionsByProduct =
+                menuProductOptionService.loadByProductIds(productIds);
+        return products.stream()
+                .map(product -> toProductResponse(
+                        product, subMap, mainMap, tagMap, allergenMap, pairingsByProduct, optionsByProduct))
+                .toList();
     }
 
     private List<MenuDtos.MenuProductResponse> mapProducts(List<MenuProduct> products, Long menuId) {

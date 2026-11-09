@@ -7,8 +7,6 @@ import com.ael.algoryqrservice.qrservice.qr.service.QrGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
 public class WifiProvider implements QrProvider<QrRequest> {
@@ -28,22 +26,9 @@ public class WifiProvider implements QrProvider<QrRequest> {
     @Override
     public QrResponse createQr(QrRequest req) {
         try {
-            String content = buildWifiContent(req.getDetails());
-            return qrGenerationService.toResponse(qrGenerationService.createAndSave(req, content));
+            return qrGenerationService.toResponse(qrGenerationService.createForType(req, getType()));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate wifi QR", e);
         }
-    }
-
-    public String buildWifiContent(Map<String, Object> details) {
-        String ssid = value(details.get("ssid"));
-        String password = value(details.get("password"));
-        String security = value(details.get("security"));
-
-        return "WIFI:T:" + security + ";S:" + ssid + ";P:" + password + ";;";
-    }
-
-    private String value(Object obj) {
-        return obj == null ? "" : obj.toString();
     }
 }

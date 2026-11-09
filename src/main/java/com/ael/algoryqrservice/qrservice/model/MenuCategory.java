@@ -48,4 +48,9 @@ public class MenuCategory extends QrBaseModel {
 
     @Column(name = "image_key", length = 512)
     private String imageKey;
+
+    /** Mutfağa gitmez: bu kategorinin ürünleri mutfak fişine düşmez, garsonca doğrudan servis edilir. */
+    @Column(name = "skip_kitchen", nullable = false)
+    @lombok.Builder.Default
+    private boolean skipKitchen = false;
 }

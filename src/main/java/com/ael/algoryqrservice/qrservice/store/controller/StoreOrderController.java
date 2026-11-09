@@ -21,7 +21,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/store/orders")
+@RequestMapping("/api/v1/store/orders")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.ONLINE_ORDER_OWNER)
 public class StoreOrderController {

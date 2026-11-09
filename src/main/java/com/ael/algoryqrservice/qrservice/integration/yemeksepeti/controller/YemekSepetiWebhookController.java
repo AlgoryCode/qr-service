@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/integrations/yemek-sepeti/webhooks")
+@RequestMapping("/api/v1/integrations/yemek-sepeti/webhooks")
 @RequiredArgsConstructor
 public class YemekSepetiWebhookController {
 

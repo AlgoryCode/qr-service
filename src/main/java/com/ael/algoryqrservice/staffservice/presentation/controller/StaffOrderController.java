@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/staff/orders", "/waiter/orders"})
+@RequestMapping("/api/v1/staff/orders")
 @RequiredArgsConstructor
 public class StaffOrderController {
 
@@ -88,6 +88,12 @@ public class StaffOrderController {
     @PostMapping("/{orderId}/ready")
     public ResponseEntity<MenuOrderDtos.OrderResponse> markReady(@PathVariable Long orderId) {
         return ResponseEntity.ok(menuWaiterOrderService.markReady(orderId));
+    }
+
+    /** Adisyona doğrudan yazılmış siparişi mutfağa iletir. */
+    @PostMapping("/{orderId}/send-to-kitchen")
+    public ResponseEntity<MenuOrderDtos.OrderResponse> sendToKitchen(@PathVariable Long orderId) {
+        return ResponseEntity.ok(menuWaiterOrderService.sendToKitchen(orderId));
     }
 
     @PostMapping("/{orderId}/served")

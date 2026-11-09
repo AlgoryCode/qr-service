@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -23,4 +24,9 @@ public class QrListResponse {
     private Boolean activePackage;
     private Boolean active;
     private Long menuId;
+    private String publicCode;
+    private String publicUrl;
+    private Boolean trackingEnabled;
+    private Long totalScans;
+    private List<QrDailyScan> dailyScans;
 }

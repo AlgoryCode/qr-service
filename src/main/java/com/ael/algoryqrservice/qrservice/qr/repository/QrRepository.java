@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface QrRepository extends JpaRepository<Qr,Long> {
@@ -15,4 +16,8 @@ public interface QrRepository extends JpaRepository<Qr,Long> {
     long countByMerchantIdAndDeletedFalseAndQrType_TypeNameNotIgnoreCase(Long merchantId, String typeName);
 
     long countByMerchantIdAndPurchaseIdAndDeletedFalse(Long merchantId, Long purchaseId);
+
+    boolean existsByPublicCode(String publicCode);
+
+    Optional<Qr> findByPublicCodeAndDeletedFalse(String publicCode);
 }

@@ -10,6 +10,8 @@ import com.ael.algoryqrservice.qrservice.model.Purchase;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.qr.model.Qr;
 import com.ael.algoryqrservice.qrservice.model.Type;
+import com.ael.algoryqrservice.qrservice.qr.dto.QrDailyScan;
+import com.ael.algoryqrservice.qrservice.qr.repository.QrScanStore;
 import com.ael.algoryqrservice.qrservice.qr.dto.QrActiveRequest;
 import com.ael.algoryqrservice.qrservice.qr.dto.QrActiveResponse;
 import com.ael.algoryqrservice.qrservice.qr.dto.QrNameRequest;
@@ -38,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,8 +53,12 @@ import com.ael.algoryqrservice.qrservice.menu.service.MenuQrSoftDeleteService;
 @RequiredArgsConstructor
 public class QrService {
 
+    private static final int CHART_DAYS = 7;
 
     private final QrProviderFactory qrProviderFactory;
+    private final QrGenerationService qrGenerationService;
+    private final QrPublicCodes qrPublicCodes;
+    private final QrScanStore qrScanStore;
     private final QrRepository qrRepository;
     private final MenuRepository menuRepository;
     private final PurchaseRepository purchaseRepository;
@@ -65,6 +72,14 @@ public class QrService {
 
     public <T extends QrRequest> QrResponse createQR(T req, Long merchantId) throws IOException, WriterException {
         Type qrType = Type.from(req.getType());
+        if (qrType != Type.MENU) {
+            // Checked before the package right is spent, so a rejected QR costs nothing.
+            req.setQrName(QrPayloads.requireName(req.getQrName()));
+            req.setDetails(QrPayloads.normalize(qrType, req.getDetails()));
+            if (!QrPayloads.isDynamic(req.getQrMode(), qrType)) {
+                QrPayloads.requireFitsInImage(qrType, req.getDetails());
+            }
+        }
         if (qrType == Type.MENU) {
             Long branchId = resolveBranchId(req);
             if (branchId != null) {
@@ -80,6 +95,7 @@ public class QrService {
         return provider.createQr(req);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public QrResponse updateQr(Long qrId, QrRequest req) throws IOException, WriterException {
         Qr existingQr = qrRepository.findById(qrId)
                 .orElseThrow(() -> new EntityNotFoundException("QR bulunamadı: " + qrId));
@@ -99,9 +115,28 @@ public class QrService {
 
         req.setMerchantId(existingQr.getMerchantId());
 
-        softDeleteQrAndLinkedMenu(existingQr);
+        Type requestedType = Type.from(req.getType());
+        if (isMenuQr(existingQr) || requestedType == Type.MENU) {
+            softDeleteQrAndLinkedMenu(existingQr);
+            return createQR(req, existingQr.getMerchantId());
+        }
 
-        return createQR(req, existingQr.getMerchantId());
+        Type currentType = QrPayloads.inferType(existingQr.getDetails());
+        if (currentType != null && currentType != requestedType) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "QR türü sonradan değiştirilemez");
+        }
+
+        Map<String, Object> details = QrPayloads.normalize(requestedType, req.getDetails());
+        if (existingQr.getPublicCode() == null) {
+            QrPayloads.requireFitsInImage(requestedType, details);
+        }
+        Qr updated = qrGenerationService.updateContent(
+                existingQr,
+                requestedType,
+                QrPayloads.requireName(req.getQrName()),
+                details
+        );
+        return qrGenerationService.toResponse(updated);
     }
 
     public QrListPageResponse getMerchantQrs(
@@ -137,6 +172,7 @@ public class QrService {
         int from = Math.min(safePage * safeSize, filtered.size());
         int to = Math.min(from + safeSize, filtered.size());
         List<QrListResponse> content = filtered.subList(from, to);
+        attachScans(content);
 
         return QrListPageResponse.builder()
                 .content(content)
@@ -146,6 +182,22 @@ public class QrService {
                 .totalPages(totalPages)
                 .hasNext(safePage + 1 < totalPages)
                 .build();
+    }
+
+    private void attachScans(List<QrListResponse> items) {
+        List<Long> qrIds = items.stream()
+                .filter(item -> item.getPublicCode() != null)
+                .map(QrListResponse::getQrId)
+                .toList();
+        LocalDate firstChartDay = LocalDate.now(QrPublicService.SCAN_ZONE).minusDays(CHART_DAYS - 1);
+        Map<Long, Long> totals = qrScanStore.totals(qrIds);
+        Map<Long, List<QrDailyScan>> daily = qrScanStore.dailySince(qrIds, firstChartDay);
+        items.stream()
+                .filter(item -> item.getPublicCode() != null)
+                .forEach(item -> {
+                    item.setTotalScans(totals.getOrDefault(item.getQrId(), 0L));
+                    item.setDailyScans(daily.getOrDefault(item.getQrId(), List.of()));
+                });
     }
 
     private void applyPurchase(QrRequest req, ExternalConsumeResponse consumed) {
@@ -251,6 +303,9 @@ public class QrService {
                 .activePackage(activePackage)
                 .active(menuQr ? qr.isActive() : true)
                 .menuId(menuId)
+                .publicCode(qr.getPublicCode())
+                .publicUrl(qrPublicCodes.urlFor(qr.getPublicCode()))
+                .trackingEnabled(qr.isTrackingEnabled())
                 .build();
     }
 

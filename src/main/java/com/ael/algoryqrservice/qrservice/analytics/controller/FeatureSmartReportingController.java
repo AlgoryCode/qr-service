@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/features/SMART_REPORTING")
+@RequestMapping("/api/v1/features/SMART_REPORTING")
 @RequiredArgsConstructor
 public class FeatureSmartReportingController {
 

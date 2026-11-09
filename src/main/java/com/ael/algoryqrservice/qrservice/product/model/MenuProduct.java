@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -79,12 +80,14 @@ public class MenuProduct extends QrBaseModel {
     @Column(nullable = false, columnDefinition = "jsonb")
     private NutritionFacts nutrition;
 
+    @BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "tbl_menu_product_tag", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "tag_id")
     @Builder.Default
     private Set<Long> tagIds = new HashSet<>();
 
+    @BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "tbl_menu_product_allergen", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "allergen_id")

@@ -25,13 +25,36 @@ class NutritionFactsServiceTest {
     }
 
     @Test
-    void validateForCreate_whenMissingRequired_thenThrow() {
+    void validateForCreate_whenCaloriesMissing_thenThrow() {
         NutritionFacts nutrition = validNutrition();
-        nutrition.setSalt(null);
+        nutrition.setEnergyKcal(null);
 
         assertThatThrownBy(() -> nutritionFactsService.validateForCreate(nutrition))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("salt");
+                .hasMessageContaining("energyKcal");
+    }
+
+    @Test
+    void validateForCreate_withOnlyCalories_isAcceptedAndFillsKilojoules() {
+        NutritionFacts nutrition = new NutritionFacts();
+        nutrition.setBasis(NutritionBasis.PER_100ML);
+        nutrition.setEnergyKcal(new BigDecimal("45"));
+
+        nutritionFactsService.validateForCreate(nutrition);
+
+        assertThat(nutrition.getEnergyKj()).isEqualByComparingTo("188.3");
+        assertThat(nutrition.getSalt()).isNull();
+    }
+
+    @Test
+    void validateForCreate_stillRefusesNegativeOptionalValues() {
+        NutritionFacts nutrition = new NutritionFacts();
+        nutrition.setBasis(NutritionBasis.PER_100G);
+        nutrition.setEnergyKcal(BigDecimal.TEN);
+        nutrition.setSalt(new BigDecimal("-1"));
+
+        assertThatThrownBy(() -> nutritionFactsService.validateForCreate(nutrition))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test

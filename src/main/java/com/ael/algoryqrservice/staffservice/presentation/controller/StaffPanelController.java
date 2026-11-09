@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantAreaDtos;
 import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantLayoutDtos;
 import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantTableDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
+import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.qrservice.order.service.MenuOrderService;
 import com.ael.algoryqrservice.staffservice.application.MenuWaiterService;
@@ -30,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/staff/panel", "/waiter-panel"})
+@RequestMapping("/api/v1/staff/panel")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.WAITER_PANEL_OWNER)
 public class StaffPanelController {
@@ -47,9 +48,24 @@ public class StaffPanelController {
         return ResponseEntity.ok(merchantCustomerService.listCustomersForCurrentBusiness());
     }
 
+    /**
+     * {@code page} verilmezse eski davranış: tüm personel tek listede döner.
+     * {@code page} verilirse DB'de filtrelenmiş/sayfalanmış sonuç döner; {@code q} ad ve kullanıcı adında LIKE araması yapar.
+     */
     @GetMapping("/staff")
-    public ResponseEntity<MenuWaiterDtos.StaffListResponse> listMerchantStaff() {
-        return ResponseEntity.ok(menuWaiterService.listMerchantStaff());
+    public ResponseEntity<MenuWaiterDtos.StaffListResponse> listMerchantStaff(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String assignment,
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) StaffRole role
+    ) {
+        if (page == null) {
+            return ResponseEntity.ok(menuWaiterService.listMerchantStaff());
+        }
+        return ResponseEntity.ok(menuWaiterService.searchMerchantStaff(q, assignment, branchId, active, role, page, size));
     }
 
     @PostMapping("/staff")
@@ -287,9 +303,10 @@ public class StaffPanelController {
     @GetMapping("/menu/{menuId}/orders")
     public ResponseEntity<List<MenuOrderDtos.OrderResponse>> listOrders(
             @PathVariable Long menuId,
-            @RequestParam(required = false, defaultValue = "ALL") String status
+            @RequestParam(required = false, defaultValue = "ALL") String status,
+            @RequestParam(required = false) Integer days
     ) {
-        return ResponseEntity.ok(menuOrderService.merchantList(menuId, status));
+        return ResponseEntity.ok(menuOrderService.merchantList(menuId, status, days));
     }
 
     @GetMapping("/menu/{menuId}/orders/{orderId}")

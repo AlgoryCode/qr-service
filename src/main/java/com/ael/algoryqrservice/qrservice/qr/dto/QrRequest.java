@@ -23,4 +23,9 @@ public class QrRequest {
 
     private Map<String, Object> details;
 
+    private Boolean trackingEnabled;
+
+    /** "dynamic" or "static"; when absent the default for the QR's type applies. */
+    private String qrMode;
+
 }

@@ -48,7 +48,7 @@ class OdealTestControllerTest {
                 "Geçersiz test API anahtarı"
         )).when(odealTestService).validateTestApiKey(null);
 
-        mockMvc.perform(get("/integrations/odeal/test/units"))
+        mockMvc.perform(get("/api/v1/integrations/odeal/test/units"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -60,7 +60,7 @@ class OdealTestControllerTest {
                 .rawBody("{\"ok\":true}")
                 .build());
 
-        mockMvc.perform(get("/integrations/odeal/test/units")
+        mockMvc.perform(get("/api/v1/integrations/odeal/test/units")
                         .header(OdealTestService.TEST_KEY_HEADER, "odeal-test-local"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statusCode").value(200))
@@ -75,7 +75,7 @@ class OdealTestControllerTest {
                 .rawBody("{\"referenceCode\":\"test-123\"}")
                 .build());
 
-        mockMvc.perform(post("/integrations/odeal/test/basket/sample")
+        mockMvc.perform(post("/api/v1/integrations/odeal/test/basket/sample")
                         .header(OdealTestService.TEST_KEY_HEADER, "odeal-test-local")
                         .param("paymentType", "CREDITCARD")
                         .param("amount", "250"))
@@ -91,7 +91,7 @@ class OdealTestControllerTest {
                 .rawBody("{\"accepted\":true}")
                 .build());
 
-        mockMvc.perform(post("/integrations/odeal/test/basket")
+        mockMvc.perform(post("/api/v1/integrations/odeal/test/basket")
                         .header(OdealTestService.TEST_KEY_HEADER, "odeal-test-local")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"referenceCode\":\"manual-001\"}"))

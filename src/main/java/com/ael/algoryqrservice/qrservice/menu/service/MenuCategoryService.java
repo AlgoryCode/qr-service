@@ -82,6 +82,7 @@ public class MenuCategoryService {
                     .name(main.getName())
                     .sortOrder(main.getSortOrder())
                     .imageUrl(main.getImageUrl())
+                    .skipKitchen(main.isSkipKitchen())
                     .subs(visibleSubs)
                     .build());
         }
@@ -159,6 +160,15 @@ public class MenuCategoryService {
                 .deleted(false)
                 .build());
         return toMainResponse(saved, List.of());
+    }
+
+    @Transactional
+    public TaxonomyDtos.MainCategoryResponse setSkipKitchen(Long menuId, Long categoryId, boolean skipKitchen) {
+        MenuCategory category = requireCategory(menuId, categoryId);
+        category.setSkipKitchen(skipKitchen);
+        category.setUpdatedAt(LocalDateTime.now());
+        menuCategoryRepository.save(category);
+        return toMainResponse(category, menuSubCategoryRepository.findByMenuCategoryIdAndDeletedFalseOrderBySortOrderAscIdAsc(categoryId));
     }
 
     @Transactional
@@ -536,6 +546,7 @@ public class MenuCategoryService {
                 .name(category.getName())
                 .sortOrder(category.getSortOrder())
                 .imageUrl(category.getImageUrl())
+                .skipKitchen(category.isSkipKitchen())
                 .subs(subs.stream().map(this::toSubResponse).toList())
                 .build();
     }

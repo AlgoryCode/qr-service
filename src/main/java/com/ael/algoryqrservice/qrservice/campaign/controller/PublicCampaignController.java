@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/menu/public/{publicId}/campaigns")
+@RequestMapping("/api/v1/menu/public/{publicId}/campaigns")
 @RequiredArgsConstructor
 public class PublicCampaignController {
 

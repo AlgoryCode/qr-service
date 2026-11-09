@@ -34,10 +34,9 @@ Replace paths per table above. Keep `API_BASE_URL` / Next.js `/api` proxy as in 
 
 ## Backend compat (temporary)
 
-- Dual `@RequestMapping` on staff panel/order/bill/ops/kitchen/courier/commission/campaign controllers.
-- `DeprecatedStaffPathCompatFilter` logs `[compat] deprecated path …` once per request.
-- `EmailVerificationGatewayFilter` allowlist includes `/waiter-panel`, `/waiter/` during alias period.
-- `InternalMerchantController` also mapped to `/internal/merchants`.
+- All controllers now live under `/api/v1/**` (2026-10-30). The `/waiter*` aliases were removed from the staff controllers.
+- `LegacyApiPathCompatFilter` rewrites old paths (`/staff/*`, `/menu/*`, `/waiter-panel/*`, `/waiter/*`, `/packages`, `/internal/*`, …) to `/api/v1/*` before Spring Security, and logs `[compat] deprecated path …` once per method + path shape.
+- `InternalMerchantController` also mapped to `/api/v1/internal/merchants`.
 
 ## Remove aliases (after dashboard-site + staff-site prod verified)
 
@@ -45,11 +44,10 @@ Replace paths per table above. Keep `API_BASE_URL` / Next.js `/api` proxy as in 
 
 Single follow-up PR in **qr-service**:
 
-1. Revert dual `@RequestMapping` to `/staff/*` only (and `/internal/merchant` only).
-2. Remove `/waiter-panel` and `/waiter/` from `EmailVerificationGatewayFilter.ALLOWED_PREFIXES`.
-3. Delete `DeprecatedStaffPathCompatFilter` and its `SecurityConfig` registration.
-4. Remove `/internal/merchants/*` from `SecurityConfig` matchers.
-5. Update [`rest-domains-merchant-staff-customer.md`](rest-domains-merchant-staff-customer.md) to state aliases are gone.
-6. Confirm prod logs show no `[compat] deprecated path` hits for 7+ days.
+1. Point clients at `/api/v1/*` (and `/api/v1/internal/merchant` only).
+2. Delete `LegacyApiPathCompatFilter` (or trim its root list) once no client uses the old paths.
+3. Remove `/api/v1/internal/merchants` from `InternalMerchantController` and `SecurityConfig` matchers.
+4. Update [`rest-domains-merchant-staff-customer.md`](rest-domains-merchant-staff-customer.md) to state aliases are gone.
+5. Confirm prod logs show no `[compat] deprecated path` hits for 7+ days.
 
 Do **not** remove aliases before **dashboard-site** and **algoryqr-staff-site** production use canonical paths (or you accept breaking old cached bundles).

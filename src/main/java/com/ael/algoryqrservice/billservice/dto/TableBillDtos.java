@@ -188,6 +188,53 @@ public final class TableBillDtos {
         private BigDecimal tipAmount;
     }
 
+    /** A partial payment of a typed amount, not tied to any bill item. */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PayBillAmountRequest {
+        @NotNull
+        @DecimalMin(value = "0.01")
+        private BigDecimal amount;
+
+        @NotNull
+        private TableBillPaymentMethod paymentMethod;
+
+        private Boolean tipReceived;
+
+        @DecimalMin(value = "0.01")
+        private BigDecimal tipAmount;
+    }
+
+    /** A tip handed over after the bill was closed, e.g. left on the table once the guests had gone. */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AddTipRequest {
+        @NotNull
+        @DecimalMin(value = "0.01")
+        private BigDecimal amount;
+
+        @NotNull
+        private TableBillPaymentMethod paymentMethod;
+    }
+
+    /** Corrects the method of payments already taken, e.g. a card payment entered as cash. */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChangePaymentMethodRequest {
+        @NotNull
+        @Size(min = 1)
+        private List<Long> paymentIds;
+
+        @NotNull
+        private TableBillPaymentMethod paymentMethod;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor

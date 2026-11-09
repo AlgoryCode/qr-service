@@ -98,6 +98,13 @@ public final class MenuOrderDtos {
 
         @Min(1)
         private Integer coverCount;
+
+        /**
+         * {@code true}: "Mutfağa gönder" (mutfak kapalıysa reddedilir; "mutfağa gitmez" kalemler yine doğrudan
+         * adisyona yazılır). {@code false}: "Adisyona ekle", tüm kalemler servis edilmiş olarak adisyona yazılır.
+         * Boş bırakan eski istemciler için mutfak açıksa mutfağa gönderilir.
+         */
+        private Boolean sendToKitchen;
     }
 
     @Data

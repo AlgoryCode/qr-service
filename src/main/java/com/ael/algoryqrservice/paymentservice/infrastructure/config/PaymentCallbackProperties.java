@@ -17,7 +17,7 @@ public record PaymentCallbackProperties(
             checkoutFormPublicUrl = "http://localhost:8080/payments/paytr/notification";
         }
         if (cardVerificationFrontendRedirectUrl == null || cardVerificationFrontendRedirectUrl.isBlank()) {
-            cardVerificationFrontendRedirectUrl = "http://localhost:3000/dashboard/hesabim/kayitli-kartlarim";
+            cardVerificationFrontendRedirectUrl = "http://localhost:3000/hesabim/kayitli-kartlarim";
         }
     }
 }

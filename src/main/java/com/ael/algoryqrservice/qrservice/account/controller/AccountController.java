@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/account")
+@RequestMapping("/api/v1/account")
 @RequiredArgsConstructor
 public class AccountController {
 
@@ -78,8 +78,8 @@ public class AccountController {
     }
 
     @GetMapping("/purchases")
-    public List<PurchaseResponse> purchases() {
-        return accountFacade.listPurchases();
+    public List<PurchaseResponse> purchases(@RequestParam(defaultValue = "false") boolean activeOnly) {
+        return activeOnly ? accountFacade.listActivePurchases() : accountFacade.listPurchases();
     }
 
     @GetMapping("/subscription-overview")

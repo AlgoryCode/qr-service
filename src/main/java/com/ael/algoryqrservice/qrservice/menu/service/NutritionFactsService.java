@@ -9,12 +9,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class NutritionFactsService {
+
+    private static final BigDecimal KJ_PER_KCAL = new BigDecimal("4.184");
 
     private final ObjectMapper objectMapper;
 
@@ -25,13 +28,17 @@ public class NutritionFactsService {
         if (nutrition.getBasis() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Besin ogesi birimi zorunludur");
         }
-        requireAmount(nutrition.getEnergyKj(), "energyKj");
+        // Only the calories are required; every other line of the label may be left out.
         requireAmount(nutrition.getEnergyKcal(), "energyKcal");
-        requireAmount(nutrition.getFat(), "fat");
-        requireAmount(nutrition.getCarbohydrate(), "carbohydrate");
-        requireAmount(nutrition.getFibre(), "fibre");
-        requireAmount(nutrition.getProtein(), "protein");
-        requireAmount(nutrition.getSalt(), "salt");
+        if (nutrition.getEnergyKj() == null) {
+            nutrition.setEnergyKj(nutrition.getEnergyKcal().multiply(KJ_PER_KCAL).setScale(1, RoundingMode.HALF_UP));
+        }
+        validateOptionalAmount(nutrition.getEnergyKj(), "energyKj");
+        validateOptionalAmount(nutrition.getFat(), "fat");
+        validateOptionalAmount(nutrition.getCarbohydrate(), "carbohydrate");
+        validateOptionalAmount(nutrition.getFibre(), "fibre");
+        validateOptionalAmount(nutrition.getProtein(), "protein");
+        validateOptionalAmount(nutrition.getSalt(), "salt");
         validateOptionalAmount(nutrition.getSaturatedFat(), "saturatedFat");
         validateOptionalAmount(nutrition.getSugars(), "sugars");
         validateOptionalAmount(nutrition.getPolyols(), "polyols");

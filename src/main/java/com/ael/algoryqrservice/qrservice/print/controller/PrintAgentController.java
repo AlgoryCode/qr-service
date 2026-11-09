@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/print-agent")
+@RequestMapping("/api/v1/print-agent")
 @RequiredArgsConstructor
 public class PrintAgentController {
 

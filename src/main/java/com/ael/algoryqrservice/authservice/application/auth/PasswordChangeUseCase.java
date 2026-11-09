@@ -19,9 +19,21 @@ import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.ael.algoryqrservice.authservice.exception.TooManyRequestsException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 @Service
 public class PasswordChangeUseCase {
+
+    /** Wrong codes allowed per code; after that the code is revoked and a new one must be requested. */
+    static final int MAX_CODE_ATTEMPTS = 5;
+    /** A new code (and e-mail) at most this often per business. */
+    static final int REQUEST_COOLDOWN_SECONDS = 60;
+
+    /** Wrong attempts per code id. Per JVM; with the per-code revoke it still caps guesses at a few per minute. */
+    private final Map<Long, AtomicInteger> failedAttempts = new ConcurrentHashMap<>();
 
     private final MerchantJpaRepository merchantRepository;
     private final DemoAccountJpaRepository demoAccountRepository;
@@ -57,6 +69,13 @@ public class PasswordChangeUseCase {
         MerchantEntity merchant = loadBasic(merchantId);
         LocalDateTime now = LocalDateTime.now();
         expireTimedOut(merchantId, now);
+        boolean tooSoon = codeRepository
+                .findByMerchantIdAndStatusAndRevokedFalseOrderByCreatedAtDesc(merchantId, PasswordChangeCodeEntity.PENDING)
+                .stream()
+                .anyMatch(pending -> pending.getCreatedAt().isAfter(now.minusSeconds(REQUEST_COOLDOWN_SECONDS)));
+        if (tooSoon) {
+            throw new TooManyRequestsException("Yeni kod istemeden önce biraz bekleyin");
+        }
         revokePending(merchantId, now);
 
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
@@ -81,7 +100,8 @@ public class PasswordChangeUseCase {
         return new CodeResponse(maskEmail(merchant.getEmail()), codeValidityMinutes * 60, codeValidityMinutes);
     }
 
-    @AuthTransactional
+    // A wrong code must still count, and a revoke after too many must stick, though the call answers 400.
+    @AuthTransactional(noRollbackFor = BadRequestException.class)
     public void confirm(Long merchantId, String code, String newPassword, String confirmPassword) {
         MerchantEntity merchant = loadBasic(merchantId);
         LocalDateTime now = LocalDateTime.now();
@@ -107,6 +127,7 @@ public class PasswordChangeUseCase {
             merchant.setPassword(encodedPassword);
         }
         merchantRepository.save(merchant);
+        failedAttempts.remove(changeCode.getId());
         changeCode.setStatus(PasswordChangeCodeEntity.USED);
         changeCode.setUsedAt(now);
         codeRepository.save(changeCode);
@@ -140,7 +161,29 @@ public class PasswordChangeUseCase {
         if (matchedExpired) {
             throw new BadRequestException("Doğrulama kodunun süresi dolmuş. Lütfen yeni kod isteyin.");
         }
+        if (recordFailure(pending, now)) {
+            throw new BadRequestException("Çok fazla hatalı deneme. Lütfen yeni kod isteyin.");
+        }
         throw new BadRequestException("Geçersiz doğrulama kodu");
+    }
+
+    /** Counts a wrong code against every live code; returns true once they were revoked for too many attempts. */
+    private boolean recordFailure(List<PasswordChangeCodeEntity> pending, LocalDateTime now) {
+        boolean exhausted = false;
+        for (PasswordChangeCodeEntity candidate : pending) {
+            if (!PasswordChangeCodeEntity.PENDING.equals(candidate.getStatus())) {
+                continue;
+            }
+            int attempts = failedAttempts.computeIfAbsent(candidate.getId(), id -> new AtomicInteger()).incrementAndGet();
+            if (attempts >= MAX_CODE_ATTEMPTS) {
+                candidate.setRevoked(true);
+                candidate.setRevokedAt(now);
+                codeRepository.save(candidate);
+                failedAttempts.remove(candidate.getId());
+                exhausted = true;
+            }
+        }
+        return exhausted;
     }
 
     private void expireTimedOut(Long merchantId, LocalDateTime now) {

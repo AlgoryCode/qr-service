@@ -14,6 +14,7 @@ import com.ael.algoryqrservice.qrservice.model.enums.IntegrationJobStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.IntegrationPublishTarget;
 import com.ael.algoryqrservice.qrservice.product.repository.IntegrationPendingProductRepository;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductIndexNotifier;
@@ -56,6 +57,8 @@ class IntegrationPublishServiceTest {
     private UberEatsConnectionService uberEatsConnectionService;
     @Mock
     private UberEatsClient uberEatsClient;
+    @Mock
+    private MenuRepository menuRepository;
 
     private IntegrationPublishService publishService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -70,7 +73,8 @@ class IntegrationPublishServiceTest {
                 menuProductIndexNotifier,
                 uberEatsConnectionService,
                 uberEatsClient,
-                new UberEatsPayloadMapper()
+                new UberEatsPayloadMapper(),
+                menuRepository
         );
     }
 
@@ -96,7 +100,7 @@ class IntegrationPublishServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
         when(pendingProductRepository.findById(pendingId)).thenReturn(Optional.of(pending));
-        when(uberEatsConnectionService.requireConnectedForUser(7L)).thenReturn(
+        when(uberEatsConnectionService.requireConnectedForBranch(eq(7L), any())).thenReturn(
                 UberEatsConnection.builder()
                         .merchantId(7L)
                         .restaurantId("store-1")
@@ -140,7 +144,7 @@ class IntegrationPublishServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
         when(pendingProductRepository.findById(pendingId)).thenReturn(Optional.of(pending));
-        when(uberEatsConnectionService.requireConnectedForUser(7L)).thenReturn(
+        when(uberEatsConnectionService.requireConnectedForBranch(eq(7L), any())).thenReturn(
                 UberEatsConnection.builder()
                         .merchantId(7L)
                         .restaurantId("store-1")

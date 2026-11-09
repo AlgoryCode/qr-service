@@ -17,7 +17,7 @@ import com.ael.algoryqrservice.qrservice.model.Product;
  * Product photos remain on the public menu payload ({@code imageUrl}).
  */
 @RestController
-@RequestMapping("/menu/public/themes")
+@RequestMapping("/api/v1/menu/public/themes")
 @RequiredArgsConstructor
 public class PublicMenuThemeController {
 

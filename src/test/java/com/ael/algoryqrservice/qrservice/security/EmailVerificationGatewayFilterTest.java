@@ -43,9 +43,10 @@ class EmailVerificationGatewayFilterTest {
     @Test
     void shouldNotFilter_whenAuthOrVerificationPath_thenSkip() {
         assertThat(filter.shouldNotFilter(request("/auth/login"))).isTrue();
-        assertThat(filter.shouldNotFilter(request("/account/email-verification/verify"))).isTrue();
-        assertThat(filter.shouldNotFilter(request("/waiter/orders"))).isTrue();
-        assertThat(filter.shouldNotFilter(request("/menus"))).isFalse();
+        assertThat(filter.shouldNotFilter(request("/api/v1/auth/email-verification/verify"))).isTrue();
+        assertThat(filter.shouldNotFilter(request("/api/v1/account/email-verification/verify"))).isTrue();
+        assertThat(filter.shouldNotFilter(request("/api/v1/staff/orders"))).isTrue();
+        assertThat(filter.shouldNotFilter(request("/api/v1/menus"))).isFalse();
     }
 
     @Test
@@ -55,7 +56,7 @@ class EmailVerificationGatewayFilterTest {
         FilterChain chain = mock(FilterChain.class);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.doFilterInternal(request("/menus"), response, chain);
+        filter.doFilterInternal(request("/api/v1/menus"), response, chain);
 
         assertThat(response.getStatus()).isEqualTo(403);
         @SuppressWarnings("unchecked")
@@ -69,7 +70,7 @@ class EmailVerificationGatewayFilterTest {
         authenticateOwner(7L);
         when(gate.isVerificationPending(7L)).thenReturn(false);
         FilterChain chain = mock(FilterChain.class);
-        MockHttpServletRequest servletRequest = request("/menus");
+        MockHttpServletRequest servletRequest = request("/api/v1/menus");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilterInternal(servletRequest, response, chain);
@@ -81,7 +82,7 @@ class EmailVerificationGatewayFilterTest {
     @Test
     void doFilter_whenUnauthenticated_thenContinueWithoutGateLookup() throws Exception {
         FilterChain chain = mock(FilterChain.class);
-        MockHttpServletRequest servletRequest = request("/menu/public/abc");
+        MockHttpServletRequest servletRequest = request("/api/v1/menu/public/abc");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilterInternal(servletRequest, response, chain);
@@ -94,7 +95,7 @@ class EmailVerificationGatewayFilterTest {
     void doFilter_whenCustomerPrincipal_thenContinueWithoutGateLookup() throws Exception {
         authenticatePrincipal(7L, JwtService.PRINCIPAL_CUSTOMER);
         FilterChain chain = mock(FilterChain.class);
-        MockHttpServletRequest servletRequest = request("/menus");
+        MockHttpServletRequest servletRequest = request("/api/v1/menus");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilterInternal(servletRequest, response, chain);

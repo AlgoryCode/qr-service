@@ -46,4 +46,12 @@ public class Qr extends QrBaseModel {
     @lombok.Builder.Default
     private boolean active = true;
 
+    /** Set once and never changed: a dynamic QR's image points at this code. Null on static and menu QRs. */
+    @Column(name = "public_code", length = 16)
+    private String publicCode;
+
+    @Column(name = "tracking_enabled", nullable = false)
+    @lombok.Builder.Default
+    private boolean trackingEnabled = true;
+
 }

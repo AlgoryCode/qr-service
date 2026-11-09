@@ -37,17 +37,19 @@ public class UberEatsConnectionService {
     }
 
     @Transactional(readOnly = true)
-    public UberEatsDtos.ConnectionResponse getMine() {
-        return toResponse(requireOwnedConnection());
+    public UberEatsDtos.ConnectionResponse getMine(Long branchId) {
+        return toResponse(requireOwnedConnection(branchId));
     }
 
+    /** Connects [branchId]'s own account; without a branch, the account-wide connection (see [findForBranch]). */
     @Transactional
-    public UberEatsDtos.ConnectionResponse upsert(UberEatsDtos.UpsertConnectionRequest request) {
+    public UberEatsDtos.ConnectionResponse upsert(UberEatsDtos.UpsertConnectionRequest request, Long branchId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        UberEatsConnection connection = connectionRepository
-                .findByMerchantId(merchantId)
+        requireOwnedBranch(branchId, merchantId);
+        UberEatsConnection connection = findForBranch(merchantId, branchId)
                 .orElseGet(() -> UberEatsConnection.builder()
                         .merchantId(merchantId)
+                        .branchId(branchId)
                         .status(UberEatsConnectionStatus.DISCONNECTED)
                         .build());
         connection.setSellerId(request.getSellerId().trim());
@@ -82,62 +84,119 @@ public class UberEatsConnectionService {
         return toResponse(connectionRepository.save(connection));
     }
 
+    /** Moves the account-wide connection to [branchId] (null: every branch); a branch keeps one connection. */
     @Transactional
     public UberEatsDtos.ConnectionResponse assignBranch(Long branchId) {
-        UberEatsConnection connection = requireOwnedConnection();
-        if (branchId != null) {
-            branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, connection.getMerchantId())
-                    .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
-        }
+        UberEatsConnection connection = requireOwnedConnection(null);
+        requireOwnedBranch(branchId, connection.getMerchantId());
+        connectionRepository.findByMerchantIdAndBranchId(connection.getMerchantId(), branchId)
+                .filter(other -> !other.getId().equals(connection.getId()))
+                .ifPresent(other -> {
+                    throw new BadRequestException("Bu şubenin zaten bir Uber Eats bağlantısı var");
+                });
         connection.setBranchId(branchId);
         return toResponse(connectionRepository.save(connection));
     }
 
     @Transactional
-    public UberEatsDtos.ConnectionResponse disconnect() {
-        UberEatsConnection connection = requireOwnedConnection();
+    public UberEatsDtos.ConnectionResponse disconnect(Long branchId) {
+        UberEatsConnection connection = requireOwnedConnection(branchId);
         connection.setStatus(UberEatsConnectionStatus.DISCONNECTED);
         connection.setLastError(null);
         return toResponse(connectionRepository.save(connection));
     }
 
     @Transactional(readOnly = true)
-    public List<UberEatsDtos.RestaurantResponse> listRestaurants() {
-        UberEatsConnection connection = requireOwnedConnection();
+    public List<UberEatsDtos.RestaurantResponse> listRestaurants(Long branchId) {
+        UberEatsConnection connection = requireOwnedConnection(branchId);
         return payloadMapper.toRestaurants(uberEatsClient.listRestaurants(decrypt(connection)));
     }
 
     @Transactional(readOnly = true)
-    public UberEatsConnection requireOwnedConnection() {
+    public UberEatsConnection requireOwnedConnection(Long branchId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return connectionRepository.findByMerchantId(merchantId)
+        return findForBranch(merchantId, branchId)
                 .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
     }
 
+    /** The account-wide connection, for callers that predate per-branch connections. */
     @Transactional(readOnly = true)
     public UberEatsConnection requireConnected() {
-        UberEatsConnection connection = requireOwnedConnection();
-        if (connection.getStatus() != UberEatsConnectionStatus.CONNECTED
-                || !hasText(connection.getRestaurantId())) {
-            throw new BadRequestException("Önce bir Uber Eats restoranı bağlayın");
-        }
-        return connection;
+        return requireConnected(null);
     }
 
     @Transactional(readOnly = true)
-    public UberEatsConnection requireConnectedForUser(Long merchantId) {
-        UberEatsConnection connection = connectionRepository.findByMerchantId(merchantId)
+    public UberEatsConnection requireConnected(Long branchId) {
+        return requireLive(requireOwnedConnection(branchId));
+    }
+
+    /** The current merchant's connection an order belongs to, whichever branch it serves. */
+    @Transactional(readOnly = true)
+    public UberEatsConnection requireConnectedById(Long connectionId) {
+        return requireConnectedForUser(securityUtils.getCurrentMerchantId(), connectionId);
+    }
+
+    @Transactional(readOnly = true)
+    public UberEatsConnection requireConnectedForUser(Long merchantId, Long connectionId) {
+        UberEatsConnection connection = connectionRepository.findById(connectionId)
+                .filter(found -> found.getMerchantId().equals(merchantId))
                 .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
+        return requireLive(connection);
+    }
+
+    /**
+     * The connection that serves [branchId]: the branch's own one, else the account-wide one (no branch). For
+     * background jobs that run without a signed-in owner, such as publishing a menu's products.
+     */
+    @Transactional(readOnly = true)
+    public UberEatsConnection requireConnectedForBranch(Long merchantId, Long branchId) {
+        java.util.Optional<UberEatsConnection> own = branchId == null
+                ? java.util.Optional.empty()
+                : connectionRepository.findByMerchantIdAndBranchId(merchantId, branchId);
+        UberEatsConnection connection = own
+                .or(() -> connectionRepository.findByMerchantIdAndBranchId(merchantId, null))
+                .orElseThrow(() -> new NotFoundException("Uber Eats bağlantısı bulunamadı"));
+        return requireLive(connection);
+    }
+
+    /** Every connection of the merchant that can receive orders, one per branch. */
+    @Transactional(readOnly = true)
+    public List<UberEatsConnection> findConnectedForMerchant(Long merchantId) {
+        if (merchantId == null) {
+            return List.of();
+        }
+        return connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(merchantId).stream()
+                .filter(connection -> connection.getStatus() == UberEatsConnectionStatus.CONNECTED
+                        && hasText(connection.getRestaurantId()))
+                .toList();
+    }
+
+    /**
+     * The connection of [branchId]. Without a branch (web panel, older clients): the account-wide connection,
+     * or the most recently updated one when the merchant only has per-branch connections.
+     */
+    private java.util.Optional<UberEatsConnection> findForBranch(Long merchantId, Long branchId) {
+        if (branchId != null) {
+            return connectionRepository.findByMerchantIdAndBranchId(merchantId, branchId);
+        }
+        List<UberEatsConnection> all = connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(merchantId);
+        return all.stream().filter(connection -> connection.getBranchId() == null).findFirst()
+                .or(() -> all.stream().findFirst());
+    }
+
+    private void requireOwnedBranch(Long branchId, Long merchantId) {
+        if (branchId != null) {
+            branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
+                    .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
+        }
+    }
+
+    private UberEatsConnection requireLive(UberEatsConnection connection) {
         if (connection.getStatus() != UberEatsConnectionStatus.CONNECTED
                 || !hasText(connection.getRestaurantId())) {
             throw new BadRequestException("Önce bir Uber Eats restoranı bağlayın");
         }
         return connection;
-    }
-
-    @Transactional(readOnly = true)
-    public UberEatsConnection findByMerchantId(Long merchantId) {
-        return connectionRepository.findByMerchantId(merchantId).orElse(null);
     }
 
     public UberEatsDtos.Credentials decrypt(UberEatsConnection connection) {

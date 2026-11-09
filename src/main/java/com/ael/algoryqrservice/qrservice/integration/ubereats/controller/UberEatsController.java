@@ -27,7 +27,7 @@ import java.util.List;
 import com.ael.algoryqrservice.qrservice.product.dto.ProductResponse;
 
 @RestController
-@RequestMapping("/integrations/ubereats")
+@RequestMapping("/api/v1/integrations/ubereats")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
 public class UberEatsController {
@@ -43,15 +43,16 @@ public class UberEatsController {
     }
 
     @GetMapping("/connections/me")
-    public ResponseEntity<UberEatsDtos.ConnectionResponse> getConnection() {
-        return ResponseEntity.ok(connectionService.getMine());
+    public ResponseEntity<UberEatsDtos.ConnectionResponse> getConnection(@RequestParam(required = false) Long branchId) {
+        return ResponseEntity.ok(connectionService.getMine(branchId));
     }
 
     @PutMapping("/connections")
     public ResponseEntity<UberEatsDtos.ConnectionResponse> upsert(
-            @Valid @RequestBody UberEatsDtos.UpsertConnectionRequest request
+            @Valid @RequestBody UberEatsDtos.UpsertConnectionRequest request,
+            @RequestParam(required = false) Long branchId
     ) {
-        return ResponseEntity.ok(connectionService.upsert(request));
+        return ResponseEntity.ok(connectionService.upsert(request, branchId));
     }
 
     @PutMapping("/connections/me/branch")
@@ -62,13 +63,13 @@ public class UberEatsController {
     }
 
     @DeleteMapping("/connections/me")
-    public ResponseEntity<UberEatsDtos.ConnectionResponse> disconnect() {
-        return ResponseEntity.ok(connectionService.disconnect());
+    public ResponseEntity<UberEatsDtos.ConnectionResponse> disconnect(@RequestParam(required = false) Long branchId) {
+        return ResponseEntity.ok(connectionService.disconnect(branchId));
     }
 
     @GetMapping("/restaurants")
-    public ResponseEntity<List<UberEatsDtos.RestaurantResponse>> restaurants() {
-        return ResponseEntity.ok(connectionService.listRestaurants());
+    public ResponseEntity<List<UberEatsDtos.RestaurantResponse>> restaurants(@RequestParam(required = false) Long branchId) {
+        return ResponseEntity.ok(connectionService.listRestaurants(branchId));
     }
 
     @GetMapping("/products")
@@ -97,21 +98,23 @@ public class UberEatsController {
 
     @GetMapping("/orders")
     public ResponseEntity<UberEatsDtos.OrderPageResponse> orders(
+            @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(orderService.listOrders(status, from, to, page, size));
+        return ResponseEntity.ok(orderService.listOrders(branchId, status, from, to, page, size));
     }
 
     @PostMapping("/orders/sync")
     public ResponseEntity<UberEatsDtos.SyncOrdersResponse> syncOrders(
+            @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ResponseEntity.ok(orderService.syncOrders(from, to));
+        return ResponseEntity.ok(orderService.syncOrders(branchId, from, to));
     }
 
     @GetMapping("/orders/{orderId}")

@@ -3,7 +3,9 @@ package com.ael.algoryqrservice.qrservice.util;
 import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
 import com.ael.algoryqrservice.authservice.security.AuthPrincipal;
 import com.ael.algoryqrservice.qrservice.client.AuthMerchantClient;
+import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import com.ael.algoryqrservice.customerservice.infrastructure.persistence.entity.Customer;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.entity.MerchantStaff;
 import com.ael.algoryqrservice.qrservice.model.User;
@@ -19,6 +21,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.http.HttpHeaders;
 
 @Component
 @RequiredArgsConstructor
@@ -28,6 +34,7 @@ public class SecurityUtils {
     private final CustomerRepository customerRepository;
     private final MerchantStaffRepository merchantStaffRepository;
     private final AuthMerchantClient authMerchantClient;
+    private final JwtService jwtService;
 
     public Optional<User> findCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -46,7 +53,7 @@ public class SecurityUtils {
     }
 
     public User getCurrentUser() {
-        return findCurrentUser().orElseThrow(() -> new UnauthorizedException("Kullanıcı bulunamadı"));
+        return findCurrentUser().orElseThrow(() -> denied("Kullanıcı bulunamadı"));
     }
 
     public Long getCurrentMerchantId() {
@@ -75,7 +82,7 @@ public class SecurityUtils {
                     if (principal.merchantId() != null) {
                         return principal.merchantId();
                     }
-                    throw new UnauthorizedException("Personel bulunamadı");
+                    throw new ForbiddenException("Personel bulunamadı");
                 }
                 if (!principal.isWaiter() && principal.merchantId() != null) {
                     return resolveMerchantAccountId(principal.merchantId(), authentication.getName());
@@ -120,16 +127,16 @@ public class SecurityUtils {
     public Customer getCurrentCustomer() {
         Authentication authentication = requireAuthentication("Müşteri bulunamadı");
         if (!isCustomerAuthentication(authentication)) {
-            throw new UnauthorizedException("Müşteri bulunamadı");
+            throw new ForbiddenException("Müşteri oturumu gerekli");
         }
         String email = authentication.getName();
         return customerRepository.findByEmail(email)
-                .orElseThrow(() -> new UnauthorizedException("Müşteri bulunamadı"));
+                .orElseThrow(() -> new ForbiddenException("Müşteri bulunamadı"));
     }
 
     public Long getCurrentCustomerId() {
         return findCurrentCustomerId()
-                .orElseThrow(() -> new UnauthorizedException("Müşteri bulunamadı"));
+                .orElseThrow(() -> denied("Müşteri oturumu gerekli"));
     }
 
     public Optional<Long> findCurrentCustomerId() {
@@ -154,7 +161,7 @@ public class SecurityUtils {
 
     public Long getCurrentStaffId() {
         return findCurrentStaffId()
-                .orElseThrow(() -> new UnauthorizedException("Personel oturumu gerekli"));
+                .orElseThrow(() -> denied("Personel oturumu gerekli"));
     }
 
     public Long getCurrentWaiterId() {
@@ -189,18 +196,46 @@ public class SecurityUtils {
                 return merchantStaffRepository.findById(principal.staffId())
                         .map(MerchantStaff::getBranchId)
                         .filter(id -> id != null)
-                        .orElseThrow(() -> new UnauthorizedException("Şube bilgisi bulunamadı"));
+                        .orElseThrow(() -> new ForbiddenException("Şube bilgisi bulunamadı"));
             }
         }
-        throw new UnauthorizedException("Şube bilgisi bulunamadı");
+        throw new ForbiddenException("Personel oturumu gerekli");
+    }
+
+    /** Session id (jti) of the access token on the current request, when there is one. */
+    public Optional<UUID> findCurrentSessionId() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return Optional.empty();
+        }
+        String header = attributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+        if (header == null || !header.startsWith("Bearer ")) {
+            return Optional.empty();
+        }
+        return jwtService.extractSessionIdIfSignatureValid(header.substring(7));
     }
 
     private Authentication requireAuthentication(String message) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (!isSignedIn(authentication)) {
             throw new UnauthorizedException(message);
         }
         return authentication;
+    }
+
+    /**
+     * 401 tells the apps the session is gone and sends them to sign in again; a signed-in caller who is simply the
+     * wrong kind of account for this endpoint gets 403 instead, so a wrong screen never ends a valid session.
+     */
+    private RuntimeException denied(String message) {
+        return isSignedIn(SecurityContextHolder.getContext().getAuthentication())
+                ? new ForbiddenException(message)
+                : new UnauthorizedException(message);
+    }
+
+    private static boolean isSignedIn(Authentication authentication) {
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 
     private boolean isCustomerAuthentication(Authentication authentication) {

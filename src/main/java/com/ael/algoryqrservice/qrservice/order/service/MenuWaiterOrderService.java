@@ -21,6 +21,8 @@ import com.ael.algoryqrservice.qrservice.model.enums.OrderSource;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillStatus;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
+import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
+import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import com.ael.algoryqrservice.qrservice.repository.MenuOrderRepository;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.RestaurantAreaRepository;
@@ -75,6 +77,7 @@ public class MenuWaiterOrderService {
     private final KitchenYemekSepetiService kitchenYemekSepetiService;
     private final StockConsumptionService stockConsumptionService;
     private final BranchRepository branchRepository;
+    private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listPending() {
@@ -92,9 +95,12 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuWaiterDtos.TableOrderSummary> listTablesForMerchantBranch(Long merchantId, Long branchId) {
-        MerchantStaff waiter = waiterAccessService.requireWaiterStaffForMerchantBranch(merchantId, branchId);
-        List<Menu> menus = waiterAccessService.menusForWaiter(waiter);
-        List<RestaurantTable> tables = waiterAccessService.tablesForWaiter(waiter);
+        // The owner (business app) and the branch's waiters both read this board; each is checked its own way.
+        Long scopedBranchId = securityUtils.findCurrentStaffId().isPresent()
+                ? waiterAccessService.requireWaiterStaffForMerchantBranch(merchantId, branchId).getBranchId()
+                : requireOwnedBranch(merchantId, branchId);
+        List<Menu> menus = waiterAccessService.menusForBranch(scopedBranchId);
+        List<RestaurantTable> tables = waiterAccessService.tablesForBranch(scopedBranchId);
         if (tables.isEmpty()) {
             return List.of();
         }
@@ -175,6 +181,17 @@ public class MenuWaiterOrderService {
                 .toList();
     }
 
+    /** The signed-in owner's own branch; another business's branch is refused, not hidden. */
+    private Long requireOwnedBranch(Long merchantId, Long branchId) {
+        Long currentMerchantId = securityUtils.getCurrentMerchantId();
+        if (merchantId == null || !merchantId.equals(currentMerchantId)) {
+            throw new ForbiddenException("Bu işletmeye erişim yetkiniz yok");
+        }
+        return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
+                .map(Branch::getId)
+                .orElseThrow(() -> new ForbiddenException("Bu şubeye erişim yetkiniz yok"));
+    }
+
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listTodayHistory() {
         MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
@@ -218,7 +235,7 @@ public class MenuWaiterOrderService {
 
     @Transactional(readOnly = true)
     public List<MenuOrderDtos.OrderResponse> listKitchenQueue() {
-        MerchantStaff staff = waiterAccessService.requireCurrentWaiter();
+        MerchantStaff staff = waiterAccessService.requireKitchenStaff();
         List<Long> menuIds = waiterAccessService.menuIdsForWaiter(staff);
         if (menuIds.isEmpty()) {
             return List.of();
@@ -297,6 +314,8 @@ public class MenuWaiterOrderService {
         orderAuditService.record(saved, OrderAuditAction.CONFIRMED, waiter.getId(), null);
         stockConsumptionService.consumeMenuOrder(saved);
         campaignEvaluationService.onOrderConfirmed(saved);
+        // Onay bekleyen QR siparişi mutfağa ancak şimdi gider.
+        menuOrderService.enqueuePrint(saved);
         return menuOrderService.toOrderResponse(saved);
     }
 
@@ -434,6 +453,31 @@ public class MenuWaiterOrderService {
         return menuOrderService.toOrderResponse(
                 menuOrderService.applyKitchenTransition(order, current, MenuOrderStatus.SERVED, waiter.getId())
         );
+    }
+
+    /**
+     * Adisyona doğrudan yazılmış (mutfaktan geçmemiş) bir siparişi sonradan mutfağa iletir: sipariş "Onaylandı"ya
+     * döner, mutfak ekranına düşer ve fişi basılır. Adisyon, stok ve prim zaten yazıldığı için tekrar dokunulmaz.
+     */
+    @Transactional
+    public MenuOrderDtos.OrderResponse sendToKitchen(Long orderId) {
+        MerchantStaff waiter = waiterAccessService.requireWaiterStaff();
+        MenuOrder order = requireOrderForWaiter(orderId, waiter);
+        if (!isBranchKitchenEnabled(waiter)) {
+            throw new BadRequestException("Mutfak özelliği kapalı");
+        }
+        if (order.getStatus() != MenuOrderStatus.SERVED || order.getPreparedAt() != null) {
+            throw new BadRequestException("Bu sipariş zaten mutfağa gönderildi");
+        }
+        order.setStatus(MenuOrderStatus.CONFIRMED);
+        order.setReadyAt(null);
+        order.setServedAt(null);
+        order.setUpdatedAt(LocalDateTime.now());
+        MenuOrder saved = menuOrderRepository.save(order);
+        orderAuditService.record(saved, OrderAuditAction.STATUS_CHANGED, waiter.getId(),
+                "{\"from\":\"SERVED\",\"to\":\"CONFIRMED\",\"reason\":\"sendToKitchen\"}");
+        menuOrderService.enqueuePrint(saved);
+        return menuOrderService.toOrderResponse(saved);
     }
 
     private boolean isBranchKitchenEnabled(MerchantStaff staff) {
@@ -598,6 +642,7 @@ public class MenuWaiterOrderService {
                 .subCategorySlug(sub == null ? null : sub.getSlug())
                 .subCategoryName(sub == null ? null : sub.getName())
                 .mainCategoryId(main == null ? null : main.getId())
+                .skipKitchen(main != null && main.isSkipKitchen())
                 .mainCategoryName(main == null ? null : main.getName())
                 .commissionEligible(commissionEligible)
                 .optionGroups(optionsByProduct.getOrDefault(product.getProductId(), List.of()))

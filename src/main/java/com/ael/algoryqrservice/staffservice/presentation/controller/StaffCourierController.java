@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/staff/courier", "/waiter/courier"})
+@RequestMapping("/api/v1/staff/courier")
 @RequiredArgsConstructor
 public class StaffCourierController {
 

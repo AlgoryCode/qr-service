@@ -13,7 +13,7 @@ import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.qrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.qrservice.exception.PaymentServiceException;
-import com.ael.algoryqrservice.qrservice.exception.UnauthorizedException;
+import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.qrservice.model.PlanPackage;
 import com.ael.algoryqrservice.qrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.qrservice.model.PaymentEventInbox;
@@ -399,7 +399,7 @@ public class PurchaseService {
         Purchase purchase = purchaseRepository.findByIdForUpdate(purchaseId)
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
         if (!purchase.getMerchantId().equals(user.getId())) {
-            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+            throw new ForbiddenException("Bu satın alıma erişim yetkiniz yok");
         }
         if (purchase.getPaymentStyle() != PaymentStyle.SUBSCRIPTION) {
             throw new BadRequestException("Bu islem yalnizca abonelikler icin gecerlidir");
@@ -727,10 +727,24 @@ public class PurchaseService {
 
     @Transactional
     public List<PurchaseResponse> getUserPurchases(Long merchantId) {
+        return getUserPurchases(merchantId, false);
+    }
+
+    @Transactional
+    public List<PurchaseResponse> getUserPurchases(Long merchantId, boolean activeOnly) {
         purchaseExpiryService.expireDueForMerchant(merchantId);
         return purchaseRepository.findByMerchantIdOrderByPurchasedAtDesc(merchantId).stream()
+                .filter(purchase -> !activeOnly || canStillBeActive(purchase))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /** Filtered before conversion, which looks up the next payment for every purchase it receives. */
+    static boolean canStillBeActive(Purchase purchase) {
+        return purchase.isUsable()
+                && !purchase.isEffectivelyExpired()
+                && purchase.getStatus() != PurchaseStatus.EXPIRED
+                && purchase.getStatus() != PurchaseStatus.CANCELLED;
     }
 
     @Transactional
@@ -821,7 +835,7 @@ public class PurchaseService {
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
         if (!purchase.getMerchantId().equals(merchantId)) {
-            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+            throw new ForbiddenException("Bu satın alıma erişim yetkiniz yok");
         }
 
         validateUserCancellable(purchase);
@@ -839,7 +853,7 @@ public class PurchaseService {
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
         if (!purchase.getMerchantId().equals(merchantId)) {
-            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+            throw new ForbiddenException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
         if (purchase.isCancelAtPeriodEnd()) {
@@ -866,7 +880,7 @@ public class PurchaseService {
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
         if (!purchase.getMerchantId().equals(merchantId)) {
-            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+            throw new ForbiddenException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
         if (!purchase.isCancelAtPeriodEnd()) {
@@ -927,7 +941,7 @@ public class PurchaseService {
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
         if (!adminOverride && !purchase.getMerchantId().equals(merchantId)) {
-            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+            throw new ForbiddenException("Bu satın alıma erişim yetkiniz yok");
         }
         validatePaidActiveSubscription(purchase);
         if (purchase.getRefundedAt() != null || purchase.getRefundStatus() == RefundStatus.COMPLETED) {
@@ -1322,7 +1336,7 @@ public class PurchaseService {
                 .orElseThrow(() -> new BadRequestException("Satın alım bulunamadı: " + purchaseId));
 
         if (!purchase.getMerchantId().equals(merchantId)) {
-            throw new UnauthorizedException("Bu satın alıma erişim yetkiniz yok");
+            throw new ForbiddenException("Bu satın alıma erişim yetkiniz yok");
         }
 
         return purchase;

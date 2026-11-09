@@ -40,6 +40,10 @@ public class AccountFacadeService {
         return purchaseService.getUserPurchases(merchantId());
     }
 
+    public List<PurchaseResponse> listActivePurchases() {
+        return purchaseService.getUserPurchases(merchantId(), true);
+    }
+
     public SubscriptionOverviewResponse subscriptionOverview() {
         return purchaseService.getMySubscriptionOverview(merchantId());
     }

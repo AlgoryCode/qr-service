@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/features/AI_MENU_IMPORT")
+@RequestMapping("/api/v1/features/AI_MENU_IMPORT")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.AI_MENU_IMPORT_OWNER)
 public class FeatureAiMenuImportController {

@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/store/couriers")
+@RequestMapping("/api/v1/store/couriers")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.ONLINE_ORDER_OWNER)
 public class StoreCourierController {

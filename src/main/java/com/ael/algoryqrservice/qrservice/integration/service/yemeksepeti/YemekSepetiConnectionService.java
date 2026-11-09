@@ -33,17 +33,19 @@ public class YemekSepetiConnectionService {
     }
 
     @Transactional(readOnly = true)
-    public YemekSepetiDtos.ConnectionResponse getMine() {
-        return toResponse(requireOwnedConnection());
+    public YemekSepetiDtos.ConnectionResponse getMine(Long branchId) {
+        return toResponse(requireOwnedConnection(branchId));
     }
 
+    /** Connects [branchId]'s own account; without a branch, the account-wide connection (see [findForBranch]). */
     @Transactional
-    public YemekSepetiDtos.ConnectionResponse upsert(YemekSepetiDtos.UpsertConnectionRequest request) {
+    public YemekSepetiDtos.ConnectionResponse upsert(YemekSepetiDtos.UpsertConnectionRequest request, Long branchId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        YemekSepetiConnection connection = connectionRepository
-                .findByMerchantId(merchantId)
+        requireOwnedBranch(branchId, merchantId);
+        YemekSepetiConnection connection = findForBranch(merchantId, branchId)
                 .orElseGet(() -> YemekSepetiConnection.builder()
                         .merchantId(merchantId)
+                        .branchId(branchId)
                         .status(YemekSepetiConnectionStatus.DISCONNECTED)
                         .build());
         connection.setChainId(request.getChainId().trim());
@@ -74,55 +76,97 @@ public class YemekSepetiConnectionService {
     }
 
     @Transactional
-    public YemekSepetiDtos.ConnectionResponse disconnect() {
-        YemekSepetiConnection connection = requireOwnedConnection();
+    public YemekSepetiDtos.ConnectionResponse disconnect(Long branchId) {
+        YemekSepetiConnection connection = requireOwnedConnection(branchId);
         connection.setStatus(YemekSepetiConnectionStatus.DISCONNECTED);
         connection.setLastError(null);
         return toResponse(connectionRepository.save(connection));
     }
 
+    /** Moves the account-wide connection to [branchId] (null: every branch); a branch keeps one connection. */
     @Transactional
     public YemekSepetiDtos.ConnectionResponse assignBranch(Long branchId) {
-        YemekSepetiConnection connection = requireOwnedConnection();
-        if (branchId != null) {
-            branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, connection.getMerchantId())
-                    .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
-        }
+        YemekSepetiConnection connection = requireOwnedConnection(null);
+        requireOwnedBranch(branchId, connection.getMerchantId());
+        connectionRepository.findByMerchantIdAndBranchId(connection.getMerchantId(), branchId)
+                .filter(other -> !other.getId().equals(connection.getId()))
+                .ifPresent(other -> {
+                    throw new BadRequestException("Bu şubenin zaten bir Yemeksepeti bağlantısı var");
+                });
         connection.setBranchId(branchId);
         return toResponse(connectionRepository.save(connection));
     }
 
     @Transactional(readOnly = true)
-    public YemekSepetiConnection requireOwnedConnection() {
+    public YemekSepetiConnection requireOwnedConnection(Long branchId) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return connectionRepository.findByMerchantId(merchantId)
+        return findForBranch(merchantId, branchId)
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti bağlantısı bulunamadı"));
     }
 
+    /** The account-wide connection, for callers that predate per-branch connections. */
     @Transactional(readOnly = true)
     public YemekSepetiConnection requireConnected() {
-        YemekSepetiConnection connection = requireOwnedConnection();
-        if (connection.getStatus() != YemekSepetiConnectionStatus.CONNECTED
-                || !hasText(connection.getVendorId())) {
-            throw new BadRequestException("Önce bir Yemeksepeti mağazası bağlayın");
-        }
-        return connection;
+        return requireConnected(null);
     }
 
     @Transactional(readOnly = true)
-    public YemekSepetiConnection requireConnectedForUser(Long merchantId) {
-        YemekSepetiConnection connection = connectionRepository.findByMerchantId(merchantId)
+    public YemekSepetiConnection requireConnected(Long branchId) {
+        return requireLive(requireOwnedConnection(branchId));
+    }
+
+    /** The current merchant's connection an order belongs to, whichever branch it serves. */
+    @Transactional(readOnly = true)
+    public YemekSepetiConnection requireConnectedById(Long connectionId) {
+        return requireConnectedForUser(securityUtils.getCurrentMerchantId(), connectionId);
+    }
+
+    @Transactional(readOnly = true)
+    public YemekSepetiConnection requireConnectedForUser(Long merchantId, Long connectionId) {
+        YemekSepetiConnection connection = connectionRepository.findById(connectionId)
+                .filter(found -> found.getMerchantId().equals(merchantId))
                 .orElseThrow(() -> new NotFoundException("Yemeksepeti bağlantısı bulunamadı"));
+        return requireLive(connection);
+    }
+
+    /** Every connection of the merchant that can receive orders, one per branch. */
+    @Transactional(readOnly = true)
+    public List<YemekSepetiConnection> findConnectedForMerchant(Long merchantId) {
+        if (merchantId == null) {
+            return List.of();
+        }
+        return connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(merchantId).stream()
+                .filter(connection -> connection.getStatus() == YemekSepetiConnectionStatus.CONNECTED
+                        && hasText(connection.getVendorId()))
+                .toList();
+    }
+
+    /**
+     * The connection of [branchId]. Without a branch (web panel, older clients): the account-wide connection,
+     * or the most recently updated one when the merchant only has per-branch connections.
+     */
+    private java.util.Optional<YemekSepetiConnection> findForBranch(Long merchantId, Long branchId) {
+        if (branchId != null) {
+            return connectionRepository.findByMerchantIdAndBranchId(merchantId, branchId);
+        }
+        List<YemekSepetiConnection> all = connectionRepository.findByMerchantIdOrderByUpdatedAtDesc(merchantId);
+        return all.stream().filter(connection -> connection.getBranchId() == null).findFirst()
+                .or(() -> all.stream().findFirst());
+    }
+
+    private void requireOwnedBranch(Long branchId, Long merchantId) {
+        if (branchId != null) {
+            branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, merchantId)
+                    .orElseThrow(() -> new NotFoundException("Şube bulunamadı"));
+        }
+    }
+
+    private YemekSepetiConnection requireLive(YemekSepetiConnection connection) {
         if (connection.getStatus() != YemekSepetiConnectionStatus.CONNECTED
                 || !hasText(connection.getVendorId())) {
             throw new BadRequestException("Önce bir Yemeksepeti mağazası bağlayın");
         }
         return connection;
-    }
-
-    @Transactional(readOnly = true)
-    public YemekSepetiConnection findByMerchantId(Long merchantId) {
-        return connectionRepository.findByMerchantId(merchantId).orElse(null);
     }
 
     public YemekSepetiDtos.Credentials decrypt(YemekSepetiConnection connection) {

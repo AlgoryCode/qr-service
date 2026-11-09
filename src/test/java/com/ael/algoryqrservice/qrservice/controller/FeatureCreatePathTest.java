@@ -22,21 +22,21 @@ class FeatureCreatePathTest {
     @Test
     void createMappings_whenFeatureControllers_thenUseFeaturesPrefix() {
         assertThat(FeatureQrController.class.getAnnotation(RequestMapping.class).value())
-                .containsExactly("/features/QR_MENU");
+                .containsExactly("/api/v1/features/QR_MENU");
         assertThat(postPaths(FeatureQrController.class)).containsExactly("/qrs");
 
         assertThat(FeatureBranchController.class.getAnnotation(RequestMapping.class).value())
-                .containsExactly("/features/QR_BRANCH");
+                .containsExactly("/api/v1/features/QR_BRANCH");
         assertThat(postPaths(FeatureBranchController.class)).containsExactly("/branches");
 
         assertThat(FeatureSmartReportingController.class.getAnnotation(RequestMapping.class).value())
-                .containsExactly("/features/SMART_REPORTING");
+                .containsExactly("/api/v1/features/SMART_REPORTING");
         assertThat(postPaths(FeatureSmartReportingController.class)).containsExactlyInAnyOrder(
                 "/branches/{branchId}/reports",
                 "/menus/{menuId}/reports"
         );
         assertThat(FeatureAiMenuImportController.class.getAnnotation(RequestMapping.class).value())
-                .containsExactly("/features/AI_MENU_IMPORT");
+                .containsExactly("/api/v1/features/AI_MENU_IMPORT");
     }
 
     @Test

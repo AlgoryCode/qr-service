@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -23,7 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/menu/{menuId}")
+@RequestMapping("/api/v1/menu/{menuId}")
 @RequiredArgsConstructor
 public class MenuCategoryController {
 
@@ -55,6 +56,17 @@ public class MenuCategoryController {
     ) {
         requireOwnedMenu(menuId);
         return menuCategoryService.updateCategory(menuId, categoryId, request);
+    }
+
+    /** "Mutfağa gitmez" işaretini açar/kapatır. */
+    @PatchMapping("/categories/{categoryId}/kitchen")
+    public TaxonomyDtos.MainCategoryResponse setKitchenRouting(
+            @PathVariable Long menuId,
+            @PathVariable Long categoryId,
+            @RequestBody TaxonomyDtos.KitchenRoutingRequest request
+    ) {
+        requireOwnedMenu(menuId);
+        return menuCategoryService.setSkipKitchen(menuId, categoryId, request.isSkipKitchen());
     }
 
     @PostMapping("/categories/{categoryId}/cover")

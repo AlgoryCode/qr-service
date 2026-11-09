@@ -7,8 +7,6 @@ import com.ael.algoryqrservice.qrservice.qr.service.QrGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
 public class LinkProvider implements QrProvider<QrRequest> {
@@ -27,24 +25,9 @@ public class LinkProvider implements QrProvider<QrRequest> {
     @Override
     public QrResponse createQr(QrRequest request) {
         try {
-            String content = buildLinkContent(request.getDetails());
-            return qrGenerationService.toResponse(qrGenerationService.createAndSave(request, content));
+            return qrGenerationService.toResponse(qrGenerationService.createForType(request, getType()));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to generate link QR", e);
         }
-    }
-
-    public String buildLinkContent(Map<String, Object> details) {
-        String url = value(details.get("url"));
-
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            url = "https://" + url;
-        }
-
-        return url;
-    }
-
-    private String value(Object obj) {
-        return obj == null ? "" : obj.toString();
     }
 }

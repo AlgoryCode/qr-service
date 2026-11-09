@@ -20,8 +20,11 @@ import com.ael.algoryqrservice.qrservice.model.enums.MenuAnalyticsEventType;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.enums.TableBillPaymentMethod;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsConnection;
+import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model.YemekSepetiConnection;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsOrderRepository;
+import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.repository.YemekSepetiConnectionRepository;
+import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.repository.YemekSepetiOrderRepository;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.repository.BillPaymentRepository;
 import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuAnalyticsEventRepository;
@@ -51,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -89,6 +93,10 @@ class AnalyticsServiceTest {
     private UberEatsConnectionRepository uberEatsConnectionRepository;
     @Mock
     private UberEatsOrderRepository uberEatsOrderRepository;
+    @Mock
+    private YemekSepetiConnectionRepository yemekSepetiConnectionRepository;
+    @Mock
+    private YemekSepetiOrderRepository yemekSepetiOrderRepository;
 
     private AnalyticsService service;
 
@@ -110,6 +118,8 @@ class AnalyticsServiceTest {
                 branchRepository,
                 uberEatsConnectionRepository,
                 uberEatsOrderRepository,
+                yemekSepetiConnectionRepository,
+                yemekSepetiOrderRepository,
                 waiterPerformanceReportService
         );
     }
@@ -313,7 +323,7 @@ class AnalyticsServiceTest {
                         .build()));
         when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
-        when(uberEatsConnectionRepository.findByMerchantId(ownerId)).thenReturn(Optional.empty());
+        when(uberEatsConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId)).thenReturn(List.of());
 
         TableBill bill = TableBill.builder().id(20L).menuId(menuId).currency("TRY").build();
         TableBillItem ayran = TableBillItem.builder()
@@ -341,11 +351,12 @@ class AnalyticsServiceTest {
         assertThat(report.unsold().count()).isEqualTo(1L);
         assertThat(report.unsold().products()).extracting(AnalyticsDtos.UnsoldProduct::name).containsExactly("Salata");
         assertThat(report.hourly()).hasSize(24);
-        assertThat(report.hourly().get(14).orderCount()).isEqualTo(3L);
+        // Three payment lines of the same bill are one order.
+        assertThat(report.hourly().get(14).orderCount()).isEqualTo(1L);
         assertThat(report.hourly().get(14).revenue()).isEqualByComparingTo("260.00");
         assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("260.00");
         assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("0.00");
-        assertThat(report.channels()).hasSize(2);
+        assertThat(report.channels()).hasSize(3);
         assertThat(report.channels().get(0).code()).isEqualTo("IN_HOUSE");
         assertThat(report.channels().get(0).revenue()).isEqualByComparingTo("260.00");
         assertThat(report.channels().get(0).orderCount()).isEqualTo(1L);
@@ -373,7 +384,7 @@ class AnalyticsServiceTest {
         UberEatsConnection connection = new UberEatsConnection();
         connection.setId(42L);
         connection.setMerchantId(ownerId);
-        when(uberEatsConnectionRepository.findByMerchantId(ownerId)).thenReturn(Optional.of(connection));
+        when(uberEatsConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId)).thenReturn(List.of(connection));
         var order = com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsOrder.builder()
                 .id(1L)
                 .connectionId(42L)
@@ -383,7 +394,7 @@ class AnalyticsServiceTest {
                 .packageCreatedAt(LocalDateTime.of(2026, 8, 13, 12, 0))
                 .build();
         when(uberEatsOrderRepository.findByConnectionAndStatuses(
-                eq(42L), any(), any(), eq(List.of("accepted", "prepared"))
+                eq(42L), any(), any(), eq(List.of("accepted", "prepared", "picking", "invoiced", "shipped", "delivered"))
         )).thenReturn(List.of(order));
 
         AnalyticsDtos.MenuRevenueReportResponse report = service.getMenuRevenueReport(menuId, ownerId, day, day);
@@ -391,14 +402,63 @@ class AnalyticsServiceTest {
         assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("175.50");
         assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("175.50");
         assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("175.50");
-        assertThat(report.channels()).hasSize(2);
+        assertThat(report.channels()).hasSize(3);
         assertThat(report.channels().get(1).code()).isEqualTo("UBER_EATS");
         assertThat(report.channels().get(1).connected()).isTrue();
         assertThat(report.channels().get(1).revenue()).isEqualByComparingTo("175.50");
         assertThat(report.channels().get(1).orderCount()).isEqualTo(1L);
         verify(uberEatsOrderRepository).findByConnectionAndStatuses(
-                eq(42L), any(), any(), eq(List.of("accepted", "prepared"))
+                eq(42L), any(), any(), eq(List.of("accepted", "prepared", "picking", "invoiced", "shipped", "delivered"))
         );
+    }
+
+    @Test
+    void getMenuRevenueReport_whenYemeksepetiOnThisBranchAndUberEatsOnAnother_thenCountsOnlyYemeksepeti() {
+        Long menuId = 5L;
+        Long ownerId = 9L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        Menu menu = publicMenu(menuId, ownerId);
+        menu.setBranchId(2L);
+        when(menuRepository.findById(menuId)).thenReturn(Optional.of(menu));
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(List.of(menuId)))
+                .thenReturn(List.of());
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(2L)).thenReturn(List.of());
+        when(menuFixedExpenseService.totalDailyActiveAmount(List.of(menuId))).thenReturn(BigDecimal.ZERO);
+        when(billPaymentRepository.findByMenuIdInAndPaidAtBetween(eq(List.of(menuId)), any(), any()))
+                .thenReturn(List.of());
+
+        UberEatsConnection otherBranch = new UberEatsConnection();
+        otherBranch.setId(42L);
+        otherBranch.setMerchantId(ownerId);
+        otherBranch.setBranchId(3L);
+        when(uberEatsConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId)).thenReturn(List.of(otherBranch));
+        YemekSepetiConnection thisBranch = new YemekSepetiConnection();
+        thisBranch.setId(7L);
+        thisBranch.setMerchantId(ownerId);
+        thisBranch.setBranchId(2L);
+        when(yemekSepetiConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId)).thenReturn(List.of(thisBranch));
+        var order = com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model.YemekSepetiOrder.builder()
+                .id(1L)
+                .connectionId(7L)
+                .externalOrderId("ys-1")
+                .packageStatus("delivered")
+                .totalAmount(new BigDecimal("320.00"))
+                .packageCreatedAt(LocalDateTime.of(2026, 8, 13, 19, 0))
+                .build();
+        when(yemekSepetiOrderRepository.findByConnectionAndStatuses(eq(7L), any(), any(), any()))
+                .thenReturn(List.of(order));
+
+        AnalyticsDtos.MenuRevenueReportResponse report = service.getMenuRevenueReport(menuId, ownerId, day, day);
+
+        assertThat(report.paymentBreakdown().yemeksepetiRevenue()).isEqualByComparingTo("320.00");
+        assertThat(report.paymentBreakdown().uberEatsRevenue()).isEqualByComparingTo("0.00");
+        assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("320.00");
+        assertThat(report.channels()).extracting(AnalyticsDtos.ChannelShare::code)
+                .containsExactly("IN_HOUSE", "UBER_EATS", "YEMEKSEPETI");
+        assertThat(report.channels().get(1).connected()).isFalse();
+        assertThat(report.channels().get(2).orderCount()).isEqualTo(1L);
+        verify(uberEatsOrderRepository, never()).findByConnectionAndStatuses(any(), any(), any(), any());
     }
 
     private BillPayment payment(
@@ -585,7 +645,7 @@ class AnalyticsServiceTest {
         when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
         when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
         when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L, 6L))).thenReturn(BigDecimal.ZERO);
-        when(uberEatsConnectionRepository.findByMerchantId(ownerId)).thenReturn(Optional.empty());
+        when(uberEatsConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId)).thenReturn(List.of());
         TableBill bill = TableBill.builder().id(20L).menuId(5L).currency("TRY").build();
         TableBillItem item = TableBillItem.builder()
                 .id(1L).productId(1L).productName("Ayran").quantity(1).paidQuantity(1).build();

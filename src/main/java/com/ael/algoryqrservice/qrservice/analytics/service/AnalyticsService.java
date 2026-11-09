@@ -2,6 +2,8 @@ package com.ael.algoryqrservice.qrservice.analytics.service;
 
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsOrderRepository;
+import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.repository.YemekSepetiConnectionRepository;
+import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.repository.YemekSepetiOrderRepository;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.billservice.infrastructure.persistence.entity.BillPayment;
 import com.ael.algoryqrservice.qrservice.model.Branch;
@@ -89,6 +91,8 @@ public class AnalyticsService {
     private final BranchRepository branchRepository;
     private final UberEatsConnectionRepository uberEatsConnectionRepository;
     private final UberEatsOrderRepository uberEatsOrderRepository;
+    private final YemekSepetiConnectionRepository yemekSepetiConnectionRepository;
+    private final YemekSepetiOrderRepository yemekSepetiOrderRepository;
     private final WaiterPerformanceReportService waiterPerformanceReportService;
 
     @Transactional
@@ -350,11 +354,13 @@ public class AnalyticsService {
     ) {
         LocalDateTime fromDt = from.atStartOfDay();
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
-        UberEatsChannelStats uberStats = loadUberEatsChannelStats(ownerId, fromDt, toDt);
+        PlatformChannelStats uberStats = loadUberEatsChannelStats(ownerId, scope.branchId(), fromDt, toDt);
+        PlatformChannelStats yemeksepetiStats = loadYemeksepetiChannelStats(ownerId, scope.branchId(), fromDt, toDt);
         BigDecimal uberEatsRevenue = uberStats.revenue();
+        BigDecimal yemeksepetiRevenue = yemeksepetiStats.revenue();
 
         if (scope.menuIds().isEmpty()) {
-            return emptyRevenueReport(scope, from, to, uberStats);
+            return emptyRevenueReport(scope, from, to, uberStats, yemeksepetiStats);
         }
         Collection<Long> menuIds = scope.menuIds();
 
@@ -385,6 +391,10 @@ public class AnalyticsService {
         Map<LocalDate, BigDecimal> revenueByDay = new HashMap<>();
         Map<LocalDate, Long> ordersByDay = new HashMap<>();
         Map<LocalDate, BigDecimal> inHouseRevenueByDay = new HashMap<>();
+        Map<LocalDate, BigDecimal> cashByDay = new HashMap<>();
+        Map<LocalDate, BigDecimal> cardByDay = new HashMap<>();
+        Map<Integer, BigDecimal> cashByHour = new HashMap<>();
+        Map<Integer, BigDecimal> cardByHour = new HashMap<>();
         Map<Integer, BigDecimal> revenueByHour = new HashMap<>();
         Map<Integer, Long> ordersByHour = new HashMap<>();
         Map<Long, AnalyticsDtos.RevenueProduct> products = new LinkedHashMap<>();
@@ -414,6 +424,13 @@ public class AnalyticsService {
             revenueByHour.merge(hour, amount, BigDecimal::add);
             if (!payment.isTip()) {
                 inHouseRevenueByDay.merge(day, amount, BigDecimal::add);
+                if (payment.getPaymentMethod() == TableBillPaymentMethod.CASH) {
+                    cashByDay.merge(day, amount, BigDecimal::add);
+                    cashByHour.merge(hour, amount, BigDecimal::add);
+                } else if (payment.getPaymentMethod() == TableBillPaymentMethod.CARD) {
+                    cardByDay.merge(day, amount, BigDecimal::add);
+                    cardByHour.merge(hour, amount, BigDecimal::add);
+                }
             }
 
             if (payment.getBill() != null) {
@@ -485,7 +502,9 @@ public class AnalyticsService {
             daily.add(new AnalyticsDtos.DailyRevenuePoint(
                     cursor,
                     revenueByDay.getOrDefault(cursor, BigDecimal.ZERO),
-                    ordersByDay.getOrDefault(cursor, 0L)
+                    ordersByDay.getOrDefault(cursor, 0L),
+                    cashByDay.getOrDefault(cursor, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                    cardByDay.getOrDefault(cursor, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)
             ));
         }
 
@@ -496,13 +515,15 @@ public class AnalyticsService {
                 .sorted(Comparator.comparing(AnalyticsDtos.RevenueCategory::revenue).reversed())
                 .toList();
 
-        Map<Integer, Long> paymentsByHour = new HashMap<>();
+        // A bill is paid line by line, so counting payment rows would turn one 3-item bill into 3 orders;
+        // count distinct bills per hour, the same way ordersByDay does per day.
+        Map<Integer, java.util.Set<Long>> billsByHour = new HashMap<>();
         for (BillPayment payment : payments) {
-            if (payment.isTip() || payment.getPaidAt() == null) {
+            if (payment.isTip() || payment.getPaidAt() == null || payment.getBill() == null) {
                 continue;
             }
-            int hour = payment.getPaidAt().getHour();
-            paymentsByHour.merge(hour, 1L, Long::sum);
+            billsByHour.computeIfAbsent(payment.getPaidAt().getHour(), ignored -> new java.util.HashSet<>())
+                    .add(payment.getBill().getId());
         }
 
         List<AnalyticsDtos.HourlyRevenuePoint> hourly = new ArrayList<>();
@@ -510,7 +531,9 @@ public class AnalyticsService {
             hourly.add(new AnalyticsDtos.HourlyRevenuePoint(
                     hour,
                     revenueByHour.getOrDefault(hour, BigDecimal.ZERO),
-                    paymentsByHour.getOrDefault(hour, 0L)
+                    (long) billsByHour.getOrDefault(hour, java.util.Set.of()).size(),
+                    cashByHour.getOrDefault(hour, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                    cardByHour.getOrDefault(hour, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)
             ));
         }
 
@@ -524,7 +547,7 @@ public class AnalyticsService {
         BigDecimal fixedExpenseTotal = dailyFixedTotal.multiply(BigDecimal.valueOf(dayCount))
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal paymentGross = totalRevenue;
-        BigDecimal grossRevenue = paymentGross.add(uberEatsRevenue);
+        BigDecimal grossRevenue = paymentGross.add(uberEatsRevenue).add(yemeksepetiRevenue);
         BigDecimal netRevenue = grossRevenue.subtract(fixedExpenseTotal).max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -552,6 +575,7 @@ public class AnalyticsService {
                 cardRevenue.setScale(2, RoundingMode.HALF_UP),
                 tipRevenue.setScale(2, RoundingMode.HALF_UP),
                 uberEatsRevenue.setScale(2, RoundingMode.HALF_UP),
+                yemeksepetiRevenue.setScale(2, RoundingMode.HALF_UP),
                 grossRevenue.setScale(2, RoundingMode.HALF_UP),
                 fixedExpenseTotal,
                 netRevenue,
@@ -567,6 +591,7 @@ public class AnalyticsService {
                 inHouseRevenueByDay,
                 ordersByDay,
                 uberStats,
+                yemeksepetiStats,
                 grossRevenue
         );
 
@@ -591,11 +616,20 @@ public class AnalyticsService {
         );
     }
 
-    private static final List<String> UBER_EATS_COUNTED_STATUSES = List.of("accepted", "prepared");
+    /**
+     * Platform orders count as revenue once the restaurant accepted them and until they are delivered; new ones
+     * awaiting an answer and cancelled, rejected or unsupplied ones are left out. "accepted"/"prepared" are what
+     * qr-service writes after an action, the rest are the platforms' own status words (lower-cased).
+     */
+    private static final List<String> UBER_EATS_COUNTED_STATUSES =
+            List.of("accepted", "prepared", "picking", "invoiced", "shipped", "delivered");
+    private static final List<String> YEMEKSEPETI_COUNTED_STATUSES =
+            List.of("accepted", "ready_for_pickup", "picked_up", "dispatched", "delivered");
     private static final String CHANNEL_IN_HOUSE = "IN_HOUSE";
     private static final String CHANNEL_UBER_EATS = "UBER_EATS";
+    private static final String CHANNEL_YEMEKSEPETI = "YEMEKSEPETI";
 
-    private record UberEatsChannelStats(
+    private record PlatformChannelStats(
             boolean connected,
             BigDecimal revenue,
             long orderCount,
@@ -610,40 +644,86 @@ public class AnalyticsService {
     ) {
     }
 
-    private UberEatsChannelStats loadUberEatsChannelStats(Long ownerId, LocalDateTime fromDt, LocalDateTime toDt) {
+    private static final PlatformChannelStats NO_PLATFORM =
+            new PlatformChannelStats(false, BigDecimal.ZERO, 0L, Map.of(), Map.of());
+
+    /**
+     * Each branch connects its own platform accounts and its report counts only those, plus the account-wide
+     * connection (no branch) that serves every branch. Menu-level reports (no branch) take every connection.
+     */
+    private static boolean coversBranch(Long connectionBranchId, Long reportBranchId) {
+        return connectionBranchId == null || reportBranchId == null || connectionBranchId.equals(reportBranchId);
+    }
+
+    private PlatformChannelStats loadUberEatsChannelStats(
+            Long ownerId,
+            Long branchId,
+            LocalDateTime fromDt,
+            LocalDateTime toDt
+    ) {
         if (ownerId == null) {
-            return new UberEatsChannelStats(false, BigDecimal.ZERO, 0L, Map.of(), Map.of());
+            return NO_PLATFORM;
         }
-        return uberEatsConnectionRepository.findByMerchantId(ownerId)
-                .map(connection -> {
-                    List<com.ael.algoryqrservice.qrservice.integration.ubereats.model.UberEatsOrder> orders =
-                            uberEatsOrderRepository.findByConnectionAndStatuses(
-                                    connection.getId(),
-                                    fromDt,
-                                    toDt,
-                                    UBER_EATS_COUNTED_STATUSES
-                            );
-                    Map<LocalDate, BigDecimal> revenueByDay = new HashMap<>();
-                    Map<LocalDate, Long> ordersByDay = new HashMap<>();
-                    BigDecimal total = BigDecimal.ZERO;
-                    for (var order : orders) {
-                        BigDecimal amount = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
-                        total = total.add(amount);
-                        LocalDate day = order.getPackageCreatedAt() != null
-                                ? order.getPackageCreatedAt().toLocalDate()
-                                : fromDt.toLocalDate();
-                        revenueByDay.merge(day, amount, BigDecimal::add);
-                        ordersByDay.merge(day, 1L, Long::sum);
-                    }
-                    return new UberEatsChannelStats(
-                            true,
-                            total.setScale(2, RoundingMode.HALF_UP),
-                            orders.size(),
-                            revenueByDay,
-                            ordersByDay
-                    );
-                })
-                .orElseGet(() -> new UberEatsChannelStats(false, BigDecimal.ZERO, 0L, Map.of(), Map.of()));
+        var connections = uberEatsConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId).stream()
+                .filter(connection -> coversBranch(connection.getBranchId(), branchId))
+                .toList();
+        if (connections.isEmpty()) {
+            return NO_PLATFORM;
+        }
+        List<PlatformSale> sales = connections.stream()
+                .flatMap(connection -> uberEatsOrderRepository.findByConnectionAndStatuses(
+                        connection.getId(), fromDt, toDt, UBER_EATS_COUNTED_STATUSES
+                ).stream())
+                .map(order -> new PlatformSale(order.getTotalAmount(), order.getPackageCreatedAt()))
+                .toList();
+        return platformStats(sales, fromDt);
+    }
+
+    private PlatformChannelStats loadYemeksepetiChannelStats(
+            Long ownerId,
+            Long branchId,
+            LocalDateTime fromDt,
+            LocalDateTime toDt
+    ) {
+        if (ownerId == null) {
+            return NO_PLATFORM;
+        }
+        var connections = yemekSepetiConnectionRepository.findByMerchantIdOrderByUpdatedAtDesc(ownerId).stream()
+                .filter(connection -> coversBranch(connection.getBranchId(), branchId))
+                .toList();
+        if (connections.isEmpty()) {
+            return NO_PLATFORM;
+        }
+        List<PlatformSale> sales = connections.stream()
+                .flatMap(connection -> yemekSepetiOrderRepository.findByConnectionAndStatuses(
+                        connection.getId(), fromDt, toDt, YEMEKSEPETI_COUNTED_STATUSES
+                ).stream())
+                .map(order -> new PlatformSale(order.getTotalAmount(), order.getPackageCreatedAt()))
+                .toList();
+        return platformStats(sales, fromDt);
+    }
+
+    private record PlatformSale(BigDecimal amount, LocalDateTime createdAt) {
+    }
+
+    private static PlatformChannelStats platformStats(List<PlatformSale> sales, LocalDateTime fromDt) {
+        Map<LocalDate, BigDecimal> revenueByDay = new HashMap<>();
+        Map<LocalDate, Long> ordersByDay = new HashMap<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (PlatformSale sale : sales) {
+            BigDecimal amount = sale.amount() != null ? sale.amount() : BigDecimal.ZERO;
+            total = total.add(amount);
+            LocalDate day = sale.createdAt() != null ? sale.createdAt().toLocalDate() : fromDt.toLocalDate();
+            revenueByDay.merge(day, amount, BigDecimal::add);
+            ordersByDay.merge(day, 1L, Long::sum);
+        }
+        return new PlatformChannelStats(
+                true,
+                total.setScale(2, RoundingMode.HALF_UP),
+                sales.size(),
+                revenueByDay,
+                ordersByDay
+        );
     }
 
     private ChannelBundle buildChannelBundle(
@@ -653,7 +733,8 @@ public class AnalyticsService {
             long inHouseOrderCount,
             Map<LocalDate, BigDecimal> inHouseRevenueByDay,
             Map<LocalDate, Long> inHouseOrdersByDay,
-            UberEatsChannelStats uberStats,
+            PlatformChannelStats uberStats,
+            PlatformChannelStats yemeksepetiStats,
             BigDecimal grossRevenue
     ) {
         BigDecimal gross = grossRevenue == null || grossRevenue.compareTo(BigDecimal.ZERO) <= 0
@@ -662,9 +743,6 @@ public class AnalyticsService {
         BigDecimal inHouseAvg = inHouseOrderCount == 0
                 ? BigDecimal.ZERO
                 : inHouseRevenue.divide(BigDecimal.valueOf(inHouseOrderCount), 2, RoundingMode.HALF_UP);
-        BigDecimal uberAvg = uberStats.orderCount() == 0
-                ? BigDecimal.ZERO
-                : uberStats.revenue().divide(BigDecimal.valueOf(uberStats.orderCount()), 2, RoundingMode.HALF_UP);
 
         List<AnalyticsDtos.ChannelShare> channels = List.of(
                 new AnalyticsDtos.ChannelShare(
@@ -677,16 +755,8 @@ public class AnalyticsService {
                         null,
                         true
                 ),
-                new AnalyticsDtos.ChannelShare(
-                        CHANNEL_UBER_EATS,
-                        "Uber Eats",
-                        uberStats.revenue(),
-                        uberStats.orderCount(),
-                        uberAvg,
-                        sharePercent(uberStats.revenue(), gross),
-                        null,
-                        uberStats.connected()
-                )
+                platformShare(CHANNEL_UBER_EATS, "Uber Eats", uberStats, gross),
+                platformShare(CHANNEL_YEMEKSEPETI, "Yemeksepeti", yemeksepetiStats, gross)
         );
 
         List<AnalyticsDtos.ChannelDailyPoint> channelDaily = new ArrayList<>();
@@ -697,14 +767,40 @@ public class AnalyticsService {
                     inHouseRevenueByDay.getOrDefault(cursor, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
                     inHouseOrdersByDay.getOrDefault(cursor, 0L)
             ));
-            channelDaily.add(new AnalyticsDtos.ChannelDailyPoint(
-                    cursor,
-                    CHANNEL_UBER_EATS,
-                    uberStats.revenueByDay().getOrDefault(cursor, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
-                    uberStats.ordersByDay().getOrDefault(cursor, 0L)
-            ));
+            channelDaily.add(platformDailyPoint(cursor, CHANNEL_UBER_EATS, uberStats));
+            channelDaily.add(platformDailyPoint(cursor, CHANNEL_YEMEKSEPETI, yemeksepetiStats));
         }
         return new ChannelBundle(channels, channelDaily);
+    }
+
+    private static AnalyticsDtos.ChannelShare platformShare(
+            String code,
+            String label,
+            PlatformChannelStats stats,
+            BigDecimal gross
+    ) {
+        BigDecimal average = stats.orderCount() == 0
+                ? BigDecimal.ZERO
+                : stats.revenue().divide(BigDecimal.valueOf(stats.orderCount()), 2, RoundingMode.HALF_UP);
+        return new AnalyticsDtos.ChannelShare(
+                code,
+                label,
+                stats.revenue(),
+                stats.orderCount(),
+                average,
+                sharePercent(stats.revenue(), gross),
+                null,
+                stats.connected()
+        );
+    }
+
+    private static AnalyticsDtos.ChannelDailyPoint platformDailyPoint(LocalDate day, String code, PlatformChannelStats stats) {
+        return new AnalyticsDtos.ChannelDailyPoint(
+                day,
+                code,
+                stats.revenueByDay().getOrDefault(day, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                stats.ordersByDay().getOrDefault(day, 0L)
+        );
     }
 
     private static BigDecimal sharePercent(BigDecimal part, BigDecimal whole) {
@@ -713,10 +809,6 @@ public class AnalyticsService {
         }
         return part.multiply(BigDecimal.valueOf(100))
                 .divide(whole, 2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal sumUberEatsRevenue(Long ownerId, LocalDateTime fromDt, LocalDateTime toDt) {
-        return loadUberEatsChannelStats(ownerId, fromDt, toDt).revenue();
     }
 
     private static final class PersonnelPaymentAgg {
@@ -1047,9 +1139,12 @@ public class AnalyticsService {
             ReportScope scope,
             LocalDate from,
             LocalDate to,
-            UberEatsChannelStats uberStats
+            PlatformChannelStats uberStats,
+            PlatformChannelStats yemeksepetiStats
     ) {
-        BigDecimal uber = uberStats.revenue() != null ? uberStats.revenue() : BigDecimal.ZERO;
+        BigDecimal uber = uberStats.revenue();
+        BigDecimal yemeksepeti = yemeksepetiStats.revenue();
+        BigDecimal platforms = uber.add(yemeksepeti);
         List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
         for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
             daily.add(new AnalyticsDtos.DailyRevenuePoint(cursor, BigDecimal.ZERO, 0L));
@@ -1066,7 +1161,8 @@ public class AnalyticsService {
                 Map.of(),
                 Map.of(),
                 uberStats,
-                uber
+                yemeksepetiStats,
+                platforms
         );
         return new AnalyticsDtos.MenuRevenueReportResponse(
                 scope.menuId(),
@@ -1075,7 +1171,7 @@ public class AnalyticsService {
                 scope.branchName(),
                 from,
                 to,
-                new AnalyticsDtos.RevenueKpis(uber, 0L, 0L, BigDecimal.ZERO, "TRY"),
+                new AnalyticsDtos.RevenueKpis(platforms, 0L, 0L, BigDecimal.ZERO, "TRY"),
                 daily,
                 List.of(),
                 List.of(),
@@ -1087,9 +1183,10 @@ public class AnalyticsService {
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         uber.setScale(2, RoundingMode.HALF_UP),
-                        uber.setScale(2, RoundingMode.HALF_UP),
+                        yemeksepeti.setScale(2, RoundingMode.HALF_UP),
+                        platforms.setScale(2, RoundingMode.HALF_UP),
                         BigDecimal.ZERO,
-                        uber.setScale(2, RoundingMode.HALF_UP),
+                        platforms.setScale(2, RoundingMode.HALF_UP),
                         "TRY"
                 ),
                 List.of(),

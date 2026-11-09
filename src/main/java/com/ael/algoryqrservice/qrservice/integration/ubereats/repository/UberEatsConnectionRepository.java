@@ -9,7 +9,8 @@ import java.util.Optional;
 
 public interface UberEatsConnectionRepository extends JpaRepository<UberEatsConnection, Long> {
 
-    Optional<UberEatsConnection> findByMerchantId(Long merchantId);
+    /** A merchant has one connection per branch, plus possibly one without a branch (see V168). */
+    Optional<UberEatsConnection> findByMerchantIdAndBranchId(Long merchantId, Long branchId);
 
     List<UberEatsConnection> findByMerchantIdOrderByUpdatedAtDesc(Long merchantId);
 

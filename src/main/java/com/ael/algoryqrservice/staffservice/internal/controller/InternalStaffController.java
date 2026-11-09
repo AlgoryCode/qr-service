@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/internal/staff")
+@RequestMapping("/api/v1/internal/staff")
 @RequiredArgsConstructor
 public class InternalStaffController {
 

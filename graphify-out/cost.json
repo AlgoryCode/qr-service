@@ -1,0 +1,72 @@
+{
+  "runs": [
+    {
+      "date": "2026-11-09T20:30:30.333170+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:31.136192+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:31.459038+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:31.481238+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:31.707799+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:31.736929+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:31.751941+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:32.005031+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:32.411631+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:32.429038+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    },
+    {
+      "date": "2026-11-09T20:30:54.219198+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 1696
+    }
+  ],
+  "total_input_tokens": 0,
+  "total_output_tokens": 0
+}

@@ -27,7 +27,7 @@ public class BillAdjustmentService {
 
     @Transactional
     public TableBillDtos.AdjustmentResponse create(Long billId, TableBillDtos.CreateAdjustmentRequest request) {
-        MerchantStaff staff = staffAccessService.requireCurrentStaff();
+        MerchantStaff staff = staffAccessService.requireWaiterStaff();
         TableBill bill = tableBillRepository.findById(billId)
                 .orElseThrow(() -> new NotFoundException("Adisyon bulunamadı"));
         staffAccessService.requireMenuInWaiterBranch(bill.getMenuId(), staff);

@@ -32,6 +32,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -47,7 +49,7 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/merchant")
+@RequestMapping("/api/v1/merchant")
 @RequiredArgsConstructor
 public class MerchantController {
 
@@ -80,22 +82,26 @@ public class MerchantController {
         }
     }
 
+    /** Grants a paid package without payment, so it is for platform admins only. */
     @PostMapping("/{merchantId}/package")
     public ResponseEntity<Void> assignPackage(
             @PathVariable Long merchantId,
             @Valid @RequestBody AssignPackageRequest request
     ) {
+        requirePlatformAdmin();
         fulfillmentService.assignPackage(merchantId, request.packageCode(), request.periodDays());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @GetMapping("/{merchantId}/active-package")
     public ResponseEntity<ActivePackageResponse> getActivePackage(@PathVariable Long merchantId) {
+        requireOwnMerchant(merchantId);
         return ResponseEntity.ok(mapper.toActivePackageResponse(fulfillmentService.requireActivePackageView(merchantId)));
     }
 
     @GetMapping("/{merchantId}/entitlements")
     public ResponseEntity<List<EntitlementResponse>> listEntitlements(@PathVariable Long merchantId) {
+        requireOwnMerchant(merchantId);
         return ResponseEntity.ok(
                 entitlementUsageService.listActive(merchantId).stream()
                         .map(item -> mapper.toEntitlementResponse(item.entitlement(), item.productCode()))
@@ -108,6 +114,7 @@ public class MerchantController {
             @PathVariable Long merchantId,
             @PathVariable String productCode
     ) {
+        requireOwnMerchant(merchantId);
         return ResponseEntity.ok(mapper.toProductAccess(entitlementUsageService.productAccess(merchantId, productCode)));
     }
 
@@ -116,16 +123,19 @@ public class MerchantController {
             @PathVariable Long merchantId,
             @Valid @RequestBody EntitlementQuantityRequest request
     ) {
+        requireOwnMerchant(merchantId);
         return ResponseEntity.ok(mapper.toConsume(
                 entitlementUsageService.consume(merchantId, request.productCode(), request.quantity())
         ));
     }
 
+    /** Hands quota back, so only platform admins may; the app releases in-process, not through this endpoint. */
     @PostMapping("/{merchantId}/entitlements/release")
     public ResponseEntity<ConsumeEntitlementResponse> release(
             @PathVariable Long merchantId,
             @Valid @RequestBody EntitlementQuantityRequest request
     ) {
+        requirePlatformAdmin();
         return ResponseEntity.ok(entitlementUsageService.release(merchantId, request.productCode(), request.quantity())
                 .map(mapper::toConsume)
                 .orElseGet(mapper::emptyConsume));
@@ -136,6 +146,7 @@ public class MerchantController {
             @PathVariable Long merchantId,
             @PageableDefault(size = 20) Pageable pageable
     ) {
+        requireOwnMerchant(merchantId);
         return ResponseEntity.ok(
                 fulfillmentService.listFulfillments(merchantId, pageable).map(mapper::toFulfillmentResponse)
         );
@@ -190,5 +201,24 @@ public class MerchantController {
             @PathVariable Long branchId
     ) {
         return ResponseEntity.ok(menuWaiterOrderService.listTablesForMerchantBranch(merchantId, branchId));
+    }
+
+    private static void requirePlatformAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean admin = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        if (!admin) {
+            throw new ForbiddenException("Bu işlem yalnızca platform yöneticisine açık");
+        }
+    }
+
+    /** The signed-in owner's own business; customers and other businesses get 403. */
+    private void requireOwnMerchant(Long merchantId) {
+        if (securityUtils.findCurrentCustomerId().isPresent()) {
+            throw new ForbiddenException("Bu işletmeye erişim yetkiniz yok");
+        }
+        if (!merchantId.equals(securityUtils.getCurrentMerchantId()) && !securityUtils.matchesTokenMerchant(merchantId)) {
+            throw new ForbiddenException("Bu işletmeye erişim yetkiniz yok");
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.staffservice.application;
 
+import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
+import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
 import com.ael.algoryqrservice.qrservice.client.AuthStaffClient;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
@@ -10,7 +12,12 @@ import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
 import com.ael.algoryqrservice.qrservice.model.enums.WaiterCommissionType;
 import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
+import com.ael.algoryqrservice.staffservice.infrastructure.persistence.repository.MerchantStaffSpecifications;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +31,15 @@ import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 @RequiredArgsConstructor
 public class MenuWaiterService {
 
+    private static final int DEFAULT_STAFF_PAGE_SIZE = 20;
+    private static final int MAX_STAFF_PAGE_SIZE = 100;
+
     private final MerchantStaffRepository merchantStaffRepository;
     private final BranchService branchService;
     private final PasswordEncoder passwordEncoder;
     private final SecurityUtils securityUtils;
     private final AuthStaffClient authStaffClient;
+    private final TokenUseCase tokenUseCase;
 
     @Transactional(readOnly = true)
     public MenuWaiterDtos.StaffListResponse listMerchantStaff() {
@@ -40,6 +51,46 @@ public class MenuWaiterService {
                 .toList();
         return MenuWaiterDtos.StaffListResponse.builder()
                 .staff(staff)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public MenuWaiterDtos.StaffListResponse searchMerchantStaff(
+            String query,
+            String assignment,
+            Long branchId,
+            Boolean active,
+            StaffRole staffRole,
+            int page,
+            Integer size
+    ) {
+        Long merchantId = securityUtils.getCurrentMerchantId();
+        int safePage = Math.max(page, 0);
+        int safeSize = size == null ? DEFAULT_STAFF_PAGE_SIZE : Math.min(Math.max(size, 1), MAX_STAFF_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Order.asc("displayName").ignoreCase(), Sort.Order.asc("id"))
+        );
+
+        Boolean assigned = switch (assignment == null ? "" : assignment.trim().toLowerCase(Locale.ROOT)) {
+            case "assigned" -> Boolean.TRUE;
+            case "unassigned" -> Boolean.FALSE;
+            default -> null;
+        };
+
+        Page<MerchantStaff> result = merchantStaffRepository.findAll(
+                MerchantStaffSpecifications.forMerchantSearch(merchantId, query, assigned, branchId, active, staffRole),
+                pageable
+        );
+
+        return MenuWaiterDtos.StaffListResponse.builder()
+                .staff(result.getContent().stream().map(this::toWaiterResponse).toList())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .hasNext(result.hasNext())
                 .build();
     }
 
@@ -107,11 +158,18 @@ public class MenuWaiterService {
             if (request.getDisplayName() != null) {
                 waiter.setDisplayName(requireDisplayName(request.getDisplayName()));
             }
+            // A new password or deactivation ends the staff member's open sessions on every device.
+            boolean signOut = false;
             if (request.getActive() != null) {
+                signOut = waiter.isActive() && !request.getActive();
                 waiter.setActive(request.getActive());
             }
             if (request.getPassword() != null && !request.getPassword().isBlank()) {
                 waiter.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+                signOut = true;
+            }
+            if (signOut && waiter.getId() != null) {
+                tokenUseCase.revokeAllExcept(AuthSubject.TYPE_STAFF, waiter.getId(), null);
             }
             if (request.getCommissionEnabled() != null) {
                 waiter.setCommissionEnabled(request.getCommissionEnabled());

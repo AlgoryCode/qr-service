@@ -24,7 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/menu")
+@RequestMapping("/api/v1/menu")
 @RequiredArgsConstructor
 public class MenuController {
 
@@ -282,31 +282,31 @@ public class MenuController {
         return ResponseEntity.ok(menuService.assignMenuBranch(menuId, branchId));
     }
 
-    @GetMapping("/catalog/products")
+    @GetMapping("/products")
     public ResponseEntity<List<MenuDtos.MenuProductResponse>> listCatalogProducts() {
         return ResponseEntity.ok(menuService.listCatalogProducts());
     }
 
-    @PostMapping("/catalog/products")
+    @PostMapping("/products")
     public ResponseEntity<MenuDtos.MenuProductResponse> createCatalogProduct(
             @RequestBody MenuDtos.MenuProductRequest request
     ) {
         return ResponseEntity.status(201).body(menuService.createCatalogProduct(request));
     }
 
-    @GetMapping("/catalog/option-groups")
+    @GetMapping("/option-groups")
     public ResponseEntity<List<MenuDtos.MenuProductOptionGroupResponse>> listCatalogOptionGroups() {
         return ResponseEntity.ok(menuService.listCatalogOptionGroups());
     }
 
-    @PostMapping("/catalog/option-groups")
+    @PostMapping("/option-groups")
     public ResponseEntity<MenuDtos.MenuProductOptionGroupResponse> createCatalogOptionGroup(
             @RequestBody MenuDtos.MenuProductOptionGroupRequest request
     ) {
         return ResponseEntity.status(201).body(menuService.createCatalogOptionGroup(request));
     }
 
-    @PutMapping("/catalog/option-groups/{groupId}")
+    @PutMapping("/option-groups/{groupId}")
     public ResponseEntity<MenuDtos.MenuProductOptionGroupResponse> updateCatalogOptionGroup(
             @PathVariable Long groupId,
             @RequestBody MenuDtos.MenuProductOptionGroupRequest request
@@ -314,13 +314,13 @@ public class MenuController {
         return ResponseEntity.ok(menuService.updateCatalogOptionGroup(groupId, request));
     }
 
-    @DeleteMapping("/catalog/option-groups/{groupId}")
+    @DeleteMapping("/option-groups/{groupId}")
     public ResponseEntity<Void> deleteCatalogOptionGroup(@PathVariable Long groupId) {
         menuService.deleteCatalogOptionGroup(groupId);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/catalog/option-groups/{groupId}/assign")
+    @PostMapping("/option-groups/{groupId}/assign")
     public ResponseEntity<MenuDtos.MenuProductOptionGroupResponse> assignCatalogOptionGroup(
             @PathVariable Long groupId,
             @RequestBody MenuDtos.AssignOptionGroupRequest request
@@ -329,19 +329,19 @@ public class MenuController {
         return ResponseEntity.ok(menuService.assignCatalogOptionGroup(groupId, productIds));
     }
 
-    @GetMapping("/catalog/categories")
+    @GetMapping("/categories")
     public ResponseEntity<List<TaxonomyDtos.MainCategoryResponse>> listCatalogCategories() {
         return ResponseEntity.ok(menuService.listCatalogCategories());
     }
 
-    @PostMapping("/catalog/categories")
+    @PostMapping("/categories")
     public ResponseEntity<TaxonomyDtos.MainCategoryResponse> createCatalogCategory(
             @RequestBody TaxonomyDtos.MainCategoryRequest request
     ) {
         return ResponseEntity.status(201).body(menuService.createCatalogCategory(request));
     }
 
-    @PutMapping("/catalog/categories/{categoryId}")
+    @PutMapping("/categories/{categoryId}")
     public ResponseEntity<TaxonomyDtos.MainCategoryResponse> updateCatalogCategory(
             @PathVariable Long categoryId,
             @RequestBody TaxonomyDtos.MainCategoryUpdateRequest request
@@ -349,13 +349,13 @@ public class MenuController {
         return ResponseEntity.ok(menuService.updateCatalogCategory(categoryId, request));
     }
 
-    @DeleteMapping("/catalog/categories/{categoryId}")
+    @DeleteMapping("/categories/{categoryId}")
     public ResponseEntity<Void> deleteCatalogCategory(@PathVariable Long categoryId) {
         menuService.deleteCatalogCategory(categoryId);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/catalog/categories/{categoryId}/cover")
+    @PostMapping("/categories/{categoryId}/cover")
     public ResponseEntity<TaxonomyDtos.MainCategoryResponse> uploadCatalogCategoryCover(
             @PathVariable Long categoryId,
             @RequestParam("file") MultipartFile file
@@ -363,12 +363,12 @@ public class MenuController {
         return ResponseEntity.ok(menuService.uploadCatalogCategoryCover(categoryId, file));
     }
 
-    @DeleteMapping("/catalog/categories/{categoryId}/cover")
+    @DeleteMapping("/categories/{categoryId}/cover")
     public ResponseEntity<TaxonomyDtos.MainCategoryResponse> clearCatalogCategoryCover(@PathVariable Long categoryId) {
         return ResponseEntity.ok(menuService.clearCatalogCategoryCover(categoryId));
     }
 
-    @PostMapping("/catalog/categories/{categoryId}/subs")
+    @PostMapping("/categories/{categoryId}/subs")
     public ResponseEntity<TaxonomyDtos.SubCategoryResponse> createCatalogSubCategory(
             @PathVariable Long categoryId,
             @RequestBody TaxonomyDtos.SubCategoryRequest request
@@ -376,7 +376,7 @@ public class MenuController {
         return ResponseEntity.status(201).body(menuService.createCatalogSubCategory(categoryId, request));
     }
 
-    @PutMapping("/catalog/subs/{subId}")
+    @PutMapping("/subs/{subId}")
     public ResponseEntity<TaxonomyDtos.SubCategoryResponse> updateCatalogSubCategory(
             @PathVariable Long subId,
             @RequestBody TaxonomyDtos.SubCategoryUpdateRequest request
@@ -384,7 +384,7 @@ public class MenuController {
         return ResponseEntity.ok(menuService.updateCatalogSubCategory(subId, request));
     }
 
-    @DeleteMapping("/catalog/subs/{subId}")
+    @DeleteMapping("/subs/{subId}")
     public ResponseEntity<Void> deleteCatalogSubCategory(@PathVariable Long subId) {
         menuService.deleteCatalogSubCategory(subId);
         return ResponseEntity.noContent().build();

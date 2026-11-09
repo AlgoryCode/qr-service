@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 
 @RestController
-@RequestMapping("/features/QR_MENU")
+@RequestMapping("/api/v1/features/QR_MENU")
 @RequiredArgsConstructor
 public class FeatureQrController {
 

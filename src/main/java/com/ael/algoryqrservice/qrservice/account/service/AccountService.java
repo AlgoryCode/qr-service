@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.account.service;
 
+import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
+import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.model.User;
 import com.ael.algoryqrservice.qrservice.account.dto.AccountDtos;
@@ -21,6 +23,7 @@ public class AccountService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final TokenUseCase tokenUseCase;
 
     @Transactional(readOnly = true)
     public AccountDtos.MyProfileResponse getMyProfile() {
@@ -106,6 +109,8 @@ public class AccountService {
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        // Anyone else holding this account's sessions is signed out; this device stays in.
+        tokenUseCase.revokeAllExcept(AuthSubject.TYPE_MERCHANT, user.getId(), securityUtils.findCurrentSessionId().orElse(null));
     }
 
     private AccountDtos.MyProfileResponse profileFromToken() {

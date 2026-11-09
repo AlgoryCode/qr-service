@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/merchant/menus")
+@RequestMapping("/api/v1/merchant/menus")
 @RequiredArgsConstructor
 @RequiresProductScope(CatalogScopes.WAITER_PANEL_OWNER)
 public class MerchantMenuCustomerController {
