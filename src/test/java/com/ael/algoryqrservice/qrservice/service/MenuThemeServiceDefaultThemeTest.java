@@ -1,11 +1,11 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.merchantservice.infrastructure.persistence.repository.MerchantJpaRepository;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuThemeService;
 import com.ael.algoryqrservice.qrservice.catalog.CatalogThemes;
 import com.ael.algoryqrservice.qrservice.model.MenuTheme;
 import com.ael.algoryqrservice.qrservice.model.UserThemeAssignment;
 import com.ael.algoryqrservice.qrservice.repository.MenuThemeRepository;
-import com.ael.algoryqrservice.qrservice.repository.UserRepository;
 import com.ael.algoryqrservice.qrservice.repository.UserThemeAssignmentRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class MenuThemeServiceDefaultThemeTest {
     @Mock
     UserThemeAssignmentRepository userThemeAssignmentRepository;
     @Mock
-    UserRepository userRepository;
+    MerchantJpaRepository merchantRepository;
     @Mock
     SecurityUtils securityUtils;
 
@@ -42,7 +42,7 @@ class MenuThemeServiceDefaultThemeTest {
     @Test
     void ensureDefaultThemeAssigned_whenNoAssignments_thenAssignLuxury() {
         MenuTheme luxury = MenuTheme.builder().id(30L).code(CatalogThemes.DEFAULT_THEME_CODE).active(true).build();
-        when(userRepository.existsById(7L)).thenReturn(true);
+        when(merchantRepository.existsById(7L)).thenReturn(true);
         when(userThemeAssignmentRepository.findByMerchantId(7L)).thenReturn(List.of()).thenReturn(List.of(
                 UserThemeAssignment.builder().merchantId(7L).themeId(30L).build()
         ));
@@ -61,7 +61,7 @@ class MenuThemeServiceDefaultThemeTest {
 
     @Test
     void ensureDefaultThemeAssigned_whenAlreadyAssigned_thenSkip() {
-        when(userRepository.existsById(7L)).thenReturn(true);
+        when(merchantRepository.existsById(7L)).thenReturn(true);
         when(userThemeAssignmentRepository.findByMerchantId(7L)).thenReturn(List.of(
                 UserThemeAssignment.builder().merchantId(7L).themeId(11L).build()
         ));

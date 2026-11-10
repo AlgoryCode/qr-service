@@ -1,16 +1,11 @@
 package com.ael.algoryqrservice.authservice.security;
 
 import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
-import com.ael.algoryqrservice.authservice.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,21 +14,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtAccessTokenParser {
 
-    private final JwtProperties jwtProperties;
+    private final JwtTokenCodec tokenCodec;
 
     public Optional<AuthPrincipal> parse(String token) {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
         try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(signingKey())
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-            if (!"access".equals(claims.get("typ", String.class))) {
-                return Optional.empty();
-            }
+            Claims claims = tokenCodec.parse(token, JwtTokenCodec.TYPE_ACCESS);
             String subjectType = claims.get("subjectType", String.class);
             Long merchantId = longClaim(claims, "merchantId");
             Long staffId = staffIdClaim(claims, subjectType);
@@ -103,7 +91,4 @@ public class JwtAccessTokenParser {
         return null;
     }
 
-    private SecretKey signingKey() {
-        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
-    }
 }

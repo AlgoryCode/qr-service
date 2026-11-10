@@ -23,7 +23,29 @@ class JwtAuthenticationFilterTest {
 
     private final JwtService jwtService = mock(JwtService.class);
     private final DashboardSessionService dashboardSessionService = mock(DashboardSessionService.class);
-    private final JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, dashboardSessionService);
+    private final com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry activeSessions = activeRegistry(true);
+    private final JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, dashboardSessionService, activeSessions);
+
+    private static com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry activeRegistry(boolean active) {
+        com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry registry = mock(com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry.class);
+        when(registry.isActive(org.mockito.ArgumentMatchers.any())).thenReturn(active);
+        return registry;
+    }
+
+    @Test
+    void doFilter_whenMerchantSessionWasSignedOut_thenDoesNotAuthenticate() throws Exception {
+        Claims claims = mock(Claims.class);
+        when(jwtService.parseValidAccessToken("token")).thenReturn(Optional.of(claims));
+        when(jwtService.isDashboardPrincipal(claims)).thenReturn(false);
+        JwtAuthenticationFilter revokedFilter =
+                new JwtAuthenticationFilter(jwtService, dashboardSessionService, activeRegistry(false));
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer token");
+        revokedFilter.doFilter(request, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        org.assertj.core.api.Assertions.assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
 
     @AfterEach
     void clearSecurity() {

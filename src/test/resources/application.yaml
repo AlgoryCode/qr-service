@@ -41,3 +41,6 @@ google:
 payment:
   token:
     encryption-key: test-payment-token-key
+
+jwt:
+  secret: test-only-jwt-secret-0123456789abcdef0123456789abcdef

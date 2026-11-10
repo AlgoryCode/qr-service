@@ -4,7 +4,6 @@ import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
 import com.ael.algoryqrservice.authservice.application.auth.RoleResponseFactory;
 import com.ael.algoryqrservice.authservice.application.auth.DemoUsernameAvailabilityUseCase;
 import com.ael.algoryqrservice.authservice.application.auth.LoginUseCase;
-import com.ael.algoryqrservice.authservice.application.auth.MerchantPackageGate;
 import com.ael.algoryqrservice.authservice.application.auth.RegisterAccountUseCase;
 import com.ael.algoryqrservice.authservice.application.auth.SubjectLoader;
 import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
@@ -53,7 +52,6 @@ public class LegacyAuthController {
     private final RegisterAccountUseCase registerAccountUseCase;
     private final DemoUsernameAvailabilityUseCase usernameAvailabilityUseCase;
     private final TokenUseCase tokenUseCase;
-    private final MerchantPackageGate merchantPackageGate;
     private final SubjectLoader subjectLoader;
     private final RoleResponseFactory roleResponseFactory;
     private final GoogleAuthSessionService sessionService;
@@ -120,7 +118,6 @@ public class LegacyAuthController {
     ) {
         AuthSubject subject = subjectLoader.load(principal.subjectType(), principal.resolveSubjectId())
                 .orElseThrow(() -> new UnauthorizedException("Subject not found"));
-        merchantPackageGate.assertOpen(subject);
         return ResponseEntity.ok(tokenUseCase.create(subject, ClientInfo.from(httpRequest)));
     }
 

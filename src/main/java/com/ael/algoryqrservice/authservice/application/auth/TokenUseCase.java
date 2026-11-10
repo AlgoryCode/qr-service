@@ -11,6 +11,7 @@ import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -22,20 +23,20 @@ public class TokenUseCase {
     private final SessionIssuer sessionIssuer;
     private final SubjectLoader subjectLoader;
     private final AuthResponseAssembler assembler;
-    private final MerchantPackageGate merchantPackageGate;
+    private final ActiveSessionRegistry activeSessions;
 
     public TokenUseCase(
             SessionJpaRepository sessionRepository,
             SessionIssuer sessionIssuer,
             SubjectLoader subjectLoader,
             AuthResponseAssembler assembler,
-            MerchantPackageGate merchantPackageGate
+            ActiveSessionRegistry activeSessions
     ) {
         this.sessionRepository = sessionRepository;
         this.sessionIssuer = sessionIssuer;
         this.subjectLoader = subjectLoader;
         this.assembler = assembler;
-        this.merchantPackageGate = merchantPackageGate;
+        this.activeSessions = activeSessions;
     }
 
     @AuthTransactional
@@ -57,28 +58,40 @@ public class TokenUseCase {
             throw new UnauthorizedException(UnauthorizedException.SESSION_EXPIRED, "Refresh token expired");
         }
         AuthSubject subject = subjectLoader.load(session.getSubjectType(), session.getSubjectId())
-                .orElseThrow(() -> new UnauthorizedException("Subject not found"));
-        merchantPackageGate.assertOpen(subject);
+                .orElseThrow(() -> new UnauthorizedException(UnauthorizedException.SESSION_EXPIRED, "Subject not found"));
         return assembler.assemble(sessionIssuer.rotate(session, subject, clientInfo, match.retryOfPrevious()), subject);
     }
 
     private record RefreshMatch(SessionEntity session, boolean retryOfPrevious) {
     }
 
+    /** Sign-out is idempotent: an unknown, already ended or malformed token is a no-op. */
     @AuthTransactional
     public void expire(String refreshToken) {
-        SessionEntity session = openSession(refreshToken);
+        Optional<SessionEntity> found = findSessionForSignOut(refreshToken);
+        if (found.isEmpty()) {
+            log.info("Logout ignored: session already ended or token unknown");
+            return;
+        }
+        SessionEntity session = found.get();
         LocalDateTime now = LocalDateTime.now();
         session.setAccessExpiresAt(now);
         session.setRefreshExpiresAt(now);
         session.setLastActivityAt(now);
         sessionRepository.save(session);
+        activeSessions.markEnded(session.getId());
         log.info("Auth session expired sessionId={} subjectType={}", session.getId(), session.getSubjectType());
     }
 
+    /** Sign-out is idempotent: an unknown, already revoked or malformed token is a no-op. */
     @AuthTransactional
     public void revoke(String refreshToken) {
-        SessionEntity session = openSession(refreshToken);
+        Optional<SessionEntity> found = findSessionForSignOut(refreshToken);
+        if (found.isEmpty()) {
+            log.info("Logout ignored: session already ended or token unknown");
+            return;
+        }
+        SessionEntity session = found.get();
         sessionIssuer.revoke(session);
         log.info("Auth session revoked sessionId={} subjectType={}", session.getId(), session.getSubjectType());
     }
@@ -139,16 +152,20 @@ public class TokenUseCase {
         throw new UnauthorizedException(UnauthorizedException.SESSION_EXPIRED, "Invalid refresh token");
     }
 
-    /** For sign-out: the current token, or the replaced one while a client may still hold it. */
-    private SessionEntity openSession(String refreshToken) {
-        SessionIssuer.RefreshTokenParts parts = sessionIssuer.parseRefreshToken(refreshToken);
-        SessionEntity session = sessionRepository.findByIdAndRevokedFalse(parts.sessionId())
-                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
-        boolean current = sessionIssuer.matchesRefresh(session, parts.rawToken());
-        if (!current && !(inGrace(session) && sessionIssuer.matchesPreviousRefresh(session, parts.rawToken()))) {
-            throw new UnauthorizedException("Invalid refresh token");
+    /**
+     * For sign-out: the open session the current token belongs to, or the replaced one while a client may still
+     * hold it. Anything else (malformed, unknown, revoked, mismatched) means there is nothing left to sign out.
+     */
+    private Optional<SessionEntity> findSessionForSignOut(String refreshToken) {
+        SessionIssuer.RefreshTokenParts parts;
+        try {
+            parts = sessionIssuer.parseRefreshToken(refreshToken);
+        } catch (UnauthorizedException malformed) {
+            return Optional.empty();
         }
-        return session;
+        return sessionRepository.findByIdAndRevokedFalse(parts.sessionId())
+                .filter(session -> sessionIssuer.matchesRefresh(session, parts.rawToken())
+                        || (inGrace(session) && sessionIssuer.matchesPreviousRefresh(session, parts.rawToken())));
     }
 
     private static boolean inGrace(SessionEntity session) {

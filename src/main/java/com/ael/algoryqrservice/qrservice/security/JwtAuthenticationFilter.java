@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.security;
 
+import com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry;
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import com.ael.algoryqrservice.adminservice.application.DashboardSessionService;
 import io.jsonwebtoken.Claims;
@@ -25,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final DashboardSessionService dashboardSessionService;
+    private final ActiveSessionRegistry activeSessions;
 
     @Override
     protected void doFilterInternal(
@@ -51,11 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isSessionActive(Claims claims) {
-        if (!jwtService.isDashboardPrincipal(claims)) {
-            return true;
-        }
         UUID sessionId = jwtService.extractSessionId(claims);
-        return dashboardSessionService.isSessionActive(sessionId);
+        if (jwtService.isDashboardPrincipal(claims)) {
+            return dashboardSessionService.isSessionActive(sessionId);
+        }
+        // Merchant, staff and customer tokens: a signed-out session stops working at once,
+        // not when its access token expires.
+        return activeSessions.isActive(sessionId);
     }
 
     private void setAuthentication(Claims claims) {

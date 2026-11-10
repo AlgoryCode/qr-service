@@ -23,7 +23,6 @@ public class DemoLoginUseCase {
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptGuard loginAttemptGuard;
     private final DemoPackageAssignment demoPackageAssignment;
-    private final MerchantPackageGate merchantPackageGate;
     private final AuthSubjectMapper mapper;
     private final TokenUseCase tokenUseCase;
 
@@ -52,7 +51,6 @@ public class DemoLoginUseCase {
         loginAttemptGuard.reset(normalized);
         demoPackageAssignment.assignIfAbsent(merchant.getId());
         AuthSubject subject = mapper.fromMerchant(merchant);
-        merchantPackageGate.assertOpen(subject);
         return tokenUseCase.create(subject, clientInfo);
     }
 }

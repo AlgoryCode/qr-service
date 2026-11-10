@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.authservice.security.JwtTokenCodec;
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 
 import com.ael.algoryqrservice.qrservice.catalog.CatalogPackages;
@@ -24,7 +25,7 @@ class JwtServiceTest {
     void generateDashboardAccessToken_whenAdmin_thenIncludeAdminRoleAndDashboardPrincipal() {
         JwtProperties properties = new JwtProperties();
         properties.setSecret("0123456789012345678901234567890123456789012345678901234567890123");
-        JwtService jwtService = new JwtService(properties);
+        JwtService jwtService = new JwtService(properties, new JwtTokenCodec("test-only-jwt-secret-0123456789abcdef0123456789abcdef", "algoryqr", "algoryqr-api"));
 
         String token = jwtService.generateDashboardAccessToken(
                 "admin@example.com",

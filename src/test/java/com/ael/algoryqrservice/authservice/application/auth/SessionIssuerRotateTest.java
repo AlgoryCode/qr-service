@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
+import com.ael.algoryqrservice.authservice.security.JwtTokenCodec;
 import com.ael.algoryqrservice.authservice.config.JwtProperties;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.SessionEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.SessionJpaRepository;
@@ -41,7 +42,9 @@ class SessionIssuerRotateTest {
     void setUp() {
         JwtProperties properties = new JwtProperties();
         properties.setSecret("x".repeat(64));
-        issuer = new SessionIssuer(sessionRepository, passwordEncoder, properties, loginPackageClaims);
+        issuer = new SessionIssuer(sessionRepository, passwordEncoder, properties, loginPackageClaims,
+                new JwtTokenCodec("test-only-jwt-secret-0123456789abcdef0123456789abcdef", "algoryqr", "algoryqr-api"),
+                org.mockito.Mockito.mock(ActiveSessionRegistry.class));
         when(passwordEncoder.encode(anyString())).thenAnswer(invocation -> "hash:" + invocation.getArgument(0));
         lenient().when(loginPackageClaims.resolve(any())).thenReturn(LoginPackageClaims.Snapshot.none());
     }

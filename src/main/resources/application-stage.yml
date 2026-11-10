@@ -31,11 +31,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        # Only liveness/readiness are public. env, heapdump, mappings, shutdown etc. expose secrets
+        # or let anyone stop the service; enable them per-environment behind auth if ever needed.
+        include: health,info
   endpoint:
-    shutdown:
-      access: unrestricted
     health:
+      show-details: never
       probes:
         enabled: true
   health:
@@ -60,7 +61,7 @@ payment:
     gateway-provider: ${PAYMENT_GATEWAY_PROVIDER:PAYTR}
 
 jwt:
-  secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
+  secret: ${JWT_SECRET}  # required, >= 32 random bytes; no default on purpose
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
 
