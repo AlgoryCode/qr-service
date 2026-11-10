@@ -36,7 +36,10 @@ class JwtAuthenticationFilterStaffTest {
         when(jwtService.extractRoles(claims)).thenReturn(List.of("ROLE_KITCHEN"));
         when(jwtService.extractBranchId(claims)).thenReturn(37L);
 
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, org.mockito.Mockito.mock(com.ael.algoryqrservice.adminservice.application.DashboardSessionService.class));
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(
+                jwtService,
+                org.mockito.Mockito.mock(com.ael.algoryqrservice.adminservice.application.DashboardSessionService.class),
+                activeRegistry());
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer token");
         FilterChain chain = (servletRequest, servletResponse) -> {
@@ -51,5 +54,11 @@ class JwtAuthenticationFilterStaffTest {
         };
 
         filter.doFilter(request, new MockHttpServletResponse(), chain);
+    }
+
+    private static com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry activeRegistry() {
+        com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry registry = org.mockito.Mockito.mock(com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry.class);
+        when(registry.isActive(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        return registry;
     }
 }

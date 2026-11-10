@@ -4,12 +4,14 @@ import com.ael.algoryqrservice.qrservice.exception.ConflictException;
 import com.ael.algoryqrservice.qrservice.exception.FulfillmentUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.core.Ordered;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -71,6 +73,14 @@ public class AuthGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "code", "FORBIDDEN",
+                "message", "Bu işlem için yetkiniz yok"
+        ));
+    }
+
     @ExceptionHandler(FulfillmentUnavailableException.class)
     public ResponseEntity<Map<String, String>> handleFulfillmentUnavailable(FulfillmentUnavailableException ex) {
         log.warn("Auth flow blocked: fulfillment unavailable. {}", ex.getMessage());
@@ -115,8 +125,23 @@ public class AuthGlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
         log.warn("Auth bad credentials: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "Geçersiz kimlik bilgileri"));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "code", UnauthorizedException.INVALID_CREDENTIALS,
+                "message", "Geçersiz kimlik bilgileri"
+        ));
+    }
+
+    /**
+     * Database unreachable or connection pool exhausted. Answered as 503 so clients treat it as "try again later"
+     * instead of a lost session (a 500/401 here used to log people out during outages).
+     */
+    @ExceptionHandler({CannotCreateTransactionException.class, DataAccessResourceFailureException.class})
+    public ResponseEntity<Map<String, String>> handleDatabaseUnavailable(Exception ex) {
+        log.error("Auth flow failed: database unavailable. {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "code", "SERVICE_UNAVAILABLE",
+                "message", "Servis şu an yanıt veremiyor, lütfen biraz sonra tekrar deneyin"
+        ));
     }
 
     @ExceptionHandler(IllegalStateException.class)

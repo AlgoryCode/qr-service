@@ -39,7 +39,7 @@ class TokenUseCaseTest {
     @Mock
     private AuthResponseAssembler assembler;
     @Mock
-    private MerchantPackageGate merchantPackageGate;
+    private ActiveSessionRegistry activeSessions;
 
     @InjectMocks
     private TokenUseCase tokenUseCase;
@@ -118,6 +118,47 @@ class TokenUseCaseTest {
         verify(sessionIssuer).revoke(phone);
         verify(sessionIssuer).revoke(tablet);
         verify(sessionIssuer, never()).revoke(current);
+    }
+
+    @Test
+    void revoke_withUnknownSession_isNoOp() {
+        when(sessionIssuer.parseRefreshToken(TOKEN)).thenReturn(new SessionIssuer.RefreshTokenParts(SESSION_ID, RAW));
+        when(sessionRepository.findByIdAndRevokedFalse(SESSION_ID)).thenReturn(Optional.empty());
+
+        tokenUseCase.revoke(TOKEN);
+
+        verify(sessionIssuer, never()).revoke(any());
+    }
+
+    @Test
+    void revoke_withMalformedToken_isNoOp() {
+        when(sessionIssuer.parseRefreshToken("garbage")).thenThrow(new UnauthorizedException("Invalid refresh token format"));
+
+        tokenUseCase.revoke("garbage");
+
+        verify(sessionIssuer, never()).revoke(any());
+    }
+
+    @Test
+    void revoke_withCurrentToken_revokesSession() {
+        SessionEntity session = openSession();
+        when(sessionIssuer.parseRefreshToken(TOKEN)).thenReturn(new SessionIssuer.RefreshTokenParts(SESSION_ID, RAW));
+        when(sessionRepository.findByIdAndRevokedFalse(SESSION_ID)).thenReturn(Optional.of(session));
+        when(sessionIssuer.matchesRefresh(session, RAW)).thenReturn(true);
+
+        tokenUseCase.revoke(TOKEN);
+
+        verify(sessionIssuer).revoke(session);
+    }
+
+    @Test
+    void expire_withAlreadyEndedSession_isNoOp() {
+        when(sessionIssuer.parseRefreshToken(TOKEN)).thenReturn(new SessionIssuer.RefreshTokenParts(SESSION_ID, RAW));
+        when(sessionRepository.findByIdAndRevokedFalse(SESSION_ID)).thenReturn(Optional.empty());
+
+        tokenUseCase.expire(TOKEN);
+
+        verify(sessionRepository, never()).save(any());
     }
 
     private void stubLookup(SessionEntity session) {

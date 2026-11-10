@@ -1,17 +1,14 @@
 package com.ael.algoryqrservice.qrservice.account.service;
 
+import com.ael.algoryqrservice.authservice.security.JwtTokenCodec;
 import com.ael.algoryqrservice.qrservice.config.JwtProperties;
 import com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.enums.DashboardRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +40,7 @@ public class JwtService {
     private static final String PROVIDER_CLAIM = "provider";
 
     private final JwtProperties jwtProperties;
+    private final JwtTokenCodec tokenCodec;
 
     public Optional<Claims> parseValidAccessToken(String token) {
         try {
@@ -217,16 +215,14 @@ public class JwtService {
             DashboardRole role
     ) {
         Date now = new Date();
-        return Jwts.builder()
+        return tokenCodec.builder(JwtTokenCodec.TYPE_ACCESS)
                 .id(sessionId.toString())
                 .subject(email)
                 .claim("dashboardUserId", dashboardUserId)
                 .claim(PRINCIPAL_TYPE_CLAIM, PRINCIPAL_DASHBOARD)
                 .claim(ROLES_CLAIM, resolveDashboardRoles(role))
-                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
-                .signWith(getSigningKey())
                 .compact();
     }
 
@@ -238,15 +234,6 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
-
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return tokenCodec.parse(token, JwtTokenCodec.TYPE_ACCESS);
     }
 }

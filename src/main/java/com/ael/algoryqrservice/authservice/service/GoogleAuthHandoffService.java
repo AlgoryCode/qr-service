@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.UUID;
 import com.ael.algoryqrservice.authservice.application.auth.AuthSubject;
 import com.ael.algoryqrservice.authservice.application.auth.GoogleAuthIntent;
-import com.ael.algoryqrservice.authservice.application.auth.MerchantPackageGate;
 import com.ael.algoryqrservice.authservice.application.auth.SubjectLoader;
 import com.ael.algoryqrservice.authservice.application.auth.TokenUseCase;
 
@@ -36,7 +35,6 @@ public class GoogleAuthHandoffService {
     private final GoogleAuthHandoffRepository ticketRepository;
     private final SubjectLoader subjectLoader;
     private final TokenUseCase tokenUseCase;
-    private final MerchantPackageGate merchantPackageGate;
     private final GoogleOAuthProperties properties;
     private final SecureRandom secureRandom;
 
@@ -74,7 +72,6 @@ public class GoogleAuthHandoffService {
                 });
         AuthSubject subject = subjectLoader.load(ticket.getSubjectType(), ticket.getSubjectId())
                 .orElseThrow(() -> new UnauthorizedException("Subject not found"));
-        merchantPackageGate.assertOpen(subject);
         if (ticketRepository.consume(ticketHash, now) != 1) {
             log.warn("Google OAuth handoff redeem failed: ticket race clientIp={}", clientInfo.ipAddress());
             throw new UnauthorizedException("Handoff ticket geçersiz, kullanılmış veya süresi dolmuş");

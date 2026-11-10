@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.integration.odeal.controller;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.ael.algoryqrservice.qrservice.integration.odeal.model.dto.OdealTestDtos;
 import com.ael.algoryqrservice.qrservice.integration.service.odeal.OdealTestService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
+@ConditionalOnProperty(name = "odeal.test-endpoints-enabled", havingValue = "true")
 @RequestMapping("/api/v1/integrations/odeal/test")
 @RequiredArgsConstructor
 public class OdealTestController {

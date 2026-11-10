@@ -27,15 +27,18 @@ public class LoginPackageClaims {
     private final EntitlementPort entitlementPort;
     private final MemberPackageAccessRepairService memberPackageAccessRepairService;
 
-    @AuthTransactional(propagation = Propagation.NOT_SUPPORTED)
+    /** Joins the caller's transaction so a token issue never holds two pooled connections at once. */
+    @AuthTransactional(propagation = Propagation.SUPPORTS)
     public Snapshot resolve(AuthSubject subject) {
         Long merchantId = merchantId(subject);
         if (merchantId == null) {
             return Snapshot.none();
         }
         try {
-            memberPackageAccessRepairService.repairIfMissingActivePackage(merchantId);
             Optional<ActivePackage> active = loginPackageLookup.findActive(merchantId);
+            if (active.isEmpty() && memberPackageAccessRepairService.repairIfMissingActivePackage(merchantId)) {
+                active = loginPackageLookup.findActive(merchantId);
+            }
             if (active.isEmpty()) {
                 return Snapshot.none();
             }

@@ -1,22 +1,19 @@
 package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.config.JwtProperties;
+import com.ael.algoryqrservice.authservice.security.JwtTokenCodec;
 import com.ael.algoryqrservice.authservice.exception.UnauthorizedException;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.entity.SessionEntity;
 import com.ael.algoryqrservice.authservice.infrastructure.persistence.repository.SessionJpaRepository;
 import com.ael.algoryqrservice.authservice.util.ClientInfo;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -37,6 +34,8 @@ public class SessionIssuer {
     private final PasswordEncoder passwordEncoder;
     private final JwtProperties jwtProperties;
     private final LoginPackageClaims loginPackageClaims;
+    private final JwtTokenCodec tokenCodec;
+    private final ActiveSessionRegistry activeSessions;
 
     @AuthTransactional
     public IssuedTokens issue(AuthSubject subject, ClientInfo clientInfo) {
@@ -136,6 +135,7 @@ public class SessionIssuer {
         session.setRevoked(true);
         session.setLastActivityAt(LocalDateTime.now());
         sessionRepository.save(session);
+        activeSessions.markEnded(session.getId());
     }
 
     public RefreshTokenParts parseRefreshToken(String refreshToken) {
@@ -174,17 +174,15 @@ public class SessionIssuer {
 
     private String buildAccessToken(AuthSubject subject, UUID sessionId, TokenAccess access) {
         Date now = new Date();
-        var builder = Jwts.builder()
+        var builder = tokenCodec.builder(JwtTokenCodec.TYPE_ACCESS)
                 .id(sessionId.toString())
                 .subject(subject.loginIdentifier())
                 .claim("subjectType", subject.subjectType())
                 .claim("roles", List.of("ROLE_" + subject.roleCode()))
                 .claim("scopes", access.scopes())
                 .claim("provider", subject.provider())
-                .claim("typ", "access")
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()))
-                .signWith(signingKey());
+                .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()));
         if (access.snapshot().present()) {
             builder.claim("activePackage", access.snapshot().activePackage());
             builder.claim("products", access.snapshot().products());
@@ -240,24 +238,18 @@ public class SessionIssuer {
 
     private String formatRefreshToken(UUID sessionId, String rawRefresh, LocalDateTime expiresAt) {
         Date expires = Date.from(expiresAt.atZone(ZoneId.systemDefault()).toInstant());
-        return Jwts.builder()
+        return tokenCodec.builder(JwtTokenCodec.TYPE_REFRESH)
                 .id(sessionId.toString())
                 .claim("raw", rawRefresh)
-                .claim("typ", "refresh")
                 .issuedAt(new Date())
                 .expiration(expires)
-                .signWith(signingKey())
                 .compact();
     }
 
     private RefreshTokenParts parseJwtRefreshToken(String refreshToken) {
         try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(signingKey())
-                    .build()
-                    .parseSignedClaims(refreshToken)
-                    .getPayload();
-            if (!"refresh".equals(claims.get("typ", String.class)) || claims.getId() == null) {
+            Claims claims = tokenCodec.parse(refreshToken, JwtTokenCodec.TYPE_REFRESH);
+            if (claims.getId() == null) {
                 throw new UnauthorizedException("Invalid refresh token");
             }
             String raw = claims.get("raw", String.class);
@@ -272,10 +264,6 @@ public class SessionIssuer {
 
     private static String isoOffset(LocalDateTime value) {
         return value.atZone(ZoneId.systemDefault()).toOffsetDateTime().toString();
-    }
-
-    private SecretKey signingKey() {
-        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
     public record IssuedTokens(

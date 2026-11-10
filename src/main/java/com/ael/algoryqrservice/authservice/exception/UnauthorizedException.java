@@ -12,11 +12,16 @@ public class UnauthorizedException extends RuntimeException {
     /** An already rotated refresh token came back after its grace window; the session was revoked. */
     public static final String SESSION_REUSED = "SESSION_REUSED";
 
+    /** Wrong username/e-mail or password. */
+    public static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
+    /** No usable credentials on the request; used when nothing more specific applies. */
+    public static final String UNAUTHORIZED = "UNAUTHORIZED";
+
     private final String code;
 
     public UnauthorizedException(String message) {
         super(message);
-        this.code = null;
+        this.code = UNAUTHORIZED;
     }
 
     public UnauthorizedException(String code, String message) {

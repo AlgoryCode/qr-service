@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.service;
 
+import com.ael.algoryqrservice.authservice.security.JwtTokenCodec;
 import com.ael.algoryqrservice.qrservice.account.service.JwtService;
 import com.ael.algoryqrservice.qrservice.config.JwtProperties;
 import io.jsonwebtoken.Claims;
@@ -11,7 +12,7 @@ import static org.mockito.Mockito.when;
 
 class JwtServicePackageOwnerTest {
 
-    private final JwtService jwtService = new JwtService(mock(JwtProperties.class));
+    private final JwtService jwtService = new JwtService(mock(JwtProperties.class), new JwtTokenCodec("test-only-jwt-secret-0123456789abcdef0123456789abcdef", "algoryqr", "algoryqr-api"));
 
     @Test
     void extractPackageOwnerId_whenStaff_thenUseMerchantId() {

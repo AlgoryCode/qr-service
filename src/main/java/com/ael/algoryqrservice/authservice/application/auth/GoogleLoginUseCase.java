@@ -18,7 +18,6 @@ public class GoogleLoginUseCase {
     private final GoogleIdTokenVerifier idTokenVerifier;
     private final GoogleIdentityUseCase identityUseCase;
     private final TokenUseCase tokenUseCase;
-    private final MerchantPackageGate merchantPackageGate;
 
     @AuthTransactional
     public Map<String, Object> authenticate(String idToken, String intent, String audience, ClientInfo clientInfo) {
@@ -31,7 +30,6 @@ public class GoogleLoginUseCase {
                 clientInfo,
                 GoogleProviders.MOBILE_GOOGLE
         );
-        merchantPackageGate.assertOpen(subject);
         log.info(
                 "Google id-token login succeeded subjectType={} subjectId={} intent={} clientIp={}",
                 subject.subjectType(),

@@ -18,8 +18,14 @@ spring:
       idle-timeout: 300000
       max-lifetime: 600000
       minimum-idle: 2
-      maximum-pool-size: 10
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
       validation-timeout: 3000
+      # Logs the stack of any code that keeps a connection checked out longer than this.
+      leak-detection-threshold: ${DB_POOL_LEAK_DETECTION_MS:30000}
+      data-source-properties:
+        # Seconds; stops a dropped network link to the remote DB from pinning a pooled connection forever.
+        socketTimeout: ${DB_SOCKET_TIMEOUT_SECONDS:120}
+        tcpKeepAlive: true
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -61,7 +67,9 @@ spring:
               - email
 
 jwt:
-  secret: ${JWT_SECRET:algoryqr-service-jwt-secret-key-min-32-chars-long}
+  secret: ${JWT_SECRET}  # required, >= 32 random bytes; no default on purpose
+  issuer: ${JWT_ISSUER:algoryqr}
+  audience: ${JWT_AUDIENCE:algoryqr-api}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
   # Absolute session lifetime; refreshes extend the session but a sign-in is needed again after this.
@@ -79,11 +87,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        # Only liveness/readiness are public. env, heapdump, mappings, shutdown etc. expose secrets
+        # or let anyone stop the service; enable them per-environment behind auth if ever needed.
+        include: health,info
   endpoint:
-    shutdown:
-      access: unrestricted
     health:
+      show-details: never
       probes:
         enabled: true
   health:
@@ -266,7 +275,9 @@ odeal:
   secret-key: ${ODEAL_SECRET_KEY:}
   external-device-key: ${ODEAL_EXTERNAL_DEVICE_KEY:}
   default-vat-ratio: ${ODEAL_DEFAULT_VAT_RATIO:10}
-  test-api-key: ${ODEAL_TEST_API_KEY:odeal-test-local}
+  # Debug proxy endpoints under /api/v1/integrations/odeal/test; off unless explicitly enabled.
+  test-endpoints-enabled: ${ODEAL_TEST_ENDPOINTS_ENABLED:false}
+  test-api-key: ${ODEAL_TEST_API_KEY:}
 
 paytr:
   merchant-id: ${PAYTR_MERCHANT_ID:}

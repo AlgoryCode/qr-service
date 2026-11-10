@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.authservice.security;
 
+import com.ael.algoryqrservice.authservice.application.auth.ActiveSessionRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,7 @@ import java.util.List;
 public class AuthJwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtAccessTokenParser jwtAccessTokenParser;
+    private final ActiveSessionRegistry activeSessions;
 
     @Override
     protected void doFilterInternal(
@@ -31,7 +33,9 @@ public class AuthJwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
-            jwtAccessTokenParser.parse(token).ifPresent(principal -> {
+            jwtAccessTokenParser.parse(token)
+                    .filter(principal -> activeSessions.isActive(principal.sessionId()))
+                    .ifPresent(principal -> {
                 List<SimpleGrantedAuthority> authorities = new ArrayList<>();
                 principal.roles().forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
                 principal.scopes().forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
