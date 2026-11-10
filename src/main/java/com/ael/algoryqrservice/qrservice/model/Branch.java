@@ -70,4 +70,16 @@ public class Branch extends QrBaseModel {
     /** Şubenin sipariş akışı; boşsa eski davranış ({@link #kitchenEnabled}, {@link #courierEnabled}) geçerlidir. */
     @Column(name = "order_flow_id")
     private Long orderFlowId;
+
+    /** Receipt heading; printers fall back to the branch name when it is empty. */
+    @Column(name = "receipt_header", length = 120)
+    private String receiptHeader;
+
+    /** Paragraph printed under the heading, e.g. opening hours or a welcome line. */
+    @Column(name = "receipt_intro", length = 500)
+    private String receiptIntro;
+
+    /** Closing lines after the order details, e.g. a thank-you note. */
+    @Column(name = "receipt_footer", length = 500)
+    private String receiptFooter;
 }

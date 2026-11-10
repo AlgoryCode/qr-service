@@ -50,6 +50,13 @@ public final class BranchDtos {
         private Boolean kitchenEnabled;
         private Boolean courierEnabled;
         private Boolean printKitchenEnabled;
+        /** Receipt template; an empty string clears the field, null leaves it unchanged. */
+        @Size(max = 120)
+        private String receiptHeader;
+        @Size(max = 500)
+        private String receiptIntro;
+        @Size(max = 500)
+        private String receiptFooter;
     }
 
     @Data
@@ -81,6 +88,9 @@ public final class BranchDtos {
         private boolean kitchenEnabled;
         private boolean courierEnabled;
         private boolean printKitchenEnabled;
+        private String receiptHeader;
+        private String receiptIntro;
+        private String receiptFooter;
         private List<MenuSummary> menus;
     }
 

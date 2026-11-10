@@ -48,6 +48,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import com.ael.algoryqrservice.qrservice.product.service.MenuProductOptionService;
 import com.ael.algoryqrservice.qrservice.stock.service.StockConsumptionService;
@@ -342,13 +343,32 @@ public class MenuOrderService {
                     menuOrderRepository.findByMenuIdAndStatusOrderBySubmittedAtDesc(menuId, orderStatus)
             ));
         }
-        listed.addAll(kitchenUberEatsService.listManagedForOwner(menu.getMerchantId()));
-        listed.addAll(kitchenYemekSepetiService.listManagedForOwner(menu.getMerchantId()));
+        Predicate<Long> listsConnectionBranch = marketplaceOwnership(menuId, menu);
+        listed.addAll(kitchenUberEatsService.listManagedForOwner(menu.getMerchantId(), listsConnectionBranch));
+        listed.addAll(kitchenYemekSepetiService.listManagedForOwner(menu.getMerchantId(), listsConnectionBranch));
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status.trim())) {
             MenuOrderStatus orderStatus = parseStatus(status, MenuOrderStatus.CONFIRMED);
             return listed.stream().filter(order -> order.getStatus() == orderStatus).toList();
         }
         return listed;
+    }
+
+    /** True for the connection branches whose marketplace orders this menu lists; see {@link MarketplaceMenuOwner}. */
+    private Predicate<Long> marketplaceOwnership(Long menuId, Menu menu) {
+        List<MarketplaceMenuOwner.MenuRef> merchantMenus = menuRepository
+                .findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(menu.getMerchantId(), menu.getChannel())
+                .stream()
+                .map(candidate -> new MarketplaceMenuOwner.MenuRef(
+                        candidate.getMenuId(),
+                        candidate.getBranchId(),
+                        candidate.isActive()
+                ))
+                .toList();
+        Map<Long, Long> ownerByBranch = new HashMap<>();
+        return connectionBranchId -> menuId.equals(ownerByBranch.computeIfAbsent(
+                connectionBranchId == null ? -1L : connectionBranchId,
+                key -> MarketplaceMenuOwner.ownerMenuId(connectionBranchId, merchantMenus)
+        ));
     }
 
     @Transactional(readOnly = true)

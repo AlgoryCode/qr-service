@@ -22,7 +22,7 @@ public class QrPublicCodes {
     public QrPublicCodes(
             SecureRandom secureRandom,
             QrRepository qrRepository,
-            @Value("${app.qr.public-base-url}") String publicBaseUrl
+            @Value("${app.qr.public-base-url:https://qr.algorycode.com}") String publicBaseUrl
     ) {
         this.secureRandom = secureRandom;
         this.qrRepository = qrRepository;

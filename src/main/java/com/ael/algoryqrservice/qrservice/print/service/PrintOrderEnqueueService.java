@@ -257,6 +257,10 @@ public class PrintOrderEnqueueService {
         putText(payload, "businessName", branch.getName());
         putText(payload, "businessAddress", branch.getAddress());
         putText(payload, "businessPhone", branch.getPhone());
+        // Branch receipt template; the print agent shows them around the order details.
+        putText(payload, "receiptHeader", branch.getReceiptHeader());
+        putText(payload, "receiptIntro", branch.getReceiptIntro());
+        putText(payload, "receiptFooter", branch.getReceiptFooter());
     }
 
     private static void attachStoreBusiness(ObjectNode payload, Merchant merchant) {

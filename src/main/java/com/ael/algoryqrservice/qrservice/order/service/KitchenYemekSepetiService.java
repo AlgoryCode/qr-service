@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 import com.ael.algoryqrservice.qrservice.branch.service.BranchScope;
 import com.ael.algoryqrservice.qrservice.order.service.KitchenUberEatsMapper;
 
@@ -71,10 +72,15 @@ public class KitchenYemekSepetiService {
                 .toList();
     }
 
+    /**
+     * Orders of the last month for the connections whose branch passes [listsConnectionBranch].
+     * Callers decide which menu shows a connection, so one order is never listed under several menus.
+     */
     @Transactional(readOnly = true)
-    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long merchantId) {
+    public List<MenuOrderDtos.OrderResponse> listManagedForOwner(Long merchantId, Predicate<Long> listsConnectionBranch) {
         LocalDate today = LocalDate.now(KitchenUberEatsMapper.ZONE);
         return connectionService.findConnectedForMerchant(merchantId).stream()
+                .filter(connection -> listsConnectionBranch.test(connection.getBranchId()))
                 .flatMap(connection -> orderRepository
                         .findByConnectionIdAndPackageCreatedAtBetweenOrderByPackageCreatedAtDesc(
                                 connection.getId(),

@@ -75,4 +75,46 @@ class MenuOrderServiceListTest {
         verify(campaignEvaluationService, times(1)).summarizeOrders(eq(8L), anyList());
         verify(campaignEvaluationService, never()).summarizeOrder(any());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void merchantList_listsMarketplaceOrdersOnlyUnderTheMenuOfTheConnectionBranch() {
+        Menu branchMenu = menu(16L, 24L);
+        Menu otherMenu = menu(8L, 5L);
+        when(menuRepository.findById(16L)).thenReturn(Optional.of(branchMenu));
+        when(menuRepository.findById(8L)).thenReturn(Optional.of(otherMenu));
+        when(securityUtils.getCurrentMerchantId()).thenReturn(7L);
+        when(menuRepository.findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(eq(7L), any()))
+                .thenReturn(List.of(otherMenu, branchMenu));
+
+        menuOrderService.merchantList(16L, "ALL", null);
+        org.mockito.ArgumentCaptor<java.util.function.Predicate<Long>> forBranchMenu =
+                org.mockito.ArgumentCaptor.forClass(java.util.function.Predicate.class);
+        verify(kitchenUberEatsService).listManagedForOwner(eq(7L), forBranchMenu.capture());
+
+        assertThat(forBranchMenu.getValue().test(24L)).isTrue();
+        assertThat(forBranchMenu.getValue().test(5L)).isFalse();
+        // No menu in branch 1 and no branch at all: the first menu (8) takes them, not this one.
+        assertThat(forBranchMenu.getValue().test(1L)).isFalse();
+        assertThat(forBranchMenu.getValue().test(null)).isFalse();
+
+        org.mockito.Mockito.clearInvocations(kitchenUberEatsService);
+        menuOrderService.merchantList(8L, "ALL", null);
+        org.mockito.ArgumentCaptor<java.util.function.Predicate<Long>> forFirstMenu =
+                org.mockito.ArgumentCaptor.forClass(java.util.function.Predicate.class);
+        verify(kitchenUberEatsService).listManagedForOwner(eq(7L), forFirstMenu.capture());
+
+        assertThat(forFirstMenu.getValue().test(24L)).isFalse();
+        assertThat(forFirstMenu.getValue().test(5L)).isTrue();
+        assertThat(forFirstMenu.getValue().test(1L)).isTrue();
+        assertThat(forFirstMenu.getValue().test(null)).isTrue();
+    }
+
+    private Menu menu(long menuId, long branchId) {
+        Menu menu = new Menu();
+        menu.setMenuId(menuId);
+        menu.setMerchantId(7L);
+        menu.setBranchId(branchId);
+        return menu;
+    }
 }

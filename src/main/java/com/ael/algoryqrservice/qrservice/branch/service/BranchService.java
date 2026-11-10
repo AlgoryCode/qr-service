@@ -116,6 +116,15 @@ public class BranchService {
         if (request.getPrintKitchenEnabled() != null) {
             branch.setPrintKitchenEnabled(request.getPrintKitchenEnabled());
         }
+        if (request.getReceiptHeader() != null) {
+            branch.setReceiptHeader(trimToNull(request.getReceiptHeader()));
+        }
+        if (request.getReceiptIntro() != null) {
+            branch.setReceiptIntro(trimToNull(request.getReceiptIntro()));
+        }
+        if (request.getReceiptFooter() != null) {
+            branch.setReceiptFooter(trimToNull(request.getReceiptFooter()));
+        }
         return toResponse(branchRepository.save(branch), menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
     }
 
@@ -228,6 +237,9 @@ public class BranchService {
                 .kitchenEnabled(branch.isKitchenEnabled())
                 .courierEnabled(branch.isCourierEnabled())
                 .printKitchenEnabled(branch.isPrintKitchenEnabled())
+                .receiptHeader(branch.getReceiptHeader())
+                .receiptIntro(branch.getReceiptIntro())
+                .receiptFooter(branch.getReceiptFooter())
                 .menus(menus.stream()
                         .map(menu -> BranchDtos.MenuSummary.builder()
                                 .menuId(menu.getMenuId())
