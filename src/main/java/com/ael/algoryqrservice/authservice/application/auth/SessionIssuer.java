@@ -11,7 +11,6 @@ import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 
 import java.time.Duration;
@@ -122,12 +121,6 @@ public class SessionIssuer {
         LocalDateTime signedIn = session.getLoggedInAt() != null ? session.getLoggedInAt() : now;
         LocalDateTime cap = signedIn.plusSeconds(jwtProperties.getRefreshMaxLifetimeMs() / 1000);
         return sliding.isAfter(cap) ? cap : sliding;
-    }
-
-    /** Revokes in its own transaction, so it sticks even when the caller then answers with an error. */
-    @AuthTransactional(propagation = Propagation.REQUIRES_NEW)
-    public void revokeNow(UUID sessionId) {
-        sessionRepository.findById(sessionId).ifPresent(this::revoke);
     }
 
     @AuthTransactional

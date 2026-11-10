@@ -64,7 +64,7 @@ class TokenUseCaseTest {
         stubRotation(session, true);
 
         assertThat(tokenUseCase.refresh(TOKEN, null)).containsKey("accessToken");
-        verify(sessionIssuer, never()).revokeNow(any());
+        verify(sessionIssuer, never()).revoke(any());
     }
 
     @Test
@@ -78,7 +78,7 @@ class TokenUseCaseTest {
         assertThatThrownBy(() -> tokenUseCase.refresh(TOKEN, null))
                 .isInstanceOfSatisfying(UnauthorizedException.class,
                         ex -> assertThat(ex.getCode()).isEqualTo(UnauthorizedException.SESSION_REUSED));
-        verify(sessionIssuer).revokeNow(SESSION_ID);
+        verify(sessionIssuer).revoke(session);
     }
 
     @Test

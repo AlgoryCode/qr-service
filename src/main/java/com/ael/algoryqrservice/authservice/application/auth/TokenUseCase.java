@@ -50,7 +50,11 @@ public class TokenUseCase {
         return assembler.assemble(sessionIssuer.issue(subject, clientInfo), subject);
     }
 
-    @AuthTransactional
+    /**
+     * Refusals (401) keep what this transaction wrote: a reused refresh token revokes the session and must stay
+     * revoked even though the request itself fails. Nothing else is written before a refusal.
+     */
+    @AuthTransactional(noRollbackFor = UnauthorizedException.class)
     public Map<String, Object> refresh(String refreshToken, ClientInfo clientInfo) {
         RefreshMatch match = openSessionForRefresh(refreshToken);
         SessionEntity session = match.session();
@@ -144,8 +148,10 @@ public class TokenUseCase {
             if (inGrace(session)) {
                 return new RefreshMatch(session, true);
             }
-            // Own transaction: the revoke must outlive this request's rollback on the 401 below.
-            sessionIssuer.revokeNow(session.getId());
+            // Same transaction and connection that already holds this row's FOR UPDATE lock. Revoking through a
+            // separate transaction here deadlocked: the second connection waited on our own lock forever, every
+            // other refresh of the session queued behind it, and the pool ran dry (prod, 10-11 Nov).
+            sessionIssuer.revoke(session);
             log.warn("Rotated refresh token reused, session revoked sessionId={} subjectType={}", session.getId(), session.getSubjectType());
             throw new UnauthorizedException(UnauthorizedException.SESSION_REUSED, "Refresh token reused");
         }
