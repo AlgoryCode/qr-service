@@ -36,7 +36,8 @@ public final class MenuReservationSpecifications {
             if (pattern != null) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("customerName")), pattern),
-                        cb.like(cb.lower(cb.coalesce(root.get("email"), cb.literal(""))), pattern)
+                        cb.like(cb.lower(cb.coalesce(root.get("email"), cb.literal(""))), pattern),
+                        cb.like(cb.coalesce(root.get("phone"), cb.literal("")), pattern)
                 ));
             }
             return cb.and(predicates.toArray(Predicate[]::new));

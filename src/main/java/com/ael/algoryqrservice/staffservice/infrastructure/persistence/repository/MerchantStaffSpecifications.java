@@ -6,6 +6,7 @@ import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
@@ -19,16 +20,18 @@ public final class MerchantStaffSpecifications {
     /**
      * İşletme personel listesi için DB tarafı filtre.
      *
-     * @param assigned null: hepsi, true: şubeli, false: şubesiz
-     * @param branchId yalnızca şubeli personelde belirli şube
+     * @param assigned   null: hepsi, true: şubeli, false: şubesiz; {@code branchIds} doluysa kullanılmaz
+     * @param branchIds  bu şubelerden biri; {@code includeNoBranch} ile şubesizler de eklenir
+     * @param staffRoles boşsa tüm roller
      */
     public static Specification<MerchantStaff> forMerchantSearch(
             Long merchantId,
             String query,
             Boolean assigned,
-            Long branchId,
+            Collection<Long> branchIds,
+            boolean includeNoBranch,
             Boolean active,
-            StaffRole staffRole
+            Collection<StaffRole> staffRoles
     ) {
         return (root, cq, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -43,20 +46,23 @@ public final class MerchantStaffSpecifications {
                 ));
             }
 
-            if (branchId != null && branchId > 0) {
-                predicates.add(cb.equal(root.get("branchId"), branchId));
+            boolean hasBranches = branchIds != null && !branchIds.isEmpty();
+            if (hasBranches && includeNoBranch) {
+                predicates.add(cb.or(root.get("branchId").in(branchIds), cb.isNull(root.get("branchId"))));
+            } else if (hasBranches) {
+                predicates.add(root.get("branchId").in(branchIds));
+            } else if (includeNoBranch || Boolean.FALSE.equals(assigned)) {
+                predicates.add(cb.isNull(root.get("branchId")));
             } else if (Boolean.TRUE.equals(assigned)) {
                 predicates.add(cb.isNotNull(root.get("branchId")));
-            } else if (Boolean.FALSE.equals(assigned)) {
-                predicates.add(cb.isNull(root.get("branchId")));
             }
 
             if (active != null) {
                 predicates.add(cb.equal(root.get("active"), active));
             }
 
-            if (staffRole != null) {
-                predicates.add(cb.equal(root.get("staffRole"), staffRole));
+            if (staffRoles != null && !staffRoles.isEmpty()) {
+                predicates.add(root.get("staffRole").in(staffRoles));
             }
 
             return cb.and(predicates.toArray(Predicate[]::new));

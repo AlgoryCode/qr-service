@@ -99,7 +99,7 @@ public final class QrPayloads {
         if (details.has("ssid")) return Type.WIFI;
         if (details.has("fullName")) return Type.CONTACT;
         if (details.has("mail") || details.has("email")) return Type.MAIL;
-        if (details.has("latitude")) return Type.LOCATION;
+        if (details.has("latitude") || details.has("mapsUrl")) return Type.LOCATION;
         if (details.has("text")) return Type.TEXT;
         return null;
     }
@@ -180,7 +180,28 @@ public final class QrPayloads {
         return Map.of("text", text);
     }
 
+    /**
+     * A location is either coordinates or a map link (for example a Google Maps business profile).
+     * Only the chosen one is kept, so the stored details never mix the two.
+     */
     private static Map<String, Object> normalizeLocation(Map<String, Object> details) {
+        if (details.containsKey("mapsUrl")) {
+            String url = text(details, "mapsUrl");
+            if (url.isEmpty()) {
+                throw badRequest("Google Maps bağlantısı zorunludur.");
+            }
+            if (url.length() > MAX_URL_LENGTH) {
+                throw badRequest("Harita bağlantısı çok uzun.");
+            }
+            String absolute = url.contains("://") ? url : "https://" + url;
+            if (!isWebUrl(absolute)) {
+                throw badRequest("Geçerli bir harita bağlantısı girin. Örn: https://maps.app.goo.gl/...");
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("mapsUrl", absolute);
+            result.put("label", text(details, "label"));
+            return result;
+        }
         String latitude = text(details, "latitude").replace(',', '.');
         String longitude = text(details, "longitude").replace(',', '.');
         requireCoordinate(latitude, 90, "Enlem -90 ile 90 arasında olmalıdır.");
@@ -269,6 +290,10 @@ public final class QrPayloads {
     }
 
     private static String locationContent(Map<String, Object> details) {
+        String mapsUrl = text(details, "mapsUrl");
+        if (!mapsUrl.isEmpty()) {
+            return mapsUrl;
+        }
         String coordinates = text(details, "latitude") + "," + text(details, "longitude");
         String label = text(details, "label");
         if (label.isEmpty()) {

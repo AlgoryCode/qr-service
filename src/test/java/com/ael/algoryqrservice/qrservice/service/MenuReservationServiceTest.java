@@ -221,6 +221,73 @@ class MenuReservationServiceTest {
                         .isEqualTo(HttpStatus.FORBIDDEN));
     }
 
+    @Test
+    void createForOwner_isConfirmedMarkedAsPanelAndNeedsNoContact() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
+        when(menuReservationRepository.save(any(MenuReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MenuDtos.ReservationResponse response = menuReservationService.createForOwner(
+                10L,
+                MenuDtos.ReservationCreateRequest.builder()
+                        .customerName("  Kapıdan gelen  ")
+                        .partySize(4)
+                        .reservationAt(LocalDateTime.now().minusHours(1))
+                        .note(" pencere kenarı ")
+                        .build(),
+                "1.2.3.4"
+        );
+
+        assertThat(response.getStatus()).isEqualTo(MenuReservationStatus.ACTIVE);
+        assertThat(response.getDeviceType()).isEqualTo(MenuReservationService.PANEL_DEVICE_TYPE);
+        assertThat(response.getCustomerName()).isEqualTo("Kapıdan gelen");
+        assertThat(response.getNote()).isEqualTo("pencere kenarı");
+        assertThat(response.getPhone()).isNull();
+    }
+
+    @Test
+    void createForOwner_whenNotOwner_thenForbidden() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(99L);
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
+
+        assertThatThrownBy(() -> menuReservationService.createForOwner(
+                10L,
+                MenuDtos.ReservationCreateRequest.builder()
+                        .customerName("X").partySize(2).reservationAt(LocalDateTime.now()).build(),
+                "1.2.3.4"
+        )).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void updateForOwner_editsDetailsAndClearsEmptyFields() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
+        when(menuReservationRepository.findById(5L)).thenReturn(Optional.of(reservation(5L, MenuReservationStatus.ACTIVE)));
+        when(menuReservationRepository.save(any(MenuReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MenuDtos.ReservationResponse response = menuReservationService.updateForOwner(
+                10L,
+                5L,
+                MenuDtos.ReservationUpdateRequest.builder().partySize(6).phone("").note("Doğum günü").build()
+        );
+
+        assertThat(response.getPartySize()).isEqualTo(6);
+        assertThat(response.getPhone()).isNull();
+        assertThat(response.getNote()).isEqualTo("Doğum günü");
+        assertThat(response.getCustomerName()).isEqualTo("Ayşe Yılmaz");
+    }
+
+    @Test
+    void updateForOwner_whenCanceled_thenDetailsAreLocked() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(ownedMenu()));
+        when(menuReservationRepository.findById(5L)).thenReturn(Optional.of(reservation(5L, MenuReservationStatus.CANCELED)));
+
+        assertThatThrownBy(() -> menuReservationService.updateForOwner(
+                10L, 5L, MenuDtos.ReservationUpdateRequest.builder().partySize(3).build()
+        )).isInstanceOf(ResponseStatusException.class);
+    }
+
     private Menu publicMenu() {
         return Menu.builder()
                 .menuId(10L)

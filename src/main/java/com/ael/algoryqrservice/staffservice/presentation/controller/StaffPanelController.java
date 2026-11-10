@@ -60,12 +60,25 @@ public class StaffPanelController {
             @RequestParam(required = false) String assignment,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) Boolean active,
-            @RequestParam(required = false) StaffRole role
+            @RequestParam(required = false) StaffRole role,
+            // Several values at once, comma separated: roles=WAITER,KITCHEN and branches=5,24,none.
+            @RequestParam(required = false) String roles,
+            @RequestParam(required = false) String branches
     ) {
         if (page == null) {
             return ResponseEntity.ok(menuWaiterService.listMerchantStaff());
         }
-        return ResponseEntity.ok(menuWaiterService.searchMerchantStaff(q, assignment, branchId, active, role, page, size));
+        StaffListFilter.Branches branchFilter = StaffListFilter.parseBranches(branches, branchId);
+        return ResponseEntity.ok(menuWaiterService.searchMerchantStaff(
+                q,
+                assignment,
+                branchFilter.ids(),
+                branchFilter.includeNoBranch(),
+                active,
+                StaffListFilter.parseRoles(roles, role),
+                page,
+                size
+        ));
     }
 
     @PostMapping("/staff")

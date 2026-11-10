@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
@@ -58,9 +59,10 @@ public class MenuWaiterService {
     public MenuWaiterDtos.StaffListResponse searchMerchantStaff(
             String query,
             String assignment,
-            Long branchId,
+            Collection<Long> branchIds,
+            boolean includeNoBranch,
             Boolean active,
-            StaffRole staffRole,
+            Collection<StaffRole> staffRoles,
             int page,
             Integer size
     ) {
@@ -80,7 +82,8 @@ public class MenuWaiterService {
         };
 
         Page<MerchantStaff> result = merchantStaffRepository.findAll(
-                MerchantStaffSpecifications.forMerchantSearch(merchantId, query, assigned, branchId, active, staffRole),
+                MerchantStaffSpecifications.forMerchantSearch(
+                        merchantId, query, assigned, branchIds, includeNoBranch, active, staffRoles),
                 pageable
         );
 

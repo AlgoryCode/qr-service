@@ -31,6 +31,8 @@ public class MenuReservationService {
 
     private static final int RATE_LIMIT_MAX = 3;
     private static final int RATE_LIMIT_WINDOW_MINUTES = 5;
+    /** Marks reservations the business entered in the panel, so the list can tell them from online ones. */
+    public static final String PANEL_DEVICE_TYPE = "PANEL";
 
     private final MenuRepository menuRepository;
     private final MenuReservationRepository menuReservationRepository;
@@ -114,6 +116,44 @@ public class MenuReservationService {
         return toResponse(menuReservationRepository.save(reservation));
     }
 
+    /**
+     * A reservation the business takes itself (by phone or at the door). Contact details are optional and the
+     * time may be in the past (to log a walk-in); it starts confirmed because the business made it.
+     */
+    @Transactional
+    public MenuDtos.ReservationResponse createForOwner(
+            Long menuId,
+            MenuDtos.ReservationCreateRequest request,
+            String ipAddress
+    ) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "İstek gövdesi zorunludur");
+        }
+        Menu menu = requireOwnedMenu(menuId);
+        String customerName = requireText(request.getCustomerName(), "Ad soyad zorunludur", 120);
+        requirePartySize(request.getPartySize());
+        if (request.getReservationAt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rezervasyon tarihi/saati zorunludur");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        MenuReservation reservation = MenuReservation.builder()
+                .menuId(menu.getMenuId())
+                .customerName(customerName)
+                .phone(trimToNull(request.getPhone()))
+                .email(normalizeEmail(request.getEmail()))
+                .partySize(request.getPartySize())
+                .reservationAt(request.getReservationAt())
+                .status(MenuReservationStatus.ACTIVE)
+                .note(trimToNull(request.getNote()))
+                .ipAddress(ipAddress == null || ipAddress.isBlank() ? "0.0.0.0" : ipAddress.trim())
+                .deviceType(PANEL_DEVICE_TYPE)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        return toResponse(menuReservationRepository.save(reservation));
+    }
+
     @Transactional(readOnly = true)
     public MenuDtos.ReservationPageResponse listForOwner(
             Long menuId,
@@ -160,7 +200,7 @@ public class MenuReservationService {
             MenuDtos.ReservationUpdateRequest request
     ) {
         requireOwnedMenu(menuId);
-        if (request == null || (request.getStatus() == null && request.getReservationAt() == null)) {
+        if (request == null || (request.getStatus() == null && request.getReservationAt() == null && !hasDetailEdits(request))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Güncellenecek alan belirtilmedi");
         }
 
@@ -175,8 +215,56 @@ public class MenuReservationService {
         if (request.getReservationAt() != null) {
             reservation.setReservationAt(request.getReservationAt());
         }
+        if (hasDetailEdits(request)) {
+            if (reservation.getStatus() == MenuReservationStatus.CANCELED) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "İptal edilmiş rezervasyon güncellenemez");
+            }
+            applyDetailEdits(reservation, request);
+        }
         reservation.setUpdatedAt(LocalDateTime.now());
         return toResponse(menuReservationRepository.save(reservation));
+    }
+
+    private static boolean hasDetailEdits(MenuDtos.ReservationUpdateRequest request) {
+        return request.getCustomerName() != null || request.getPhone() != null || request.getEmail() != null
+                || request.getPartySize() != null || request.getNote() != null;
+    }
+
+    /** An empty phone, e-mail or note clears it; the name cannot be cleared. */
+    private void applyDetailEdits(MenuReservation reservation, MenuDtos.ReservationUpdateRequest request) {
+        if (request.getCustomerName() != null) {
+            reservation.setCustomerName(requireText(request.getCustomerName(), "Ad soyad zorunludur", 120));
+        }
+        if (request.getPhone() != null) {
+            reservation.setPhone(trimToNull(request.getPhone()));
+        }
+        if (request.getEmail() != null) {
+            reservation.setEmail(normalizeEmail(request.getEmail()));
+        }
+        if (request.getPartySize() != null) {
+            requirePartySize(request.getPartySize());
+            reservation.setPartySize(request.getPartySize());
+        }
+        if (request.getNote() != null) {
+            reservation.setNote(trimToNull(request.getNote()));
+        }
+    }
+
+    private static void requirePartySize(Integer partySize) {
+        if (partySize == null || partySize < 1 || partySize > 50) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Kişi sayısı 1 ile 50 arasında olmalıdır");
+        }
+    }
+
+    private String normalizeEmail(String value) {
+        String email = trimToNull(value);
+        if (email == null) {
+            return null;
+        }
+        if (!email.contains("@")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Geçerli bir e-posta giriniz");
+        }
+        return email.toLowerCase(Locale.ROOT);
     }
 
     private void validateStatusTransition(MenuReservationStatus current, MenuReservationStatus next) {

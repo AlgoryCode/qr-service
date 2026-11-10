@@ -8,6 +8,7 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public final class UserAccountingEntrySpecifications {
@@ -17,7 +18,7 @@ public final class UserAccountingEntrySpecifications {
 
     public static Specification<UserAccountingEntry> forUserListedSources(
             Long merchantId,
-            AccountingEntryType entryType,
+            Collection<AccountingEntryType> entryTypes,
             LocalDateTime from,
             LocalDateTime to,
             String pattern
@@ -29,8 +30,8 @@ public final class UserAccountingEntrySpecifications {
                     AccountingSourceType.MANUAL,
                     AccountingSourceType.BILL_SALE
             ));
-            if (entryType != null) {
-                predicates.add(cb.equal(root.get("entryType"), entryType));
+            if (entryTypes != null && !entryTypes.isEmpty()) {
+                predicates.add(root.get("entryType").in(entryTypes));
             }
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("occurredAt"), from));

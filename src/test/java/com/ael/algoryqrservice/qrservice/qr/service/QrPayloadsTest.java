@@ -87,6 +87,18 @@ class QrPayloadsTest {
     }
 
     @Test
+    void locationCanBeAMapLinkAndKeepsOnlyThatLink() {
+        Map<String, Object> details = QrPayloads.normalize(Type.LOCATION,
+                Map.of("mapsUrl", "maps.app.goo.gl/abc123", "latitude", "41", "longitude", "28", "label", "Ana Şube"));
+        assertThat(details).containsOnlyKeys("mapsUrl", "label");
+        assertThat(QrPayloads.content(Type.LOCATION, details)).isEqualTo("https://maps.app.goo.gl/abc123");
+        assertThatThrownBy(() -> QrPayloads.normalize(Type.LOCATION, Map.of("mapsUrl", "")))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> QrPayloads.normalize(Type.LOCATION, Map.of("mapsUrl", "javascript:alert(1)")))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void modeDefaultsByTypeAndRejectsUnknownValues() {
         assertThat(QrPayloads.isDynamic(null, Type.WIFI)).isFalse();
         assertThat(QrPayloads.isDynamic(null, Type.LINK)).isTrue();

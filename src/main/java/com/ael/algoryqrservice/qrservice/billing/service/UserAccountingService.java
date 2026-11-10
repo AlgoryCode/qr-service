@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -177,7 +178,7 @@ public class UserAccountingService {
     ) {
         Long merchantId = securityUtils.getCurrentMerchantId();
         requireAllowAccess(merchantId);
-        AccountingEntryType typeFilter = parseTypeFilter(type);
+        Set<AccountingEntryType> typeFilter = parseTypeFilter(type);
         LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
         LocalDateTime toDt = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
         String query = trimToNull(q);
@@ -367,15 +368,22 @@ public class UserAccountingService {
         return currency != null && !currency.isBlank() ? currency : "TRY";
     }
 
-    private AccountingEntryType parseTypeFilter(String type) {
-        if (type == null || type.isBlank() || "all".equalsIgnoreCase(type)) {
-            return null;
+    /** "all" or empty means every type; otherwise one type or a comma-separated list such as "GELIR,GIDER". */
+    static Set<AccountingEntryType> parseTypeFilter(String type) {
+        if (type == null || type.isBlank() || "all".equalsIgnoreCase(type.trim())) {
+            return Set.of();
         }
-        try {
-            return AccountingEntryType.valueOf(type.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Geçersiz kayıt türü");
+        Set<AccountingEntryType> types = EnumSet.noneOf(AccountingEntryType.class);
+        for (String part : type.split(",")) {
+            String value = part.trim();
+            if (value.isEmpty() || "all".equalsIgnoreCase(value)) continue;
+            try {
+                types.add(AccountingEntryType.valueOf(value.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ex) {
+                throw new BadRequestException("Geçersiz kayıt türü");
+            }
         }
+        return types;
     }
 
     private void requireOwnedMenu(Long menuId, Long merchantId) {

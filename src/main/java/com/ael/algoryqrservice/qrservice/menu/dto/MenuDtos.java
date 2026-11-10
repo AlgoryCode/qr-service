@@ -306,6 +306,19 @@ public final class MenuDtos {
     public static class ReservationUpdateRequest {
         private MenuReservationStatus status;
         private LocalDateTime reservationAt;
+        /** Optional edits from the panel; a field left null keeps its value. */
+        @Size(max = 120)
+        private String customerName;
+        @Size(max = 40)
+        private String phone;
+        @Email
+        @Size(max = 255)
+        private String email;
+        @Min(1)
+        @Max(50)
+        private Integer partySize;
+        @Size(max = 500)
+        private String note;
     }
 
     @Data

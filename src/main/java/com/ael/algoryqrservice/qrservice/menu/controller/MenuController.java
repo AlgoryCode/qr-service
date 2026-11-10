@@ -224,12 +224,25 @@ public class MenuController {
         ));
     }
 
+    /** A reservation the business takes itself (phone, walk-in); it is confirmed straight away. */
+    @PostMapping("/{menuId}/reservations")
+    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    public ResponseEntity<MenuDtos.ReservationResponse> createReservation(
+            @PathVariable Long menuId,
+            @Valid @RequestBody MenuDtos.ReservationCreateRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        return ResponseEntity.status(201).body(
+                menuReservationService.createForOwner(menuId, request, extractClientIp(httpRequest))
+        );
+    }
+
     @PatchMapping("/{menuId}/reservations/{reservationId}")
     @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
     public ResponseEntity<MenuDtos.ReservationResponse> updateReservation(
             @PathVariable Long menuId,
             @PathVariable Long reservationId,
-            @RequestBody MenuDtos.ReservationUpdateRequest request
+            @Valid @RequestBody MenuDtos.ReservationUpdateRequest request
     ) {
         return ResponseEntity.ok(menuReservationService.updateForOwner(menuId, reservationId, request));
     }
@@ -479,5 +492,13 @@ public class MenuController {
     public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
         menuService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
+    }
+
+    private static String extractClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
