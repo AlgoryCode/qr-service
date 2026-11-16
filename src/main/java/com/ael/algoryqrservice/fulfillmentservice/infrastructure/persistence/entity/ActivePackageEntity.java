@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity;
 
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.PackageStatus;
+import com.ael.algoryqrservice.fulfillmentservice.domain.model.SubscriptionKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -58,4 +59,11 @@ public class ActivePackageEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_kind", length = 16)
+    private SubscriptionKind kind;
+
+    @Column(name = "grace_ends_at")
+    private Instant graceEndsAt;
 }

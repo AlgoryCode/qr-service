@@ -61,6 +61,15 @@ public class FulfillmentServiceClient {
         }
     }
 
+    /** Whether the merchant ever had any package; false means the trial is still on offer. */
+    public boolean hasAnyPackage(Long merchantId) {
+        try {
+            return fulfillmentService.hasAnyPackage(merchantId);
+        } catch (RuntimeException exception) {
+            throw unavailable(merchantId, exception);
+        }
+    }
+
     public Optional<ExternalActivePackageResponse> findActivePackage(Long merchantId) {
         try {
             PackageView view = findPackage(merchantId);
@@ -145,13 +154,15 @@ public class FulfillmentServiceClient {
                 .orElse(0);
     }
 
-    public int openQuantity(Long merchantId, String productCode, String source) {
-        return listEntitlements(merchantId).stream()
+    /** Units still unused across the open entitlements for {@code productCode} (optionally one source). */
+    public int openRemaining(Long merchantId, String productCode, String source) {
+        long total = listEntitlements(merchantId).stream()
                 .filter(item -> matches(item, productCode))
                 .filter(item -> source == null || source.equals(item.source()))
                 .filter(this::open)
-                .mapToInt(this::granted)
+                .mapToLong(this::remainingOf)
                 .sum();
+        return (int) Math.min(total, Integer.MAX_VALUE);
     }
 
     private boolean matches(ExternalEntitlementResponse item, String productCode) {
@@ -174,13 +185,6 @@ public class FulfillmentServiceClient {
         return Math.max(0, total - used);
     }
 
-    private int granted(ExternalEntitlementResponse item) {
-        if (item.unlimited()) {
-            return Integer.MAX_VALUE;
-        }
-        return item.quantity() == null ? 0 : item.quantity();
-    }
-
     private ExternalActivePackageResponse toExternal(ActivePackageResponse response) {
         return new ExternalActivePackageResponse(
                 response.id(),
@@ -196,7 +200,9 @@ public class FulfillmentServiceClient {
                 response.activatedAt(),
                 response.updatedAt(),
                 response.products(),
-                response.scopes()
+                response.scopes(),
+                response.kind() == null ? null : response.kind().name(),
+                response.graceEndsAt()
         );
     }
 
@@ -233,18 +239,7 @@ public class FulfillmentServiceClient {
     }
 
     private String statusOf(ExternalActivePackageResponse response) {
-        if (response == null) {
-            return "INACTIVE";
-        }
-        String status = response.status();
-        if (!PackageStatus.ACTIVE.name().equals(status)) {
-            return "INACTIVE";
-        }
-        LocalDate periodEnd = response.periodEnd();
-        if (periodEnd != null && periodEnd.isBefore(LocalDate.now(AppTime.ZONE))) {
-            return "INACTIVE";
-        }
-        return "ACTIVE";
+        return response != null && response.isOpen() ? "ACTIVE" : "INACTIVE";
     }
 
     private FulfillmentUnavailableException unavailable(Long merchantId, Exception exception) {

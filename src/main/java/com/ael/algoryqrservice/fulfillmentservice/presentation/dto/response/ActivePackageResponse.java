@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.fulfillmentservice.presentation.dto.response;
 
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.PackageStatus;
+import com.ael.algoryqrservice.fulfillmentservice.domain.model.SubscriptionKind;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,6 +21,8 @@ public record ActivePackageResponse(
         Instant activatedAt,
         Instant updatedAt,
         List<String> products,
-        List<String> scopes
+        List<String> scopes,
+        SubscriptionKind kind,
+        Instant graceEndsAt
 ) {
 }

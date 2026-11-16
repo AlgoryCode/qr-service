@@ -1,9 +1,11 @@
 package com.ael.algoryqrservice.qrservice.menu.service;
 
+import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuReservation;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuReservationStatus;
+import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuReservationRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuReservationSpecifications;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,7 @@ public class MenuReservationService {
     public static final String PANEL_DEVICE_TYPE = "PANEL";
 
     private final MenuRepository menuRepository;
+    private final BranchRepository branchRepository;
     private final MenuReservationRepository menuReservationRepository;
     private final SecurityUtils securityUtils;
 
@@ -64,6 +68,13 @@ public class MenuReservationService {
         }
 
         Menu menu = requirePublicMenu(menuId);
+        // Reservations are kept per venue: a menu that is not placed in a branch cannot take them.
+        if (menu.getBranchId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Bu menü için şu an rezervasyon alınmıyor. Lütfen restoranla iletişime geçin."
+            );
+        }
         String customerName = requireText(request.getCustomerName(), "Ad soyad zorunludur", 120);
         String phone = trimToNull(request.getPhone());
         String email = trimToNull(request.getEmail());
@@ -99,6 +110,7 @@ public class MenuReservationService {
         LocalDateTime now = LocalDateTime.now();
         MenuReservation reservation = MenuReservation.builder()
                 .menuId(menu.getMenuId())
+                .branchId(menu.getBranchId())
                 .customerName(customerName)
                 .phone(phone)
                 .email(email)
@@ -126,10 +138,30 @@ public class MenuReservationService {
             MenuDtos.ReservationCreateRequest request,
             String ipAddress
     ) {
+        Menu menu = requireOwnedMenu(menuId);
+        return createByBusiness(menu.getMenuId(), menu.getBranchId(), request, ipAddress);
+    }
+
+    /** A reservation the business takes for a branch; it names no menu. */
+    @Transactional
+    public MenuDtos.ReservationResponse createForBranch(
+            Long branchId,
+            MenuDtos.ReservationCreateRequest request,
+            String ipAddress
+    ) {
+        Branch branch = requireOwnedBranch(branchId);
+        return createByBusiness(null, branch.getId(), request, ipAddress);
+    }
+
+    private MenuDtos.ReservationResponse createByBusiness(
+            Long menuId,
+            Long branchId,
+            MenuDtos.ReservationCreateRequest request,
+            String ipAddress
+    ) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "İstek gövdesi zorunludur");
         }
-        Menu menu = requireOwnedMenu(menuId);
         String customerName = requireText(request.getCustomerName(), "Ad soyad zorunludur", 120);
         requirePartySize(request.getPartySize());
         if (request.getReservationAt() == null) {
@@ -138,7 +170,8 @@ public class MenuReservationService {
 
         LocalDateTime now = LocalDateTime.now();
         MenuReservation reservation = MenuReservation.builder()
-                .menuId(menu.getMenuId())
+                .menuId(menuId)
+                .branchId(branchId)
                 .customerName(customerName)
                 .phone(trimToNull(request.getPhone()))
                 .email(normalizeEmail(request.getEmail()))
@@ -165,12 +198,48 @@ public class MenuReservationService {
             int size
     ) {
         requireOwnedMenu(menuId);
-        MenuReservationStatus statusFilter = parseStatusFilter(status);
-        LocalDateTime fromDt = from == null ? null : from.atStartOfDay();
-        LocalDateTime toDt = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
-        String query = trimToNull(q);
-        String pattern = query == null ? null : "%" + query.toLowerCase(Locale.ROOT) + "%";
+        ListFilter filter = listFilter(status, from, to, q);
+        return listPage(
+                MenuReservationSpecifications.forOwner(menuId, filter.status(), filter.from(), filter.to(), filter.pattern()),
+                page,
+                size
+        );
+    }
 
+    /** Every reservation of the branch: booked from any of its menus or entered in the panel. */
+    @Transactional(readOnly = true)
+    public MenuDtos.ReservationPageResponse listForBranch(
+            Long branchId,
+            String status,
+            LocalDate from,
+            LocalDate to,
+            String q,
+            int page,
+            int size
+    ) {
+        requireOwnedBranch(branchId);
+        ListFilter filter = listFilter(status, from, to, q);
+        return listPage(
+                MenuReservationSpecifications.forBranch(branchId, filter.status(), filter.from(), filter.to(), filter.pattern()),
+                page,
+                size
+        );
+    }
+
+    private record ListFilter(MenuReservationStatus status, LocalDateTime from, LocalDateTime to, String pattern) {
+    }
+
+    private ListFilter listFilter(String status, LocalDate from, LocalDate to, String q) {
+        String query = trimToNull(q);
+        return new ListFilter(
+                parseStatusFilter(status),
+                from == null ? null : from.atStartOfDay(),
+                to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1),
+                query == null ? null : "%" + query.toLowerCase(Locale.ROOT) + "%"
+        );
+    }
+
+    private MenuDtos.ReservationPageResponse listPage(Specification<MenuReservation> spec, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? 20 : Math.min(size, 100);
         Pageable pageable = PageRequest.of(
@@ -178,10 +247,7 @@ public class MenuReservationService {
                 safeSize,
                 Sort.by(Sort.Order.desc("reservationAt"), Sort.Order.desc("createdAt"))
         );
-        Page<MenuReservation> result = menuReservationRepository.findAll(
-                MenuReservationSpecifications.forOwner(menuId, statusFilter, fromDt, toDt, pattern),
-                pageable
-        );
+        Page<MenuReservation> result = menuReservationRepository.findAll(spec, pageable);
 
         return MenuDtos.ReservationPageResponse.builder()
                 .content(result.getContent().stream().map(this::toResponse).toList())
@@ -200,13 +266,34 @@ public class MenuReservationService {
             MenuDtos.ReservationUpdateRequest request
     ) {
         requireOwnedMenu(menuId);
+        requireSomeEdit(request);
+        MenuReservation reservation = menuReservationRepository.findById(reservationId)
+                .filter(r -> menuId.equals(r.getMenuId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rezervasyon bulunamadı"));
+        return applyUpdate(reservation, request);
+    }
+
+    @Transactional
+    public MenuDtos.ReservationResponse updateForBranch(
+            Long branchId,
+            Long reservationId,
+            MenuDtos.ReservationUpdateRequest request
+    ) {
+        requireOwnedBranch(branchId);
+        requireSomeEdit(request);
+        MenuReservation reservation = menuReservationRepository.findById(reservationId)
+                .filter(r -> branchId.equals(r.getBranchId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rezervasyon bulunamadı"));
+        return applyUpdate(reservation, request);
+    }
+
+    private static void requireSomeEdit(MenuDtos.ReservationUpdateRequest request) {
         if (request == null || (request.getStatus() == null && request.getReservationAt() == null && !hasDetailEdits(request))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Güncellenecek alan belirtilmedi");
         }
+    }
 
-        MenuReservation reservation = menuReservationRepository.findById(reservationId)
-                .filter(r -> r.getMenuId().equals(menuId))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rezervasyon bulunamadı"));
+    private MenuDtos.ReservationResponse applyUpdate(MenuReservation reservation, MenuDtos.ReservationUpdateRequest request) {
 
         if (request.getStatus() != null) {
             validateStatusTransition(reservation.getStatus(), request.getStatus());
@@ -317,6 +404,12 @@ public class MenuReservationService {
         return menu;
     }
 
+    private Branch requireOwnedBranch(Long branchId) {
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        return branchRepository.findByIdAndMerchantIdAndDeletedFalse(branchId, ownerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Şube bulunamadı"));
+    }
+
     private Menu requireOwnedMenu(Long menuId) {
         Long ownerId = securityUtils.getCurrentMerchantId();
         Menu menu = menuRepository.findById(menuId)
@@ -332,6 +425,7 @@ public class MenuReservationService {
         return MenuDtos.ReservationResponse.builder()
                 .id(reservation.getId())
                 .menuId(reservation.getMenuId())
+                .branchId(reservation.getBranchId())
                 .customerName(reservation.getCustomerName())
                 .phone(reservation.getPhone())
                 .email(reservation.getEmail())
@@ -364,7 +458,7 @@ public class MenuReservationService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private String extractIpAddress(HttpServletRequest request) {
+    public String extractIpAddress(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
             return xff.split(",")[0].trim();

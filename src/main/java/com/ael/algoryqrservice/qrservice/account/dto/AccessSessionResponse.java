@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.account.dto;
 
+import com.ael.algoryqrservice.qrservice.access.BillingState;
 import com.ael.algoryqrservice.qrservice.model.enums.AccessDecision;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,7 @@ public record AccessSessionResponse(
         LocalDateTime endsAt,
         LocalDateTime debtDueAt,
         String messageKey,
-        String code
+        String code,
+        BillingState billingState
 ) {
 }

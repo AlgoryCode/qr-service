@@ -206,8 +206,12 @@ public class BranchService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR bulunamadı"));
             menuQrSoftDeleteService.softDeleteMenuQr(qr);
         }
+        boolean wasLive = !branch.isDeleted();
         branch.setDeleted(true);
         branchRepository.save(branch);
+        if (wasLive) {
+            productUsageGateway.free(branch.getMerchantId(), CatalogProducts.QR_BRANCH, 1);
+        }
     }
 
     @Transactional

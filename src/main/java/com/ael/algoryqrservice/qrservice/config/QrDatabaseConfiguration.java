@@ -58,6 +58,7 @@ public class QrDatabaseConfiguration {
                 "com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.authservice.infrastructure.persistence.entity",
                 "com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity",
+                "com.ael.algoryqrservice.shared.scheduling",
                 "com.ael.algoryqrservice.paymentservice.infrastructure.persistence.entity"
         );
         factory.setPersistenceUnitName("default");

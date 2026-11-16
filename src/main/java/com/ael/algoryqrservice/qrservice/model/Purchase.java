@@ -74,6 +74,10 @@ public class Purchase {
     @Column(name = "recurring_price", precision = 12, scale = 2)
     private BigDecimal recurringPrice;
 
+    /** Host purchase only: full-period total of recurring modules bought later; renews with it. */
+    @Column(name = "addon_recurring_amount", precision = 12, scale = 2)
+    private BigDecimal addonRecurringAmount;
+
     @Column(name = "coupon_id")
     private Long couponId;
 

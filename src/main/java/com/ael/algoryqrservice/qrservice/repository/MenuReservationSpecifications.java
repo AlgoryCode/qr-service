@@ -21,9 +21,31 @@ public final class MenuReservationSpecifications {
             LocalDateTime to,
             String pattern
     ) {
+        return filtered("menuId", menuId, status, from, to, pattern);
+    }
+
+    /** Every reservation of a branch, whichever menu (or the panel) it came from. */
+    public static Specification<MenuReservation> forBranch(
+            Long branchId,
+            MenuReservationStatus status,
+            LocalDateTime from,
+            LocalDateTime to,
+            String pattern
+    ) {
+        return filtered("branchId", branchId, status, from, to, pattern);
+    }
+
+    private static Specification<MenuReservation> filtered(
+            String scopeField,
+            Long scopeId,
+            MenuReservationStatus status,
+            LocalDateTime from,
+            LocalDateTime to,
+            String pattern
+    ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("menuId"), menuId));
+            predicates.add(cb.equal(root.get(scopeField), scopeId));
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
             }

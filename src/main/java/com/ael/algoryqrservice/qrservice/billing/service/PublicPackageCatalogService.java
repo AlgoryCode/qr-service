@@ -59,6 +59,12 @@ public class PublicPackageCatalogService {
         return toResponse(planPackage, modulesFor(List.of(planPackage.getId())).getOrDefault(id, List.of()));
     }
 
+    @Transactional(readOnly = true)
+    public java.util.Optional<PlanPackageResponse> findByCode(String code) {
+        return planPackageRepository.findByCodeWithItems(code)
+                .map(pkg -> toResponse(pkg, modulesFor(List.of(pkg.getId())).getOrDefault(pkg.getId(), List.of())));
+    }
+
     private List<PlanPackageResponse> toResponses(List<PlanPackage> packages) {
         Map<Long, List<PlanPackageModuleResponse>> modules = modulesFor(
                 packages.stream().map(PlanPackage::getId).toList()

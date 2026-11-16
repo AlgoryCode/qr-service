@@ -68,6 +68,7 @@ import com.ael.algoryqrservice.qrservice.analytics.service.WaiterPerformanceRepo
 @RequiredArgsConstructor
 public class AnalyticsService {
 
+    public static final String MERCHANT_WIDE_SCOPE_NAME = "Tüm şubeler";
     private static final String MOBILE = "MOBILE";
     private static final String TABLET = "TABLET";
     private static final String DESKTOP = "DESKTOP";
@@ -177,6 +178,16 @@ public class AnalyticsService {
             LocalDate to
     ) {
         return buildVisitReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
+    }
+
+    /** Visit report across every QR menu of the merchant (all branches). */
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuAnalyticsReportResponse getMerchantReport(
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        return buildVisitReport(resolveMerchantScope(ownerId), from, to);
     }
 
     private AnalyticsDtos.MenuAnalyticsReportResponse buildVisitReport(
@@ -344,6 +355,34 @@ public class AnalyticsService {
             LocalDate to
     ) {
         return buildRevenueReport(resolveBranchScope(branchId, menuId, ownerId), ownerId, from, to);
+    }
+
+    /** All detailed reports of the merchant (visits, revenue, waiters) for one period. */
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MerchantDetailedReportResponse getMerchantDetailedReport(
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        ReportScope scope = resolveMerchantScope(ownerId);
+        return new AnalyticsDtos.MerchantDetailedReportResponse(
+                scope.branchName(),
+                from,
+                to,
+                buildVisitReport(scope, from, to),
+                buildRevenueReport(scope, ownerId, from, to),
+                buildWaiterPerformanceReport(scope, from, to)
+        );
+    }
+
+    /** Revenue report across every branch and QR menu of the merchant. */
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MenuRevenueReportResponse getMerchantRevenueReport(
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        return buildRevenueReport(resolveMerchantScope(ownerId), ownerId, from, to);
     }
 
     private AnalyticsDtos.MenuRevenueReportResponse buildRevenueReport(
@@ -851,6 +890,16 @@ public class AnalyticsService {
         return buildWaiterPerformanceReport(resolveBranchScope(branchId, menuId, ownerId), from, to);
     }
 
+    /** Waiter performance across every branch of the merchant. */
+    @Transactional(readOnly = true)
+    public AnalyticsDtos.MerchantStaffPerformanceReportResponse getMerchantWaiterPerformanceReport(
+            Long ownerId,
+            LocalDate from,
+            LocalDate to
+    ) {
+        return buildWaiterPerformanceReport(resolveMerchantScope(ownerId), from, to);
+    }
+
     private AnalyticsDtos.MerchantStaffPerformanceReportResponse buildWaiterPerformanceReport(
             ReportScope scope,
             LocalDate from,
@@ -1060,7 +1109,21 @@ public class AnalyticsService {
         if (scope.branchId() != null) {
             return merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(scope.branchId());
         }
+        if (scope.merchantId() != null) {
+            return merchantStaffRepository.findByMerchantIdOrderByDisplayNameAsc(scope.merchantId());
+        }
         return List.of();
+    }
+
+    private ReportScope resolveMerchantScope(Long ownerId) {
+        if (ownerId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Merchant bulunamadı");
+        }
+        List<Menu> menus = menuRepository.findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(
+                ownerId,
+                MenuChannel.QR
+        );
+        return ReportScope.forMerchant(ownerId, MERCHANT_WIDE_SCOPE_NAME, menus);
     }
 
     private ReportScope resolveMenuScope(Long menuId, Long ownerId) {
@@ -1248,8 +1311,23 @@ public class AnalyticsService {
             String menuName,
             List<Long> menuIds,
             Map<Long, String> menuNamesById,
-            boolean disambiguateNames
+            boolean disambiguateNames,
+            Long merchantId
     ) {
+        private static ReportScope forMerchant(Long merchantId, String label, List<Menu> menus) {
+            ReportScope base = forMenus(null, label, null, null, menus);
+            return new ReportScope(
+                    null,
+                    label,
+                    null,
+                    null,
+                    base.menuIds(),
+                    base.menuNamesById(),
+                    base.disambiguateNames(),
+                    merchantId
+            );
+        }
+
         private static ReportScope forMenus(
                 Long branchId,
                 String branchName,
@@ -1272,7 +1350,8 @@ public class AnalyticsService {
                     menuName,
                     ids,
                     names,
-                    menuId == null && ids.size() > 1
+                    menuId == null && ids.size() > 1,
+                    null
             );
         }
     }

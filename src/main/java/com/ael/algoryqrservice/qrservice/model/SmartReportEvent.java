@@ -35,6 +35,11 @@ public class SmartReportEvent {
     public static final String STATUS_COMPLETED = "completed";
     public static final String STATUS_FAILED = "failed";
 
+    /** Credit that paid for the report. */
+    public static final String CREDIT_FREE = "FREE";
+    public static final String CREDIT_BONUS = "BONUS";
+    public static final String CREDIT_PAID = "PAID";
+
     @Id
     @Column(name = "process_id", nullable = false)
     private UUID processId;
@@ -86,4 +91,8 @@ public class SmartReportEvent {
 
     @Column(name = "notification_sent_at")
     private LocalDateTime notificationSentAt;
+
+    /** FREE, BONUS or PAID; see the CREDIT_* constants. */
+    @Column(name = "credit_source", length = 16)
+    private String creditSource;
 }

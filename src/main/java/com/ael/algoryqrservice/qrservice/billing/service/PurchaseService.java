@@ -100,6 +100,8 @@ public class PurchaseService {
     private final CartPricingService cartPricingService;
     private final PurchaseItemRepository purchaseItemRepository;
     private final ExternalPackageViewService externalPackageView;
+    private final PlanChangeService planChangeService;
+    private final com.ael.algoryqrservice.qrservice.billing.invoice.InvoiceService invoiceService;
 
     /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
     private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
@@ -276,6 +278,11 @@ public class PurchaseService {
                 && purchase.getCancellationReason() != PurchaseCancellationReason.PAYMENT_TIMEOUT) {
             throw new InvalidPaymentEventException("Manually cancelled purchase cannot be fulfilled");
         }
+        if (planChangeService.fulfillUpgradePayment(purchase, event, metadata)) {
+            invoiceService.recordSale(purchase, event);
+            markEventProcessed(event, purchase.getId());
+            return;
+        }
         purchaseFulfillmentService.fulfillPaidInstallment(purchase, event, metadata);
         couponRedemptionService.consume(purchase);
 
@@ -286,6 +293,7 @@ public class PurchaseService {
                 purchase.getPackageName() + " paketi " + metadata.installmentNumber()
                         + "/" + metadata.installmentCount() + " taksiti işlendi"
         );
+        invoiceService.recordSale(purchase, event);
         markEventProcessed(event, purchase.getId());
     }
 
@@ -314,6 +322,8 @@ public class PurchaseService {
                         LocalDateTime.now().plusDays(billingSubscriptionProperties.getManualPaymentGraceDays())
                 );
                 purchaseRepository.save(purchase);
+                fulfillmentQueuePublisher.publishPaymentOverdue(
+                        purchase, purchase.getSubscriptionGraceEndsAt(), "payment_failed_after_retries");
                 log.warn(
                         "Marked subscription GRACE_PERIOD after renewal failure. purchaseId={} eventId={}",
                         purchase.getId(),
@@ -338,6 +348,7 @@ public class PurchaseService {
             }
             purchaseRepository.save(purchase);
             couponRedemptionService.release(purchase);
+            planChangeService.onPaymentFailed(purchase.getId());
             String reason = event.getFailureReason() == null || event.getFailureReason().isBlank()
                     ? "ödeme başarısız"
                     : event.getFailureReason();
@@ -377,6 +388,8 @@ public class PurchaseService {
                 "payment_failed_after_retries", "system_renewal");
         purchase.setSubscriptionGraceEndsAt(now.plusDays(billingSubscriptionProperties.getManualPaymentGraceDays()));
         purchaseRepository.save(purchase);
+        fulfillmentQueuePublisher.publishPaymentOverdue(
+                purchase, purchase.getSubscriptionGraceEndsAt(), "payment_failed_after_retries");
         purchaseLogService.log(
                 purchase.getId(),
                 purchase.getMerchantId(),
@@ -528,6 +541,7 @@ public class PurchaseService {
         } else {
             applyExternalRefundSideEffects(purchase);
         }
+        invoiceService.recordRefund(purchase, event);
         markEventProcessed(event, purchase.getId());
     }
 
@@ -1361,7 +1375,12 @@ public class PurchaseService {
                 throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
             }
         } else if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
-            if (purchase.getPrice().compareTo(event.getAmount()) != 0) {
+            // The first charge is the purchase price (coupons apply once); renewals charge the recurring price.
+            boolean firstCharge = purchase.getPrice().compareTo(event.getAmount()) == 0;
+            boolean renewalCharge = (purchase.getRecurringPrice() != null
+                    && purchase.getRecurringPrice().compareTo(event.getAmount()) == 0)
+                    || RecurringAddonBilling.renewalAmount(purchase).compareTo(event.getAmount()) == 0;
+            if (!firstCharge && !renewalCharge) {
                 throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
             }
         } else {

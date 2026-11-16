@@ -14,6 +14,9 @@ import com.ael.algoryqrservice.qrservice.model.enums.AccessDecision;
 import com.ael.algoryqrservice.qrservice.model.enums.AuthProvider;
 import com.ael.algoryqrservice.qrservice.model.enums.UserRole;
 import com.ael.algoryqrservice.qrservice.repository.UserRepository;
+import com.ael.algoryqrservice.qrservice.access.BillingState;
+import com.ael.algoryqrservice.qrservice.access.SessionAccessService;
+import com.ael.algoryqrservice.qrservice.billing.externalpackageresponsemapper.service.ExternalPackageResponseMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +51,14 @@ class SessionContextServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SessionContextService(userRepository, authMerchantClient, fulfillmentClient, new SessionContextAssembler());
+        ExternalPackageResponseMapper mapper = new ExternalPackageResponseMapper();
+        service = new SessionContextService(
+                userRepository,
+                authMerchantClient,
+                fulfillmentClient,
+                new SessionContextAssembler(),
+                new SessionAccessService(fulfillmentClient, mapper),
+                mapper);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user()));
     }
 
@@ -60,6 +70,7 @@ class SessionContextServiceTest {
         SessionContextResponse response = service.resolve(USER_ID);
 
         assertThat(response.decision()).isEqualTo(AccessDecision.ALLOW);
+        assertThat(response.billingState()).isEqualTo(BillingState.ACTIVE);
         assertThat(response.packageCode()).isEqualTo("ULTIMATE_PACKAGE");
         assertThat(response.packageName()).isEqualTo("Ultimate");
         assertThat(response.products()).containsExactly("QR_MENU");
@@ -67,8 +78,45 @@ class SessionContextServiceTest {
     }
 
     @Test
+    void resolve_whenRenewalFailed_thenAllowWithGraceDeadline() {
+        Instant graceEndsAt = Instant.now().plusSeconds(3 * 86_400);
+        ExternalActivePackageResponse grace = withLifecycle(activePackage("GRACE_PERIOD"), "PAID", graceEndsAt,
+                LocalDate.now().minusDays(1));
+        when(fulfillmentClient.findPackage(USER_ID)).thenReturn(new PackageView("ACTIVE", grace));
+        when(fulfillmentClient.listEntitlements(USER_ID)).thenReturn(List.of(entitlement()));
+
+        SessionContextResponse response = service.resolve(USER_ID);
+
+        assertThat(response.decision()).isEqualTo(AccessDecision.ALLOW);
+        assertThat(response.billingState()).isEqualTo(BillingState.PAST_DUE);
+        assertThat(response.debtDueAt()).isNotNull();
+        assertThat(response.entitlements().getFirst().remaining()).isEqualTo(8);
+    }
+
+    @Test
+    void resolve_whenTrial_thenTrialing() {
+        when(fulfillmentClient.findPackage(USER_ID)).thenReturn(new PackageView("ACTIVE",
+                withLifecycle(activePackage("ACTIVE"), "TRIAL", null, LocalDate.now().plusDays(5))));
+        when(fulfillmentClient.listEntitlements(USER_ID)).thenReturn(List.of());
+
+        assertThat(service.resolve(USER_ID).billingState()).isEqualTo(BillingState.TRIALING);
+    }
+
+    @Test
+    void resolve_whenNeverHadPackage_thenStartPackage() {
+        when(fulfillmentClient.findPackage(USER_ID)).thenReturn(new PackageView("INACTIVE", null));
+        when(fulfillmentClient.hasAnyPackage(USER_ID)).thenReturn(false);
+
+        SessionContextResponse response = service.resolve(USER_ID);
+
+        assertThat(response.decision()).isEqualTo(AccessDecision.START_PACKAGE);
+        assertThat(response.billingState()).isEqualTo(BillingState.NONE);
+    }
+
+    @Test
     void resolve_whenPackageInactive_thenRequirePurchase() {
         when(fulfillmentClient.findPackage(USER_ID)).thenReturn(new PackageView("INACTIVE", null));
+        when(fulfillmentClient.hasAnyPackage(USER_ID)).thenReturn(true);
 
         SessionContextResponse response = service.resolve(USER_ID);
 
@@ -107,13 +155,20 @@ class SessionContextServiceTest {
                 "ULTIMATE_PACKAGE",
                 "Ultimate",
                 LocalDate.of(2026, 9, 1),
-                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2099, 10, 1),
                 status,
                 Instant.parse("2026-09-01T00:00:00Z"),
                 Instant.parse("2026-09-01T00:00:00Z"),
                 List.of("QR_MENU"),
                 List.of("QR_MENU_OWNER")
         );
+    }
+
+    private static ExternalActivePackageResponse withLifecycle(
+            ExternalActivePackageResponse base, String kind, Instant graceEndsAt, LocalDate periodEnd) {
+        return new ExternalActivePackageResponse(base.id(), base.merchantId(), base.fulfillmentId(), base.purchaseId(),
+                base.packageId(), base.packageCode(), base.packageName(), base.periodStart(), periodEnd,
+                base.status(), base.activatedAt(), base.updatedAt(), base.products(), base.scopes(), kind, graceEndsAt);
     }
 
     private ExternalEntitlementResponse entitlement() {

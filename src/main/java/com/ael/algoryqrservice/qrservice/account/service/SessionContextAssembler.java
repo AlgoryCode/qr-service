@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.qrservice.account.service;
 
 import com.ael.algoryqrservice.qrservice.access.AccessSession;
+import com.ael.algoryqrservice.qrservice.access.BillingState;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.qrservice.account.dto.SessionContextResponse;
@@ -19,18 +20,20 @@ public class SessionContextAssembler {
 
     public SessionContextResponse paid(
             SessionUserResponse user,
+            AccessSession session,
             ExternalActivePackageResponse activePackage,
             List<ExternalEntitlementResponse> entitlements
     ) {
         return response(new Parts(
                 user,
                 AccessDecision.ALLOW,
+                session.billingState(),
                 activePackage.packageCode(),
                 activePackage.packageName(),
                 activePackage.periodStart(),
                 activePackage.periodEnd(),
                 endOf(activePackage.periodEnd()),
-                null,
+                session.debtDueAt(),
                 sorted(activePackage.products()),
                 sorted(activePackage.scopes()),
                 entitlements.stream().map(this::entitlement).toList()
@@ -41,6 +44,7 @@ public class SessionContextAssembler {
         return response(new Parts(
                 user,
                 session.decision(),
+                session.billingState(),
                 session.packageCode(),
                 null,
                 null,
@@ -57,6 +61,7 @@ public class SessionContextAssembler {
         return response(new Parts(
                 user,
                 session.decision(),
+                session.billingState(),
                 session.packageCode(),
                 null,
                 null,
@@ -80,6 +85,7 @@ public class SessionContextAssembler {
                 parts.endsAt(),
                 parts.debtDueAt(),
                 AccessSession.messageKeyOf(parts.decision()),
+                parts.billingState(),
                 parts.products(),
                 parts.scopes(),
                 parts.entitlements()
@@ -94,8 +100,19 @@ public class SessionContextAssembler {
                 entitlement.quantity(),
                 entitlement.unlimited(),
                 entitlement.usedQuantity(),
-                entitlement.source()
+                remaining(entitlement),
+                entitlement.source(),
+                entitlement.expiresAt()
         );
+    }
+
+    private static Integer remaining(ExternalEntitlementResponse entitlement) {
+        if (entitlement.unlimited()) {
+            return null;
+        }
+        int limit = entitlement.quantity() == null ? 0 : entitlement.quantity();
+        int used = entitlement.usedQuantity() == null ? 0 : entitlement.usedQuantity();
+        return Math.max(0, limit - used);
     }
 
     private List<String> sorted(List<String> codes) {
@@ -115,6 +132,7 @@ public class SessionContextAssembler {
     private record Parts(
             SessionUserResponse user,
             AccessDecision decision,
+            BillingState billingState,
             String packageCode,
             String packageName,
             LocalDate periodStart,

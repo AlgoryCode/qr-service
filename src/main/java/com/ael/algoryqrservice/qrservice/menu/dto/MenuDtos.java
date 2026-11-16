@@ -328,6 +328,7 @@ public final class MenuDtos {
     public static class ReservationResponse {
         private Long id;
         private Long menuId;
+        private Long branchId;
         private String customerName;
         private String phone;
         private String email;

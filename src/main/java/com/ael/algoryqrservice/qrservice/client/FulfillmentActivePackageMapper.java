@@ -23,7 +23,7 @@ public class FulfillmentActivePackageMapper {
                 ? null
                 : LocalDateTime.ofInstant(source.activatedAt(), ZoneOffset.UTC);
         boolean expired = expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
-        boolean active = "ACTIVE".equals(source.status()) && !expired;
+        boolean active = source.isOpen();
         Integer daysUntilExpiry = source.periodEnd() == null
                 ? null
                 : (int) ChronoUnit.DAYS.between(LocalDate.now(), source.periodEnd());

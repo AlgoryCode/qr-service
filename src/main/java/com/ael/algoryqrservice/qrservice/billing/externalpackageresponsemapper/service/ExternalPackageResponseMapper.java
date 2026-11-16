@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.qrservice.billing.externalpackageresponsemapper.service;
 
 import com.ael.algoryqrservice.qrservice.access.AccessSession;
+import com.ael.algoryqrservice.qrservice.access.BillingState;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalActivePackageResponse;
 import com.ael.algoryqrservice.qrservice.client.dto.ExternalEntitlementResponse;
 import com.ael.algoryqrservice.qrservice.integration.dto.FulfillmentDetailResponse;
@@ -30,7 +31,7 @@ public class ExternalPackageResponseMapper {
 
     public PurchaseResponse toPurchase(ExternalActivePackageResponse active) {
         LocalDateTime expiresAt = endOfDay(active.periodEnd());
-        boolean usable = isOpen(active.status(), active.periodEnd());
+        boolean usable = active.isOpen();
         return PurchaseResponse.builder()
                 .id(purchaseKey(active))
                 .merchantId(active.merchantId())
@@ -70,16 +71,19 @@ public class ExternalPackageResponseMapper {
     }
 
     public AccessSession toAllowSession(ExternalActivePackageResponse active) {
+        LocalDateTime debtDueAt = active.inGrace() && active.graceEndsAt() != null
+                ? LocalDateTime.ofInstant(active.graceEndsAt(), AppTime.ZONE)
+                : null;
         return AccessSession.of(
                 AccessDecision.ALLOW,
                 active.packageCode(),
                 endOfDay(active.periodEnd()),
-                null
-        );
+                debtDueAt
+        ).withBillingState(BillingState.of(active));
     }
 
     public Optional<AccessSession> toOpenSession(ExternalActivePackageResponse active) {
-        if (active == null || !isOpen(active.status(), active.periodEnd())) {
+        if (active == null || !active.isOpen()) {
             return Optional.empty();
         }
         return Optional.of(toAllowSession(active));
@@ -157,13 +161,6 @@ public class ExternalPackageResponseMapper {
         }
         Instant expiresAt = entitlement.expiresAt();
         return expiresAt == null || expiresAt.isAfter(Instant.now());
-    }
-
-    private boolean isOpen(String status, LocalDate periodEnd) {
-        if (!ACTIVE.equals(status)) {
-            return false;
-        }
-        return periodEnd == null || !periodEnd.isBefore(LocalDate.now(AppTime.ZONE));
     }
 
     private PurchaseStatus purchaseStatus(String status, boolean usable) {

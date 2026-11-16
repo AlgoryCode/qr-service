@@ -747,4 +747,19 @@ public class AnalyticsDtos {
             List<DrillDownLink> drillDownHints
     ) {
     }
+
+    /**
+     * Every detailed report of a merchant for one period, across all branches:
+     * menu visits, revenue/channels and waiter performance. This is the data the
+     * merchant-wide smart report sends to the AI batch API.
+     */
+    public record MerchantDetailedReportResponse(
+            String scopeName,
+            LocalDate from,
+            LocalDate to,
+            MenuAnalyticsReportResponse visits,
+            MenuRevenueReportResponse revenue,
+            MerchantStaffPerformanceReportResponse waiter
+    ) {
+    }
 }

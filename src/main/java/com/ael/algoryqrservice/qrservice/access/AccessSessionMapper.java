@@ -20,7 +20,8 @@ public final class AccessSessionMapper {
                 session.endsAt(),
                 session.debtDueAt(),
                 session.messageKey(),
-                code
+                code,
+                session.billingState()
         );
     }
 
@@ -31,7 +32,8 @@ public final class AccessSessionMapper {
                 session.endsAt(),
                 session.debtDueAt(),
                 PRODUCT_NOT_IN_PACKAGE,
-                PRODUCT_NOT_IN_PACKAGE
+                PRODUCT_NOT_IN_PACKAGE,
+                session.billingState()
         );
     }
 }

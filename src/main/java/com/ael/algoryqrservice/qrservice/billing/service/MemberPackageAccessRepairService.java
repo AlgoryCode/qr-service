@@ -208,12 +208,17 @@ public class MemberPackageAccessRepairService {
 
         private final MemberPackageAccessRepairService repairService;
         private final AppProperties appProperties;
+        private final com.ael.algoryqrservice.shared.scheduling.SchedulerLock schedulerLock;
 
         @Scheduled(fixedDelayString = "${app.fulfillment.repair-job-fixed-delay-ms:900000}")
         public void runScheduledRepair() {
             if (!appProperties.getFulfillment().isRepairJobEnabled()) {
                 return;
             }
+            schedulerLock.runExclusively("fulfillment-repair", java.time.Duration.ofMinutes(14), this::repair);
+        }
+
+        void repair() {
             int repaired = repairService.repairBatch(appProperties.getFulfillment().getRepairJobBatchSize());
             if (repaired > 0) {
                 log.info("Scheduled fulfillment repair completed for {} merchant(s)", repaired);

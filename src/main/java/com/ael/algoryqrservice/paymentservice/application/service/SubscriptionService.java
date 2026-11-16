@@ -166,7 +166,7 @@ public class SubscriptionService {
                 .sourceReferenceId(command.getSourceReferenceId())
                 .paymentMethodId(command.getPaymentMethodId())
                 .initialConversationId(command.getConversationId())
-                .amount(command.getPaidPrice())
+                .amount(renewalAmount(command.getSourceMetadata(), command.getPaidPrice()))
                 .currency(command.getCurrency())
                 .billingIntervalMonths(resolveInterval(command))
                 .totalCycleCount(command.getSubscriptionCycleCount())
@@ -214,7 +214,7 @@ public class SubscriptionService {
                 .serviceName(command.getServiceName())
                 .sourceReferenceId(command.getSourceReferenceId())
                 .initialConversationId(command.getConversationId())
-                .amount(command.getPaidPrice())
+                .amount(renewalAmount(command.getSourceMetadata(), command.getPaidPrice()))
                 .currency(command.getCurrency())
                 .billingIntervalMonths(intervalMonths)
                 .totalCycleCount(command.getSubscriptionCycleCount())
@@ -267,14 +267,54 @@ public class SubscriptionService {
             subscription.setCompletedCycleCount(Math.max(subscription.getCompletedCycleCount(), cycle));
         }
 
+        LocalDateTime previousDue = subscription.getNextChargeAt();
         subscription.setRetryCount(0);
         subscription.setLastError(null);
         subscription.setStatus(isComplete(subscription) ? "COMPLETED" : "ACTIVE");
         subscription.setNextChargeAt(isComplete(subscription)
                 ? null
-                : now.plusMonths(subscription.getBillingIntervalMonths()));
+                : nextChargeAfterPayment(previousDue, initialPayment, now, subscription.getBillingIntervalMonths()));
         subscription.setUpdatedAt(now);
         repository.save(subscription);
+    }
+
+    /**
+     * The next charge keeps the subscription's billing day: a renewal paid late (after retries or
+     * in the grace period) still bills on the original day next time. Only when even that day has
+     * already passed (paid more than a whole period late) does the cycle restart from today.
+     */
+    static LocalDateTime nextChargeAfterPayment(
+            LocalDateTime previousDue,
+            boolean initialPayment,
+            LocalDateTime now,
+            int intervalMonths
+    ) {
+        if (initialPayment || previousDue == null) {
+            return now.plusMonths(intervalMonths);
+        }
+        LocalDateTime anchored = previousDue.plusMonths(intervalMonths);
+        return anchored.isAfter(now) ? anchored : now.plusMonths(intervalMonths);
+    }
+
+    /**
+     * What every renewal charges: the package plus its modules at list price ({@code recurringPrice}
+     * from the purchase), not the first payment, which may include a coupon or a prorated period.
+     */
+    static BigDecimal renewalAmount(Map<String, Object> sourceMetadata, BigDecimal firstPayment) {
+        Object raw = sourceMetadata == null ? null : sourceMetadata.get("recurringPrice");
+        BigDecimal recurring = null;
+        if (raw instanceof BigDecimal decimal) {
+            recurring = decimal;
+        } else if (raw instanceof Number number) {
+            recurring = new BigDecimal(number.toString());
+        } else if (raw instanceof String text && !text.isBlank()) {
+            try {
+                recurring = new BigDecimal(text.trim());
+            } catch (NumberFormatException ignored) {
+                recurring = null;
+            }
+        }
+        return recurring != null && recurring.signum() > 0 ? recurring : firstPayment;
     }
 
     @Transactional
@@ -303,6 +343,53 @@ public class SubscriptionService {
         subscription.setNextChargeAt(null);
         subscription.setUpdatedAt(LocalDateTime.now());
         return toResponse(repository.save(subscription));
+    }
+
+    /**
+     * Points a live subscription at another purchase (a plan change): every later renewal charges
+     * {@code amount} and its payment event carries {@code metadataPatch} (a null value removes the key).
+     * The billing day is kept. Returns false, changing nothing, when the subscription is missing,
+     * no longer renews, or its stored renewal request cannot be rewritten.
+     */
+    @Transactional
+    public boolean switchPlan(
+            String accountId,
+            String id,
+            String sourceReferenceId,
+            BigDecimal amount,
+            Map<String, Object> metadataPatch
+    ) {
+        Optional<SubscriptionEntity> found = repository.findByIdAndAccountId(id, accountId);
+        if (found.isEmpty() || !RENEWAL_LINK_STATUSES.contains(found.get().getStatus())) {
+            return false;
+        }
+        SubscriptionEntity subscription = found.get();
+        String payload;
+        try {
+            CreatePaymentCommand template = jsonMapper.readValue(subscription.getRequestPayload(), CreatePaymentCommand.class);
+            Map<String, Object> metadata = new java.util.LinkedHashMap<>(
+                    template.getSourceMetadata() == null ? Map.of() : template.getSourceMetadata());
+            metadataPatch.forEach((key, value) -> {
+                if (value == null) {
+                    metadata.remove(key);
+                } else {
+                    metadata.put(key, value);
+                }
+            });
+            template.setSourceReferenceId(sourceReferenceId);
+            template.setSourceMetadata(metadata);
+            payload = serializeRenewalTemplate(template);
+        } catch (Exception exception) {
+            log.error("Subscription renewal request could not be rewritten for a plan change. subscriptionId={}",
+                    id, exception);
+            return false;
+        }
+        subscription.setRequestPayload(payload);
+        subscription.setSourceReferenceId(sourceReferenceId);
+        subscription.setAmount(amount);
+        subscription.setUpdatedAt(LocalDateTime.now());
+        repository.save(subscription);
+        return true;
     }
 
     @Transactional

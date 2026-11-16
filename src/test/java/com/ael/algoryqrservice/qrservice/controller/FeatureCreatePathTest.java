@@ -33,7 +33,8 @@ class FeatureCreatePathTest {
                 .containsExactly("/api/v1/features/SMART_REPORTING");
         assertThat(postPaths(FeatureSmartReportingController.class)).containsExactlyInAnyOrder(
                 "/branches/{branchId}/reports",
-                "/menus/{menuId}/reports"
+                "/menus/{menuId}/reports",
+                "/merchant/reports"
         );
         assertThat(FeatureAiMenuImportController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/api/v1/features/AI_MENU_IMPORT");

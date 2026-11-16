@@ -1024,9 +1024,13 @@ public class MenuService {
             ensureOwnedMenu(product.getMenuId());
         }
         productImageStorageService.deleteQuietly(productImageStorageService.extractObjectKey(product.getImageUrl()));
+        boolean wasLive = !product.isDeleted();
         product.setDeleted(true);
         menuProductRepository.save(product);
         menuProductIndexNotifier.productRemoved(product.getMenuId(), product.getProductId());
+        if (wasLive) {
+            productUsageGateway.free(product.getMerchantId(), CatalogProducts.MENU_PRODUCT, 1);
+        }
     }
 
     @Transactional

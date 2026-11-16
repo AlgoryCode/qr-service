@@ -125,6 +125,34 @@ class AnalyticsServiceTest {
     }
 
     @Test
+    void getMerchantDetailedReport_whenCalled_thenAggregatesAllBranchesOfMerchant() {
+        LocalDate from = LocalDate.of(2026, 11, 1);
+        LocalDate to = LocalDate.of(2026, 11, 7);
+        when(menuRepository.findByMerchantIdAndChannelAndDeletedFalseOrderByMenuIdAsc(7L, MenuChannel.QR))
+                .thenReturn(List.of());
+
+        AnalyticsDtos.MerchantDetailedReportResponse report = service.getMerchantDetailedReport(7L, from, to);
+
+        assertThat(report.scopeName()).isEqualTo(AnalyticsService.MERCHANT_WIDE_SCOPE_NAME);
+        assertThat(report.from()).isEqualTo(from);
+        assertThat(report.to()).isEqualTo(to);
+        assertThat(report.visits()).isNotNull();
+        assertThat(report.visits().branchId()).isNull();
+        assertThat(report.visits().branchName()).isEqualTo(AnalyticsService.MERCHANT_WIDE_SCOPE_NAME);
+        assertThat(report.visits().daily()).hasSize(7);
+        assertThat(report.revenue()).isNotNull();
+        verify(merchantStaffRepository).findByMerchantIdOrderByDisplayNameAsc(7L);
+        verify(merchantStaffRepository, never()).findByBranchIdOrderByDisplayNameAsc(any());
+        verify(uberEatsConnectionRepository).findByMerchantIdOrderByUpdatedAtDesc(7L);
+    }
+
+    @Test
+    void getMerchantDetailedReport_whenNoMerchant_thenUnauthorized() {
+        assertThatThrownBy(() -> service.getMerchantDetailedReport(null, LocalDate.now(), LocalDate.now()))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void recordEvents_whenValidBatch_thenUpsertsSessionAndSavesEvents() {
         UUID sessionId = UUID.randomUUID();
         Menu menu = publicMenu(5L, 9L);

@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.paymentservice.infrastructure.messaging;
 
+import com.ael.algoryqrservice.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import com.ael.algoryqrservice.paymentservice.domain.model.PaymentCompletedEvent;
 import com.ael.algoryqrservice.paymentservice.infrastructure.persistence.entity.PaymentEventOutboxEntity;
 import com.ael.algoryqrservice.paymentservice.infrastructure.persistence.repository.PaymentEventOutboxJpaRepository;
@@ -25,22 +27,28 @@ public class PaymentEventOutboxPublisher {
     private static final int MAX_BACKOFF_MINUTES = 60;
 
     private final PaymentEventOutboxJpaRepository outboxRepository;
+    private final SchedulerLock schedulerLock;
     private final JsonMapper jsonMapper;
     private final PaymentModuleQrEventBridge inProcessBridge;
 
     public PaymentEventOutboxPublisher(
             PaymentEventOutboxJpaRepository outboxRepository,
             JsonMapper jsonMapper,
-            @Lazy PaymentModuleQrEventBridge inProcessBridge
+            @Lazy PaymentModuleQrEventBridge inProcessBridge,
+            SchedulerLock schedulerLock
     ) {
         this.outboxRepository = outboxRepository;
+        this.schedulerLock = schedulerLock;
         this.jsonMapper = jsonMapper;
         this.inProcessBridge = inProcessBridge;
     }
 
     @Scheduled(fixedDelayString = "${payment.outbox.fixed-delay:5000}")
-    @Transactional
     public void publishPendingEvents() {
+        schedulerLock.runExclusivelyInTransaction("payment-outbox", Duration.ofMinutes(2), this::publishPendingEventsLocked);
+    }
+
+    void publishPendingEventsLocked() {
         List<PaymentEventOutboxEntity> events =
                 outboxRepository.findByStatusAndNextAttemptAtLessThanEqualOrderById(
                         STATUS_PENDING,

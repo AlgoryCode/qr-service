@@ -15,6 +15,7 @@ import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class ProductUsageGateway {
 
     private static final String ACTIVE = "ACTIVE";
@@ -40,6 +41,21 @@ public class ProductUsageGateway {
             return fulfillmentClient.consume(merchantId, productCode, quantity);
         } catch (FulfillmentQuotaExceededException exception) {
             throw quotaExceeded(productCode);
+        }
+    }
+
+    /**
+     * Gives back usage when the counted thing (a branch, a menu product) is deleted, so the merchant
+     * can create another within the same limit. Best effort: a failure here must not block the delete.
+     */
+    public void free(Long merchantId, String productCode, int quantity) {
+        if (merchantId == null || quantity <= 0) {
+            return;
+        }
+        try {
+            fulfillmentClient.release(merchantId, productCode, quantity);
+        } catch (RuntimeException exception) {
+            log.warn("Usage release failed. merchantId={} product={} quantity={}", merchantId, productCode, quantity, exception);
         }
     }
 
