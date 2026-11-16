@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.config;
 
+import com.ael.algoryqrservice.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import com.ael.algoryqrservice.qrservice.messaging.dto.SmartReportStatusMessage;
 import com.ael.algoryqrservice.qrservice.model.BatchReport;
 import com.ael.algoryqrservice.qrservice.model.BatchReportItem;
@@ -19,10 +21,15 @@ import java.time.Instant;
 public class BatchReportReconcileScheduler {
 
     private final BatchReportService batchReportService;
+    private final SchedulerLock schedulerLock;
     private final SmartReportService smartReportService;
 
     @Scheduled(fixedDelayString = "${batch-reports.reconcile-interval-ms:60000}")
     public void reconcile() {
+        schedulerLock.runExclusively("batch-report-reconcile", Duration.ofMinutes(5), this::reconcileLocked);
+    }
+
+    void reconcileLocked() {
         var openBatches = batchReportService.findOpenBatches();
         log.info("Batch report reconcile tick. openBatchCount={}", openBatches.size());
         for (BatchReport batch : openBatches) {

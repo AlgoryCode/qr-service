@@ -1,10 +1,12 @@
 package com.ael.algoryqrservice.qrservice.service;
 
 import com.ael.algoryqrservice.qrservice.menu.service.MenuReservationService;
+import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.MenuReservation;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuReservationStatus;
+import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuReservationRepository;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -36,6 +38,8 @@ class MenuReservationServiceTest {
 
     @Mock
     private MenuRepository menuRepository;
+    @Mock
+    private BranchRepository branchRepository;
     @Mock
     private MenuReservationRepository menuReservationRepository;
     @Mock
@@ -288,10 +292,113 @@ class MenuReservationServiceTest {
         )).isInstanceOf(ResponseStatusException.class);
     }
 
+    @Test
+    void createPublic_stampsTheMenusBranch() {
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(publicMenu()));
+        when(menuReservationRepository.countByMenuIdAndIpAddressAndCreatedAtAfter(eq(10L), eq("1.2.3.4"), any()))
+                .thenReturn(0L);
+        when(menuReservationRepository.save(any(MenuReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MenuDtos.ReservationResponse response = menuReservationService.createPublic(
+                10L, validRequest(), "1.2.3.4", "Mozilla/5.0"
+        );
+
+        assertThat(response.getBranchId()).isEqualTo(7L);
+        assertThat(response.getMenuId()).isEqualTo(10L);
+    }
+
+    @Test
+    void createPublic_whenMenuHasNoBranch_thenConflict() {
+        Menu menu = publicMenu();
+        menu.setBranchId(null);
+        when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+
+        assertThatThrownBy(() -> menuReservationService.createPublic(10L, validRequest(), "1.2.3.4", "Mozilla/5.0"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void createForBranch_namesNoMenuAndIsConfirmed() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(7L, 9L)).thenReturn(Optional.of(branch()));
+        when(menuReservationRepository.save(any(MenuReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MenuDtos.ReservationResponse response = menuReservationService.createForBranch(7L, validRequest(), "1.2.3.4");
+
+        assertThat(response.getBranchId()).isEqualTo(7L);
+        assertThat(response.getMenuId()).isNull();
+        assertThat(response.getStatus()).isEqualTo(MenuReservationStatus.ACTIVE);
+        assertThat(response.getDeviceType()).isEqualTo(MenuReservationService.PANEL_DEVICE_TYPE);
+    }
+
+    @Test
+    void branchEndpoints_whenBranchIsNotOwned_thenNotFound() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(99L);
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(7L, 99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> menuReservationService.listForBranch(7L, "all", null, null, null, 0, 20))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void listForBranch_returnsThePage() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(7L, 9L)).thenReturn(Optional.of(branch()));
+        when(menuReservationRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<MenuReservation>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(reservation(5L, MenuReservationStatus.PENDING))));
+
+        MenuDtos.ReservationPageResponse page = menuReservationService.listForBranch(7L, "all", null, null, "ayşe", 0, 20);
+
+        assertThat(page.getContent()).extracting(MenuDtos.ReservationResponse::getBranchId).containsExactly(7L);
+    }
+
+    @Test
+    void updateForBranch_whenReservationIsOfAnotherBranch_thenNotFound() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(8L, 9L))
+                .thenReturn(Optional.of(Branch.builder().id(8L).merchantId(9L).name("Moda").build()));
+        when(menuReservationRepository.findById(5L)).thenReturn(Optional.of(reservation(5L, MenuReservationStatus.PENDING)));
+
+        assertThatThrownBy(() -> menuReservationService.updateForBranch(
+                8L, 5L, MenuDtos.ReservationUpdateRequest.builder().status(MenuReservationStatus.ACTIVE).build()
+        )).isInstanceOfSatisfying(ResponseStatusException.class,
+                ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void updateForBranch_confirmsAPendingReservation() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(9L);
+        when(branchRepository.findByIdAndMerchantIdAndDeletedFalse(7L, 9L)).thenReturn(Optional.of(branch()));
+        when(menuReservationRepository.findById(5L)).thenReturn(Optional.of(reservation(5L, MenuReservationStatus.PENDING)));
+        when(menuReservationRepository.save(any(MenuReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MenuDtos.ReservationResponse response = menuReservationService.updateForBranch(
+                7L, 5L, MenuDtos.ReservationUpdateRequest.builder().status(MenuReservationStatus.ACTIVE).build()
+        );
+
+        assertThat(response.getStatus()).isEqualTo(MenuReservationStatus.ACTIVE);
+    }
+
+    private MenuDtos.ReservationCreateRequest validRequest() {
+        return MenuDtos.ReservationCreateRequest.builder()
+                .customerName("Ayşe Yılmaz")
+                .phone("05551234567")
+                .partySize(2)
+                .reservationAt(LocalDateTime.now().plusDays(1))
+                .build();
+    }
+
+    private Branch branch() {
+        return Branch.builder().id(7L).merchantId(9L).name("Kadıköy").build();
+    }
+
     private Menu publicMenu() {
         return Menu.builder()
                 .menuId(10L)
                 .merchantId(9L)
+                .branchId(7L)
                 .qrId(1L)
                 .themeId("soft")
                 .businessName("Test")
@@ -308,6 +415,7 @@ class MenuReservationServiceTest {
         return MenuReservation.builder()
                 .id(id)
                 .menuId(10L)
+                .branchId(7L)
                 .customerName("Ayşe Yılmaz")
                 .phone("05551234567")
                 .partySize(2)

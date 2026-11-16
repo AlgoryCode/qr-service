@@ -22,6 +22,8 @@ public class NotificationPublisherService {
     private static final String MESSAGE_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
     private static final String MESSAGE_TYPE_EMAIL_VERIFICATION = "EMAIL_VERIFICATION";
     private static final String MESSAGE_TYPE_SMART_REPORT_READY = "SMART_REPORT_READY";
+    private static final String MESSAGE_TYPE_TRIAL_EXPIRY_REMINDER = "PRO_TRIAL_EXPIRY_REMINDER";
+    private static final String MESSAGE_TYPE_GENERIC = "GENERIC";
 
     private final RabbitTemplate rabbitTemplate;
     private final PushNotificationProperties pushNotificationProperties;
@@ -119,6 +121,51 @@ public class NotificationPublisherService {
                 message
         );
         log.info("Smart report ready notification queued. eventId={}, email={}", eventId, maskEmail(email));
+    }
+
+    public void publishTrialExpiryReminder(
+            UUID eventId,
+            String email,
+            String userName,
+            String packageName,
+            String expiresAt,
+            long daysRemaining,
+            String upgradeUrl
+    ) {
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("userName", userName);
+        templateData.put("packageName", packageName);
+        templateData.put("expiresAt", expiresAt);
+        templateData.put("daysRemaining", daysRemaining);
+        templateData.put("upgradeUrl", upgradeUrl);
+        send(eventId, MESSAGE_TYPE_TRIAL_EXPIRY_REMINDER, email, "Deneme süreniz bitiyor", templateData);
+        log.info("Trial expiry reminder queued. eventId={}, email={}", eventId, maskEmail(email));
+    }
+
+    /** Plain-text notice; GENERIC messages have no template and render {@code message} as the body. */
+    public void publishGeneric(UUID eventId, String email, String subject, String body) {
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("message", body);
+        send(eventId, MESSAGE_TYPE_GENERIC, email, subject, templateData);
+        log.info("Generic notification queued. eventId={}, email={}", eventId, maskEmail(email));
+    }
+
+    private void send(UUID eventId, String messageType, String email, String subject, Map<String, Object> templateData) {
+        NotificationRequestMessage message = new NotificationRequestMessage(
+                eventId,
+                pushNotificationProperties.getChannels(),
+                serviceName,
+                messageType,
+                new NotificationRecipientsMessage(email, List.of(), List.of()),
+                subject,
+                templateData,
+                false
+        );
+        rabbitTemplate.convertAndSend(
+                pushNotificationProperties.getMessaging().getExchange(),
+                pushNotificationProperties.getMessaging().getRoutingKey(),
+                message
+        );
     }
 
     private void publishVerificationCode(

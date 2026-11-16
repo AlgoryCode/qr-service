@@ -9,5 +9,10 @@ public enum PackageStatus {
     CANCELLED,
     EXPIRED,
     SUPERSEDED,
-    REVOKED
+    REVOKED;
+
+    /** ACTIVE and GRACE_PERIOD keep the merchant's features on; every other status is closed. */
+    public boolean grantsAccess() {
+        return this == ACTIVE || this == GRACE_PERIOD;
+    }
 }

@@ -21,7 +21,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tbl_menu_reservation", indexes = {
-        @Index(name = "idx_menu_reservation_menu_status_at", columnList = "menu_id, status, reservation_at")
+        @Index(name = "idx_menu_reservation_menu_status_at", columnList = "menu_id, status, reservation_at"),
+        @Index(name = "idx_menu_reservation_branch_status_at", columnList = "branch_id, status, reservation_at")
 })
 @Getter
 @Setter
@@ -36,8 +37,13 @@ public class MenuReservation {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "menu_id", nullable = false)
+    /** The menu the guest booked from; null for a reservation the business entered for a branch. */
+    @Column(name = "menu_id")
     private Long menuId;
+
+    /** The venue the reservation is for. Null only for old reservations of menus without a branch. */
+    @Column(name = "branch_id")
+    private Long branchId;
 
     @Column(name = "customer_name", nullable = false, length = 120)
     private String customerName;

@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.fulfillmentservice.domain.model.ActivePackage;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.FulfillmentStatus;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.PackageFulfillment;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.PackageStatus;
+import com.ael.algoryqrservice.fulfillmentservice.domain.model.SubscriptionKind;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.FulfillmentRepositoryPort;
 import com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity.ActivePackageEntity;
 import com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.entity.PackageFulfillmentEntity;
@@ -15,6 +16,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import org.springframework.data.domain.PageRequest;
+import java.util.List;
+import java.time.LocalDate;
 import java.util.Optional;
 
 @Component
@@ -68,9 +72,50 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
         entity.setPeriodStart(activePackage.periodStart());
         entity.setPeriodEnd(activePackage.periodEnd());
         entity.setStatus(activePackage.status() == null ? PackageStatus.ACTIVE : activePackage.status());
+        entity.setKind(activePackage.kind() == null ? SubscriptionKind.PAID : activePackage.kind());
+        entity.setGraceEndsAt(activePackage.graceEndsAt());
         entity.setActivatedAt(now);
         entity.setUpdatedAt(now);
         return toDomain(activePackageJpaRepository.save(entity));
+    }
+
+    @Override
+    public ActivePackage saveActivePackage(ActivePackage activePackage) {
+        ActivePackageEntity entity = activePackageJpaRepository.findByMerchantId(activePackage.merchantId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "No active package row for merchant " + activePackage.merchantId()));
+        entity.setStatus(activePackage.status());
+        entity.setGraceEndsAt(activePackage.graceEndsAt());
+        entity.setUpdatedAt(Instant.now());
+        return toDomain(activePackageJpaRepository.save(entity));
+    }
+
+    @Override
+    public List<ActivePackage> findLifecycleDue(LocalDate today, Instant now, int limit) {
+        return activePackageJpaRepository.findLifecycleDue(
+                        PackageStatus.ACTIVE,
+                        PackageStatus.GRACE_PERIOD,
+                        SubscriptionKind.FREE,
+                        today,
+                        now,
+                        PageRequest.of(0, Math.max(1, limit)))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<ActivePackage> findTrialsEndingBetween(LocalDate from, LocalDate to) {
+        return activePackageJpaRepository.findTrialsEndingBetween(
+                        SubscriptionKind.TRIAL, PackageStatus.ACTIVE, from, to)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public boolean hasAnyFulfillment(Long merchantId) {
+        return packageFulfillmentJpaRepository.existsByMerchantId(merchantId);
     }
 
     @Override
@@ -137,7 +182,9 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
                 entity.getPeriodEnd(),
                 entity.getStatus(),
                 entity.getActivatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getKind() == null ? SubscriptionKind.PAID : entity.getKind(),
+                entity.getGraceEndsAt()
         );
     }
 }

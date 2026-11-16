@@ -19,6 +19,8 @@ public record ActivePackageView(
         Instant updatedAt,
         List<String> products,
         List<String> scopes,
-        List<UserEntitlement> entitlements
+        List<UserEntitlement> entitlements,
+        SubscriptionKind kind,
+        Instant graceEndsAt
 ) {
 }

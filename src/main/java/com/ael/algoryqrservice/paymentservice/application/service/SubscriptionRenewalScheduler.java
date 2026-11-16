@@ -9,14 +9,16 @@ import com.ael.algoryqrservice.paymentservice.domain.model.PaymentStyle;
 import com.ael.algoryqrservice.paymentservice.domain.port.PaymentEventPublisherPort;
 import com.ael.algoryqrservice.paymentservice.infrastructure.persistence.entity.SubscriptionEntity;
 import com.ael.algoryqrservice.paymentservice.infrastructure.persistence.repository.SubscriptionJpaRepository;
+import com.ael.algoryqrservice.paymentservice.domain.model.BasketItemInfo;
+import com.ael.algoryqrservice.shared.scheduling.SchedulerLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Instant;
@@ -40,10 +42,19 @@ public class SubscriptionRenewalScheduler {
     private final PaymentEventPublisherPort eventPublisher;
     private final SubscriptionService subscriptionService;
     private final JsonMapper jsonMapper;
+    private final SchedulerLock schedulerLock;
 
+    /**
+     * Charges due subscriptions. Runs under a cluster lock so two instances never charge the same
+     * card, and outside any surrounding transaction: each card attempt talks to the payment
+     * provider over HTTP, and every state change is saved on its own right after.
+     */
     @Scheduled(fixedDelayString = "${payment.subscriptions.fixed-delay:60000}")
-    @Transactional
     public void renewDueSubscriptions() {
+        schedulerLock.runExclusively("subscription-renewal", Duration.ofMinutes(10), this::renewDueBatch);
+    }
+
+    void renewDueBatch() {
         List<SubscriptionEntity> subscriptions = repository
                 .findByStatusInAndNextChargeAtLessThanEqualOrderByNextChargeAt(
                         List.of("ACTIVE", "RETRY"),
@@ -115,11 +126,25 @@ public class SubscriptionRenewalScheduler {
         command.setPaymentCard(method.card());
         command.setPrice(subscription.getAmount());
         command.setPaidPrice(subscription.getAmount());
-        command.setPeriodStart(LocalDate.now());
-        command.setPeriodEnd(LocalDate.now().plusMonths(subscription.getBillingIntervalMonths()).minusDays(1));
-        if (command.getBasketItems() != null && command.getBasketItems().size() == 1) {
-            command.getBasketItems().getFirst().setPrice(subscription.getAmount());
+        // The new period starts on the billing day it was due, not on the day a retry succeeds.
+        LocalDate periodStart = subscription.getNextChargeAt() == null
+                ? LocalDate.now()
+                : subscription.getNextChargeAt().toLocalDate();
+        if (periodStart.isAfter(LocalDate.now())) {
+            periodStart = LocalDate.now();
         }
+        command.setPeriodStart(periodStart);
+        command.setPeriodEnd(periodStart.plusMonths(subscription.getBillingIntervalMonths()).minusDays(1));
+        // A renewal is one line for the whole recurring amount; the first purchase's basket may list
+        // the package and its modules separately and would no longer add up to the charged amount.
+        command.setBasketItems(List.of(BasketItemInfo.builder()
+                .id("subscription-renewal")
+                .name("Abonelik yenileme")
+                .category1("Billing")
+                .category2("Subscription")
+                .itemType("VIRTUAL")
+                .price(subscription.getAmount())
+                .build()));
         return command;
     }
 

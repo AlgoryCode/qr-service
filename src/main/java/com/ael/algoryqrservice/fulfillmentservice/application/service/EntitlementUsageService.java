@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,7 +40,8 @@ public class EntitlementUsageService {
 
     @Transactional(readOnly = true)
     public ProductAccessView productAccess(Long merchantId, String productCode) {
-        Optional<ActivePackage> active = fulfillmentRepository.findActiveByMerchantId(merchantId);
+        Optional<ActivePackage> active = fulfillmentRepository.findActiveByMerchantId(merchantId)
+                .filter(ActivePackage::grantsAccess);
         if (active.isEmpty()) {
             return ProductAccessView.denied(null);
         }
@@ -51,7 +53,16 @@ public class EntitlementUsageService {
     @Transactional
     public UserEntitlement consume(Long merchantId, String productCode, int quantity) {
         requireQuantity(quantity);
-        UserEntitlement entitlement = requireMatch(merchantId, productCode);
+        List<UserEntitlement> candidates = candidates(merchantId, productCode, true);
+        if (candidates.isEmpty()) {
+            throw new QuotaExceededException("Product is not in the active package");
+        }
+        // Spend from the first entitlement that can still cover the request (e.g. a second add-on
+        // purchase once the first is used up); otherwise the best match reports the overflow.
+        UserEntitlement entitlement = candidates.stream()
+                .filter(candidate -> candidate.unlimited() || usedOf(candidate) + quantity <= limitOf(candidate))
+                .findFirst()
+                .orElse(candidates.get(0));
         if (entitlement.unlimited()) {
             return entitlement;
         }
@@ -65,7 +76,11 @@ public class EntitlementUsageService {
     @Transactional
     public Optional<UserEntitlement> release(Long merchantId, String productCode, int quantity) {
         requireQuantity(quantity);
-        Optional<UserEntitlement> match = match(merchantId, productCode);
+        List<UserEntitlement> candidates = candidates(merchantId, productCode, true);
+        Optional<UserEntitlement> match = candidates.stream()
+                .filter(candidate -> !candidate.unlimited() && usedOf(candidate) > 0)
+                .findFirst()
+                .or(() -> candidates.stream().findFirst());
         if (match.isEmpty() || match.get().unlimited()) {
             return match;
         }
@@ -80,33 +95,49 @@ public class EntitlementUsageService {
         return new ProductAccessView(true, active.packageCode(), entitlement.featureCode(), entitlement.scopeCode());
     }
 
-    private UserEntitlement requireMatch(Long merchantId, String productCode) {
-        return match(merchantId, productCode)
-                .orElseThrow(() -> new QuotaExceededException("Product is not in the active package"));
+    private Optional<UserEntitlement> match(Long merchantId, String productCode) {
+        return candidates(merchantId, productCode, false).stream().findFirst();
     }
 
-    private Optional<UserEntitlement> match(Long merchantId, String productCode) {
-        if (fulfillmentRepository.findActiveByMerchantId(merchantId).isEmpty()) {
-            return Optional.empty();
+    /**
+     * Active entitlements that grant {@code productCode}, most specific first: an exact feature code,
+     * then the purchased product itself, then any entitlement sharing the product's feature. Without
+     * this order an add-on (e.g. SMART_REPORTING_ADDON, feature SMART_REPORTING) could resolve to the
+     * package's unlimited SMART_REPORTING row and never be decremented.
+     */
+    private List<UserEntitlement> candidates(Long merchantId, String productCode, boolean forUpdate) {
+        if (fulfillmentRepository.findActiveByMerchantId(merchantId).filter(ActivePackage::grantsAccess).isEmpty()) {
+            return List.of();
         }
         Optional<CatalogProduct> product = productPort.findByCode(productCode);
-        return entitlementPort.findActiveByMerchantId(merchantId).stream()
-                .filter(entitlement -> matches(entitlement, productCode, product))
-                .findFirst();
+        // Usage changes lock the merchant's rows: two concurrent requests would otherwise both read
+        // the old counter and one write would be lost, letting the merchant exceed the limit.
+        List<UserEntitlement> rows = forUpdate
+                ? entitlementPort.lockActiveByMerchantId(merchantId)
+                : entitlementPort.findActiveByMerchantId(merchantId);
+        return rows.stream()
+                .filter(entitlement -> rank(entitlement, productCode, product) < NO_MATCH)
+                .sorted(Comparator.comparingInt(entitlement -> rank(entitlement, productCode, product)))
+                .toList();
     }
 
-    private boolean matches(UserEntitlement entitlement, String productCode, Optional<CatalogProduct> product) {
+    private static final int NO_MATCH = 3;
+
+    private static int rank(UserEntitlement entitlement, String productCode, Optional<CatalogProduct> product) {
         if (productCode.equals(entitlement.featureCode())) {
-            return true;
+            return 0;
         }
         if (product.isEmpty()) {
-            return false;
+            return NO_MATCH;
         }
         CatalogProduct catalogProduct = product.get();
         if (entitlement.productId() != null && entitlement.productId().equals(catalogProduct.id())) {
-            return true;
+            return 1;
         }
-        return catalogProduct.featureCode() != null && catalogProduct.featureCode().equals(entitlement.featureCode());
+        if (catalogProduct.featureCode() != null && catalogProduct.featureCode().equals(entitlement.featureCode())) {
+            return 2;
+        }
+        return NO_MATCH;
     }
 
     private List<Long> productIds(List<UserEntitlement> entitlements) {

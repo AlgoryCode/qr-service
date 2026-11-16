@@ -17,7 +17,17 @@ public final class CatalogProducts {
     public static final String QR_MENU_ADDON = "QR_MENU_ADDON";
     public static final String QR_BRANCH_ADDON = "QR_BRANCH_ADDON";
     public static final String SMART_REPORTING_ADDON = "SMART_REPORTING_ADDON";
+    /** Free smart reports per quota period granted by a package (its line quantity). */
+    public static final String SMART_REPORT_QUOTA = "SMART_REPORT_QUOTA";
 
     private CatalogProducts() {
     }
+
+    /**
+     * Products whose counter tracks things that still exist (branches, menus, QR codes, menu
+     * products). Their used count is carried over when the package renews or changes, and is given
+     * back when the thing is deleted. Every other countable product is a per-period allowance.
+     */
+    public static final java.util.Set<String> COUNTED_RESOURCES = java.util.Set.of(
+            QR_CREATE, QR_MENU, QR_BRANCH, MENU_PRODUCT);
 }

@@ -87,6 +87,17 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             Pageable pageable
     );
 
+    /** Batch form of {@link #findByPaymentOrPeriodConversationId} for admin payment listings. */
+    @Query("""
+            select p from Purchase p
+            where p.paymentConversationId in :conversationIds
+               or p.currentPeriodConversationId in :conversationIds
+            order by p.purchasedAt desc
+            """)
+    List<Purchase> findByPaymentOrPeriodConversationIdIn(
+            @Param("conversationIds") java.util.Collection<String> conversationIds
+    );
+
     @Query(
             value = """
                     select distinct p.merchant_id

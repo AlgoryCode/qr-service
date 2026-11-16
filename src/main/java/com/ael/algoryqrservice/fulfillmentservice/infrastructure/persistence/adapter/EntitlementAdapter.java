@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.adapter;
 
+import com.ael.algoryqrservice.fulfillmentservice.domain.model.EntitlementSource;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.PackageStatus;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.UserEntitlement;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.EntitlementPort;
@@ -41,6 +42,21 @@ public class EntitlementAdapter implements EntitlementPort {
     }
 
     @Override
+    public List<UserEntitlement> lockActiveByMerchantId(Long merchantId) {
+        return userEntitlementJpaRepository.lockActiveByMerchantId(merchantId, PackageStatus.ACTIVE, Instant.now())
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public int extendAddonExpiry(Long purchaseId, Instant expiresAt) {
+        return userEntitlementJpaRepository.extendExpiry(
+                purchaseId, EntitlementSource.ADDON_PURCHASE, PackageStatus.ACTIVE, expiresAt, Instant.now());
+    }
+
+    @Override
     @Transactional
     public void supersedeOtherEntitlements(Long merchantId, Long keepFulfillmentId) {
         userEntitlementJpaRepository.supersedeOthers(
@@ -48,8 +64,23 @@ public class EntitlementAdapter implements EntitlementPort {
                 keepFulfillmentId,
                 PackageStatus.ACTIVE,
                 PackageStatus.SUPERSEDED,
+                // Purchased add-on credits outlive package renewals; only the package's own rows rotate.
+                EntitlementSource.ADDON_PURCHASE,
                 Instant.now()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByPurchaseIdAndSource(Long purchaseId, EntitlementSource source) {
+        return userEntitlementJpaRepository.existsByPurchaseIdAndSource(purchaseId, source);
+    }
+
+    @Override
+    @Transactional
+    public int changeStatusByPurchaseId(Long purchaseId, EntitlementSource source, PackageStatus newStatus) {
+        return userEntitlementJpaRepository.changeStatusByPurchaseId(
+                purchaseId, source, PackageStatus.ACTIVE, newStatus, Instant.now());
     }
 
     private UserEntitlement toDomain(UserEntitlementEntity entity) {

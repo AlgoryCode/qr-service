@@ -205,6 +205,7 @@ menu:
 
 ai-service:
   url: ${AI_SERVICE_URL:http://localhost:8000}
+  api-key: ${AI_SERVICE_API_KEY:}
   connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:3s}
   read-timeout: ${AI_SERVICE_READ_TIMEOUT:60s}
   reindex-batch-size: ${AI_SERVICE_REINDEX_BATCH_SIZE:100}

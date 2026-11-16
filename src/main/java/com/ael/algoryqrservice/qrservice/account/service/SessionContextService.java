@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.account.service;
 
+import com.ael.algoryqrservice.qrservice.access.SessionAccessService;
+import com.ael.algoryqrservice.qrservice.billing.externalpackageresponsemapper.service.ExternalPackageResponseMapper;
 import com.ael.algoryqrservice.qrservice.access.AccessSession;
 import com.ael.algoryqrservice.qrservice.client.AuthMerchantClient;
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
@@ -28,17 +30,17 @@ public class SessionContextService {
     private final AuthMerchantClient authMerchantClient;
     private final FulfillmentServiceClient fulfillmentServiceClient;
     private final SessionContextAssembler assembler;
+    private final SessionAccessService sessionAccessService;
+    private final ExternalPackageResponseMapper externalPackageResponseMapper;
 
     public SessionContextResponse resolve(Long merchantId) {
         SessionUserResponse user = sessionUser(merchantId);
         PackageView view = fulfillmentServiceClient.findPackage(merchantId);
-        if (!"ACTIVE".equals(view.status()) || view.body() == null) {
-            return assembler.blocked(
-                    user,
-                    AccessSession.of(AccessDecision.REQUIRE_PURCHASE, null, null, null)
-            );
+        if (view.body() == null || !view.body().isOpen()) {
+            return assembler.blocked(user, sessionAccessService.closed(merchantId));
         }
-        return assembler.paid(user, view.body(), fulfillmentServiceClient.listEntitlements(merchantId));
+        AccessSession session = externalPackageResponseMapper.toAllowSession(view.body());
+        return assembler.paid(user, session, view.body(), fulfillmentServiceClient.listEntitlements(merchantId));
     }
 
     private SessionUserResponse sessionUser(Long merchantId) {

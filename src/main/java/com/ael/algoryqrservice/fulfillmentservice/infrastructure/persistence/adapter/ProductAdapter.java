@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.fulfillmentservice.domain.model.CatalogProduct;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.ProductPort;
 import com.ael.algoryqrservice.fulfillmentservice.infrastructure.persistence.repository.ProductJpaRepository;
 import com.ael.algoryqrservice.qrservice.model.Product;
+import com.ael.algoryqrservice.qrservice.model.enums.ProductBillingType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -43,7 +44,9 @@ public class ProductAdapter implements ProductPort {
                 entity.getCode(),
                 entity.getName(),
                 entity.getFeatureCode(),
-                entity.getScopeCode()
+                entity.getScopeCode(),
+                entity.isConsumable(),
+                entity.getBillingType() == ProductBillingType.RECURRING
         );
     }
 }

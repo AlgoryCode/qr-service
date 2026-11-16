@@ -33,7 +33,9 @@ public class FulfillmentPresentationMapper {
                 view.activatedAt(),
                 view.updatedAt(),
                 view.products(),
-                view.scopes()
+                view.scopes(),
+                view.kind(),
+                view.graceEndsAt()
         );
     }
 

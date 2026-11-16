@@ -248,6 +248,24 @@ public class PaymentServiceClient {
         );
     }
 
+    /** Moves the subscription's future renewals to another purchase and amount; see {@link SubscriptionService#switchPlan}. */
+    public boolean switchSubscriptionPlan(
+            Long merchantId,
+            String subscriptionId,
+            Long purchaseId,
+            BigDecimal amount,
+            Map<String, Object> metadataPatch
+    ) {
+        requireMerchantId(merchantId);
+        return subscriptionService.switchPlan(
+                String.valueOf(merchantId),
+                subscriptionId,
+                String.valueOf(purchaseId),
+                amount,
+                metadataPatch
+        );
+    }
+
     public BillingPaymentDtos.Subscription cancelSubscriptionAtPeriodEnd(Long merchantId, String subscriptionId) {
         throw new PaymentServiceException("Abonelik donem sonu iptali monolit icinde desteklenmiyor");
     }

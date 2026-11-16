@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.qrservice.analytics.dto.SmartReportDtos;
 import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
 import com.ael.algoryqrservice.qrservice.analytics.service.AnalyticsService;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuService;
+import com.ael.algoryqrservice.qrservice.analytics.service.SmartReportFeedbackService;
 import com.ael.algoryqrservice.qrservice.analytics.service.SmartReportService;
 import com.ael.algoryqrservice.qrservice.analytics.service.UnifiedAnalyticsService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -18,10 +19,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,6 +43,7 @@ public class AnalyticsController {
     private final AnalyticsService analyticsService;
     private final UnifiedAnalyticsService unifiedAnalyticsService;
     private final SmartReportService smartReportService;
+    private final SmartReportFeedbackService smartReportFeedbackService;
     private final ProductUsageGateway productUsageGateway;
     private final SecurityUtils securityUtils;
     private final MenuService menuService;
@@ -170,6 +175,21 @@ public class AnalyticsController {
         );
     }
 
+    @GetMapping("/merchant/detailed-report")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<AnalyticsDtos.MerchantDetailedReportResponse> getMerchantDetailedReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        LocalDate effectiveFrom = from != null ? from : effectiveTo.minusDays(29);
+        if (effectiveFrom.isAfter(effectiveTo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must be on or before to");
+        }
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.ok(analyticsService.getMerchantDetailedReport(ownerId, effectiveFrom, effectiveTo));
+    }
+
     @GetMapping("/smart-reports/quota")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<SmartReportDtos.SmartReportQuotaResponse> getSmartReportQuota() {
@@ -177,14 +197,26 @@ public class AnalyticsController {
         return ResponseEntity.ok(smartReportService.getQuota(ownerId));
     }
 
+    /** Reports created in the last 7 or 30 days, split into free, feedback-bonus and purchased credits. */
+    @GetMapping("/smart-reports/usage")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<SmartReportDtos.SmartReportUsageResponse> getSmartReportUsage(
+            @RequestParam(defaultValue = "7") int days
+    ) {
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.ok(smartReportService.getUsage(ownerId, days));
+    }
+
     @GetMapping("/smart-reports")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<Page<SmartReportDtos.SmartReportListItem>> listSmartReports(
             @RequestParam(required = false, defaultValue = "completed") String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Pageable pageable
     ) {
         Long ownerId = securityUtils.getCurrentMerchantId();
-        return ResponseEntity.ok(smartReportService.listJobs(ownerId, status, pageable));
+        return ResponseEntity.ok(smartReportService.listJobs(ownerId, status, from, to, pageable));
     }
 
     @GetMapping("/smart-reports/{jobId}")
@@ -194,6 +226,36 @@ public class AnalyticsController {
     ) {
         Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(smartReportService.getJobDetail(ownerId, jobId));
+    }
+
+    @GetMapping("/smart-reports/{jobId}/feedback")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<SmartReportDtos.FeedbackResponse> getSmartReportFeedback(@PathVariable UUID jobId) {
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        return smartReportFeedbackService.find(ownerId, jobId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PutMapping("/smart-reports/{jobId}/feedback")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<SmartReportDtos.FeedbackResponse> saveSmartReportFeedback(
+            @PathVariable UUID jobId,
+            @RequestBody SmartReportDtos.FeedbackRequest request
+    ) {
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.ok(smartReportFeedbackService.save(ownerId, jobId, request));
+    }
+
+    /** Saves the feedback and queues a revised report over the same scope and period (uses 1 credit). */
+    @PostMapping("/smart-reports/{jobId}/revise")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<SmartReportDtos.SmartReportAccepted> reviseSmartReport(
+            @PathVariable UUID jobId,
+            @RequestBody SmartReportDtos.FeedbackRequest request
+    ) {
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(smartReportFeedbackService.revise(ownerId, jobId, request));
     }
 
     @PostMapping("/menu/{publicId}/visit")

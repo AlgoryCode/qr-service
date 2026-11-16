@@ -92,15 +92,26 @@ public class AddonPurchaseService {
         List<ResolvedLine> lines = resolveLines(request.getModules());
         BillingPeriod billingPeriod = BillingPeriodResolver.resolve(host);
 
-        BigDecimal total = lines.stream()
-                .map(ResolvedLine::lineTotal)
+        LocalDateTime startsAt = AppTime.nowLocal();
+        // Recurring modules run on the package's billing date: pay for the days left now, and the
+        // full price joins the package renewal once this purchase is paid.
+        Map<ResolvedLine, BigDecimal> charged = new LinkedHashMap<>();
+        BigDecimal recurringFull = BigDecimal.ZERO;
+        for (ResolvedLine line : lines) {
+            if (isRecurring(line)) {
+                charged.put(line, RecurringAddonBilling.prorate(line.lineTotal(), host, startsAt));
+                recurringFull = recurringFull.add(line.lineTotal());
+            } else {
+                charged.put(line, line.lineTotal());
+            }
+        }
+        BigDecimal total = charged.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2);
+                .setScale(2, java.math.RoundingMode.HALF_UP);
         if (total.signum() <= 0) {
             throw new BadRequestException("Sepet tutari gecersiz");
         }
 
-        LocalDateTime startsAt = AppTime.nowLocal();
         LocalDateTime expiresAt = host.getExpiresAt() != null && host.getExpiresAt().isAfter(startsAt)
                 ? host.getExpiresAt()
                 : startsAt.plusDays(30);
@@ -124,6 +135,9 @@ public class AddonPurchaseService {
                 .packageName(packageName)
                 .addonQuantity(primary.quantity())
                 .price(total)
+                .recurringPrice(RecurringAddonBilling.renewsWithHost(host) && recurringFull.signum() > 0
+                        ? recurringFull.setScale(2, java.math.RoundingMode.HALF_UP)
+                        : null)
                 .currency("TRY")
                 .paymentMode(PaymentMode.CHECKOUT_FORM)
                 .paymentStyle(PaymentStyle.ONE_TIME)
@@ -174,7 +188,7 @@ public class AddonPurchaseService {
                         .category1("Digital")
                         .category2("Product")
                         .itemType("VIRTUAL")
-                        .price(line.lineTotal())
+                        .price(charged.get(line))
                         .build())
                 .toList();
 
@@ -264,6 +278,10 @@ public class AddonPurchaseService {
             ));
         }
         return resolved;
+    }
+
+    private static boolean isRecurring(ResolvedLine line) {
+        return line.product().getBillingType() == ProductBillingType.RECURRING && !line.product().isConsumable();
     }
 
     private Purchase findHostPurchase(Long merchantId) {

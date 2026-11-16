@@ -6,6 +6,7 @@ import com.ael.algoryqrservice.qrservice.client.dto.MenuProductReindexDtos;
 import com.ael.algoryqrservice.qrservice.config.AiServiceProperties;
 import com.ael.algoryqrservice.qrservice.product.dto.MenuProductDocumentMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class AiServiceClient {
     private static final String MENU_IMPORT_PATH = "/api/v1/menu-import";
     private static final String BATCH_REPORTS_PATH = "/api/v1/batch-reports";
     private static final Duration BATCH_READ_TIMEOUT = Duration.ofSeconds(180);
+    static final String API_KEY_HEADER = "X-API-Key";
 
     private final RestClient restClient;
     private final RestClient batchRestClient;
@@ -35,13 +37,25 @@ public class AiServiceClient {
         this.restClient = restClientBuilder
                 .clone()
                 .baseUrl(properties.getUrl())
+                .defaultHeaders(headers -> applyApiKey(headers, properties))
                 .requestFactory(requestFactory(properties.getConnectTimeout(), properties.getReadTimeout()))
                 .build();
         this.batchRestClient = restClientBuilder
                 .clone()
                 .baseUrl(properties.getUrl())
+                .defaultHeaders(headers -> applyApiKey(headers, properties))
                 .requestFactory(requestFactory(properties.getConnectTimeout(), BATCH_READ_TIMEOUT))
                 .build();
+        if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
+            log.warn("AI_SERVICE_API_KEY is not set: ai-service will reject batch, import and reindex calls");
+        }
+    }
+
+    static void applyApiKey(HttpHeaders headers, AiServiceProperties properties) {
+        String apiKey = properties.getApiKey();
+        if (apiKey != null && !apiKey.isBlank()) {
+            headers.set(API_KEY_HEADER, apiKey.trim());
+        }
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {

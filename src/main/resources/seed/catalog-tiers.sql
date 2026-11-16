@@ -101,8 +101,9 @@ UPDATE tbl_product SET
     updated_at = NOW()
 WHERE code = 'SMART_REPORTING_ADDON';
 
+-- FREE_PACKAGE stays active: it is the fallback every ended trial or package drops to (V175).
 UPDATE tbl_plan_package SET active = FALSE, purchasable = FALSE, updated_at = NOW()
-WHERE code IN ('FREE_PACKAGE', 'CORPORATE_PACKAGE');
+WHERE code = 'CORPORATE_PACKAGE';
 
 INSERT INTO tbl_plan_package (code, name, description, features, price, subtotal, vat_amount, currency, active, validity_days, priority, purchasable, system_managed, yearly_price, created_at, updated_at)
 SELECT 'STARTER_PACKAGE', 'Baslangic', 'Kucuk kafeler icin operasyonel giris paketi',

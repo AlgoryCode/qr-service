@@ -23,6 +23,23 @@ public class FeatureSmartReportingController {
     private final SmartReportService smartReportService;
     private final SecurityUtils securityUtils;
 
+    /** Smart report over all branches of the merchant (aggregated detailed reports). */
+    @PostMapping("/merchant/reports")
+    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    public ResponseEntity<SmartReportDtos.SmartReportAccepted> createMerchantSmartReport(
+            @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
+    ) {
+        Long ownerId = securityUtils.getCurrentMerchantId();
+        SmartReportDtos.SmartReportAccepted accepted = smartReportService.enqueueForMerchant(
+                ownerId,
+                body.from(),
+                body.to(),
+                body.locale(),
+                body.options()
+        );
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(accepted);
+    }
+
     @PostMapping("/branches/{branchId}/reports")
     @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createBranchSmartReport(

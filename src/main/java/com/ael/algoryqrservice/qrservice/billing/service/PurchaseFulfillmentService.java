@@ -71,6 +71,29 @@ public class PurchaseFulfillmentService {
             PaymentCompletedEventDto event,
             PaymentEventMetadata metadata
     ) {
+        fulfill(purchase, event, metadata, null);
+    }
+
+    /**
+     * A plan-change difference payment: the purchase runs from now until {@code periodEnd} (the
+     * replaced package's billing date), and the package reaches fulfillment with that period.
+     */
+    @Transactional
+    public void fulfillPlanChangeInstallment(
+            Purchase purchase,
+            PaymentCompletedEventDto event,
+            PaymentEventMetadata metadata,
+            LocalDateTime periodEnd
+    ) {
+        fulfill(purchase, event, metadata, periodEnd);
+    }
+
+    private void fulfill(
+            Purchase purchase,
+            PaymentCompletedEventDto event,
+            PaymentEventMetadata metadata,
+            LocalDateTime fixedPeriodEnd
+    ) {
         PurchaseFulfillment fulfillment = resolveFulfillment(purchase, event, metadata);
         if (fulfillment.getStatus() == FulfillmentStatus.PAID) {
             return;
@@ -84,7 +107,10 @@ public class PurchaseFulfillmentService {
 
         LocalDateTime periodStart;
         LocalDateTime periodEnd;
-        if (firstPaidInstallment && purchase.getPurchaseType() == PurchaseType.ADD_ON) {
+        if (fixedPeriodEnd != null) {
+            periodStart = now;
+            periodEnd = fixedPeriodEnd;
+        } else if (firstPaidInstallment && purchase.getPurchaseType() == PurchaseType.ADD_ON) {
             periodStart = now;
             periodEnd = purchase.getExpiresAt() != null && purchase.getExpiresAt().isAfter(now)
                     ? purchase.getExpiresAt()
@@ -134,7 +160,13 @@ public class PurchaseFulfillmentService {
         }
         purchase.setCancellationReason(null);
         purchaseRepository.save(purchase);
-        fulfillmentQueuePublisher.publishPayment(event);
+        if (purchase.getPurchaseType() == PurchaseType.ADD_ON || fixedPeriodEnd != null) {
+            // An add-on grants its own entitlements; the package path would replace the merchant's package.
+            // A plan change uses the purchase's own period: the payment event only carries the difference.
+            fulfillmentQueuePublisher.publishGranted(purchase);
+        } else {
+            fulfillmentQueuePublisher.publishPayment(event);
+        }
         menuPublicAccessService.syncForMerchant(purchase.getMerchantId());
     }
 

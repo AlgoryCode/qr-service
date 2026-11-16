@@ -31,4 +31,6 @@ public interface PackageFulfillmentJpaRepository extends JpaRepository<PackageFu
             @Param("activeStatus") FulfillmentStatus activeStatus,
             @Param("updatedAt") Instant updatedAt
     );
+
+    boolean existsByMerchantId(Long merchantId);
 }

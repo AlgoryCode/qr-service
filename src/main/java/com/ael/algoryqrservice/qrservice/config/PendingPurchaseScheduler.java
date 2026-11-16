@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.config;
 
+import com.ael.algoryqrservice.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import com.ael.algoryqrservice.qrservice.model.Purchase;
 import com.ael.algoryqrservice.qrservice.repository.PurchaseRepository;
 import com.ael.algoryqrservice.qrservice.billing.service.PurchaseService;
@@ -18,11 +20,16 @@ import java.util.List;
 public class PendingPurchaseScheduler {
 
     private final PurchaseService purchaseService;
+    private final SchedulerLock schedulerLock;
     private final PurchaseRepository purchaseRepository;
     private final PaymentClientProperties paymentClientProperties;
 
     @Scheduled(fixedRate = 300_000)
     public void reconcileAndExpirePendingPurchases() {
+        schedulerLock.runExclusively("pending-purchase", Duration.ofMinutes(4), this::reconcileAndExpirePendingPurchasesLocked);
+    }
+
+    void reconcileAndExpirePendingPurchasesLocked() {
         LocalDateTime graceBefore = LocalDateTime.now().minusMinutes(2);
         List<Purchase> candidates = purchaseRepository.findPendingWithConversationBefore(
                 graceBefore,

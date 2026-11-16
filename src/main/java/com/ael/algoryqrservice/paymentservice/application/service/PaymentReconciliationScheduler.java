@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.paymentservice.application.service;
 
+import com.ael.algoryqrservice.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import com.ael.algoryqrservice.paymentservice.domain.model.PaymentStatus;
 import com.ael.algoryqrservice.paymentservice.domain.model.PaymentTransaction;
 import com.ael.algoryqrservice.paymentservice.domain.port.PaymentRepositoryPort;
@@ -18,11 +20,16 @@ import java.time.LocalDateTime;
 public class PaymentReconciliationScheduler {
 
     private final PaymentRepositoryPort paymentRepositoryPort;
+    private final SchedulerLock schedulerLock;
     private final PaymentService paymentService;
     private final PaymentReconciliationProperties properties;
 
     @Scheduled(fixedDelayString = "${payment.reconciliation.fixed-delay:900000}")
     public void reconcileStalePayments() {
+        schedulerLock.runExclusively("payment-reconciliation", Duration.ofMinutes(14), this::reconcileStalePaymentsLocked);
+    }
+
+    void reconcileStalePaymentsLocked() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(properties.staleAfterMinutes());
         var stalePayments = paymentRepositoryPort.findStaleByStatus(
                 PaymentStatus.INITIATED,

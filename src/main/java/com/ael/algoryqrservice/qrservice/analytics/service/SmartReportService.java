@@ -4,6 +4,7 @@ import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.qrservice.config.SmartReportQuotaProperties;
+import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
 import com.ael.algoryqrservice.qrservice.exception.NotFoundException;
 import com.ael.algoryqrservice.qrservice.exception.TooManyRequestsException;
 import com.ael.algoryqrservice.qrservice.messaging.dto.SmartReportStatusMessage;
@@ -14,6 +15,7 @@ import com.ael.algoryqrservice.qrservice.analytics.dto.SmartReportDtos;
 import com.ael.algoryqrservice.qrservice.analytics.dto.SmartReportModelDtos;
 import com.ael.algoryqrservice.qrservice.product.repository.ProductRepository;
 import com.ael.algoryqrservice.qrservice.repository.SmartReportEventRepository;
+import com.ael.algoryqrservice.qrservice.repository.SmartReportFeedbackRepository;
 import com.ael.algoryqrservice.qrservice.repository.SmartReportResultRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -58,6 +60,7 @@ public class SmartReportService {
     private final SmartReportQuotaProperties quotaProperties;
     private final SmartReportEventRepository smartReportEventRepository;
     private final SmartReportResultRepository smartReportResultRepository;
+    private final SmartReportFeedbackRepository smartReportFeedbackRepository;
     private final FulfillmentServiceClient fulfillmentClient;
     private final ProductUsageGateway productUsageGateway;
     private final ProductRepository productRepository;
@@ -73,7 +76,22 @@ public class SmartReportService {
             String locale,
             SmartReportDtos.Options options
     ) {
-        return enqueue(branchId, null, ownerId, from, to, locale, options, true);
+        return enqueue(branchId, null, ownerId, from, to, locale, options, ReportTarget.BRANCH);
+    }
+
+    /**
+     * Queues a smart report over every branch and QR menu of the merchant. The
+     * merchant's detailed reports are aggregated and sent to the ai-service batch API.
+     */
+    @Transactional
+    public SmartReportDtos.SmartReportAccepted enqueueForMerchant(
+            Long ownerId,
+            LocalDate from,
+            LocalDate to,
+            String locale,
+            SmartReportDtos.Options options
+    ) {
+        return enqueue(null, null, ownerId, from, to, locale, options, ReportTarget.MERCHANT);
     }
 
     @Transactional
@@ -85,7 +103,7 @@ public class SmartReportService {
             String locale,
             SmartReportDtos.Options options
     ) {
-        return enqueue(null, menuId, ownerId, from, to, locale, options, false);
+        return enqueue(null, menuId, ownerId, from, to, locale, options, ReportTarget.MENU);
     }
 
     private SmartReportDtos.SmartReportAccepted enqueue(
@@ -96,40 +114,50 @@ public class SmartReportService {
             LocalDate to,
             String locale,
             SmartReportDtos.Options options,
-            boolean branchOnly
+            ReportTarget target
     ) {
+        boolean merchantWide = target == ReportTarget.MERCHANT;
+        boolean branchOnly = target == ReportTarget.BRANCH || merchantWide;
         if (from == null || to == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from and to are required");
         }
         if (from.isAfter(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must be on or before to");
         }
-        if (branchOnly && branchId == null) {
+        if (target == ReportTarget.BRANCH && branchId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "branchId is required");
         }
-        if (!branchOnly && menuId == null) {
+        if (target == ReportTarget.MENU && menuId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "menuId is required");
         }
 
-        assertQuotaAvailable(ownerId);
+        String creditSource = assertQuotaAvailable(ownerId);
 
-        Long scopedMenuId = branchOnly ? null : menuId;
-        AnalyticsDtos.MenuAnalyticsReportResponse report = branchOnly
-                ? analyticsService.getBranchReport(branchId, null, ownerId, from, to)
-                : analyticsService.getMenuReport(menuId, ownerId, from, to);
-
-        AnalyticsDtos.MenuRevenueReportResponse revenue = branchOnly
-                ? analyticsService.getBranchRevenueReport(branchId, null, ownerId, from, to)
-                : analyticsService.getMenuRevenueReport(menuId, ownerId, from, to);
-
-        AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter = branchOnly
-                ? analyticsService.getBranchWaiterPerformanceReport(branchId, null, ownerId, from, to)
-                : analyticsService.getMerchantStaffPerformanceReport(menuId, ownerId, from, to);
+        AnalyticsDtos.MenuAnalyticsReportResponse report;
+        AnalyticsDtos.MenuRevenueReportResponse revenue;
+        AnalyticsDtos.MerchantStaffPerformanceReportResponse waiter;
+        if (merchantWide) {
+            AnalyticsDtos.MerchantDetailedReportResponse detailed =
+                    analyticsService.getMerchantDetailedReport(ownerId, from, to);
+            report = detailed.visits();
+            revenue = detailed.revenue();
+            waiter = detailed.waiter();
+        } else if (branchOnly) {
+            report = analyticsService.getBranchReport(branchId, null, ownerId, from, to);
+            revenue = analyticsService.getBranchRevenueReport(branchId, null, ownerId, from, to);
+            waiter = analyticsService.getBranchWaiterPerformanceReport(branchId, null, ownerId, from, to);
+        } else {
+            report = analyticsService.getMenuReport(menuId, ownerId, from, to);
+            revenue = analyticsService.getMenuRevenueReport(menuId, ownerId, from, to);
+            waiter = analyticsService.getMerchantStaffPerformanceReport(menuId, ownerId, from, to);
+        }
 
         UUID processId = UUID.randomUUID();
         String resolvedLocale = locale == null || locale.isBlank() ? "tr" : locale.trim();
-        Long resolvedBranchId = report.branchId() != null ? report.branchId() : branchId;
-        String branchName = report.branchName();
+        Long resolvedBranchId = merchantWide
+                ? null
+                : report.branchId() != null ? report.branchId() : branchId;
+        String branchName = merchantWide ? AnalyticsService.MERCHANT_WIDE_SCOPE_NAME : report.branchName();
         Long resolvedMenuId = branchOnly ? null : report.menuId();
         String menuName = branchOnly ? null : report.menuName();
         if (!branchOnly && (menuName == null || menuName.isBlank())) {
@@ -157,6 +185,7 @@ public class SmartReportService {
                 .toDate(to)
                 .locale(resolvedLocale)
                 .status(SmartReportEvent.STATUS_QUEUED)
+                .creditSource(creditSource)
                 .build());
 
 
@@ -165,7 +194,9 @@ public class SmartReportService {
             Map<String, Object> branchOptions = optionsMap == null ? new HashMap<>() : new HashMap<>(optionsMap);
             branchOptions.putIfAbsent(
                     "focusAreas",
-                    List.of("şube siparişleri", "kanal kıyası", "ciro ve ürün satışları")
+                    merchantWide
+                            ? List.of("tüm şubelerin genel performansı", "kanal kıyası", "ciro ve ürün satışları", "personel performansı")
+                            : List.of("şube siparişleri", "kanal kıyası", "ciro ve ürün satışları")
             );
             optionsMap = branchOptions;
         }
@@ -196,16 +227,22 @@ public class SmartReportService {
         );
 
         log.info(
-                "Smart report batch submitted. processId={} branchId={} menuId={} branchOnly={} merchantId={} from={} to={}",
+                "Smart report batch submitted. processId={} branchId={} menuId={} target={} merchantId={} from={} to={}",
                 processId,
                 resolvedBranchId,
                 resolvedMenuId,
-                branchOnly,
+                target,
                 ownerId,
                 from,
                 to
         );
         return new SmartReportDtos.SmartReportAccepted(processId, SmartReportEvent.STATUS_QUEUED);
+    }
+
+    private enum ReportTarget {
+        MENU,
+        BRANCH,
+        MERCHANT
     }
 
     private static AnalyticsDtos.MenuAnalyticsReportResponse stripMenuIdentity(
@@ -369,8 +406,16 @@ public class SmartReportService {
         LocalDateTime periodStart = periodStart(zone);
         Instant resetsAt = periodEnd(zone).atZone(zone).toInstant();
         long used = smartReportEventRepository.countByMerchantIdAndCreatedAtGreaterThanEqual(merchantId, periodStart);
-        int limit = Math.max(quotaProperties.getQuotaLimit(), 0);
-        long remaining = Math.max(limit - used, 0);
+        int freeLimit = freeLimit(merchantId);
+        long freeRemaining = Math.max(freeLimit - used, 0);
+        LocalDate bonusWeek = currentBonusWeek();
+        boolean bonusEarned = smartReportFeedbackRepository.existsByMerchantIdAndBonusWeek(merchantId, bonusWeek);
+        int bonusCredits = bonusEarned
+                && smartReportFeedbackRepository.existsByMerchantIdAndBonusWeekAndBonusUsedAtIsNull(merchantId, bonusWeek)
+                ? 1 : 0;
+        // The feedback bonus counts as one more free report this week.
+        int limit = freeLimit + (bonusEarned ? 1 : 0);
+        long remaining = freeRemaining + bonusCredits;
         int paidCredits = paidCredits(merchantId);
         BigDecimal addonUnitPrice = productRepository.findByCode(CatalogProducts.SMART_REPORTING_ADDON)
                 .map(com.ael.algoryqrservice.qrservice.model.Product::getUnitPrice)
@@ -384,19 +429,56 @@ public class SmartReportService {
                 resolveLastUsage(merchantId),
                 paidCredits,
                 CatalogProducts.SMART_REPORTING_ADDON,
-                addonUnitPrice
+                addonUnitPrice,
+                bonusCredits,
+                !bonusEarned
         );
     }
 
     @Transactional(readOnly = true)
     public Page<SmartReportDtos.SmartReportListItem> listJobs(Long merchantId, String status, Pageable pageable) {
+        return listJobs(merchantId, status, null, null, pageable);
+    }
+
+    /**
+     * @param createdFrom first creation day to include (inclusive), or {@code null} for no lower bound
+     * @param createdTo   last creation day to include (inclusive), or {@code null} for no upper bound
+     */
+    @Transactional(readOnly = true)
+    public Page<SmartReportDtos.SmartReportListItem> listJobs(
+            Long merchantId,
+            String status,
+            LocalDate createdFrom,
+            LocalDate createdTo,
+            Pageable pageable
+    ) {
+        if (createdFrom != null && createdTo != null && createdFrom.isAfter(createdTo)) {
+            throw new BadRequestException("Baslangic tarihi bitis tarihinden sonra olamaz");
+        }
         String normalized = status != null && "all".equalsIgnoreCase(status.trim())
                 ? null
                 : normalizeStatus(status);
-        Page<SmartReportEvent> page = normalized == null
-                ? smartReportEventRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, pageable)
-                : smartReportEventRepository.findByMerchantIdAndStatusOrderByCreatedAtDesc(merchantId, normalized, pageable);
-        return page.map(event -> new SmartReportDtos.SmartReportListItem(
+        Page<SmartReportEvent> page;
+        if (createdFrom == null && createdTo == null) {
+            page = normalized == null
+                    ? smartReportEventRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, pageable)
+                    : smartReportEventRepository.findByMerchantIdAndStatusOrderByCreatedAtDesc(merchantId, normalized, pageable);
+        } else {
+            LocalDateTime from = createdFrom == null ? LocalDateTime.of(2000, 1, 1, 0, 0) : createdFrom.atStartOfDay();
+            LocalDateTime before = createdTo == null ? LocalDateTime.of(9999, 1, 1, 0, 0) : createdTo.plusDays(1).atStartOfDay();
+            page = normalized == null
+                    ? smartReportEventRepository
+                            .findByMerchantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                                    merchantId, from, before, pageable)
+                    : smartReportEventRepository
+                            .findByMerchantIdAndStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                                    merchantId, normalized, from, before, pageable);
+        }
+        return page.map(SmartReportService::toListItem);
+    }
+
+    private static SmartReportDtos.SmartReportListItem toListItem(SmartReportEvent event) {
+        return new SmartReportDtos.SmartReportListItem(
                 event.getProcessId(),
                 event.getMenuId(),
                 event.getMenuName(),
@@ -406,8 +488,58 @@ public class SmartReportService {
                 event.getToDate(),
                 event.getLocale(),
                 event.getStatus(),
-                event.getCreatedAt()
-        ));
+                event.getCreatedAt(),
+                event.getCreditSource()
+        );
+    }
+
+    /** Reports created over the last {@code days} days (today included), per day and per credit source. */
+    @Transactional(readOnly = true)
+    public SmartReportDtos.SmartReportUsageResponse getUsage(Long merchantId, int days) {
+        if (days != 7 && days != 30) {
+            throw new BadRequestException("days 7 veya 30 olmali");
+        }
+        LocalDate to = LocalDate.now(zoneId());
+        LocalDate from = to.minusDays(days - 1L);
+        List<SmartReportEvent> events = smartReportEventRepository
+                .findByMerchantIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(merchantId, from.atStartOfDay());
+
+        Map<LocalDate, long[]> perDay = new java.util.LinkedHashMap<>();
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            perDay.put(day, new long[3]);
+        }
+        long[] totals = new long[3];
+        for (SmartReportEvent event : events) {
+            int slot = creditSlot(event.getCreditSource());
+            totals[slot]++;
+            long[] bucket = perDay.get(event.getCreatedAt().toLocalDate());
+            if (bucket != null) {
+                bucket[slot]++;
+            }
+        }
+        List<SmartReportDtos.UsageDay> daily = perDay.entrySet().stream()
+                .map(entry -> new SmartReportDtos.UsageDay(
+                        entry.getKey(), entry.getValue()[0], entry.getValue()[1], entry.getValue()[2]))
+                .toList();
+        return new SmartReportDtos.SmartReportUsageResponse(
+                days,
+                from,
+                to,
+                new SmartReportDtos.UsageTotals(totals[0], totals[1], totals[2], events.size()),
+                daily,
+                events.stream().map(SmartReportService::toListItem).toList()
+        );
+    }
+
+    /** 0 = free, 1 = bonus, 2 = paid; reports without a recorded source count as free. */
+    private static int creditSlot(String creditSource) {
+        if (SmartReportEvent.CREDIT_BONUS.equals(creditSource)) {
+            return 1;
+        }
+        if (SmartReportEvent.CREDIT_PAID.equals(creditSource)) {
+            return 2;
+        }
+        return 0;
     }
 
     @Transactional(readOnly = true)
@@ -532,17 +664,55 @@ public class SmartReportService {
     }
 
     private int paidCredits(Long merchantId) {
-        return Math.max(fulfillmentClient.openQuantity(merchantId, CatalogProducts.SMART_REPORTING, "ADDON_PURCHASE"), 0);
+        return Math.max(fulfillmentClient.openRemaining(merchantId, CatalogProducts.SMART_REPORTING, "ADDON_PURCHASE"), 0);
     }
 
-    private void assertQuotaAvailable(Long merchantId) {
-        SmartReportDtos.SmartReportQuotaResponse quota = getQuota(merchantId);
-        if (quota.remaining() > 0) {
-            return;
+    /**
+     * Free reports per period come from the merchant's package (a {@code SMART_REPORT_QUOTA} line, so
+     * each package can grant a different number). Packages without that line keep the configured
+     * default ({@code app.smart-report.quota-limit}).
+     */
+    int freeLimit(Long merchantId) {
+        List<com.ael.algoryqrservice.qrservice.client.dto.ExternalEntitlementResponse> quota;
+        try {
+            quota = fulfillmentClient.listEntitlements(merchantId).stream()
+                    .filter(item -> CatalogProducts.SMART_REPORT_QUOTA.equals(item.featureCode()))
+                    .filter(item -> item.status() == null || "ACTIVE".equals(item.status()))
+                    .filter(item -> item.expiresAt() == null || item.expiresAt().isAfter(Instant.now()))
+                    .toList();
+        } catch (RuntimeException exception) {
+            quota = List.of();
         }
-        if (quota.paidCredits() > 0) {
+        if (quota.isEmpty()) {
+            return Math.max(quotaProperties.getQuotaLimit(), 0);
+        }
+        if (quota.stream().anyMatch(item -> item.unlimited())) {
+            return Integer.MAX_VALUE;
+        }
+        return quota.stream().mapToInt(item -> item.quantity() == null ? 0 : item.quantity()).sum();
+    }
+
+    /** Monday (in the quota zone) of the current week: the window in which feedback can earn one extra credit. */
+    public LocalDate currentBonusWeek() {
+        return LocalDate.now(zoneId()).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    }
+
+    /**
+     * Spends credits in order: the period's free quota, this week's feedback bonus, then purchased credits.
+     * Returns the {@code SmartReportEvent.CREDIT_*} source that paid for the report.
+     */
+    private String assertQuotaAvailable(Long merchantId) {
+        ZoneId zone = zoneId();
+        long used = smartReportEventRepository.countByMerchantIdAndCreatedAtGreaterThanEqual(merchantId, periodStart(zone));
+        if (used < freeLimit(merchantId)) {
+            return SmartReportEvent.CREDIT_FREE;
+        }
+        if (smartReportFeedbackRepository.consumeBonus(merchantId, currentBonusWeek(), LocalDateTime.now(zone)) > 0) {
+            return SmartReportEvent.CREDIT_BONUS;
+        }
+        if (paidCredits(merchantId) > 0) {
             productUsageGateway.use(merchantId, CatalogProducts.SMART_REPORTING_ADDON, 1);
-            return;
+            return SmartReportEvent.CREDIT_PAID;
         }
         String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK
                 ? "Bu haftaki ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin."

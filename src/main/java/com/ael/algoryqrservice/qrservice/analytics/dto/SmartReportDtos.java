@@ -33,6 +33,38 @@ public final class SmartReportDtos {
     ) {
     }
 
+    /**
+     * Answers to the questions under a finished report. Every field is optional.
+     *
+     * @param helpful            YES, PARTLY or NO
+     * @param recommendationsFit FITS, PARTLY or NOT_FIT
+     * @param detailLevel        SHORTER, SAME or LONGER
+     */
+    public record FeedbackRequest(
+            String helpful,
+            String recommendationsFit,
+            List<String> unclearSections,
+            List<String> focusAreas,
+            String detailLevel,
+            String note
+    ) {
+    }
+
+    public record FeedbackResponse(
+            UUID jobId,
+            String helpful,
+            String recommendationsFit,
+            List<String> unclearSections,
+            List<String> focusAreas,
+            String detailLevel,
+            String note,
+            UUID revisionJobId,
+            LocalDateTime updatedAt,
+            /** True when this feedback earned the weekly extra report credit. */
+            boolean bonusGranted
+    ) {
+    }
+
     public record SmartReportAccepted(
             UUID jobId,
             String status
@@ -49,8 +81,27 @@ public final class SmartReportDtos {
             LocalDate to,
             String locale,
             String status,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            /** FREE, BONUS or PAID: which credit paid for the report. */
+            String creditSource
     ) {
+    }
+
+    /** Reports created per day over the last N days, split by the credit that paid for them. */
+    public record SmartReportUsageResponse(
+            int days,
+            LocalDate from,
+            LocalDate to,
+            UsageTotals totals,
+            List<UsageDay> daily,
+            List<SmartReportListItem> items
+    ) {
+    }
+
+    public record UsageTotals(long free, long bonus, long paid, long total) {
+    }
+
+    public record UsageDay(LocalDate date, long free, long bonus, long paid) {
     }
 
     public record SmartReportQuotaResponse(
@@ -62,7 +113,11 @@ public final class SmartReportDtos {
             Instant lastUsage,
             int paidCredits,
             String addonProductCode,
-            BigDecimal addonUnitPrice
+            BigDecimal addonUnitPrice,
+            /** Extra credit earned by giving feedback this week and not yet spent (0 or 1); included in limit/remaining. */
+            int bonusCredits,
+            /** True while feedback can still earn this week's extra credit. */
+            boolean feedbackBonusAvailable
     ) {
         public SmartReportQuotaResponse(
                 String period,
@@ -72,7 +127,7 @@ public final class SmartReportDtos {
                 Instant resetsAt,
                 Instant lastUsage
         ) {
-            this(period, limit, used, remaining, resetsAt, lastUsage, 0, null, null);
+            this(period, limit, used, remaining, resetsAt, lastUsage, 0, null, null, 0, false);
         }
     }
 
