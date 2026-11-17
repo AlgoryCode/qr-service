@@ -660,10 +660,12 @@ public class MenuOrderService {
                 String note = trimToNull(itemRequest.getNote());
                 String key = MenuProductOptionService.lineKey(product.getProductId(), resolved.selectedOptions());
 
+                int assistantQuantity = assistantQuantity(itemRequest.getAssistantQuantity(), quantity);
                 MenuOrderItem existing = mergedByLineKey.get(key);
                 if (existing != null) {
                     int nextQty = existing.getQuantity() + quantity;
                     existing.setQuantity(nextQty);
+                    existing.setAssistantQuantity(existing.getAssistantQuantity() + assistantQuantity);
                     existing.setLineTotal(existing.getUnitPrice().multiply(BigDecimal.valueOf(nextQty)));
                     if (existing.getNote() == null && note != null) {
                         existing.setNote(note);
@@ -680,6 +682,7 @@ public class MenuOrderService {
                         .note(note)
                         .selectedOptions(new ArrayList<>(resolved.selectedOptions()))
                         .lineTotal(lineTotal)
+                        .assistantQuantity(assistantQuantity)
                         .build();
                 mergedByLineKey.put(key, item);
 
@@ -696,6 +699,14 @@ public class MenuOrderService {
 
         order.setTotalAmount(total);
         order.setCurrency(currency);
+    }
+
+    /** Assistant-attributed units of a cart line, never negative and never above the line quantity. */
+    static int assistantQuantity(Integer requested, int quantity) {
+        if (requested == null || requested <= 0) {
+            return 0;
+        }
+        return Math.min(requested, Math.max(quantity, 0));
     }
 
     private MenuOrder getOrCreateDraftEntity(TableSession session) {
@@ -842,6 +853,7 @@ public class MenuOrderService {
                         .note(item.getNote())
                         .lineTotal(item.getLineTotal())
                         .selectedOptions(toSelectedOptionResponses(item.getSelectedOptions()))
+                        .assistantQuantity(item.getAssistantQuantity())
                         .build())
                 .toList();
 

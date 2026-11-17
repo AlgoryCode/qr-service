@@ -40,6 +40,10 @@ public final class MenuOrderDtos {
         private String note;
 
         private List<Long> selectedOptionIds;
+
+        /** Units of this line added from a menu assistant suggestion; capped at quantity. */
+        @Min(0)
+        private Integer assistantQuantity;
     }
 
     @Data
@@ -120,6 +124,7 @@ public final class MenuOrderDtos {
         private String note;
         private BigDecimal lineTotal;
         private List<SelectedOptionResponse> selectedOptions;
+        private int assistantQuantity;
     }
 
     @Data

@@ -1511,6 +1511,17 @@ public class AnalyticsService {
             );
             case CHECKOUT_START -> "Checkout basladi";
             case ORDER_SUBMITTED -> "Siparis gonderildi";
+            case CHEF_CHAT_OPEN -> "Asistan acildi";
+            case CHEF_RECOMMENDATION_REQUEST -> "Asistandan oneri istendi";
+            case CHEF_RECOMMENDATION_SHOWN -> "Asistan oneri gosterdi";
+            case CHEF_PRODUCT_CARD_CLICK -> "Asistan onerisi: " + productNames.getOrDefault(
+                    event.getProductId(), "Urun #" + event.getProductId());
+            case CHEF_PRODUCT_ADD, CHEF_CROSS_SELL_ADD -> "Asistanla sepete: " + productNames.getOrDefault(
+                    event.getProductId(), "Urun #" + event.getProductId());
+            case CHEF_CROSS_SELL_SHOWN -> "Asistan yan urun onerdi";
+            case CHEF_CROSS_SELL_CLICK -> "Asistan yan urun tiklandi";
+            case CHEF_CART_OPEN -> "Asistandan sepet acildi";
+            case CHEF_RECOMMENDATION_FEEDBACK -> "Asistan onerisi degerlendirildi";
         };
     }
 

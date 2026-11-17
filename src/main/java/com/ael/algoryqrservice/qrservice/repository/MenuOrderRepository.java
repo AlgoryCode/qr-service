@@ -156,4 +156,38 @@ public interface MenuOrderRepository extends JpaRepository<MenuOrder, Long> {
             @Param("fromDt") LocalDateTime fromDt,
             @Param("toDt") LocalDateTime toDt
     );
+
+    /**
+     * Lines of placed orders that carry menu-assistant units: order id, product id, product name,
+     * unit price, assistant units, submitted at.
+     */
+    @Query("""
+            select o.id, i.productId, i.productName, i.unitPrice, i.assistantQuantity, o.submittedAt
+            from MenuOrderItem i join i.order o
+            where o.menuId in :menuIds
+              and o.status in :statuses
+              and o.submittedAt between :from and :to
+              and i.assistantQuantity > 0
+            """)
+    List<Object[]> findAssistantLines(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("statuses") Collection<MenuOrderStatus> statuses,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    /** Order count and total amount of placed orders: [count, sum]. */
+    @Query("""
+            select count(o), coalesce(sum(o.totalAmount), 0)
+            from MenuOrder o
+            where o.menuId in :menuIds
+              and o.status in :statuses
+              and o.submittedAt between :from and :to
+            """)
+    List<Object[]> placedOrderTotals(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("statuses") Collection<MenuOrderStatus> statuses,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }
