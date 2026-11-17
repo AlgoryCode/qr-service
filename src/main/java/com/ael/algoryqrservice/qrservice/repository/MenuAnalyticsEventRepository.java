@@ -208,4 +208,33 @@ public interface MenuAnalyticsEventRepository extends JpaRepository<MenuAnalytic
     List<MenuAnalyticsEvent> findBySessionIdInOrderBySessionIdAscSequenceAsc(Collection<UUID> sessionIds);
 
     long countBySessionIdAndMenuId(UUID sessionId, Long menuId);
+
+    @Query("""
+            select count(distinct e.sessionId)
+            from MenuAnalyticsEvent e
+            where e.menuId in :menuIds
+              and e.eventType = :eventType
+              and e.occurredAt between :from and :to
+            """)
+    long countDistinctSessions(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("eventType") MenuAnalyticsEventType eventType,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+            select e.eventType, count(e)
+            from MenuAnalyticsEvent e
+            where e.menuId in :menuIds
+              and e.eventType in :eventTypes
+              and e.occurredAt between :from and :to
+            group by e.eventType
+            """)
+    List<Object[]> countByEventTypes(
+            @Param("menuIds") Collection<Long> menuIds,
+            @Param("eventTypes") Collection<MenuAnalyticsEventType> eventTypes,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }

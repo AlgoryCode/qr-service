@@ -53,4 +53,9 @@ public class MenuOrderItem {
 
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
+
+    /** Units of this line the guest added from a menu assistant suggestion (0..quantity). */
+    @Column(name = "assistant_quantity", nullable = false)
+    @Builder.Default
+    private int assistantQuantity = 0;
 }

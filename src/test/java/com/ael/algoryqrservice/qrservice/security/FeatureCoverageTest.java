@@ -78,6 +78,7 @@ class FeatureCoverageTest {
             entry("qrservice.analytics.controller.SiteAnalyticsController", "Ziyaret ölçümü"),
             entry("qrservice.branch.capacity.CapacityController", "Paket düşüşünde şube seçimi, her pakette"),
             entry("qrservice.usage.UsageController", "Dönemlik kotaları okur ve ölçer, her pakette"),
+            entry("qrservice.analytics.assistant.AssistantReportController", "Asistan raporu ve kullanım kaydı, her pakette; şube sahipliği serviste kontrol edilir"),
             entry("qrservice.analytics.controller.MenuFixedExpenseController", "SMART_REPORTING/WAITER_PANEL içeride kontrol edilir")
     );
 
