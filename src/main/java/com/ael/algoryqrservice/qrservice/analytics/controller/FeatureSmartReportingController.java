@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.analytics.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.analytics.dto.SmartReportDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.analytics.service.SmartReportService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import jakarta.validation.Valid;
@@ -25,7 +25,7 @@ public class FeatureSmartReportingController {
 
     /** Smart report over all branches of the merchant (aggregated detailed reports). */
     @PostMapping("/merchant/reports")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createMerchantSmartReport(
             @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
     ) {
@@ -41,7 +41,7 @@ public class FeatureSmartReportingController {
     }
 
     @PostMapping("/branches/{branchId}/reports")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createBranchSmartReport(
             @PathVariable Long branchId,
             @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body
@@ -59,7 +59,7 @@ public class FeatureSmartReportingController {
     }
 
     @PostMapping("/menus/{menuId}/reports")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> createSmartReport(
             @PathVariable Long menuId,
             @Valid @RequestBody SmartReportDtos.SmartReportCreateRequest body

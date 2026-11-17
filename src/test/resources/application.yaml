@@ -24,6 +24,9 @@ spring:
 
 app:
   url: http://localhost:3000
+  features:
+    # Tests build the schema from entities; the feature catalog is seeded by Flyway only.
+    validation: warn
 ubereats:
   poll-enabled: false
   encrypt-key: dGVzdC10Z28tZW5jcnlwdC1rZXktMzItYnl0ZXMh

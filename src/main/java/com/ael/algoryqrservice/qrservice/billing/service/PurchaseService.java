@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.qrservice.config.BillingRefundProperties;
 import com.ael.algoryqrservice.qrservice.config.BillingSubscriptionProperties;
 import com.ael.algoryqrservice.qrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.qrservice.exception.ConflictException;
 import com.ael.algoryqrservice.qrservice.exception.FulfillmentUnavailableException;
 import com.ael.algoryqrservice.qrservice.exception.InvalidPaymentEventException;
 import com.ael.algoryqrservice.qrservice.exception.PaymentServiceException;
@@ -102,6 +103,8 @@ public class PurchaseService {
     private final ExternalPackageViewService externalPackageView;
     private final PlanChangeService planChangeService;
     private final com.ael.algoryqrservice.qrservice.billing.invoice.InvoiceService invoiceService;
+    private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
+    private final DuplicatePackageRefunder duplicatePackageRefunder;
 
     /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
     private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
@@ -136,6 +139,8 @@ public class PurchaseService {
         if (!request.isPaymentPlanValid()) {
             throw new BadRequestException("Geçersiz ödeme planı");
         }
+        purchaseExpiryService.expireDueForMerchant(user.getId());
+        rejectIfPaidPackageActive(user.getId());
 
         purchaseLogService.log(
                 null,
@@ -260,6 +265,84 @@ public class PurchaseService {
         }
     }
 
+    /**
+     * A merchant holds one paid package at a time. A second checkout would charge again and start a
+     * parallel subscription, so moving to another package must go through the plan change flow.
+     */
+    void rejectIfPaidPackageActive(Long merchantId) {
+        LocalDateTime now = AppTime.nowLocal();
+        boolean hasPaidPackage = purchaseRepository
+                .findByMerchantIdAndStatusAndPurchaseType(merchantId, PurchaseStatus.ACTIVE, PurchaseType.PAID)
+                .stream()
+                .anyMatch(active -> active.getPackageId() != null
+                        && (active.getExpiresAt() == null || active.getExpiresAt().isAfter(now)));
+        if (hasPaidPackage) {
+            throw new ConflictException(
+                    "PAID_PACKAGE_ACTIVE",
+                    "Aktif bir ücretli paketiniz var. Başka bir pakete geçmek için paket değiştirmeyi kullanın."
+            );
+        }
+    }
+
+    /**
+     * The checkout guard cannot see a payment that lands late (a timed-out checkout, two open tabs).
+     * Before a package is activated, any other paid package of the merchant is settled: one still in
+     * its paid period wins and this payment is refunded; one that has lapsed is replaced, and its
+     * subscription is stopped so it never charges again. Returns true when this payment is refunded.
+     */
+    boolean refundIfSecondPackage(Purchase purchase, PaymentCompletedEventDto event) {
+        if (purchase.getPurchaseType() != PurchaseType.PAID
+                || purchase.getPackageId() == null
+                || purchase.getStatus() == PurchaseStatus.ACTIVE) {
+            return false;
+        }
+        LocalDateTime now = AppTime.nowLocal();
+        List<Purchase> others = purchaseRepository
+                .findByMerchantIdAndStatusAndPurchaseType(purchase.getMerchantId(), PurchaseStatus.ACTIVE, PurchaseType.PAID)
+                .stream()
+                .filter(other -> other.getPackageId() != null && !other.getId().equals(purchase.getId()))
+                .toList();
+        boolean otherStillPaid = others.stream()
+                .anyMatch(other -> other.getExpiresAt() == null || other.getExpiresAt().isAfter(now));
+        if (otherStillPaid) {
+            purchase.setStatus(PurchaseStatus.CANCELLED);
+            purchase.setCancellationReason(PurchaseCancellationReason.DUPLICATE_PACKAGE);
+            if (event.getSubscriptionId() != null && !event.getSubscriptionId().isBlank()) {
+                purchase.setSubscriptionId(event.getSubscriptionId());
+            }
+            if ((purchase.getPaymentConversationId() == null || purchase.getPaymentConversationId().isBlank())
+                    && event.getConversationId() != null) {
+                purchase.setPaymentConversationId(event.getConversationId());
+            }
+            purchase.setRefundStatus(RefundStatus.PENDING);
+            purchase.setRefundPendingAt(now);
+            purchaseRepository.save(purchase);
+            couponRedemptionService.release(purchase);
+            purchaseLogService.log(
+                    purchase.getId(),
+                    purchase.getMerchantId(),
+                    PurchaseLogAction.PURCHASE_REFUND_STARTED,
+                    purchase.getPackageName() + " ödendi ama aktif bir paket zaten var; ödeme iade ediliyor"
+            );
+            log.warn("duplicate_package_payment merchantId={} purchaseId={} amount={}",
+                    purchase.getMerchantId(), purchase.getId(), event.getAmount());
+            applicationEventPublisher.publishEvent(new DuplicatePackageRefunder.Requested(purchase.getId()));
+            return true;
+        }
+        for (Purchase lapsed : others) {
+            lapsed.setStatus(PurchaseStatus.SUPERSEDED);
+            purchaseRepository.save(lapsed);
+            remoteSubscriptionCanceller.cancelIfNeeded(lapsed);
+            purchaseLogService.log(
+                    lapsed.getId(),
+                    lapsed.getMerchantId(),
+                    PurchaseLogAction.PURCHASE_DEACTIVATED,
+                    lapsed.getPackageName() + " süresi dolmuştu; yerine " + purchase.getPackageName() + " geçti"
+            );
+        }
+        return false;
+    }
+
     @Transactional
     public void handlePaymentSuccess(PaymentCompletedEventDto event) {
         if (paymentEventInboxRepository.existsByEventId(event.getEventId())) {
@@ -280,6 +363,10 @@ public class PurchaseService {
         }
         if (planChangeService.fulfillUpgradePayment(purchase, event, metadata)) {
             invoiceService.recordSale(purchase, event);
+            markEventProcessed(event, purchase.getId());
+            return;
+        }
+        if (refundIfSecondPackage(purchase, event)) {
             markEventProcessed(event, purchase.getId());
             return;
         }
@@ -1084,6 +1171,12 @@ public class PurchaseService {
     public void reconcilePendingRefunds() {
         List<Purchase> pending = purchaseRepository.findByRefundStatus(RefundStatus.PENDING);
         for (Purchase purchase : pending) {
+            if (DuplicatePackageRefunder.isDuplicate(purchase)) {
+                // Money for a second package must go back: keep retrying, never clear it. The
+                // refunder locks the row in its own transaction, so it is not locked here.
+                duplicatePackageRefunder.refund(purchase.getId());
+                continue;
+            }
             try {
                 Purchase locked = purchaseRepository.findByIdForUpdate(purchase.getId()).orElse(null);
                 if (locked == null || locked.getRefundStatus() != RefundStatus.PENDING) {
@@ -1370,9 +1463,11 @@ public class PurchaseService {
             throw new InvalidPaymentEventException("Installment metadata does not match purchase");
         }
         if (isPlanChangeDifference(event)) {
-            BigDecimal expected = metadataAmount(event, "totalAmount");
+            // The event's own metadata is not proof of price: compare with the charge recorded
+            // when the upgrade checkout was created.
+            BigDecimal expected = planChangeService.expectedUpgradeCharge(purchase.getId()).orElse(null);
             if (expected == null || expected.compareTo(event.getAmount()) != 0) {
-                throw new InvalidPaymentEventException("Payment amount does not match purchase installment");
+                throw new InvalidPaymentEventException("Payment amount does not match plan change charge");
             }
         } else if (purchase.getPaymentStyle() == PaymentStyle.SUBSCRIPTION) {
             // The first charge is the purchase price (coupons apply once); renewals charge the recurring price.
@@ -1412,17 +1507,6 @@ public class PurchaseService {
         return Boolean.TRUE.equals(flag) || "true".equalsIgnoreCase(String.valueOf(flag));
     }
 
-    private BigDecimal metadataAmount(PaymentCompletedEventDto event, String key) {
-        Map<String, Object> metadata = event.getSourceMetadata();
-        if (metadata == null || metadata.get(key) == null) {
-            return null;
-        }
-        Object value = metadata.get(key);
-        if (value instanceof BigDecimal decimal) {
-            return decimal;
-        }
-        return new BigDecimal(String.valueOf(value));
-    }
 
     private void validateIdentity(
             PaymentCompletedEventDto event,
@@ -1672,6 +1756,18 @@ public class PurchaseService {
     private void extendPurchase(Purchase purchase, int days) {
         if (days < 1 || days > 3650) {
             throw new BadRequestException("days 1 ile 3650 arasinda olmalidir");
+        }
+        if (purchase.getStatus() != PurchaseStatus.ACTIVE
+                && purchase.getPurchaseType() == PurchaseType.PAID
+                && purchase.getPackageId() != null) {
+            // Reviving an old package next to the current one would leave two active paid packages.
+            boolean anotherActive = purchaseRepository
+                    .findByMerchantIdAndStatusAndPurchaseType(purchase.getMerchantId(), PurchaseStatus.ACTIVE, PurchaseType.PAID)
+                    .stream()
+                    .anyMatch(other -> other.getPackageId() != null && !other.getId().equals(purchase.getId()));
+            if (anotherActive) {
+                throw new BadRequestException("Kullanıcının aktif başka bir ücretli paketi var; önce onu uzatın");
+            }
         }
         LocalDateTime now = AppTime.nowLocal();
         LocalDateTime base = purchase.getExpiresAt() != null && purchase.getExpiresAt().isAfter(now)

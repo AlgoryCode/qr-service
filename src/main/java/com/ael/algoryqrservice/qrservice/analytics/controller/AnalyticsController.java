@@ -1,12 +1,12 @@
 package com.ael.algoryqrservice.qrservice.analytics.controller;
 
 import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.exception.ForbiddenException;
 import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.qrservice.analytics.dto.AnalyticsDtos;
 import com.ael.algoryqrservice.qrservice.analytics.dto.SmartReportDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.analytics.service.AnalyticsService;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuService;
 import com.ael.algoryqrservice.qrservice.analytics.service.SmartReportFeedbackService;
@@ -176,7 +176,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/merchant/detailed-report")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<AnalyticsDtos.MerchantDetailedReportResponse> getMerchantDetailedReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
@@ -191,7 +191,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/smart-reports/quota")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportQuotaResponse> getSmartReportQuota() {
         Long ownerId = securityUtils.getCurrentMerchantId();
         return ResponseEntity.ok(smartReportService.getQuota(ownerId));
@@ -199,7 +199,7 @@ public class AnalyticsController {
 
     /** Reports created in the last 7 or 30 days, split into free, feedback-bonus and purchased credits. */
     @GetMapping("/smart-reports/usage")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportUsageResponse> getSmartReportUsage(
             @RequestParam(defaultValue = "7") int days
     ) {
@@ -208,7 +208,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/smart-reports")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<Page<SmartReportDtos.SmartReportListItem>> listSmartReports(
             @RequestParam(required = false, defaultValue = "completed") String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -220,7 +220,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/smart-reports/{jobId}")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportDetailResponse> getSmartReport(
             @PathVariable UUID jobId
     ) {
@@ -229,7 +229,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/smart-reports/{jobId}/feedback")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.FeedbackResponse> getSmartReportFeedback(@PathVariable UUID jobId) {
         Long ownerId = securityUtils.getCurrentMerchantId();
         return smartReportFeedbackService.find(ownerId, jobId)
@@ -238,7 +238,7 @@ public class AnalyticsController {
     }
 
     @PutMapping("/smart-reports/{jobId}/feedback")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.FeedbackResponse> saveSmartReportFeedback(
             @PathVariable UUID jobId,
             @RequestBody SmartReportDtos.FeedbackRequest request
@@ -249,7 +249,7 @@ public class AnalyticsController {
 
     /** Saves the feedback and queues a revised report over the same scope and period (uses 1 credit). */
     @PostMapping("/smart-reports/{jobId}/revise")
-    @RequiresProductScope(CatalogScopes.SMART_REPORTING_OWNER)
+    @RequiresFeature(FeatureKey.SMART_REPORTING)
     public ResponseEntity<SmartReportDtos.SmartReportAccepted> reviseSmartReport(
             @PathVariable UUID jobId,
             @RequestBody SmartReportDtos.FeedbackRequest request

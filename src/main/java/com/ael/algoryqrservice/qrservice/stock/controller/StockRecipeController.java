@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.stock.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.stock.dto.StockDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.stock.service.StockRecipeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +22,13 @@ public class StockRecipeController {
     private final StockRecipeService stockRecipeService;
 
     @GetMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.RecipeResponse> get(@PathVariable Long productId) {
         return ResponseEntity.ok(stockRecipeService.get(productId));
     }
 
     @PutMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.RecipeResponse> replace(
             @PathVariable Long productId,
             @Valid @RequestBody StockDtos.RecipeReplaceRequest request

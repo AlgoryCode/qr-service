@@ -27,6 +27,12 @@ public class AdminCatalogController {
 
     private final AdminCatalogService catalog;
 
+    /** Feature and scope codes a product may carry, with labels for the admin form. */
+    @GetMapping("/catalog-codes")
+    public CatalogCodes.Response catalogCodes() {
+        return CatalogCodes.ALL;
+    }
+
     @GetMapping("/products")
     public List<ProductResponse> products() {
         return catalog.listProducts();

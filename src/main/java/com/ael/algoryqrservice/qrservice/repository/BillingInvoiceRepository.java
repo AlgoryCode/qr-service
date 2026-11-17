@@ -7,7 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface BillingInvoiceRepository extends JpaRepository<BillingInvoice, Long> {
+public interface BillingInvoiceRepository extends JpaRepository<BillingInvoice, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<BillingInvoice> {
 
     boolean existsByPaymentEventIdAndKind(String paymentEventId, BillingInvoice.Kind kind);
 

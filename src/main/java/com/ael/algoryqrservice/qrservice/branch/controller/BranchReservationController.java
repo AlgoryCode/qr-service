@@ -1,9 +1,9 @@
 package com.ael.algoryqrservice.qrservice.branch.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuReservationService;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class BranchReservationController {
     private final MenuReservationService menuReservationService;
 
     @GetMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.ReservationPageResponse> list(
             @PathVariable Long branchId,
             @RequestParam(required = false, defaultValue = "all") String status,
@@ -45,7 +45,7 @@ public class BranchReservationController {
 
     /** A reservation the business takes itself (phone, walk-in); it is confirmed straight away. */
     @PostMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.ReservationResponse> create(
             @PathVariable Long branchId,
             @Valid @RequestBody MenuDtos.ReservationCreateRequest request,
@@ -61,7 +61,7 @@ public class BranchReservationController {
     }
 
     @PatchMapping("/{reservationId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.ReservationResponse> update(
             @PathVariable Long branchId,
             @PathVariable Long reservationId,

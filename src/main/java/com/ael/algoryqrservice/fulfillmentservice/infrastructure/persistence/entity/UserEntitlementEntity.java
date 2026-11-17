@@ -18,7 +18,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "user_entitlement")
+@Table(name = "entitlement_grants")
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.stock.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.stock.dto.StockDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.stock.service.StockIngredientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class StockController {
     private final StockIngredientService stockIngredientService;
 
     @GetMapping("/branches/{branchId}/ingredients")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.IngredientPageResponse> list(
             @PathVariable Long branchId,
             @RequestParam(defaultValue = "false") boolean lowOnly,
@@ -36,7 +36,7 @@ public class StockController {
     }
 
     @PostMapping("/branches/{branchId}/ingredients")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.IngredientResponse> create(
             @PathVariable Long branchId,
             @Valid @RequestBody StockDtos.IngredientRequest request
@@ -45,13 +45,13 @@ public class StockController {
     }
 
     @GetMapping("/ingredients/{ingredientId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.IngredientResponse> get(@PathVariable Long ingredientId) {
         return ResponseEntity.ok(stockIngredientService.get(ingredientId));
     }
 
     @PutMapping("/ingredients/{ingredientId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.IngredientResponse> update(
             @PathVariable Long ingredientId,
             @Valid @RequestBody StockDtos.IngredientUpdateRequest request
@@ -60,14 +60,14 @@ public class StockController {
     }
 
     @DeleteMapping("/ingredients/{ingredientId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<Void> delete(@PathVariable Long ingredientId) {
         stockIngredientService.delete(ingredientId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/ingredients/{ingredientId}/movements")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.MovementPageResponse> listMovements(
             @PathVariable Long ingredientId,
             @RequestParam(defaultValue = "0") int page,
@@ -77,7 +77,7 @@ public class StockController {
     }
 
     @PostMapping("/ingredients/{ingredientId}/movements")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<StockDtos.MovementResponse> recordMovement(
             @PathVariable Long ingredientId,
             @Valid @RequestBody StockDtos.MovementRequest request

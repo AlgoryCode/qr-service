@@ -35,6 +35,8 @@ public final class AdminUserDtos {
         private AuthProvider provider;
         private UserRole role;
         private LocalDateTime createdAt;
+        /** Admin labels on the member. */
+        private List<String> tags;
     }
 
     @Data

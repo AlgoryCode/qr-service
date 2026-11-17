@@ -54,9 +54,19 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findByMerchantIdAndStatus(Long merchantId, PurchaseStatus status);
 
+    List<Purchase> findByStatusAndPurchaseTypeAndPaymentStyle(
+            PurchaseStatus status,
+            PurchaseType purchaseType,
+            com.ael.algoryqrservice.qrservice.model.enums.PaymentStyle paymentStyle
+    );
+
     List<Purchase> findByMerchantIdAndStatusAndPurchaseType(Long merchantId, PurchaseStatus status, PurchaseType purchaseType);
 
     boolean existsByMerchantIdAndStatus(Long merchantId, PurchaseStatus status);
+
+    boolean existsByMerchantIdAndStatusAndPurchaseTypeAndPriceGreaterThan(
+            Long merchantId, PurchaseStatus status, com.ael.algoryqrservice.qrservice.model.enums.PurchaseType purchaseType,
+            java.math.BigDecimal price);
 
     boolean existsByPackageIdAndStatus(Long packageId, PurchaseStatus status);
 
@@ -101,8 +111,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     @Query(
             value = """
                     select distinct p.merchant_id
-                    from tbl_purchase p
-                             left join active_package ap
+                    from purchases p
+                             left join merchant_subscriptions ap
                                        on ap.merchant_id = p.merchant_id and ap.status = 'ACTIVE'
                     where p.status = 'ACTIVE'
                       and p.expires_at is not null
@@ -117,4 +127,32 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             Pageable pageable
     );
 
+
+    /**
+     * Paid package purchases that describe a merchant's billing standing: every active one, plus
+     * expired ones that lapsed after {@code lapsedSince}.
+     */
+    @Query("""
+            select p from Purchase p
+            where p.purchaseType = com.ael.algoryqrservice.qrservice.model.enums.PurchaseType.PAID
+              and p.packageId is not null
+              and p.merchantId is not null
+              and (p.status = com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus.ACTIVE
+                   or (p.status = com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus.EXPIRED
+                       and p.expiresAt >= :lapsedSince))
+            """)
+    List<Purchase> findBillingStandingCandidates(@Param("lapsedSince") LocalDateTime lapsedSince);
+
+    /** Every paid package purchase that was ever in force; the base for revenue and churn figures. */
+    @Query("""
+            select p from Purchase p
+            where p.purchaseType = com.ael.algoryqrservice.qrservice.model.enums.PurchaseType.PAID
+              and p.packageId is not null
+              and p.merchantId is not null
+              and p.startsAt is not null
+              and p.status in (com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus.ACTIVE,
+                               com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus.EXPIRED,
+                               com.ael.algoryqrservice.qrservice.model.enums.PurchaseStatus.SUPERSEDED)
+            """)
+    List<Purchase> findPaidPackageHistory();
 }

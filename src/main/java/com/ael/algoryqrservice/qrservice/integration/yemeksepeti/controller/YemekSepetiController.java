@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.qrservice.integration.yemeksepeti.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.model.dto.YemekSepetiDtos;
 import com.ael.algoryqrservice.qrservice.integration.service.yemeksepeti.YemekSepetiConnectionService;
 import com.ael.algoryqrservice.qrservice.integration.service.yemeksepeti.YemekSepetiOrderService;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,7 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/integrations/yemek-sepeti")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+@RequiresFeature(FeatureKey.QR_MENU)
 public class YemekSepetiController {
 
     private final YemekSepetiConnectionService connectionService;

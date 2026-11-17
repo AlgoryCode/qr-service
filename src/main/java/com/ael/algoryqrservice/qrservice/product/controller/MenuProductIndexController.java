@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.product.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.product.service.menuindex.MenuProductReindexService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +18,7 @@ public class MenuProductIndexController {
     private final MenuProductReindexService menuProductReindexService;
 
     @PostMapping("/{menuId}/search-index/reindex")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuProductReindexService.ReindexSummary> reindexMenu(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuProductReindexService.reindexMenu(menuId));
     }

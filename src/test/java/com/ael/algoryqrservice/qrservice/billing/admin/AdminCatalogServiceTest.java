@@ -44,7 +44,8 @@ class AdminCatalogServiceTest {
     private final PlanPackageRepository packages = mock(PlanPackageRepository.class);
     private final PlanPackageItemRepository items = mock(PlanPackageItemRepository.class);
     private final AdminCatalogService service =
-            new AdminCatalogService(products, packages, items, new PackagePricingService());
+            new AdminCatalogService(products, packages, items, new PackagePricingService(),
+                    org.mockito.Mockito.mock(PlanVersionService.class), org.mockito.Mockito.mock(FeatureLabels.class));
 
     private final Product menu = product(1L, "QR_MENU", "100");
     private final Product branch = product(2L, "QR_BRANCH", "50");
@@ -74,10 +75,10 @@ class AdminCatalogServiceTest {
 
     @Test
     void newProductUsesItsCodeAsFeatureCodeWhenNoneGiven() {
-        ProductResponse created = service.createProduct(productRequest("kitchen_display", null, true));
+        ProductResponse created = service.createProduct(productRequest("waiter_panel", null, true));
 
-        assertThat(created.code()).isEqualTo("KITCHEN_DISPLAY");
-        assertThat(created.featureCode()).isEqualTo("KITCHEN_DISPLAY");
+        assertThat(created.code()).isEqualTo("WAITER_PANEL");
+        assertThat(created.featureCode()).isEqualTo("WAITER_PANEL");
         assertThat(created.priceWithVat()).isEqualByComparingTo("60.00");
     }
 
@@ -92,9 +93,39 @@ class AdminCatalogServiceTest {
     @Test
     void consumableAddonIsAlwaysSoldOnce() {
         ProductRequest request = new ProductRequest("REPORT_QUOTA", "Rapor hakkı", null, ProductType.ADDON_PRODUCT,
-                null, null, new BigDecimal("25"), null, ProductBillingType.RECURRING, true, true, false, true);
+                "SMART_REPORT_QUOTA", null, new BigDecimal("25"), null, ProductBillingType.RECURRING, true, true, true);
 
         assertThat(service.createProduct(request).billingType()).isEqualTo(ProductBillingType.ONE_TIME);
+    }
+
+    @Test
+    void featureCodeNothingChecksIsRejected() {
+        assertThatThrownBy(() -> service.createProduct(productRequest("KITCHEN_DISPLAY", null, true)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tanımsız hak kodu");
+        verify(products, never()).save(any());
+    }
+
+    @Test
+    void scopeCodeNothingChecksIsRejected() {
+        ProductRequest request = new ProductRequest("QR_MENU_PLUS", "Ürün", null, ProductType.PACKAGE_PRODUCT,
+                "QR_MENU", "qr_menu_admin", new BigDecimal("50"), new BigDecimal("20"),
+                ProductBillingType.RECURRING, false, false, true);
+
+        assertThatThrownBy(() -> service.createProduct(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tanımsız panel yetkisi");
+    }
+
+    @Test
+    void legacyProductKeepsItsUnknownCodesWhenEdited() {
+        archived.setScopeCode("OLD_THING_OWNER");
+        archived.setActive(true);
+        ProductRequest request = new ProductRequest("OLD_THING", "Eski", null, ProductType.PACKAGE_PRODUCT,
+                "OLD_THING", "OLD_THING_OWNER", new BigDecimal("12"), new BigDecimal("20"),
+                ProductBillingType.RECURRING, false, false, true);
+
+        assertThat(service.updateProduct(3L, request).unitPrice()).isEqualByComparingTo("12.00");
     }
 
     @Test
@@ -108,9 +139,9 @@ class AdminCatalogServiceTest {
     void featureCodeOfAProductInPackagesCannotChange() {
         when(items.existsByProductId(1L)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.updateProduct(1L, productRequest("QR_MENU", "OTHER_FEATURE", true)))
+        assertThatThrownBy(() -> service.updateProduct(1L, productRequest("QR_MENU", "QR_BRANCH", true)))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("hak kodu");
+                .hasMessageContaining("Paketlerde kullanılan");
     }
 
     @Test
@@ -137,7 +168,7 @@ class AdminCatalogServiceTest {
         catalog.add(pro);
         ProductRequest cheaper = new ProductRequest("QR_MENU", "QR Menü", null, ProductType.PACKAGE_PRODUCT,
                 "QR_MENU", null, new BigDecimal("40"), new BigDecimal("20"), ProductBillingType.RECURRING,
-                false, false, false, true);
+                false, false, true);
 
         service.updateProduct(1L, cheaper);
 
@@ -275,7 +306,7 @@ class AdminCatalogServiceTest {
 
     private static ProductRequest productRequest(String code, String featureCode, boolean active) {
         return new ProductRequest(code, "Ürün", null, ProductType.PACKAGE_PRODUCT, featureCode, null,
-                new BigDecimal("50"), new BigDecimal("20"), ProductBillingType.RECURRING, false, false, false, active);
+                new BigDecimal("50"), new BigDecimal("20"), ProductBillingType.RECURRING, false, false, active);
     }
 
     private static PackageRequest packageRequest(String code, boolean active, boolean purchasable,

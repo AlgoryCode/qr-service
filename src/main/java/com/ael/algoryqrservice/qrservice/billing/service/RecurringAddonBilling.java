@@ -85,20 +85,20 @@ public class RecurringAddonBilling {
         findHost(merchantId).ifPresent(this::syncHost);
     }
 
-    /** Same as {@link #sync} for a known host purchase; safe to call repeatedly. */
+    /**
+     * Same as {@link #sync} for a known host purchase; safe to call repeatedly. The host's
+     * {@code addonRecurringAmount} only changes once the provider has taken the new renewal charge,
+     * so it always states what the subscription really bills for modules. Returns false when the
+     * provider refused the change; those modules then stay unbilled and are not renewed.
+     */
     @Transactional
-    public void syncHost(Purchase host) {
+    public boolean syncHost(Purchase host) {
         if (host == null || host.getMerchantId() == null || !renewsWithHost(host)) {
-            return;
+            return false;
         }
-        LocalDateTime now = AppTime.nowLocal();
-        BigDecimal addons = recurringAddons(host.getMerchantId(), now).stream()
-                .map(Purchase::getRecurringPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-        host.setAddonRecurringAmount(addons);
-        purchaseRepository.save(host);
-        BigDecimal amount = renewalAmount(host);
+        BigDecimal addons = expectedAddons(host);
+        BigDecimal base = host.getRecurringPrice() != null ? host.getRecurringPrice() : host.getPrice();
+        BigDecimal amount = (base == null ? BigDecimal.ZERO : base).add(addons);
         boolean switched = paymentServiceClient.switchSubscriptionPlan(
                 host.getMerchantId(),
                 host.getSubscriptionId(),
@@ -107,22 +107,82 @@ public class RecurringAddonBilling {
                 Map.of("recurringPrice", amount, "addonRecurringAmount", addons)
         );
         if (!switched) {
-            log.warn("recurring_addon_sync_skipped merchantId={} purchaseId={} subscriptionId={}",
-                    host.getMerchantId(), host.getId(), host.getSubscriptionId());
-            return;
+            log.error("recurring_addon_sync_failed merchantId={} purchaseId={} subscriptionId={} billedAddons={} wantedAddons={}",
+                    host.getMerchantId(), host.getId(), host.getSubscriptionId(),
+                    host.getAddonRecurringAmount(), addons);
+            return false;
         }
+        host.setAddonRecurringAmount(addons);
+        purchaseRepository.save(host);
         log.info("recurring_addon_sync merchantId={} hostPurchaseId={} addons={} renewalAmount={}",
                 host.getMerchantId(), host.getId(), addons, amount);
+        return true;
     }
 
-    /** The package renewed: recurring modules follow it to the new period end. */
+    /** What the host's subscription should bill for modules right now. */
+    BigDecimal expectedAddons(Purchase host) {
+        return recurringAddons(host.getMerchantId(), AppTime.nowLocal()).stream()
+                .map(Purchase::getRecurringPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Re-syncs every renewing package whose billed module amount differs from its modules, e.g.
+     * after a provider error, a module that lapsed, or a sync that never ran. Returns how many
+     * subscriptions were corrected.
+     */
+    public int reconcileAll() {
+        int fixed = 0;
+        List<Purchase> hosts = purchaseRepository.findByStatusAndPurchaseTypeAndPaymentStyle(
+                PurchaseStatus.ACTIVE, PurchaseType.PAID, PaymentStyle.SUBSCRIPTION);
+        for (Purchase host : hosts) {
+            if (host.getPackageId() == null || !renewsWithHost(host)) {
+                continue;
+            }
+            try {
+                BigDecimal billed = host.getAddonRecurringAmount() == null ? BigDecimal.ZERO : host.getAddonRecurringAmount();
+                if (expectedAddons(host).compareTo(billed) != 0 && syncHost(host)) {
+                    fixed++;
+                }
+            } catch (RuntimeException exception) {
+                log.error("recurring_addon_reconcile_failed merchantId={} purchaseId={}",
+                        host.getMerchantId(), host.getId(), exception);
+            }
+        }
+        return fixed;
+    }
+
+    /**
+     * The package renewed: recurring modules the renewal paid for follow it to the new period end.
+     * Modules the subscription was never switched to bill (a failed sync) are left to lapse instead
+     * of being renewed for free; oldest purchases are covered first.
+     */
     @EventListener
     public void onSubscriptionEvent(SubscriptionEvent event) {
         if (event.type() != SubscriptionEventType.PACKAGE_RENEWED || event.endsAt() == null) {
             return;
         }
         LocalDateTime newEnd = LocalDateTime.ofInstant(event.endsAt(), AppTime.ZONE);
-        for (Purchase addon : recurringAddons(event.merchantId(), AppTime.nowLocal())) {
+        BigDecimal budget = findHost(event.merchantId())
+                .map(Purchase::getAddonRecurringAmount)
+                .orElse(BigDecimal.ZERO);
+        if (budget == null) {
+            budget = BigDecimal.ZERO;
+        }
+        List<Purchase> oldestFirst = recurringAddons(event.merchantId(), AppTime.nowLocal()).stream()
+                .sorted(Comparator.comparing(Purchase::getPurchasedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(Purchase::getId, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .toList();
+        BigDecimal covered = BigDecimal.ZERO;
+        for (Purchase addon : oldestFirst) {
+            BigDecimal next = covered.add(addon.getRecurringPrice());
+            if (next.compareTo(budget) > 0) {
+                log.warn("recurring_addon_not_billed merchantId={} purchaseId={} recurringPrice={} billedAddons={}",
+                        addon.getMerchantId(), addon.getId(), addon.getRecurringPrice(), budget);
+                continue;
+            }
+            covered = next;
             if (addon.getExpiresAt() != null && !addon.getExpiresAt().isBefore(newEnd)) {
                 continue;
             }

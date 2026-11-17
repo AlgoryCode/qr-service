@@ -41,6 +41,7 @@ public class SecurityConfig {
     private final StaffPathGatewayFilter staffPathGatewayFilter;
     private final ProductAccessGatewayFilter productAccessGatewayFilter;
     private final EmailVerificationGatewayFilter emailVerificationGatewayFilter;
+    private final EntitlementVersionHeaderFilter entitlementVersionHeaderFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -69,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/healthcheck").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/plan-packages/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/faq").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/analytics/menu/*/events").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/analytics/menu/*/visit").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/analytics/menu/*/product/*/visit").permitAll()
@@ -80,7 +82,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/internal/menu-import/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/google/callback", "/auth/google/callback")
                             .permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/dashboard/auth/login", "/api/v1/dashboard/auth/refresh", "/api/v1/dashboard/auth/logout")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/dashboard/auth/login", "/api/v1/dashboard/auth/login/mfa", "/api/v1/dashboard/auth/refresh", "/api/v1/dashboard/auth/logout")
                             .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verification/resend", "/api/v1/auth/email-verification/verify")
                             .permitAll()
@@ -108,7 +110,8 @@ public class SecurityConfig {
                 .addFilterBefore(printDeviceAuthenticationFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(staffPathGatewayFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(productAccessGatewayFilter, StaffPathGatewayFilter.class)
-                .addFilterAfter(emailVerificationGatewayFilter, ProductAccessGatewayFilter.class);
+                .addFilterAfter(emailVerificationGatewayFilter, ProductAccessGatewayFilter.class)
+                .addFilterAfter(entitlementVersionHeaderFilter, EmailVerificationGatewayFilter.class);
 
         return http.build();
     }
@@ -125,6 +128,15 @@ public class SecurityConfig {
             ProductAccessGatewayFilter filter
     ) {
         FilterRegistrationBean<ProductAccessGatewayFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<EntitlementVersionHeaderFilter> entitlementVersionHeaderFilterRegistration(
+            EntitlementVersionHeaderFilter filter
+    ) {
+        FilterRegistrationBean<EntitlementVersionHeaderFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

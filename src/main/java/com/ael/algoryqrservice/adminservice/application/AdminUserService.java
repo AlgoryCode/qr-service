@@ -35,18 +35,35 @@ public class AdminUserService {
     private final PurchaseService purchaseService;
     private final QrRepository qrRepository;
     private final MenuRepository menuRepository;
+    private final com.ael.algoryqrservice.adminservice.infrastructure.persistence.repository.MemberTagRepository memberTagRepository;
     private final AuthCredentialClient authCredentialClient;
 
     @Transactional(readOnly = true)
     public AdminUserDtos.UserPageResponse listUsers(String query, int page, int size) {
+        return listUsers(query, null, page, size);
+    }
+
+    /** {@code tag} limits the list to members carrying that admin label. */
+    @Transactional(readOnly = true)
+    public AdminUserDtos.UserPageResponse listUsers(String query, String tag, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         String trimmed = query == null ? "" : query.trim();
-        Page<User> result = trimmed.isEmpty()
-                ? userRepository.findAll(pageable)
-                : userRepository.findAll(UserSpecifications.forAdminSearch(trimmed), pageable);
+        org.springframework.data.jpa.domain.Specification<User> spec = trimmed.isEmpty()
+                ? (root, q, cb) -> cb.conjunction()
+                : UserSpecifications.forAdminSearch(trimmed);
+        if (tag != null && !tag.isBlank()) {
+            List<Long> ids = memberTagRepository.findByTag(tag.trim().toLowerCase(java.util.Locale.ROOT)).stream()
+                    .map(com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.MemberTag::getMerchantId)
+                    .toList();
+            if (ids.isEmpty()) {
+                return toPageResponse(Page.empty(pageable));
+            }
+            spec = spec.and((root, q, cb) -> root.get("id").in(ids));
+        }
+        Page<User> result = userRepository.findAll(spec, pageable);
 
         return toPageResponse(result);
     }
@@ -135,8 +152,22 @@ public class AdminUserService {
     }
 
     private AdminUserDtos.UserPageResponse toPageResponse(Page<User> result) {
+        java.util.Map<Long, List<String>> tags = memberTagRepository
+                .findByMerchantIdIn(result.getContent().stream().map(User::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.MemberTag::getMerchantId,
+                        java.util.TreeMap::new,
+                        java.util.stream.Collectors.mapping(
+                                com.ael.algoryqrservice.adminservice.infrastructure.persistence.entity.MemberTag::getTag,
+                                java.util.stream.Collectors.toList())));
         return AdminUserDtos.UserPageResponse.builder()
-                .content(result.getContent().stream().map(this::toSummary).toList())
+                .content(result.getContent().stream()
+                        .map(user -> {
+                            AdminUserDtos.UserSummaryResponse summary = toSummary(user);
+                            summary.setTags(tags.getOrDefault(user.getId(), List.of()));
+                            return summary;
+                        })
+                        .toList())
                 .page(result.getNumber())
                 .size(result.getSize())
                 .totalElements(result.getTotalElements())

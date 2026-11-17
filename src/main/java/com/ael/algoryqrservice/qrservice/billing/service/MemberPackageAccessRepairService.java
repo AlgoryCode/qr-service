@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Rebuilds runtime fulfillment ({@code active_package} / entitlements) from an already-paid
+ * Rebuilds runtime fulfillment ({@code merchant_subscriptions} / entitlements) from an already-paid
  * {@link Purchase} when the purchase row exists but fulfillment state is missing (legacy cutover).
  */
 @Slf4j

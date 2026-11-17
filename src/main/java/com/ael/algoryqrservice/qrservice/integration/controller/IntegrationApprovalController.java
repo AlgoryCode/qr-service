@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.integration.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.integration.dto.IntegrationPendingProductDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.integration.service.IntegrationApprovalService;
 import com.ael.algoryqrservice.qrservice.integration.service.IntegrationExportService;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
@@ -27,7 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/integrations")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+@RequiresFeature(FeatureKey.QR_MENU)
 public class IntegrationApprovalController {
 
     private final IntegrationApprovalService approvalService;

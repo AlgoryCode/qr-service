@@ -37,7 +37,6 @@ public final class AdminCatalogDtos {
             @NotNull ProductBillingType billingType,
             boolean consumable,
             boolean addonPurchasable,
-            boolean requiresCountSync,
             boolean active
     ) {
     }
@@ -56,7 +55,6 @@ public final class AdminCatalogDtos {
             ProductBillingType billingType,
             boolean consumable,
             boolean addonPurchasable,
-            boolean requiresCountSync,
             boolean active,
             long packageCount,
             LocalDateTime createdAt,
@@ -121,6 +119,7 @@ public final class AdminCatalogDtos {
             boolean purchasable,
             boolean active,
             boolean systemManaged,
+            Long currentVersionId,
             List<PackageItemResponse> items,
             LocalDateTime createdAt,
             LocalDateTime updatedAt

@@ -36,5 +36,8 @@ public class PlanPackageResponse {
     private List<InstallmentOptionResponse> installmentOptions;
     private List<PlanPackageItemResponse> items;
     private List<PlanPackageModuleResponse> availableModules;
+    /** Discount campaign running on this package now, if any. */
+    private String campaignLabel;
+    private LocalDateTime campaignEndsAt;
     private LocalDateTime createdAt;
 }

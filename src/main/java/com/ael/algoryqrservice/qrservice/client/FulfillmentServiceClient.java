@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.client;
 
+import com.ael.algoryqrservice.fulfillmentservice.application.metering.MeteringService;
 import com.ael.algoryqrservice.fulfillmentservice.application.service.EntitlementUsageService;
 import com.ael.algoryqrservice.fulfillmentservice.application.service.FulfillmentService;
 import com.ael.algoryqrservice.fulfillmentservice.domain.exception.PackageAlreadyAssignedException;
@@ -36,6 +37,22 @@ public class FulfillmentServiceClient {
     private final FulfillmentService fulfillmentService;
     private final EntitlementUsageService entitlementUsageService;
     private final FulfillmentPresentationMapper mapper;
+    private final MeteringService metering;
+
+    /** Spends a per-period allowance (see {@link MeteringService#consume}); never throws when it is used up. */
+    public MeteringService.Charge meter(Long merchantId, String featureKey, int quantity, String idempotencyKey,
+                                        String reference) {
+        return metering.consume(merchantId, featureKey, quantity, idempotencyKey, reference);
+    }
+
+    /** Gives a spend back; false when the key is unknown or was already given back. */
+    public boolean releaseMeter(String idempotencyKey) {
+        return metering.release(idempotencyKey);
+    }
+
+    public MeteringService.Usage meterUsage(Long merchantId, String featureKey) {
+        return metering.usage(merchantId, featureKey);
+    }
 
     public void createPackage(Long merchantId, String packageCode, int periodDays) {
         try {
@@ -112,7 +129,7 @@ public class FulfillmentServiceClient {
         try {
             return toExternal(mapper.toConsume(entitlementUsageService.consume(merchantId, productCode, quantity)));
         } catch (QuotaExceededException exception) {
-            throw new FulfillmentQuotaExceededException();
+            throw new FulfillmentQuotaExceededException(exception.limit(), exception.used());
         } catch (RuntimeException exception) {
             throw unavailable(merchantId, exception);
         }
@@ -145,13 +162,9 @@ public class FulfillmentServiceClient {
         }
     }
 
+    /** Units left across every open grant of {@code productCode} (package lines and add-ons together). */
     public int remaining(Long merchantId, String productCode) {
-        return listEntitlements(merchantId).stream()
-                .filter(item -> matches(item, productCode))
-                .filter(this::open)
-                .mapToInt(this::remainingOf)
-                .max()
-                .orElse(0);
+        return openRemaining(merchantId, productCode, null);
     }
 
     /** Units still unused across the open entitlements for {@code productCode} (optionally one source). */
@@ -161,7 +174,7 @@ public class FulfillmentServiceClient {
                 .filter(item -> source == null || source.equals(item.source()))
                 .filter(this::open)
                 .mapToLong(this::remainingOf)
-                .sum();
+                .reduce(0L, (a, b) -> a >= Integer.MAX_VALUE || b >= Integer.MAX_VALUE ? Integer.MAX_VALUE : a + b);
         return (int) Math.min(total, Integer.MAX_VALUE);
     }
 

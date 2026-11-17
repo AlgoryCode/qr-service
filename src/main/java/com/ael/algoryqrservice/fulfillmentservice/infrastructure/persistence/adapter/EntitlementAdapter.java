@@ -18,9 +18,11 @@ import java.util.List;
 public class EntitlementAdapter implements EntitlementPort {
 
     private final UserEntitlementJpaRepository userEntitlementJpaRepository;
+    private final com.ael.algoryqrservice.fulfillmentservice.application.snapshot.EntitlementSnapshotService snapshots;
 
     @Override
     public List<UserEntitlement> saveAll(List<UserEntitlement> entitlements) {
+        entitlements.stream().map(UserEntitlement::merchantId).distinct().forEach(snapshots::markDirty);
         return userEntitlementJpaRepository.saveAll(entitlements.stream().map(this::toEntity).toList())
                 .stream()
                 .map(this::toDomain)
@@ -29,6 +31,7 @@ public class EntitlementAdapter implements EntitlementPort {
 
     @Override
     public UserEntitlement save(UserEntitlement entitlement) {
+        snapshots.markDirty(entitlement.merchantId());
         return toDomain(userEntitlementJpaRepository.save(toEntity(entitlement)));
     }
 
@@ -52,6 +55,7 @@ public class EntitlementAdapter implements EntitlementPort {
     @Override
     @Transactional
     public int extendAddonExpiry(Long purchaseId, Instant expiresAt) {
+        snapshots.markDirtyByPurchase(purchaseId);
         return userEntitlementJpaRepository.extendExpiry(
                 purchaseId, EntitlementSource.ADDON_PURCHASE, PackageStatus.ACTIVE, expiresAt, Instant.now());
     }
@@ -59,6 +63,7 @@ public class EntitlementAdapter implements EntitlementPort {
     @Override
     @Transactional
     public void supersedeOtherEntitlements(Long merchantId, Long keepFulfillmentId) {
+        snapshots.markDirty(merchantId);
         userEntitlementJpaRepository.supersedeOthers(
                 merchantId,
                 keepFulfillmentId,
@@ -79,6 +84,7 @@ public class EntitlementAdapter implements EntitlementPort {
     @Override
     @Transactional
     public int changeStatusByPurchaseId(Long purchaseId, EntitlementSource source, PackageStatus newStatus) {
+        snapshots.markDirtyByPurchase(purchaseId);
         return userEntitlementJpaRepository.changeStatusByPurchaseId(
                 purchaseId, source, PackageStatus.ACTIVE, newStatus, Instant.now());
     }

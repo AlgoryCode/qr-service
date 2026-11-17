@@ -33,7 +33,7 @@ import java.util.Optional;
 
 /**
  * Admin actions on a merchant's subscription, on the fulfillment lifecycle model: the merchant's
- * current package is the fulfillment {@code active_package} row, and ending anything means falling
+ * current package is the fulfillment {@code merchant_subscriptions} row, and ending anything means falling
  * back to the free package through {@link SubscriptionLifecycleService#downgradeToFree}.
  */
 @Service

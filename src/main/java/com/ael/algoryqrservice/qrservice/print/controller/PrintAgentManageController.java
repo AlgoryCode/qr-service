@@ -1,11 +1,11 @@
 package com.ael.algoryqrservice.qrservice.print.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.branch.dto.BranchDtos;
 import com.ael.algoryqrservice.qrservice.print.dto.PrintAgentDtos;
 import com.ael.algoryqrservice.qrservice.print.service.PrintAgentDeviceService;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,13 +32,13 @@ public class PrintAgentManageController {
     private final BranchService branchService;
 
     @GetMapping("/settings")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<PrintAgentDtos.SettingsResponse> settings(@RequestParam Long branchId) {
         return ResponseEntity.ok(deviceService.getSettings(branchId));
     }
 
     @PostMapping("/pairing-codes")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<PrintAgentDtos.PairingCodeResponse> createPairingCode(
             @Valid @RequestBody PrintAgentDtos.CreatePairingCodeRequest request
     ) {
@@ -46,7 +46,7 @@ public class PrintAgentManageController {
     }
 
     @PostMapping("/api-keys")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<PrintAgentDtos.ApiKeyResponse> createApiKey(
             @Valid @RequestBody PrintAgentDtos.CreateApiKeyRequest request
     ) {
@@ -54,13 +54,13 @@ public class PrintAgentManageController {
     }
 
     @GetMapping("/devices")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<List<PrintAgentDtos.DeviceResponse>> listDevices(@RequestParam Long branchId) {
         return ResponseEntity.ok(deviceService.listDevices(branchId));
     }
 
     @PutMapping("/devices/{deviceId}/enabled")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<PrintAgentDtos.DeviceResponse> setEnabled(
             @PathVariable Long deviceId,
             @RequestBody Map<String, Boolean> body
@@ -73,19 +73,19 @@ public class PrintAgentManageController {
     }
 
     @GetMapping("/jobs/failed")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<List<PrintAgentDtos.JobResponse>> failedJobs(@RequestParam Long branchId) {
         return ResponseEntity.ok(deviceService.listFailedJobs(branchId));
     }
 
     @PostMapping("/jobs/{jobId}/retry")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<PrintAgentDtos.JobResponse> retryJob(@PathVariable Long jobId) {
         return ResponseEntity.ok(deviceService.retryJobForOwner(jobId));
     }
 
     @PutMapping("/branches/{branchId}/print-kitchen")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> setPrintKitchen(
             @PathVariable Long branchId,
             @Valid @RequestBody PrintAgentDtos.SetPrintKitchenRequest request

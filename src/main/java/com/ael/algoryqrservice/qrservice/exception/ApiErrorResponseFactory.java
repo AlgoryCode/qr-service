@@ -40,4 +40,17 @@ public final class ApiErrorResponseFactory {
     public static ResponseEntity<Map<String, String>> internalError() {
         return message(HttpStatus.INTERNAL_SERVER_ERROR, "Beklenmeyen bir sunucu hatası oluştu");
     }
+
+    /** One body for every refused feature, so clients can offer the right upgrade. */
+    public static ResponseEntity<Map<String, Object>> entitlementDenied(EntitlementDeniedException ex) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("code", ex.getCode());
+        body.put("message", ex.getMessage());
+        body.put("feature", ex.feature());
+        body.put("packageCode", ex.packageCode());
+        body.put("limit", ex.limit());
+        body.put("used", ex.used());
+        body.put("upgrades", ex.upgrades());
+        return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(body);
+    }
 }

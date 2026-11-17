@@ -42,6 +42,8 @@ class AdminUserServiceTest {
     MenuRepository menuRepository;
     @Mock
     AuthCredentialClient authCredentialClient;
+    @Mock
+    com.ael.algoryqrservice.adminservice.infrastructure.persistence.repository.MemberTagRepository memberTagRepository;
 
     AdminUserService service;
 
@@ -53,6 +55,7 @@ class AdminUserServiceTest {
                 purchaseService,
                 qrRepository,
                 menuRepository,
+                memberTagRepository,
                 authCredentialClient
         );
     }

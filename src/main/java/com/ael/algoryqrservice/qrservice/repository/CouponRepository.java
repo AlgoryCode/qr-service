@@ -31,7 +31,7 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
     @Query("""
             select c from Coupon c
             where (:status is null or c.status = :status)
-              and (:q is null or lower(c.code) like lower(concat('%', :q, '%')))
+              and (cast(:q as String) is null or lower(c.code) like lower(concat('%', cast(:q as String), '%')))
             """)
     Page<Coupon> search(
             @Param("status") CouponStatus status,

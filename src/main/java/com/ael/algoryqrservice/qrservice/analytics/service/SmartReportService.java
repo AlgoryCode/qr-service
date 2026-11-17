@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.qrservice.analytics.service;
 
 import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
+import com.ael.algoryqrservice.fulfillmentservice.application.metering.MeteringService;
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.qrservice.config.SmartReportQuotaProperties;
@@ -131,7 +132,8 @@ public class SmartReportService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "menuId is required");
         }
 
-        String creditSource = assertQuotaAvailable(ownerId);
+        UUID processId = UUID.randomUUID();
+        String creditSource = assertQuotaAvailable(ownerId, processId);
 
         AnalyticsDtos.MenuAnalyticsReportResponse report;
         AnalyticsDtos.MenuRevenueReportResponse revenue;
@@ -152,7 +154,6 @@ public class SmartReportService {
             waiter = analyticsService.getMerchantStaffPerformanceReport(menuId, ownerId, from, to);
         }
 
-        UUID processId = UUID.randomUUID();
         String resolvedLocale = locale == null || locale.isBlank() ? "tr" : locale.trim();
         Long resolvedBranchId = merchantWide
                 ? null
@@ -397,31 +398,34 @@ public class SmartReportService {
             reportEvent.setCompletedAt(LocalDateTime.now());
         }
         smartReportEventRepository.save(reportEvent);
+        if (SmartReportEvent.CREDIT_FREE.equals(reportEvent.getCreditSource())) {
+            // A report that never arrived does not use up the free quota.
+            fulfillmentClient.releaseMeter(freeQuotaKey(reportEvent.getProcessId()));
+        }
         smartReportCompletionNotifier.markFailedNotified(reportEvent.getProcessId());
     }
 
     @Transactional(readOnly = true)
     public SmartReportDtos.SmartReportQuotaResponse getQuota(Long merchantId) {
-        ZoneId zone = zoneId();
-        LocalDateTime periodStart = periodStart(zone);
-        Instant resetsAt = periodEnd(zone).atZone(zone).toInstant();
-        long used = smartReportEventRepository.countByMerchantIdAndCreatedAtGreaterThanEqual(merchantId, periodStart);
-        int freeLimit = freeLimit(merchantId);
-        long freeRemaining = Math.max(freeLimit - used, 0);
+        MeteringService.Usage free = fulfillmentClient.meterUsage(merchantId, CatalogProducts.SMART_REPORT_QUOTA);
+        Instant resetsAt = free.resetsAt();
+        long used = free.used();
+        int freeLimit = free.unlimited() ? Integer.MAX_VALUE : (int) Math.min(free.limit(), Integer.MAX_VALUE);
+        long freeRemaining = free.unlimited() ? Integer.MAX_VALUE : free.remaining();
         LocalDate bonusWeek = currentBonusWeek();
         boolean bonusEarned = smartReportFeedbackRepository.existsByMerchantIdAndBonusWeek(merchantId, bonusWeek);
         int bonusCredits = bonusEarned
                 && smartReportFeedbackRepository.existsByMerchantIdAndBonusWeekAndBonusUsedAtIsNull(merchantId, bonusWeek)
                 ? 1 : 0;
         // The feedback bonus counts as one more free report this week.
-        int limit = freeLimit + (bonusEarned ? 1 : 0);
-        long remaining = freeRemaining + bonusCredits;
+        int limit = freeLimit == Integer.MAX_VALUE ? freeLimit : freeLimit + (bonusEarned ? 1 : 0);
+        long remaining = freeRemaining == Integer.MAX_VALUE ? freeRemaining : freeRemaining + bonusCredits;
         int paidCredits = paidCredits(merchantId);
         BigDecimal addonUnitPrice = productRepository.findByCode(CatalogProducts.SMART_REPORTING_ADDON)
                 .map(com.ael.algoryqrservice.qrservice.model.Product::getUnitPrice)
                 .orElse(new BigDecimal("200.00"));
         return new SmartReportDtos.SmartReportQuotaResponse(
-                quotaProperties.getQuotaPeriod().name(),
+                free.periodKey().contains("-W") ? "WEEK" : free.periodKey().length() == 10 ? "DAY" : "MONTH",
                 limit,
                 used,
                 remaining,
@@ -667,31 +671,6 @@ public class SmartReportService {
         return Math.max(fulfillmentClient.openRemaining(merchantId, CatalogProducts.SMART_REPORTING, "ADDON_PURCHASE"), 0);
     }
 
-    /**
-     * Free reports per period come from the merchant's package (a {@code SMART_REPORT_QUOTA} line, so
-     * each package can grant a different number). Packages without that line keep the configured
-     * default ({@code app.smart-report.quota-limit}).
-     */
-    int freeLimit(Long merchantId) {
-        List<com.ael.algoryqrservice.qrservice.client.dto.ExternalEntitlementResponse> quota;
-        try {
-            quota = fulfillmentClient.listEntitlements(merchantId).stream()
-                    .filter(item -> CatalogProducts.SMART_REPORT_QUOTA.equals(item.featureCode()))
-                    .filter(item -> item.status() == null || "ACTIVE".equals(item.status()))
-                    .filter(item -> item.expiresAt() == null || item.expiresAt().isAfter(Instant.now()))
-                    .toList();
-        } catch (RuntimeException exception) {
-            quota = List.of();
-        }
-        if (quota.isEmpty()) {
-            return Math.max(quotaProperties.getQuotaLimit(), 0);
-        }
-        if (quota.stream().anyMatch(item -> item.unlimited())) {
-            return Integer.MAX_VALUE;
-        }
-        return quota.stream().mapToInt(item -> item.quantity() == null ? 0 : item.quantity()).sum();
-    }
-
     /** Monday (in the quota zone) of the current week: the window in which feedback can earn one extra credit. */
     public LocalDate currentBonusWeek() {
         return LocalDate.now(zoneId()).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
@@ -701,10 +680,11 @@ public class SmartReportService {
      * Spends credits in order: the period's free quota, this week's feedback bonus, then purchased credits.
      * Returns the {@code SmartReportEvent.CREDIT_*} source that paid for the report.
      */
-    private String assertQuotaAvailable(Long merchantId) {
+    private String assertQuotaAvailable(Long merchantId, UUID processId) {
         ZoneId zone = zoneId();
-        long used = smartReportEventRepository.countByMerchantIdAndCreatedAtGreaterThanEqual(merchantId, periodStart(zone));
-        if (used < freeLimit(merchantId)) {
+        MeteringService.Charge free = fulfillmentClient.meter(merchantId, CatalogProducts.SMART_REPORT_QUOTA, 1,
+                freeQuotaKey(processId), "smart-report:" + processId);
+        if (free.allowed()) {
             return SmartReportEvent.CREDIT_FREE;
         }
         if (smartReportFeedbackRepository.consumeBonus(merchantId, currentBonusWeek(), LocalDateTime.now(zone)) > 0) {
@@ -714,10 +694,14 @@ public class SmartReportService {
             productUsageGateway.use(merchantId, CatalogProducts.SMART_REPORTING_ADDON, 1);
             return SmartReportEvent.CREDIT_PAID;
         }
-        String message = quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK
-                ? "Bu haftaki ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin."
-                : "Bugunku ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin.";
+        String message = free.usage().periodKey().length() == 10
+                ? "Bugunku ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin."
+                : "Bu haftaki ucretsiz akilli rapor hakkiniz kullanildi. Ek rapor icin satin alin.";
         throw new TooManyRequestsException(message);
+    }
+
+    private static String freeQuotaKey(UUID processId) {
+        return "smart-report:" + processId;
     }
 
     private ZoneId zoneId() {
@@ -726,24 +710,6 @@ public class SmartReportService {
         } catch (Exception ignored) {
             return ZoneId.of("Europe/Istanbul");
         }
-    }
-
-    private LocalDateTime periodStart(ZoneId zone) {
-        LocalDate today = LocalDate.now(zone);
-        if (quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK) {
-            LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-            return weekStart.atStartOfDay();
-        }
-        return today.atStartOfDay();
-    }
-
-    private LocalDateTime periodEnd(ZoneId zone) {
-        LocalDate today = LocalDate.now(zone);
-        if (quotaProperties.getQuotaPeriod() == SmartReportQuotaProperties.QuotaPeriod.WEEK) {
-            LocalDate weekEnd = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1);
-            return weekEnd.atStartOfDay();
-        }
-        return today.plusDays(1).atStartOfDay();
     }
 
     private static String normalizeStatus(String status) {

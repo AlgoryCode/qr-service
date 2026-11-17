@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_product", uniqueConstraints = {
+@Table(name = "catalog_products", uniqueConstraints = {
         @UniqueConstraint(columnNames = "code")
 })
 @Getter
@@ -64,11 +64,6 @@ public class Product {
     @ColumnDefault("false")
     @Builder.Default
     private boolean addonPurchasable = false;
-
-    @Column(name = "requires_count_sync", nullable = false)
-    @ColumnDefault("false")
-    @Builder.Default
-    private boolean requiresCountSync = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "billing_type", nullable = false, length = 16)

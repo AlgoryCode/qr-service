@@ -43,6 +43,15 @@ public final class PlatformFeedbackDtos {
 
         @Size(max = 5000)
         private String adminNote;
+
+        /** LOW, NORMAL, HIGH or URGENT. */
+        @jakarta.validation.constraints.Pattern(regexp = "LOW|NORMAL|HIGH|URGENT")
+        private String priority;
+
+        /** Dashboard user to own the ticket; with {@code unassign} true the owner is cleared. */
+        private Long assigneeId;
+
+        private boolean unassign;
     }
 
     public record FeedbackItemResponse(
@@ -57,7 +66,12 @@ public final class PlatformFeedbackDtos {
             PlatformFeedbackStatus status,
             String adminNote,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt
+            LocalDateTime updatedAt,
+            String priority,
+            Long assigneeId,
+            String assigneeName,
+            LocalDateTime firstResponseAt,
+            LocalDateTime resolvedAt
     ) {
     }
 

@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.menu.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.menu.dto.AiMenuImportDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.menu.service.AiMenuImportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/menus/{menuId}/ai-import")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.AI_MENU_IMPORT_OWNER)
+@RequiresFeature(FeatureKey.AI_MENU_IMPORT)
 public class AiMenuImportController {
 
     private final AiMenuImportService aiMenuImportService;

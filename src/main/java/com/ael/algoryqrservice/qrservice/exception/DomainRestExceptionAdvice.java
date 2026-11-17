@@ -34,6 +34,12 @@ public abstract class DomainRestExceptionAdvice {
         return ApiErrorResponseFactory.message(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(EntitlementDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleEntitlementDenied(EntitlementDeniedException ex) {
+        log.warn("[{}] Entitlement denied: {} {}", domainTag(), ex.getCode(), ex.feature());
+        return ApiErrorResponseFactory.entitlementDenied(ex);
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
         log.warn("[{}] Forbidden: {}", domainTag(), ex.getMessage());

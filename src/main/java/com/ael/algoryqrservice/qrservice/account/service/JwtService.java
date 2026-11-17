@@ -226,11 +226,10 @@ public class JwtService {
                 .compact();
     }
 
+    /** Every panel account reaches /admin; the dashboard role then decides what it may change. */
     private List<String> resolveDashboardRoles(DashboardRole role) {
-        if (role == DashboardRole.ADMIN) {
-            return List.of("ROLE_ADMIN");
-        }
-        return List.of("ROLE_ADMIN");
+        DashboardRole effective = role == null ? DashboardRole.VIEWER : role;
+        return List.of("ROLE_ADMIN", effective.authority());
     }
 
     private Claims extractAllClaims(String token) {

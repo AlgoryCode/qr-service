@@ -32,7 +32,8 @@ class FulfillmentServiceAddonGrantTest {
     private final PackageCatalogPort catalog = mock(PackageCatalogPort.class);
     private final EntitlementPort entitlements = mock(EntitlementPort.class);
     private final FulfillmentServiceImpl service = new FulfillmentServiceImpl(
-            fulfillments, catalog, entitlements, mock(PurchaseModulePort.class), mock(SubscriptionEvents.class));
+            fulfillments, catalog, entitlements, mock(PurchaseModulePort.class),
+            mock(com.ael.algoryqrservice.fulfillmentservice.domain.port.PlanVersionPort.class), mock(SubscriptionEvents.class));
 
     private static final AddonGrant SMART_REPORTS = new AddonGrant(1L, 900L, List.of(
             new AddonGrant.Line(95L, "SMART_REPORTING", "SMART_REPORTING_OWNER", 5, null)));

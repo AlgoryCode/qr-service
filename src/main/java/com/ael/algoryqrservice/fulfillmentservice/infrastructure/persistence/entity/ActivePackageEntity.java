@@ -18,7 +18,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "active_package")
+@Table(name = "merchant_subscriptions")
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -66,4 +66,22 @@ public class ActivePackageEntity {
 
     @Column(name = "grace_ends_at")
     private Instant graceEndsAt;
+
+    // Maintained by SQL (purchase mirror and entitlement snapshot); never written through this entity.
+    @Column(name = "plan_version_id", insertable = false, updatable = false)
+    private Long planVersionId;
+
+    @Column(name = "billing_status", length = 32, insertable = false, updatable = false)
+    private String billingStatus;
+
+    @Column(name = "cancel_at_period_end", insertable = false, updatable = false,
+            columnDefinition = "boolean default false not null")
+    private Boolean cancelAtPeriodEnd;
+
+    @Column(name = "provider_subscription_id", insertable = false, updatable = false)
+    private String providerSubscriptionId;
+
+    @Column(name = "entitlement_version", insertable = false, updatable = false,
+            columnDefinition = "bigint default 0 not null")
+    private Long entitlementVersion;
 }

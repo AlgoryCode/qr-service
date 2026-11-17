@@ -33,6 +33,22 @@ public class DashboardUser {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /** Optional sign-in name; unique ignoring case (see V181). */
+    @Column(length = 64)
+    private String username;
+
+    /** Base32 TOTP secret; set during setup, used once {@link #totpEnabled}. */
+    @Column(name = "totp_secret", length = 64)
+    private String totpSecret;
+
+    @Column(name = "totp_enabled", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean totpEnabled = false;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
     @Column(nullable = false)
     private String password;
 

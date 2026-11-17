@@ -100,6 +100,17 @@ public class InvoiceService {
         return issued;
     }
 
+    /** Panel retry: sends one invoice again now, whatever its attempt count. */
+    @Transactional
+    public BillingInvoice retry(Long invoiceId) {
+        BillingInvoice invoice = repository.findById(invoiceId)
+                .orElseThrow(() -> new com.ael.algoryqrservice.qrservice.exception.NotFoundException("Fatura bulunamadı"));
+        if (invoice.getStatus() != BillingInvoice.Status.ISSUED) {
+            issueOne(invoice);
+        }
+        return invoice;
+    }
+
     boolean issueOne(BillingInvoice invoice) {
         invoice.setAttempts(invoice.getAttempts() + 1);
         invoice.setProvider(provider.name());

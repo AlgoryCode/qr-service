@@ -126,6 +126,28 @@ public class DashboardSessionService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public java.util.List<DashboardUserSession> sessionsOf(Long dashboardUserId) {
+        return sessionRepository.findTop50ByDashboardUserIdOrderByLoggedInAtDesc(dashboardUserId);
+    }
+
+    /** Ends one session of the given account; refuses sessions of other accounts. */
+    @Transactional
+    public void revokeOwnedSession(Long dashboardUserId, UUID sessionId) {
+        DashboardUserSession session = sessionRepository.findById(sessionId)
+                .filter(s -> s.getDashboardUserId().equals(dashboardUserId))
+                .orElseThrow(() -> new BadRequestException("Oturum bulunamadı"));
+        revoke(session);
+    }
+
+    /** Signs the account out everywhere, e.g. after a role, password or status change. */
+    @Transactional
+    public int revokeAll(Long dashboardUserId) {
+        java.util.List<DashboardUserSession> open = sessionRepository.findByDashboardUserIdAndRevokedFalse(dashboardUserId);
+        open.forEach(this::revoke);
+        return open.size();
+    }
+
     private void revoke(DashboardUserSession session) {
         if (!session.isRevoked()) {
             session.setRevoked(true);

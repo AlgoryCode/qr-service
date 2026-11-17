@@ -1,9 +1,9 @@
 package com.ael.algoryqrservice.qrservice.orderflow.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.orderflow.dto.OrderFlowDtos;
 import com.ael.algoryqrservice.qrservice.orderflow.service.OrderFlowService;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,25 +28,25 @@ public class OrderFlowController {
     private final OrderFlowService orderFlowService;
 
     @GetMapping("/catalog")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.CatalogResponse> catalog() {
         return ResponseEntity.ok(orderFlowService.catalog());
     }
 
     @GetMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<List<OrderFlowDtos.FlowResponse>> list() {
         return ResponseEntity.ok(orderFlowService.list());
     }
 
     @PostMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.FlowResponse> create(@Valid @RequestBody OrderFlowDtos.SaveFlowRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderFlowService.create(request));
     }
 
     @PutMapping("/{flowId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.FlowResponse> update(
             @PathVariable Long flowId,
             @Valid @RequestBody OrderFlowDtos.SaveFlowRequest request
@@ -55,38 +55,38 @@ public class OrderFlowController {
     }
 
     @DeleteMapping("/{flowId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<Void> delete(@PathVariable Long flowId) {
         orderFlowService.delete(flowId);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{flowId}/branches/{branchId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.BranchFlowResponse> assign(@PathVariable Long flowId, @PathVariable Long branchId) {
         return ResponseEntity.ok(orderFlowService.assign(flowId, branchId));
     }
 
     @GetMapping("/branches/{branchId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.BranchFlowResponse> branchFlow(@PathVariable Long branchId) {
         return ResponseEntity.ok(orderFlowService.branchFlow(orderFlowService.ownedBranchId(branchId)));
     }
 
     @DeleteMapping("/branches/{branchId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.BranchFlowResponse> unassign(@PathVariable Long branchId) {
         return ResponseEntity.ok(orderFlowService.unassign(branchId));
     }
 
     @GetMapping("/requests")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<List<OrderFlowDtos.RequestResponse>> listRequests() {
         return ResponseEntity.ok(orderFlowService.listRequests());
     }
 
     @PostMapping("/requests")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<OrderFlowDtos.RequestResponse> createRequest(
             @Valid @RequestBody OrderFlowDtos.CreateRequestRequest request
     ) {

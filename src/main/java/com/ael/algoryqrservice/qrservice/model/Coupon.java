@@ -23,7 +23,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_coupon", uniqueConstraints = {
+@Table(name = "coupons", uniqueConstraints = {
         @UniqueConstraint(name = "uk_coupon_code", columnNames = "code")
 }, indexes = {
         @Index(name = "idx_coupon_status", columnList = "status"),

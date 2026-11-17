@@ -30,6 +30,8 @@ public class PublicPackageCatalogService {
     private final PlanPackageRepository planPackageRepository;
     private final PlanPackageAddonRepository planPackageAddonRepository;
     private final PackagePricingService packagePricingService;
+    private final com.ael.algoryqrservice.qrservice.repository.ModuleShowcaseRepository moduleShowcaseRepository;
+    private final com.ael.algoryqrservice.qrservice.repository.CatalogScheduleRepository catalogScheduleRepository;
 
     @Transactional(readOnly = true)
     public List<PlanPackageResponse> getActivePackages() {
@@ -75,16 +77,34 @@ public class PublicPackageCatalogService {
     }
 
     private Map<Long, List<PlanPackageModuleResponse>> modulesFor(List<Long> packageIds) {
+        Map<Long, com.ael.algoryqrservice.qrservice.model.ModuleShowcase> showcase = moduleShowcaseRepository == null ? Map.of() : moduleShowcaseRepository.findAll().stream()
+                .collect(Collectors.toMap(com.ael.algoryqrservice.qrservice.model.ModuleShowcase::getProductId, Function.identity()));
+        java.util.Comparator<PlanPackageModuleResponse> order = java.util.Comparator
+                .comparing(PlanPackageModuleResponse::isFeatured).reversed()
+                .thenComparingInt(PlanPackageModuleResponse::getSortOrder);
         return planPackageAddonRepository.findActiveByPackageIdIn(packageIds).stream()
+                .filter(addon -> {
+                    var s = showcase.get(addon.getProduct().getId());
+                    return s == null || !s.isHidden();
+                })
                 .collect(Collectors.groupingBy(
                         addon -> addon.getPlanPackage().getId(),
-                        Collectors.mapping(this::toModuleResponse, Collectors.toList())
+                        Collectors.mapping(addon -> toModuleResponse(addon, showcase.get(addon.getProduct().getId())),
+                                Collectors.collectingAndThen(Collectors.toList(), list -> {
+                                    list.sort(order);
+                                    return list;
+                                }))
                 ));
     }
 
-    private PlanPackageModuleResponse toModuleResponse(PlanPackageAddon addon) {
+    private PlanPackageModuleResponse toModuleResponse(PlanPackageAddon addon,
+                                                       com.ael.algoryqrservice.qrservice.model.ModuleShowcase showcase) {
         Product product = addon.getProduct();
         return PlanPackageModuleResponse.builder()
+                .tagline(showcase == null ? null : showcase.getTagline())
+                .badge(showcase == null || showcase.getBadge() == null ? null : showcase.getBadge().name())
+                .featured(showcase != null && showcase.isFeatured())
+                .sortOrder(showcase == null ? 0 : showcase.getSortOrder())
                 .productId(product.getId())
                 .productCode(product.getCode())
                 .productName(product.getName())
@@ -101,6 +121,10 @@ public class PublicPackageCatalogService {
         PackagePricingService.PriceBreakdown breakdown = packagePricingService.calculate(planPackage.getItems());
         Map<Long, PackagePricingService.LinePrice> lineByProductId = breakdown.lines().stream()
                 .collect(Collectors.toMap(PackagePricingService.LinePrice::productId, Function.identity(), (left, right) -> left));
+        var campaign = catalogScheduleRepository == null ? null : catalogScheduleRepository
+                .findByTargetTypeAndTargetIdAndStatusIn(com.ael.algoryqrservice.qrservice.model.CatalogSchedule.TargetType.PACKAGE,
+                        planPackage.getId(), List.of(com.ael.algoryqrservice.qrservice.model.CatalogSchedule.Status.ACTIVE))
+                .stream().filter(c -> c.getEndsAt() != null).findFirst().orElse(null);
         return PlanPackageResponse.builder()
                 .id(planPackage.getId())
                 .code(planPackage.getCode())
@@ -128,6 +152,8 @@ public class PublicPackageCatalogService {
                         .map(item -> toItemResponse(item, lineByProductId.get(item.getProduct().getId())))
                         .toList())
                 .availableModules(availableModules)
+                .campaignLabel(campaign == null ? null : campaign.getLabel())
+                .campaignEndsAt(campaign == null ? null : campaign.getEndsAt())
                 .createdAt(planPackage.getCreatedAt())
                 .build();
     }

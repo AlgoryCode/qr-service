@@ -2,21 +2,19 @@ package com.ael.algoryqrservice.authservice.application.auth;
 
 import com.ael.algoryqrservice.authservice.config.AuthTransactional;
 import com.ael.algoryqrservice.fulfillmentservice.application.service.MerchantLoginPackageLookup;
-import com.ael.algoryqrservice.fulfillmentservice.domain.model.ActivePackage;
-import com.ael.algoryqrservice.fulfillmentservice.domain.model.UserEntitlement;
-import com.ael.algoryqrservice.fulfillmentservice.domain.port.EntitlementPort;
+import com.ael.algoryqrservice.fulfillmentservice.application.snapshot.EntitlementSnapshotService;
 import com.ael.algoryqrservice.qrservice.billing.service.MemberPackageAccessRepairService;
-import com.ael.algoryqrservice.qrservice.exception.FulfillmentUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-
+/**
+ * What an access token says about the merchant's plan: only the entitlement version ({@code ent_ver}).
+ * The plan itself is never in the token, so it cannot go stale for the token's lifetime; every check
+ * reads the entitlement snapshot, and a client compares versions to know when to reload.
+ */
 @Component
 @RequiredArgsConstructor
 public class LoginPackageClaims {
@@ -24,8 +22,8 @@ public class LoginPackageClaims {
     private static final Logger log = LoggerFactory.getLogger(LoginPackageClaims.class);
 
     private final MerchantLoginPackageLookup loginPackageLookup;
-    private final EntitlementPort entitlementPort;
     private final MemberPackageAccessRepairService memberPackageAccessRepairService;
+    private final EntitlementSnapshotService snapshots;
 
     /** Joins the caller's transaction so a token issue never holds two pooled connections at once. */
     @AuthTransactional(propagation = Propagation.SUPPORTS)
@@ -35,36 +33,13 @@ public class LoginPackageClaims {
             return Snapshot.none();
         }
         try {
-            Optional<ActivePackage> active = loginPackageLookup.findActive(merchantId);
-            if (active.isEmpty() && memberPackageAccessRepairService.repairIfMissingActivePackage(merchantId)) {
-                active = loginPackageLookup.findActive(merchantId);
+            if (loginPackageLookup.findActive(merchantId).isEmpty()) {
+                // A member who paid but lost the package row gets it back on sign-in.
+                memberPackageAccessRepairService.repairIfMissingActivePackage(merchantId);
             }
-            if (active.isEmpty()) {
-                return Snapshot.none();
-            }
-            String packageCode = active.get().packageCode();
-            if (packageCode == null || packageCode.isBlank()) {
-                return Snapshot.none();
-            }
-            List<UserEntitlement> entitlements = entitlementPort.findActiveByMerchantId(merchantId);
-            return new Snapshot(
-                    packageCode,
-                    distinctSorted(entitlements.stream().map(UserEntitlement::featureCode).toList()),
-                    distinctSorted(entitlements.stream().map(UserEntitlement::scopeCode).toList())
-            );
-        } catch (FulfillmentUnavailableException exception) {
-            log.warn(
-                    "Fulfillment unavailable while resolving login package claims merchantId={}: {}",
-                    merchantId,
-                    exception.getMessage()
-            );
-            return Snapshot.none();
+            return new Snapshot(snapshots.version(merchantId));
         } catch (RuntimeException exception) {
-            log.warn(
-                    "Fulfillment lookup failed while resolving login package claims merchantId={}: {}",
-                    merchantId,
-                    exception.getMessage()
-            );
+            log.warn("Entitlement version lookup failed at sign-in merchantId={}: {}", merchantId, exception.getMessage());
             return Snapshot.none();
         }
     }
@@ -85,29 +60,15 @@ public class LoginPackageClaims {
         return null;
     }
 
-    private static List<String> distinctSorted(List<String> values) {
-        return values.stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .distinct()
-                .sorted()
-                .toList();
-    }
-
-    public record Snapshot(String activePackage, List<String> products, List<String> productScopes) {
-
-        public Snapshot {
-            products = products == null ? List.of() : List.copyOf(products);
-            productScopes = productScopes == null ? List.of() : List.copyOf(productScopes);
-        }
+    /** {@code entitlementVersion} is null for subjects without a merchant. */
+    public record Snapshot(Long entitlementVersion) {
 
         public static Snapshot none() {
-            return new Snapshot(null, List.of(), List.of());
+            return new Snapshot(null);
         }
 
         public boolean present() {
-            return activePackage != null && !activePackage.isBlank();
+            return entitlementVersion != null;
         }
     }
 }
