@@ -35,7 +35,11 @@ class EntitlementUsageServiceTest {
     private final FulfillmentRepositoryPort fulfillments = mock(FulfillmentRepositoryPort.class);
     private final EntitlementPort entitlements = mock(EntitlementPort.class);
     private final ProductPort products = mock(ProductPort.class);
-    private final EntitlementUsageService service = new EntitlementUsageService(fulfillments, entitlements, products);
+    private final com.ael.algoryqrservice.fulfillmentservice.application.snapshot.EntitlementSnapshotService snapshots =
+            mock(com.ael.algoryqrservice.fulfillmentservice.application.snapshot.EntitlementSnapshotService.class);
+    private final com.ael.algoryqrservice.fulfillmentservice.domain.port.CountedResourcePort counted =
+            mock(com.ael.algoryqrservice.fulfillmentservice.domain.port.CountedResourcePort.class);
+    private final EntitlementUsageService service = new EntitlementUsageService(fulfillments, entitlements, products, counted, snapshots);
 
     @BeforeEach
     void setUp() {
@@ -104,6 +108,60 @@ class EntitlementUsageServiceTest {
         when(entitlements.lockActiveByMerchantId(MERCHANT)).thenReturn(List.of(addonRow));
 
         assertThat(service.consume(MERCHANT, "SMART_REPORTING_ADDON", 1).usedQuantity()).isEqualTo(1);
+    }
+
+    @Test
+    void branchLimitAddsPackageAndAddonGrantsAndCountsWhatExists() {
+        UserEntitlement packageRow = branch(1L, 1, EntitlementSource.PACKAGE_INCLUDE);
+        UserEntitlement addonRow = branch(2L, 1, EntitlementSource.ADDON_PURCHASE);
+        when(entitlements.lockActiveByMerchantId(MERCHANT)).thenReturn(List.of(packageRow, addonRow));
+        when(counted.isCounted("QR_BRANCH")).thenReturn(true);
+        when(counted.count(MERCHANT, "QR_BRANCH")).thenReturn(java.util.OptionalLong.of(1));
+
+        assertThat(service.consume(MERCHANT, "QR_BRANCH", 1).usedQuantity()).isEqualTo(2);
+        org.mockito.Mockito.verify(entitlements, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void branchLimitRefusesWithTheNumbersWhenEveryGrantIsTaken() {
+        when(entitlements.lockActiveByMerchantId(MERCHANT)).thenReturn(List.of(branch(1L, 1, EntitlementSource.PACKAGE_INCLUDE)));
+        when(counted.isCounted("QR_BRANCH")).thenReturn(true);
+        when(counted.count(MERCHANT, "QR_BRANCH")).thenReturn(java.util.OptionalLong.of(1));
+
+        assertThatThrownBy(() -> service.consume(MERCHANT, "QR_BRANCH", 1))
+                .isInstanceOfSatisfying(QuotaExceededException.class, exception -> {
+                    assertThat(exception.featureCode()).isEqualTo("QR_BRANCH");
+                    assertThat(exception.limit()).isEqualTo(1L);
+                    assertThat(exception.used()).isEqualTo(1L);
+                });
+    }
+
+    @Test
+    void deletingACountedResourceHasNothingToGiveBack() {
+        when(counted.isCounted("QR_BRANCH")).thenReturn(true);
+
+        assertThat(service.release(MERCHANT, "QR_BRANCH", 1)).isEmpty();
+        org.mockito.Mockito.verify(entitlements, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void listedUsageFillsGrantsInOrderAndKeepsOverflowOnTheLast() {
+        when(entitlements.findActiveByMerchantId(MERCHANT)).thenReturn(List.of(
+                branch(1L, 1, EntitlementSource.PACKAGE_INCLUDE), branch(2L, 1, EntitlementSource.ADDON_PURCHASE)));
+        when(counted.isCounted("QR_BRANCH")).thenReturn(true);
+        when(counted.count(MERCHANT, "QR_BRANCH")).thenReturn(java.util.OptionalLong.of(3));
+
+        List<Integer> used = service.listActive(MERCHANT).stream()
+                .map(listed -> listed.entitlement().usedQuantity())
+                .toList();
+
+        assertThat(used).containsExactly(1, 2);
+    }
+
+    private static UserEntitlement branch(Long id, int quantity, EntitlementSource source) {
+        Instant now = Instant.now();
+        return new UserEntitlement(id, MERCHANT, 7L, null, 10L, ProductType.PACKAGE_PRODUCT,
+                "QR_BRANCH", "QR_BRANCH_OWNER", quantity, false, 0, source, PackageStatus.ACTIVE, now, null, now, now);
     }
 
     private static UserEntitlement entitlement(

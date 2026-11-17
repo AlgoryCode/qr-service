@@ -91,6 +91,8 @@ public final class BranchDtos {
         private String receiptHeader;
         private String receiptIntro;
         private String receiptFooter;
+        /** Read-only because the plan allows fewer branches; see /capacity/branches. */
+        private boolean locked;
         private List<MenuSummary> menus;
     }
 

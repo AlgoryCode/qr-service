@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.branch.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.branch.dto.BranchDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,19 +27,19 @@ public class BranchController {
     private final BranchService branchService;
 
     @GetMapping
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.ListResponse> list() {
         return ResponseEntity.ok(branchService.listMine());
     }
 
     @GetMapping("/{branchId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> get(@PathVariable Long branchId) {
         return ResponseEntity.ok(branchService.getMine(branchId));
     }
 
     @PutMapping("/{branchId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> update(
             @PathVariable Long branchId,
             @Valid @RequestBody BranchDtos.UpdateRequest request
@@ -48,13 +48,13 @@ public class BranchController {
     }
 
     @PostMapping("/{branchId}/kitchen")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> enableKitchen(@PathVariable Long branchId) {
         return ResponseEntity.ok(branchService.enableKitchen(branchId));
     }
 
     @PostMapping("/{branchId}/photo")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> uploadPhoto(
             @PathVariable Long branchId,
             @RequestParam("file") MultipartFile file
@@ -63,25 +63,25 @@ public class BranchController {
     }
 
     @DeleteMapping("/{branchId}/photo")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> clearPhoto(@PathVariable Long branchId) {
         return ResponseEntity.ok(branchService.clearPhoto(branchId));
     }
 
     @PostMapping("/{branchId}/photo/apply-all-branches")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.ListResponse> applyPhotoToAllBranches(@PathVariable Long branchId) {
         return ResponseEntity.ok(branchService.applyPhotoToAllBranches(branchId));
     }
 
     @PostMapping("/{branchId}/photo/apply-all-menus")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.ListResponse> applyPhotoToAllMenus(@PathVariable Long branchId) {
         return ResponseEntity.ok(branchService.applyPhotoToAllMenus(branchId));
     }
 
     @DeleteMapping("/{branchId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<Void> delete(@PathVariable Long branchId) {
         branchService.delete(branchId);
         return ResponseEntity.noContent().build();

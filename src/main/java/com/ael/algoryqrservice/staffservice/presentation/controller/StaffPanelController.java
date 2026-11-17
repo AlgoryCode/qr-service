@@ -1,6 +1,5 @@
 package com.ael.algoryqrservice.staffservice.presentation.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.order.dto.MenuOrderDtos;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuWaiterDtos;
 import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantAreaDtos;
@@ -8,7 +7,8 @@ import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantLayoutDtos;
 import com.ael.algoryqrservice.qrservice.branch.dto.RestaurantTableDtos;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuOrderStatus;
 import com.ael.algoryqrservice.qrservice.model.enums.StaffRole;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.order.service.MenuOrderService;
 import com.ael.algoryqrservice.staffservice.application.MenuWaiterService;
 import com.ael.algoryqrservice.customerservice.application.MenuCustomerListService;
@@ -33,7 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/staff/panel")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.WAITER_PANEL_OWNER)
+@RequiresFeature(FeatureKey.WAITER_PANEL)
 public class StaffPanelController {
 
     private final MenuWaiterService menuWaiterService;

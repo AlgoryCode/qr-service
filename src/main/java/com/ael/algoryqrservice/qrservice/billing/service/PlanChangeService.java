@@ -282,6 +282,13 @@ public class PlanChangeService {
      * subscription onto it and supersedes the old purchase. Returns whether it handled the payment.
      */
     @Transactional
+    /** What the upgrade checkout for this purchase was priced at, as recorded when it started. */
+    public Optional<BigDecimal> expectedUpgradeCharge(Long resultingPurchaseId) {
+        return planChangeRepository.findByResultingPurchaseId(resultingPurchaseId)
+                .filter(change -> change.getTiming() == PlanChangeTiming.IMMEDIATE)
+                .map(PlanChange::getChargeAmount);
+    }
+
     public boolean fulfillUpgradePayment(
             Purchase purchase,
             PaymentCompletedEventDto event,

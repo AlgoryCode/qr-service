@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.store.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.store.model.StoreOrderStatus;
 import com.ael.algoryqrservice.qrservice.store.model.dto.StoreOrderDtos;
 import com.ael.algoryqrservice.qrservice.store.service.StoreOrderPanelService;
@@ -23,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/store/orders")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.ONLINE_ORDER_OWNER)
+@RequiresFeature(FeatureKey.ONLINE_ORDER)
 public class StoreOrderController {
 
     private final StoreOrderPanelService storeOrderPanelService;

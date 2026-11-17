@@ -19,4 +19,6 @@ public interface BranchRepository extends JpaRepository<Branch, Long> {
     List<Branch> findByMerchantIdAndDeletedFalse(Long merchantId);
 
     List<Branch> findByOrderFlowIdAndDeletedFalse(Long orderFlowId);
+
+    long countByMerchantIdAndDeletedFalseAndCapacityLockedAtIsNull(Long merchantId);
 }

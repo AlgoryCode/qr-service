@@ -19,7 +19,8 @@ import java.time.LocalDateTime;
 import com.ael.algoryqrservice.qrservice.model.enums.BillingPeriod;
 
 @Entity
-@Table(name = "tbl_purchase", indexes = {
+@EntityListeners(PurchasePlanVersionListener.class)
+@Table(name = "purchases", indexes = {
         @Index(name = "idx_purchase_merchant_id", columnList = "merchant_id"),
         @Index(name = "idx_purchase_status", columnList = "status"),
         @Index(name = "idx_purchase_expires_at", columnList = "expires_at")
@@ -40,6 +41,14 @@ public class Purchase {
 
     @Column(name = "package_id")
     private Long packageId;
+
+    /**
+     * The package version this purchase was bought on. Renewals grant this version's lines, so a later
+     * edit of the package never changes what an existing subscriber gets. Filled from the package's
+     * current version when the purchase is saved without one or moves to another package.
+     */
+    @Column(name = "plan_version_id")
+    private Long planVersionId;
 
     @Column(name = "product_id")
     private Long productId;

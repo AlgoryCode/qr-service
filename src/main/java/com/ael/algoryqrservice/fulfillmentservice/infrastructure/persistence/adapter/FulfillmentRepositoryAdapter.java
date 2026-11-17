@@ -27,6 +27,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
 
     private final PackageFulfillmentJpaRepository packageFulfillmentJpaRepository;
     private final ActivePackageJpaRepository activePackageJpaRepository;
+    private final com.ael.algoryqrservice.fulfillmentservice.application.snapshot.EntitlementSnapshotService snapshots;
 
     @Override
     public Optional<PackageFulfillment> findByEventId(String eventId) {
@@ -61,6 +62,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
 
     @Override
     public ActivePackage upsertActivePackage(ActivePackage activePackage) {
+        snapshots.markDirty(activePackage.merchantId());
         ActivePackageEntity entity = activePackageJpaRepository.findByMerchantId(activePackage.merchantId())
                 .orElseGet(ActivePackageEntity::new);
         Instant now = Instant.now();
@@ -81,6 +83,7 @@ public class FulfillmentRepositoryAdapter implements FulfillmentRepositoryPort {
 
     @Override
     public ActivePackage saveActivePackage(ActivePackage activePackage) {
+        snapshots.markDirty(activePackage.merchantId());
         ActivePackageEntity entity = activePackageJpaRepository.findByMerchantId(activePackage.merchantId())
                 .orElseThrow(() -> new IllegalStateException(
                         "No active package row for merchant " + activePackage.merchantId()));

@@ -82,4 +82,8 @@ public class Branch extends QrBaseModel {
     /** Closing lines after the order details, e.g. a thank-you note. */
     @Column(name = "receipt_footer", length = 500)
     private String receiptFooter;
+
+    /** Set while the branch is read-only for being over the plan's branch limit. */
+    @Column(name = "capacity_locked_at")
+    private java.time.LocalDateTime capacityLockedAt;
 }

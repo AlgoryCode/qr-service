@@ -39,6 +39,8 @@ class DashboardAuthServiceTest {
     private DashboardSessionService dashboardSessionService;
     @Mock
     private JwtService jwtService;
+    @Mock
+    private com.ael.algoryqrservice.adminservice.security.MfaChallenges mfaChallenges;
 
     @InjectMocks
     private DashboardAuthService dashboardAuthService;
@@ -61,7 +63,7 @@ class DashboardAuthServiceTest {
         when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
         when(dashboardSessionService.createSession(user, CLIENT_INFO)).thenReturn(expected);
 
-        AuthResponse result = dashboardAuthService.login(request, CLIENT_INFO);
+        AuthResponse result = (AuthResponse) dashboardAuthService.login(request, CLIENT_INFO);
 
         assertThat(result.getAccessToken()).isEqualTo("a");
         verify(dashboardSessionService).createSession(user, CLIENT_INFO);
@@ -98,5 +100,46 @@ class DashboardAuthServiceTest {
 
         assertThatThrownBy(() -> dashboardAuthService.login(request, CLIENT_INFO))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void login_withUsername_looksUpUsernameIgnoringCase() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("  Thamarat ");
+        request.setPassword("secret");
+        DashboardUser user = DashboardUser.builder()
+                .id(2L)
+                .email("t@example.com")
+                .username("thamarat")
+                .password("hash")
+                .role(DashboardRole.ADMIN)
+                .active(true)
+                .build();
+        AuthResponse expected = AuthResponse.builder().accessToken("a").refreshToken("r").build();
+        when(dashboardUserRepository.findByUsernameIgnoreCase("thamarat")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+        when(dashboardSessionService.createSession(user, CLIENT_INFO)).thenReturn(expected);
+
+        assertThat(dashboardAuthService.login(request, CLIENT_INFO)).isSameAs(expected);
+    }
+
+    @Test
+    void login_withUnknownUsername_isRejected() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("nobody");
+        request.setPassword("secret");
+        when(dashboardUserRepository.findByUsernameIgnoreCase("nobody")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> dashboardAuthService.login(request, CLIENT_INFO))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void login_withoutIdentifier_isBadRequest() {
+        LoginRequest request = new LoginRequest();
+        request.setPassword("secret");
+
+        assertThatThrownBy(() -> dashboardAuthService.login(request, CLIENT_INFO))
+                .isInstanceOf(com.ael.algoryqrservice.qrservice.exception.BadRequestException.class);
     }
 }

@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.branch.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.branch.dto.BranchDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.branch.service.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ public class FeatureBranchController {
     private final BranchService branchService;
 
     @PostMapping("/branches")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<BranchDtos.Response> create(@Valid @RequestBody BranchDtos.CreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(branchService.create(request));
     }

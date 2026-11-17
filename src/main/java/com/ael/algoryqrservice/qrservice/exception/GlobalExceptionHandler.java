@@ -108,6 +108,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("message", ex.getMessage()));
     }
 
+    @ExceptionHandler(EntitlementDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleEntitlementDenied(EntitlementDeniedException ex) {
+        return ApiErrorResponseFactory.entitlementDenied(ex);
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
         Map<String, String> body = new HashMap<>();

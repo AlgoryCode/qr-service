@@ -63,6 +63,23 @@ public class PlatformFeedback {
     @Column(name = "admin_note", columnDefinition = "text")
     private String adminNote;
 
+    /** LOW, NORMAL, HIGH or URGENT. */
+    @Column(nullable = false, length = 16)
+    @Builder.Default
+    private String priority = "NORMAL";
+
+    @Column(name = "assignee_id")
+    private Long assigneeId;
+
+    @Column(name = "assignee_name", length = 128)
+    private String assigneeName;
+
+    @Column(name = "first_response_at")
+    private LocalDateTime firstResponseAt;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

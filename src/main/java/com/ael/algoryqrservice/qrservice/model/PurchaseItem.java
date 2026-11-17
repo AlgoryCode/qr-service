@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * checkout so later catalog edits do not rewrite history.
  */
 @Entity
-@Table(name = "tbl_purchase_item", uniqueConstraints = {
+@Table(name = "purchase_items", uniqueConstraints = {
         @UniqueConstraint(name = "uk_purchase_item_product", columnNames = {"purchase_id", "product_id"})
 }, indexes = {
         @Index(name = "idx_purchase_item_purchase_id", columnList = "purchase_id"),

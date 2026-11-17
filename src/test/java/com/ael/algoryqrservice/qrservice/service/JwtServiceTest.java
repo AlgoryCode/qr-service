@@ -37,7 +37,7 @@ class JwtServiceTest {
         Claims claims = jwtService.parseValidAccessToken(token).orElseThrow();
         assertThat(claims.get(JwtService.PRINCIPAL_TYPE_CLAIM)).isEqualTo(JwtService.PRINCIPAL_DASHBOARD);
         assertThat(jwtService.isDashboardPrincipal(claims)).isTrue();
-        assertThat(jwtService.extractRoles(claims)).containsExactly("ROLE_ADMIN");
+        assertThat(jwtService.extractRoles(claims)).containsExactly("ROLE_ADMIN", "ROLE_DASHBOARD_ADMIN");
         assertThat(jwtService.extractDashboardUserId(claims)).isEqualTo(7L);
     }
 

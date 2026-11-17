@@ -113,6 +113,9 @@ class RecurringAddonBillingTest {
         LocalDateTime newEnd = oldEnd.plusMonths(1);
         Purchase lapsed = addon(10L, PurchaseStatus.EXPIRED, new BigDecimal("100.00"), oldEnd);
         Purchase longGone = addon(11L, PurchaseStatus.EXPIRED, new BigDecimal("100.00"), oldEnd.minusMonths(3));
+        Purchase host = host(newEnd);
+        host.setAddonRecurringAmount(new BigDecimal("100.00"));
+        when(purchases.findByMerchantIdAndStatus(MERCHANT, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
         when(purchases.findByMerchantIdOrderByPurchasedAtDesc(MERCHANT)).thenReturn(List.of(lapsed, longGone));
 
         billing.onSubscriptionEvent(new SubscriptionEvent(MERCHANT, SubscriptionEventType.PACKAGE_RENEWED, "PRO",
@@ -123,6 +126,63 @@ class RecurringAddonBillingTest {
         assertThat(lapsed.getExpiresAt()).isEqualTo(newEnd);
         verify(addonEntitlements).extend(lapsed);
         verify(addonEntitlements, never()).extend(longGone);
+    }
+
+    @Test
+    void failedSyncKeepsTheBilledModuleAmount() {
+        Purchase host = host(AppTime.nowLocal().plusDays(10));
+        host.setRecurringPrice(new BigDecimal("499.00"));
+        host.setAddonRecurringAmount(new BigDecimal("50.00"));
+        Purchase recurring = addon(10L, PurchaseStatus.ACTIVE, new BigDecimal("100.00"), host.getExpiresAt());
+        when(purchases.findByMerchantIdAndStatus(MERCHANT, PurchaseStatus.ACTIVE)).thenReturn(List.of(host, recurring));
+        when(purchases.findByMerchantIdOrderByPurchasedAtDesc(MERCHANT)).thenReturn(List.of(host, recurring));
+        when(payments.switchSubscriptionPlan(anyLong(), anyString(), anyLong(), any(), anyMap())).thenReturn(false);
+
+        assertThat(billing.syncHost(host)).isFalse();
+
+        assertThat(host.getAddonRecurringAmount()).isEqualByComparingTo("50.00");
+        assertThat(RecurringAddonBilling.renewalAmount(host)).isEqualByComparingTo("549.00");
+        verify(purchases, never()).save(host);
+    }
+
+    @Test
+    void renewalDoesNotExtendModulesTheSubscriptionNeverBilled() {
+        LocalDateTime oldEnd = AppTime.nowLocal().minusHours(2);
+        LocalDateTime newEnd = oldEnd.plusMonths(1);
+        Purchase billed = addon(10L, PurchaseStatus.ACTIVE, new BigDecimal("100.00"), oldEnd);
+        billed.setPurchasedAt(oldEnd.minusDays(20));
+        Purchase unbilled = addon(11L, PurchaseStatus.ACTIVE, new BigDecimal("80.00"), oldEnd);
+        unbilled.setPurchasedAt(oldEnd.minusDays(5));
+        Purchase host = host(newEnd);
+        host.setAddonRecurringAmount(new BigDecimal("100.00"));
+        when(purchases.findByMerchantIdAndStatus(MERCHANT, PurchaseStatus.ACTIVE)).thenReturn(List.of(host));
+        when(purchases.findByMerchantIdOrderByPurchasedAtDesc(MERCHANT)).thenReturn(List.of(unbilled, billed));
+
+        billing.onSubscriptionEvent(new SubscriptionEvent(MERCHANT, SubscriptionEventType.PACKAGE_RENEWED, "PRO",
+                null, PackageStatus.ACTIVE, newEnd.atZone(AppTime.ZONE).toInstant(), null, "system", null,
+                java.time.Instant.now()));
+
+        assertThat(billed.getExpiresAt()).isEqualTo(newEnd);
+        verify(addonEntitlements).extend(billed);
+        assertThat(unbilled.getExpiresAt()).isEqualTo(oldEnd);
+        verify(addonEntitlements, never()).extend(unbilled);
+    }
+
+    @Test
+    void dailyReconcileResyncsOnlySubscriptionsThatDrifted() {
+        Purchase drifted = host(AppTime.nowLocal().plusDays(10));
+        drifted.setRecurringPrice(new BigDecimal("499.00"));
+        drifted.setAddonRecurringAmount(BigDecimal.ZERO);
+        Purchase recurring = addon(10L, PurchaseStatus.ACTIVE, new BigDecimal("100.00"), drifted.getExpiresAt());
+        when(purchases.findByStatusAndPurchaseTypeAndPaymentStyle(PurchaseStatus.ACTIVE, PurchaseType.PAID, PaymentStyle.SUBSCRIPTION))
+                .thenReturn(List.of(drifted));
+        when(purchases.findByMerchantIdOrderByPurchasedAtDesc(MERCHANT)).thenReturn(List.of(drifted, recurring));
+
+        assertThat(billing.reconcileAll()).isEqualTo(1);
+        assertThat(drifted.getAddonRecurringAmount()).isEqualByComparingTo("100.00");
+
+        assertThat(billing.reconcileAll()).isZero();
+        verify(payments).switchSubscriptionPlan(anyLong(), anyString(), anyLong(), any(), anyMap());
     }
 
     private static Purchase host(LocalDateTime expiresAt) {

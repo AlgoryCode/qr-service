@@ -45,6 +45,7 @@ public class QrDatabaseConfiguration {
         factory.setPackagesToScan(
                 "com.ael.algoryqrservice.qrservice.model",
                 "com.ael.algoryqrservice.qrservice.product.model",
+                "com.ael.algoryqrservice.qrservice.billing.collection",
                 "com.ael.algoryqrservice.qrservice.qr.model",
                 "com.ael.algoryqrservice.qrservice.store.model",
                 "com.ael.algoryqrservice.qrservice.print.model",

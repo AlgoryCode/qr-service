@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
+import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuCategoryService;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuService;
 
@@ -42,6 +44,7 @@ public class AiMenuImportService {
     private final MenuCategoryService menuCategoryService;
     private final AiServiceClient aiServiceClient;
     private final SecurityUtils securityUtils;
+    private final ProductUsageGateway productUsageGateway;
 
     public AiMenuImportDtos.JobAccepted createJob(Long menuId, AiMenuImportDtos.CreateJobRequest request) {
         Menu menu = requireOwnedMenuEntity(menuId);
@@ -49,6 +52,10 @@ public class AiMenuImportService {
         if (imageUrls.isEmpty()) {
             throw new BadRequestException("En az bir görsel URL zorunludur");
         }
+        // Charged before the AI call and given back if the job never starts.
+        String usageKey = "ai-import:" + UUID.randomUUID();
+        productUsageGateway.meter(menu.getMerchantId(), CatalogProducts.AI_MENU_IMPORT_RUN, 1, usageKey, "menu:" + menuId);
+        boolean started = false;
         try {
             AiMenuImportClientDtos.JobAccepted remote = aiServiceClient.createMenuImportJob(
                     AiMenuImportClientDtos.CreateRequest.builder()
@@ -60,6 +67,7 @@ public class AiMenuImportService {
             if (remote == null || remote.getJobId() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI menü import başlatılamadı");
             }
+            started = true;
             log.info(
                     "menu_import_proxy_accepted jobId={} menuId={} status={}",
                     remote.getJobId(), menuId, remote.getStatus()
@@ -70,6 +78,10 @@ public class AiMenuImportService {
                     .build();
         } catch (RestClientResponseException ex) {
             throw mapAiServiceError(ex, "AI menü import başlatılamadı");
+        } finally {
+            if (!started) {
+                productUsageGateway.unmeter(usageKey);
+            }
         }
     }
 

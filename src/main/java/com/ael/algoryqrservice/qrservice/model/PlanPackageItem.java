@@ -5,7 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 
 @Entity
-@Table(name = "tbl_plan_package_item", uniqueConstraints = {
+@Table(name = "plan_items", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"package_id", "product_id"})
 })
 @Getter

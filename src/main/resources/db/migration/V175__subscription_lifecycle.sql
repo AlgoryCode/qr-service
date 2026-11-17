@@ -93,7 +93,7 @@ INSERT INTO tbl_product (
     consumable, addon_purchasable, requires_count_sync, unit_price, vat_rate, created_at, updated_at
 )
 SELECT 'SMART_REPORT_QUOTA', 'Haftalik Akilli Rapor', 'Paketle gelen haftalik ucretsiz akilli rapor sayisi',
-       TRUE, NULL, 'PACKAGE_PRODUCT', 'SMART_REPORT_QUOTA', TRUE, FALSE, FALSE, 0.00, 20.00, NOW(), NOW()
+       TRUE, 'SMART_REPORTING_OWNER', 'PACKAGE_PRODUCT', 'SMART_REPORT_QUOTA', TRUE, FALSE, FALSE, 0.00, 20.00, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM tbl_product WHERE code = 'SMART_REPORT_QUOTA');
 
 INSERT INTO tbl_plan_package_item (package_id, product_id, quantity, unlimited)

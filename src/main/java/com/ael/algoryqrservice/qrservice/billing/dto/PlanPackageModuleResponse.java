@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 
 /**
  * An optional module the buyer may attach to this package at checkout, resolved from
- * {@code tbl_plan_package_addon}.
+ * {@code plan_addons}.
  */
 @Data
 @Builder
@@ -23,4 +23,9 @@ public class PlanPackageModuleResponse {
     private BigDecimal vatRate;
     private ProductBillingType billingType;
     private boolean consumable;
+    /** Store presentation, set by admins; null when not configured. */
+    private String tagline;
+    private String badge;
+    private boolean featured;
+    private int sortOrder;
 }

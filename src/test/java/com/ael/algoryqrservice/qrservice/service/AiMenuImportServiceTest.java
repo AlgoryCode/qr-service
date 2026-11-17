@@ -43,6 +43,8 @@ class AiMenuImportServiceTest {
     private AiServiceClient aiServiceClient;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.security.ProductUsageGateway productUsageGateway;
 
     @InjectMocks
     private AiMenuImportService service;
@@ -78,6 +80,25 @@ class AiMenuImportServiceTest {
         assertThat(captor.getValue().getMenuId()).isEqualTo(menuId);
         assertThat(captor.getValue().getMerchantId()).isEqualTo(userId);
         assertThat(captor.getValue().getImageUrls()).containsExactly("https://cdn.example/a.jpg");
+        verify(productUsageGateway).meter(eq(userId), eq("AI_MENU_IMPORT_RUN"), eq(1), any(), any());
+        verify(productUsageGateway, org.mockito.Mockito.never()).unmeter(any());
+    }
+
+    @Test
+    void createJob_whenAiServiceFails_thenGivesTheImportBack() {
+        when(securityUtils.getCurrentMerchantId()).thenReturn(userId);
+        when(menuRepository.findById(menuId)).thenReturn(Optional.of(Menu.builder()
+                .menuId(menuId)
+                .merchantId(userId)
+                .deleted(false)
+                .build()));
+        when(aiServiceClient.createMenuImportJob(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> service.createJob(
+                menuId,
+                AiMenuImportDtos.CreateJobRequest.builder().imageUrls(List.of("https://cdn.example/a.jpg")).build()
+        )).isInstanceOf(ResponseStatusException.class);
+        verify(productUsageGateway).unmeter(org.mockito.ArgumentMatchers.startsWith("ai-import:"));
     }
 
     @Test

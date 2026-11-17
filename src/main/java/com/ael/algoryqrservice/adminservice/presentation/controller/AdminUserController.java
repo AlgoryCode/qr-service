@@ -32,10 +32,11 @@ public class AdminUserController {
     @GetMapping
     public ResponseEntity<AdminUserDtos.UserPageResponse> listUsers(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(adminUserService.listUsers(q, page, size));
+        return ResponseEntity.ok(adminUserService.listUsers(q, tag, page, size));
     }
 
     @GetMapping("/{id}")

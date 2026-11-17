@@ -7,7 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_plan_package_addon", uniqueConstraints = {
+@Table(name = "plan_addons", uniqueConstraints = {
         @UniqueConstraint(name = "uk_package_addon", columnNames = {"package_id", "product_id"})
 }, indexes = {
         @Index(name = "idx_ppa_package_id", columnList = "package_id"),

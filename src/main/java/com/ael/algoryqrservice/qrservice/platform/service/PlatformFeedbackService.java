@@ -40,6 +40,7 @@ public class PlatformFeedbackService {
     private final PlatformFeedbackRepository platformFeedbackRepository;
     private final UserRepository userRepository;
     private final SecurityUtils securityUtils;
+    private final com.ael.algoryqrservice.adminservice.infrastructure.persistence.repository.DashboardUserRepository dashboardUserRepository;
 
     @Transactional
     public PlatformFeedbackDtos.FeedbackItemResponse create(PlatformFeedbackDtos.CreateRequest request) {
@@ -77,7 +78,7 @@ public class PlatformFeedbackService {
     @Transactional(readOnly = true)
     public PlatformFeedbackDtos.FeedbackPageResponse listMine(int page, int size) {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return list(merchantId, null, null, page, size);
+        return list(merchantId, null, null, page, size, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +88,13 @@ public class PlatformFeedbackService {
             int page,
             int size
     ) {
-        return list(null, status, q, page, size);
+        return list(null, status, q, page, size, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformFeedbackDtos.FeedbackPageResponse listForAdmin(
+            PlatformFeedbackStatus status, String q, String priority, Long assigneeId, int page, int size) {
+        return list(null, status, q, page, size, priority, assigneeId);
     }
 
     @Transactional(readOnly = true)
@@ -106,8 +113,21 @@ public class PlatformFeedbackService {
                 .orElseThrow(() -> new NotFoundException("Geri bildirim bulunamadı"));
 
         if (request != null) {
-            if (request.getStatus() != null) {
+            if (request.getStatus() != null && request.getStatus() != feedback.getStatus()) {
                 feedback.setStatus(request.getStatus());
+                feedback.setResolvedAt(request.getStatus() == PlatformFeedbackStatus.RESOLVED ? LocalDateTime.now() : null);
+            }
+            if (request.getPriority() != null) {
+                feedback.setPriority(request.getPriority());
+            }
+            if (request.isUnassign()) {
+                feedback.setAssigneeId(null);
+                feedback.setAssigneeName(null);
+            } else if (request.getAssigneeId() != null) {
+                var owner = dashboardUserRepository.findById(request.getAssigneeId())
+                        .orElseThrow(() -> new NotFoundException("Yönetici bulunamadı"));
+                feedback.setAssigneeId(owner.getId());
+                feedback.setAssigneeName(owner.getUsername() != null ? owner.getUsername() : owner.getEmail());
             }
             if (request.getAdminNote() != null) {
                 feedback.setAdminNote(trimToNull(request.getAdminNote()));
@@ -123,7 +143,9 @@ public class PlatformFeedbackService {
             PlatformFeedbackStatus status,
             String q,
             int page,
-            int size
+            int size,
+            String priority,
+            Long assigneeId
     ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
@@ -132,7 +154,10 @@ public class PlatformFeedbackService {
         Specification<PlatformFeedback> spec = Specification
                 .where(PlatformFeedbackSpecifications.hasMerchantId(merchantId))
                 .and(PlatformFeedbackSpecifications.hasStatus(status))
-                .and(PlatformFeedbackSpecifications.matchesQuery(q));
+                .and(PlatformFeedbackSpecifications.matchesQuery(q))
+                .and((root, query, cb) -> priority == null || priority.isBlank() ? null : cb.equal(root.get("priority"), priority))
+                .and((root, query, cb) -> assigneeId == null ? null
+                        : assigneeId == 0 ? cb.isNull(root.get("assigneeId")) : cb.equal(root.get("assigneeId"), assigneeId));
 
         Page<PlatformFeedback> result = platformFeedbackRepository.findAll(spec, pageable);
         Map<Long, User> usersById = loadUsers(result);
@@ -184,7 +209,12 @@ public class PlatformFeedbackService {
                 feedback.getStatus(),
                 feedback.getAdminNote(),
                 feedback.getCreatedAt(),
-                feedback.getUpdatedAt()
+                feedback.getUpdatedAt(),
+                feedback.getPriority(),
+                feedback.getAssigneeId(),
+                feedback.getAssigneeName(),
+                feedback.getFirstResponseAt(),
+                feedback.getResolvedAt()
         );
     }
 

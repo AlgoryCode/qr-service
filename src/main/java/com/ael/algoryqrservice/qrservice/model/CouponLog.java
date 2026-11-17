@@ -21,7 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tbl_coupon_log", indexes = {
+@Table(name = "coupon_logs", indexes = {
         @Index(name = "idx_coupon_log_coupon_id", columnList = "coupon_id"),
         @Index(name = "idx_coupon_log_purchase_id", columnList = "purchase_id")
 })

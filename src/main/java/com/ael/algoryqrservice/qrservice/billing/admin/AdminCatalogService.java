@@ -58,6 +58,8 @@ public class AdminCatalogService {
     private final PlanPackageRepository planPackageRepository;
     private final PlanPackageItemRepository planPackageItemRepository;
     private final PackagePricingService pricing;
+    private final PlanVersionService planVersions;
+    private final FeatureLabels featureLabels;
 
     // ---- products ----
 
@@ -77,10 +79,12 @@ public class AdminCatalogService {
         if (productRepository.findByCode(code).isPresent()) {
             throw new ConflictException("PRODUCT_CODE_TAKEN", "Bu kodla bir ürün zaten var: " + code);
         }
+        String featureCode = featureCodeOf(request, code);
+        requireKnownCodes(featureCode, normalizeCode(blankToNull(request.scopeCode())), null);
         Product product = new Product();
         product.setCode(code);
         apply(product, request);
-        product.setFeatureCode(featureCodeOf(request, code));
+        product.setFeatureCode(featureCode);
         Product saved = productRepository.save(product);
         log.info("admin_catalog product_created code={} feature={}", saved.getCode(), saved.getFeatureCode());
         return toResponse(saved);
@@ -93,6 +97,7 @@ public class AdminCatalogService {
             throw new BadRequestException("PRODUCT_CODE_IMMUTABLE", "Ürün kodu değiştirilemez");
         }
         String featureCode = featureCodeOf(request, product.getCode());
+        requireKnownCodes(featureCode, normalizeCode(blankToNull(request.scopeCode())), product);
         if (!Objects.equals(product.getFeatureCode(), featureCode)
                 && product.getFeatureCode() != null
                 && planPackageItemRepository.existsByProductId(product.getId())) {
@@ -145,6 +150,7 @@ public class AdminCatalogService {
         planPackage.setSystemManaged(false);
         apply(planPackage, request);
         PlanPackage saved = planPackageRepository.save(planPackage);
+        planVersions.snapshot(saved, "Paket oluşturuldu");
         log.info("admin_catalog package_created code={} price={} items={}",
                 saved.getCode(), saved.getPrice(), saved.getItems().size());
         return toResponse(saved);
@@ -162,6 +168,7 @@ public class AdminCatalogService {
         }
         apply(planPackage, request);
         PlanPackage saved = planPackageRepository.save(planPackage);
+        planVersions.snapshot(saved, "Paket güncellendi");
         log.info("admin_catalog package_updated code={} active={} price={} items={}",
                 saved.getCode(), saved.isActive(), saved.getPrice(), saved.getItems().size());
         return toResponse(saved);
@@ -173,7 +180,7 @@ public class AdminCatalogService {
         product.setName(request.name().trim());
         product.setDescription(blankToNull(request.description()));
         product.setTypeId(request.type());
-        product.setScopeCode(blankToNull(request.scopeCode()));
+        product.setScopeCode(normalizeCode(blankToNull(request.scopeCode())));
         product.setUnitPrice(money(request.unitPrice()));
         product.setVatRate(request.vatRate() == null
                 ? PackagePricingService.DEFAULT_VAT_RATE
@@ -185,7 +192,6 @@ public class AdminCatalogService {
             product.setBillingType(ProductBillingType.ONE_TIME);
         }
         product.setAddonPurchasable(request.addonPurchasable());
-        product.setRequiresCountSync(request.requiresCountSync());
         product.setActive(request.active());
     }
 
@@ -200,6 +206,10 @@ public class AdminCatalogService {
         planPackage.setPurchasable(request.purchasable());
         planPackage.setActive(request.active());
         replaceItems(planPackage, request.items(), request.active());
+        if (planPackage.getFeatures().isEmpty()) {
+            // No marketing lines written: describe what the package grants, so the two never drift.
+            planPackage.setFeatures(new ArrayList<>(featureLabels.describe(planPackage.getItems())));
+        }
 
         pricing.applyTo(planPackage);
         BigDecimal monthlyDiscount = money(request.monthlyDiscount());
@@ -270,7 +280,7 @@ public class AdminCatalogService {
                 .toList();
         for (PlanPackage planPackage : planPackageRepository.findAllByIdWithItems(packageIds)) {
             pricing.applyTo(planPackage);
-            planPackageRepository.save(planPackage);
+            planVersions.snapshot(planPackageRepository.save(planPackage), "Ürün fiyatı değişti");
         }
     }
 
@@ -307,7 +317,6 @@ public class AdminCatalogService {
                 product.getBillingType(),
                 product.isConsumable(),
                 product.isAddonPurchasable(),
-                product.isRequiresCountSync(),
                 product.isActive(),
                 planPackageItemRepository.countByProductId(product.getId()),
                 product.getCreatedAt(),
@@ -350,10 +359,28 @@ public class AdminCatalogService {
                 planPackage.isPurchasable(),
                 planPackage.isActive(),
                 planPackage.isSystemManaged(),
+                planPackage.getCurrentVersionId(),
                 items,
                 planPackage.getCreatedAt(),
                 planPackage.getUpdatedAt()
         );
+    }
+
+    /**
+     * Feature and scope codes must be ones the application checks. A product saved before this
+     * rule may keep the code it already has, so editing its price or name still works.
+     */
+    static void requireKnownCodes(String featureCode, String scopeCode, Product existing) {
+        boolean keepsFeature = existing != null
+                && (Objects.equals(existing.getFeatureCode(), featureCode)
+                || (existing.getFeatureCode() == null && Objects.equals(existing.getCode(), featureCode)));
+        if (!keepsFeature && !CatalogCodes.isFeature(featureCode)) {
+            throw new BadRequestException("PRODUCT_FEATURE_UNKNOWN", "Tanımsız hak kodu: " + featureCode);
+        }
+        boolean keepsScope = existing != null && Objects.equals(existing.getScopeCode(), scopeCode);
+        if (scopeCode != null && !keepsScope && !CatalogCodes.isScope(scopeCode)) {
+            throw new BadRequestException("PRODUCT_SCOPE_UNKNOWN", "Tanımsız panel yetkisi: " + scopeCode);
+        }
     }
 
     private static String featureCodeOf(ProductRequest request, String productCode) {
@@ -367,6 +394,57 @@ public class AdminCatalogService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    // ---- scheduled changes ----
+
+    /** Sets a product's unit price and reprices the packages built from it; returns the old price. */
+    @Transactional
+    public BigDecimal changeUnitPrice(Long productId, BigDecimal unitPrice) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BadRequestException("Ürün bulunamadı: " + productId));
+        if (unitPrice == null || unitPrice.signum() < 0) {
+            throw new BadRequestException("Birim fiyat sıfırdan küçük olamaz");
+        }
+        BigDecimal previous = product.getUnitPrice();
+        product.setUnitPrice(money(unitPrice));
+        productRepository.save(product);
+        repriceSalesOf(productId);
+        log.info("admin_catalog scheduled_price product={} {} -> {}", product.getCode(), previous, product.getUnitPrice());
+        return previous;
+    }
+
+    /**
+     * Sets a package's monthly and/or yearly discount (null leaves that one alone); returns the
+     * previous {monthly, yearly}.
+     */
+    @Transactional
+    public BigDecimal[] changePackageDiscounts(Long packageId, BigDecimal monthlyDiscount, BigDecimal yearlyDiscount) {
+        PlanPackage planPackage = planPackageRepository.findByIdWithItems(packageId)
+                .orElseThrow(() -> new BadRequestException("Paket bulunamadı: " + packageId));
+        BigDecimal[] previous = {planPackage.getMonthlyDiscount(), planPackage.getYearlyDiscount()};
+        if (monthlyDiscount != null) {
+            if (monthlyDiscount.signum() < 0 || monthlyDiscount.compareTo(planPackage.getPrice()) > 0) {
+                throw new BadRequestException("PACKAGE_DISCOUNT_TOO_HIGH", "Aylık indirim paket fiyatını aşamaz");
+            }
+            planPackage.setMonthlyDiscount(money(monthlyDiscount));
+        }
+        if (yearlyDiscount != null) {
+            if (planPackage.getYearlyPrice() == null) {
+                throw new BadRequestException("Bu paketin yıllık fiyatı yok; yıllık indirim uygulanamaz");
+            }
+            if (yearlyDiscount.signum() < 0 || yearlyDiscount.compareTo(planPackage.getYearlyPrice()) > 0) {
+                throw new BadRequestException("PACKAGE_DISCOUNT_TOO_HIGH", "Yıllık indirim yıllık fiyatı aşamaz");
+            }
+            planPackage.setYearlyDiscount(money(yearlyDiscount));
+        }
+        if (planPackage.isPurchasable() && planPackage.effectiveMonthlyPrice().signum() <= 0) {
+            throw new BadRequestException("PACKAGE_FREE_PURCHASABLE", "İndirim paketi ücretsiz yapamaz");
+        }
+        planPackageRepository.save(planPackage);
+        log.info("admin_catalog scheduled_discount package={} monthly={} yearly={}",
+                planPackage.getCode(), planPackage.getMonthlyDiscount(), planPackage.getYearlyDiscount());
+        return previous;
     }
 
     private static BigDecimal money(BigDecimal value) {

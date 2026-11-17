@@ -11,5 +11,7 @@ public interface DashboardUserRepository extends JpaRepository<DashboardUser, Lo
 
     Optional<DashboardUser> findByEmailIgnoreCase(String email);
 
+    Optional<DashboardUser> findByUsernameIgnoreCase(String username);
+
     boolean existsByEmailIgnoreCase(String email);
 }

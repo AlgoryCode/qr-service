@@ -12,6 +12,10 @@ public final class CatalogProducts {
     public static final String CUSTOM_DESIGN = "CUSTOM_DESIGN";
     public static final String WAITER_PANEL = "WAITER_PANEL";
     public static final String AI_MENU_IMPORT = "AI_MENU_IMPORT";
+    /** Metered: AI menu imports started per month (unlimited with AI_MENU_IMPORT unless a grant sets a number). */
+    public static final String AI_MENU_IMPORT_RUN = "AI_MENU_IMPORT_RUN";
+    /** Metered: dashboard assistant questions per day (unlimited with SMART_ASSISTANT). */
+    public static final String ASSISTANT_QUESTION = "ASSISTANT_QUESTION";
     public static final String ONLINE_ORDER = "ONLINE_ORDER";
 
     public static final String QR_MENU_ADDON = "QR_MENU_ADDON";

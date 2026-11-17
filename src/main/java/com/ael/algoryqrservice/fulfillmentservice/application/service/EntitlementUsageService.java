@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.fulfillmentservice.domain.model.CatalogProduct;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.ListedEntitlement;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.ProductAccessView;
 import com.ael.algoryqrservice.fulfillmentservice.domain.model.UserEntitlement;
+import com.ael.algoryqrservice.fulfillmentservice.domain.port.CountedResourcePort;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.EntitlementPort;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.FulfillmentRepositoryPort;
 import com.ael.algoryqrservice.fulfillmentservice.domain.port.ProductPort;
@@ -15,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,16 +31,22 @@ public class EntitlementUsageService {
     private final FulfillmentRepositoryPort fulfillmentRepository;
     private final EntitlementPort entitlementPort;
     private final ProductPort productPort;
+    private final CountedResourcePort countedResources;
+    private final com.ael.algoryqrservice.fulfillmentservice.application.snapshot.EntitlementSnapshotService snapshots;
 
     @Transactional(readOnly = true)
     public List<ListedEntitlement> listActive(Long merchantId) {
-        List<UserEntitlement> entitlements = entitlementPort.findActiveByMerchantId(merchantId);
+        List<UserEntitlement> entitlements = withLiveUsage(merchantId, entitlementPort.findActiveByMerchantId(merchantId));
         Map<Long, CatalogProduct> products = productPort.findByIds(productIds(entitlements));
         return entitlements.stream()
                 .map(entitlement -> new ListedEntitlement(entitlement, productCode(entitlement, products)))
                 .toList();
     }
 
+    /**
+     * Whether the merchant may use {@code productCode} now. Read from the entitlement snapshot: one
+     * row per feature, already summed over every open grant and closed when the package is.
+     */
     @Transactional(readOnly = true)
     public ProductAccessView productAccess(Long merchantId, String productCode) {
         Optional<ActivePackage> active = fulfillmentRepository.findActiveByMerchantId(merchantId)
@@ -45,8 +54,13 @@ public class EntitlementUsageService {
         if (active.isEmpty()) {
             return ProductAccessView.denied(null);
         }
-        return match(merchantId, productCode)
-                .map(entitlement -> allowed(active.get(), entitlement))
+        Optional<CatalogProduct> product = productPort.findByCode(productCode);
+        String feature = product.map(CatalogProduct::featureCode)
+                .filter(code -> code != null && !code.isBlank())
+                .orElse(productCode);
+        String scope = product.map(CatalogProduct::scopeCode).orElse(null);
+        return snapshots.read(merchantId).feature(feature)
+                .map(effective -> new ProductAccessView(true, active.get().packageCode(), feature, scope))
                 .orElseGet(() -> ProductAccessView.denied(active.get().packageCode()));
     }
 
@@ -56,6 +70,10 @@ public class EntitlementUsageService {
         List<UserEntitlement> candidates = candidates(merchantId, productCode, true);
         if (candidates.isEmpty()) {
             throw new QuotaExceededException("Product is not in the active package");
+        }
+        String counted = countedFeature(productCode);
+        if (counted != null) {
+            return checkCapacity(merchantId, counted, candidates, quantity);
         }
         // Spend from the first entitlement that can still cover the request (e.g. a second add-on
         // purchase once the first is used up); otherwise the best match reports the overflow.
@@ -68,14 +86,37 @@ public class EntitlementUsageService {
         }
         int used = usedOf(entitlement) + quantity;
         if (used > limitOf(entitlement)) {
-            throw new QuotaExceededException("Entitlement quota exceeded");
+            throw new QuotaExceededException("Entitlement quota exceeded",
+                    entitlement.featureCode(), (long) limitOf(entitlement), (long) usedOf(entitlement));
         }
         return entitlementPort.save(copyUsed(entitlement, used));
     }
 
+    /**
+     * Capacity features (branches, menus, products, QR codes) are checked against what exists right
+     * now: every open grant for the feature adds to the limit, and nothing is written. The caller's
+     * rows are locked, so two concurrent creates in one transaction each see the other's result.
+     */
+    private UserEntitlement checkCapacity(Long merchantId, String feature, List<UserEntitlement> grants, int quantity) {
+        Optional<UserEntitlement> unlimited = grants.stream().filter(UserEntitlement::unlimited).findFirst();
+        if (unlimited.isPresent()) {
+            return unlimited.get();
+        }
+        long limit = grants.stream().mapToLong(this::limitOf).sum();
+        long used = countedResources.count(merchantId, feature).orElse(0);
+        if (used + quantity > limit) {
+            throw new QuotaExceededException("Entitlement quota exceeded", feature, limit, used);
+        }
+        return copyUsed(grants.get(0), (int) Math.min(used + quantity, Integer.MAX_VALUE));
+    }
+
+    /** Capacity usage is live, so a delete has nothing to give back. Credits and meters still do. */
     @Transactional
     public Optional<UserEntitlement> release(Long merchantId, String productCode, int quantity) {
         requireQuantity(quantity);
+        if (countedFeature(productCode) != null) {
+            return Optional.empty();
+        }
         List<UserEntitlement> candidates = candidates(merchantId, productCode, true);
         Optional<UserEntitlement> match = candidates.stream()
                 .filter(candidate -> !candidate.unlimited() && usedOf(candidate) > 0)
@@ -89,6 +130,47 @@ public class EntitlementUsageService {
             return match;
         }
         return Optional.of(entitlementPort.save(copyUsed(match.get(), used)));
+    }
+
+    /**
+     * Fills each capacity row's used count from the live total, in grant order (package lines first,
+     * then add-ons), so screens and "remaining" math read real numbers without a stored counter.
+     * Whatever exceeds every row (after a downgrade) stays on the last one.
+     */
+    private List<UserEntitlement> withLiveUsage(Long merchantId, List<UserEntitlement> rows) {
+        Map<String, Long> live = new HashMap<>();
+        List<UserEntitlement> result = new ArrayList<>(rows.size());
+        Map<String, Integer> lastIndex = new HashMap<>();
+        for (UserEntitlement row : rows) {
+            String feature = row.featureCode();
+            if (!countedResources.isCounted(feature)) {
+                result.add(row);
+                continue;
+            }
+            long left = live.computeIfAbsent(feature, key -> countedResources.count(merchantId, key).orElse(0));
+            long take = row.unlimited() ? left : Math.min(left, limitOf(row));
+            live.put(feature, left - take);
+            lastIndex.put(feature, result.size());
+            result.add(copyUsed(row, (int) Math.min(take, Integer.MAX_VALUE)));
+        }
+        live.forEach((feature, left) -> {
+            Integer index = lastIndex.get(feature);
+            if (left > 0 && index != null) {
+                UserEntitlement last = result.get(index);
+                result.set(index, copyUsed(last, (int) Math.min(usedOf(last) + left, Integer.MAX_VALUE)));
+            }
+        });
+        return result;
+    }
+
+    private String countedFeature(String productCode) {
+        if (countedResources.isCounted(productCode)) {
+            return productCode;
+        }
+        return productPort.findByCode(productCode)
+                .map(CatalogProduct::featureCode)
+                .filter(countedResources::isCounted)
+                .orElse(null);
     }
 
     private ProductAccessView allowed(ActivePackage active, UserEntitlement entitlement) {

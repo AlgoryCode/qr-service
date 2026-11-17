@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "tbl_plan_package", uniqueConstraints = {
+@Table(name = "plans", uniqueConstraints = {
         @UniqueConstraint(columnNames = "code")
 })
 @Getter
@@ -92,6 +92,10 @@ public class PlanPackage {
     @ColumnDefault("false")
     @Builder.Default
     private boolean systemManaged = false;
+
+    /** The version new purchases are pinned to. */
+    @Column(name = "current_version_id")
+    private Long currentVersionId;
 
     @OneToMany(mappedBy = "planPackage", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

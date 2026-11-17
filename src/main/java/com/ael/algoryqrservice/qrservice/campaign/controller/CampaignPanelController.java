@@ -1,8 +1,8 @@
 package com.ael.algoryqrservice.qrservice.campaign.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.campaign.dto.CampaignDtos;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.campaign.service.CampaignService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/staff/panel")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.WAITER_PANEL_OWNER)
+@RequiresFeature(FeatureKey.WAITER_PANEL)
 public class CampaignPanelController {
 
     private final CampaignService campaignService;

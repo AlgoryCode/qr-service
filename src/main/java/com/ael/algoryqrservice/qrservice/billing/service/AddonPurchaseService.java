@@ -7,6 +7,9 @@ import com.ael.algoryqrservice.qrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.qrservice.config.AppProperties;
 import com.ael.algoryqrservice.qrservice.config.PaymentClientProperties;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
+import com.ael.algoryqrservice.qrservice.exception.ConflictException;
+import com.ael.algoryqrservice.qrservice.model.PlanPackageItem;
+import com.ael.algoryqrservice.qrservice.repository.PlanPackageRepository;
 import com.ael.algoryqrservice.qrservice.exception.PaymentServiceException;
 import com.ael.algoryqrservice.qrservice.model.BillingSnapshot;
 import com.ael.algoryqrservice.qrservice.model.Product;
@@ -39,6 +42,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +73,7 @@ public class AddonPurchaseService {
     private final AppProperties appProperties;
     private final PaymentClientProperties paymentClientProperties;
     private final PurchaseExpiryService purchaseExpiryService;
+    private final PlanPackageRepository planPackageRepository;
 
     @Transactional(noRollbackFor = PaymentServiceException.class)
     public PurchaseInitiateResponse purchase(User user, AddonPurchaseRequest request, String clientIp) {
@@ -90,6 +97,7 @@ public class AddonPurchaseService {
         purchaseExpiryService.expireDueForMerchant(user.getId());
         Purchase host = findHostPurchase(user.getId());
         List<ResolvedLine> lines = resolveLines(request.getModules());
+        rejectOwnedModules(user.getId(), host, lines);
         BillingPeriod billingPeriod = BillingPeriodResolver.resolve(host);
 
         LocalDateTime startsAt = AppTime.nowLocal();
@@ -278,6 +286,64 @@ public class AddonPurchaseService {
             ));
         }
         return resolved;
+    }
+
+    /**
+     * A non-consumable module is a right, not a balance: buying it again while the package already
+     * includes it, or while an earlier module purchase is still active, would only charge twice.
+     */
+    private void rejectOwnedModules(Long merchantId, Purchase host, List<ResolvedLine> lines) {
+        List<Product> rights = lines.stream()
+                .map(ResolvedLine::product)
+                .filter(product -> !product.isConsumable())
+                .toList();
+        if (rights.isEmpty()) {
+            return;
+        }
+        Set<Long> ownedProductIds = new HashSet<>();
+        planPackageRepository.findByIdWithItems(host.getPackageId())
+                .ifPresent(planPackage -> planPackage.getItems().stream()
+                        .filter(item -> item.isUnlimited() || (item.getQuantity() != null && item.getQuantity() > 0))
+                        .map(PlanPackageItem::getProduct)
+                        .filter(Objects::nonNull)
+                        .forEach(product -> ownedProductIds.add(product.getId())));
+        List<Purchase> activeAddons = purchaseRepository.findByMerchantIdAndStatus(merchantId, PurchaseStatus.ACTIVE)
+                .stream()
+                .filter(Purchase::isUsable)
+                .filter(purchase -> purchase.getPurchaseType() == PurchaseType.ADD_ON)
+                .toList();
+        activeAddons.stream()
+                .map(Purchase::getProductId)
+                .filter(Objects::nonNull)
+                .forEach(ownedProductIds::add);
+        List<Long> withLines = new ArrayList<>();
+        withLines.add(host.getId());
+        activeAddons.forEach(addon -> withLines.add(addon.getId()));
+        purchaseItemRepository.findByPurchaseIdIn(withLines).stream()
+                .map(PurchaseItem::getProductId)
+                .filter(Objects::nonNull)
+                .forEach(ownedProductIds::add);
+
+        Set<String> ownedFeatures = new HashSet<>();
+        productRepository.findAllById(ownedProductIds).forEach(product -> {
+            if (!product.isConsumable()) {
+                ownedFeatures.add(featureOf(product));
+            }
+        });
+        for (Product product : rights) {
+            if (ownedProductIds.contains(product.getId()) || ownedFeatures.contains(featureOf(product))) {
+                throw new ConflictException(
+                        "MODULE_ALREADY_OWNED",
+                        product.getName() + " modülü zaten paketinizde veya aktif modülleriniz arasında"
+                );
+            }
+        }
+    }
+
+    private static String featureOf(Product product) {
+        return product.getFeatureCode() != null && !product.getFeatureCode().isBlank()
+                ? product.getFeatureCode()
+                : product.getCode();
     }
 
     private static boolean isRecurring(ResolvedLine line) {

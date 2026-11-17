@@ -51,6 +51,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
     private final PackageCatalogPort packageCatalogPort;
     private final EntitlementPort entitlementPort;
     private final PurchaseModulePort purchaseModulePort;
+    private final com.ael.algoryqrservice.fulfillmentservice.domain.port.PlanVersionPort planVersionPort;
     private final SubscriptionEvents subscriptionEvents;
 
     @Override
@@ -104,13 +105,12 @@ public class FulfillmentServiceImpl implements FulfillmentService {
             throw exception;
         }
 
-        // Read the outgoing package's counters before its rows are superseded: branches, menus and
-        // products that exist keep counting against the new package instead of starting from zero.
+        // Capacity usage is counted live from what exists, so nothing is carried between packages.
         Optional<ActivePackage> previous = fulfillmentRepository.findActiveByMerchantId(command.merchantId());
-        Map<String, Integer> carriedUsage = countedUsage(entitlementPort.lockActiveByMerchantId(command.merchantId()));
+        entitlementPort.lockActiveByMerchantId(command.merchantId());
         fulfillmentRepository.supersedeOtherFulfillments(command.merchantId(), created.id());
         entitlementPort.supersedeOtherEntitlements(command.merchantId(), created.id());
-        grantPackageEntitlements(created, command.periodStart(), command.periodEnd(), now, carriedUsage);
+        grantPackageEntitlements(created, command.periodStart(), command.periodEnd(), now);
         SubscriptionKind kind = resolveKind(command);
         fulfillmentRepository.upsertActivePackage(
                 new ActivePackage(
@@ -265,7 +265,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
             log.info("Add-on already granted. purchaseId={}", grant.purchaseId());
             return List.of();
         }
-        // user_entitlement.fulfillment_id is required: hang the add-on off the package it was bought on.
+        // entitlement_grants.fulfillment_id is required: hang the add-on off the package it was bought on.
         ActivePackage host = fulfillmentRepository.findActiveByMerchantId(grant.merchantId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Active package not found for add-on grant: merchantId=" + grant.merchantId()));
@@ -329,8 +329,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
             PackageFulfillment fulfillment,
             LocalDate periodStart,
             LocalDate periodEnd,
-            Instant now,
-            Map<String, Integer> carriedUsage
+            Instant now
     ) {
         Optional<PlanPackage> planPackage = resolvePlanPackage(fulfillment.packageId(), fulfillment.packageCode());
         if (planPackage.isEmpty()) {
@@ -344,7 +343,11 @@ public class FulfillmentServiceImpl implements FulfillmentService {
 
         Instant startsAt = toInstant(periodStart);
         Instant expiresAt = toInstant(periodEnd);
-        List<UserEntitlement> entitlements = new ArrayList<>(planPackage.get().items().stream()
+        // A purchase grants the version it was bought on, so editing the package later never changes
+        // an existing subscriber's rights. Trials, grants and the free package have no purchase pin.
+        List<PlanPackageItem> lines = planVersionPort.linesOfPurchase(fulfillment.purchaseId())
+                .orElseGet(() -> planPackage.get().items());
+        List<UserEntitlement> entitlements = new ArrayList<>(lines.stream()
                 .map(item -> toEntitlement(fulfillment, item, startsAt, expiresAt, now))
                 .toList());
         // Modules bought together with the package are paid for in the same charge, so they live
@@ -371,52 +374,7 @@ public class FulfillmentServiceImpl implements FulfillmentService {
                         now
                 ))
                 .forEach(entitlements::add);
-        entitlementPort.saveAll(applyCarriedUsage(entitlements, carriedUsage));
-    }
-
-    /** Sum of used counters per counted resource across the merchant's package-bound rows. */
-    private static Map<String, Integer> countedUsage(List<UserEntitlement> current) {
-        Map<String, Integer> used = new HashMap<>();
-        for (UserEntitlement entitlement : current) {
-            if (entitlement.source() == EntitlementSource.ADDON_PURCHASE
-                    || !CatalogProducts.COUNTED_RESOURCES.contains(entitlement.featureCode())
-                    || entitlement.usedQuantity() == null
-                    || entitlement.usedQuantity() <= 0) {
-                continue;
-            }
-            used.merge(entitlement.featureCode(), entitlement.usedQuantity(), Integer::sum);
-        }
-        return used;
-    }
-
-    /**
-     * Puts the carried counters on the first new row of each feature. A downgrade can leave the
-     * counter above the new limit: nothing is deleted, the merchant just cannot add more.
-     */
-    private static List<UserEntitlement> applyCarriedUsage(
-            List<UserEntitlement> entitlements,
-            Map<String, Integer> carriedUsage
-    ) {
-        if (carriedUsage.isEmpty()) {
-            return entitlements;
-        }
-        Map<String, Integer> remaining = new HashMap<>(carriedUsage);
-        List<UserEntitlement> result = new ArrayList<>(entitlements.size());
-        for (UserEntitlement entitlement : entitlements) {
-            Integer carried = remaining.remove(entitlement.featureCode());
-            if (carried == null || entitlement.unlimited()) {
-                result.add(entitlement);
-                continue;
-            }
-            result.add(new UserEntitlement(
-                    entitlement.id(), entitlement.merchantId(), entitlement.fulfillmentId(),
-                    entitlement.purchaseId(), entitlement.productId(), entitlement.productTypeId(),
-                    entitlement.featureCode(), entitlement.scopeCode(), entitlement.quantity(),
-                    entitlement.unlimited(), carried, entitlement.source(), entitlement.status(),
-                    entitlement.startsAt(), entitlement.expiresAt(), entitlement.createdAt(),
-                    entitlement.updatedAt()));
-        }
-        return result;
+        entitlementPort.saveAll(entitlements);
     }
 
     private static SubscriptionEventType paidEventType(Optional<ActivePackage> previous, FulfillmentCommand command) {

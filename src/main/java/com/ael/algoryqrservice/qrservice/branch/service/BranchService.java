@@ -244,6 +244,7 @@ public class BranchService {
                 .receiptHeader(branch.getReceiptHeader())
                 .receiptIntro(branch.getReceiptIntro())
                 .receiptFooter(branch.getReceiptFooter())
+                .locked(branch.getCapacityLockedAt() != null)
                 .menus(menus.stream()
                         .map(menu -> BranchDtos.MenuSummary.builder()
                                 .menuId(menu.getMenuId())
@@ -261,7 +262,7 @@ public class BranchService {
     }
 
     private BranchDtos.Quota branchQuota(Long merchantId) {
-        int used = (int) branchRepository.countByMerchantIdAndDeletedFalse(merchantId);
+        int used = (int) branchRepository.countByMerchantIdAndDeletedFalseAndCapacityLockedAtIsNull(merchantId);
         int remaining = fulfillmentClient.remaining(merchantId, CatalogProducts.QR_BRANCH);
         return BranchDtos.Quota.builder()
                 .used(used)

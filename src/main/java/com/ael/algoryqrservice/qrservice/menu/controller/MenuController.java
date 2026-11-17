@@ -1,10 +1,10 @@
 package com.ael.algoryqrservice.qrservice.menu.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.menu.dto.MenuDtos;
 import com.ael.algoryqrservice.qrservice.menu.dto.TaxonomyDtos;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.menu.service.ChefAvatarService;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuFeedbackService;
 import com.ael.algoryqrservice.qrservice.menu.service.MenuReservationService;
@@ -175,7 +175,7 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/feedback")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.FeedbackPageResponse> listFeedback(
             @PathVariable Long menuId,
             @RequestParam(required = false, defaultValue = "all") String type,
@@ -191,7 +191,7 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/feedback/summary")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.FeedbackSummaryResponse> feedbackSummary(@PathVariable Long menuId) {
         return ResponseEntity.ok(menuFeedbackService.getSummary(menuId));
     }
@@ -209,7 +209,7 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/reservations")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.ReservationPageResponse> listReservations(
             @PathVariable Long menuId,
             @RequestParam(required = false, defaultValue = "all") String status,
@@ -226,7 +226,7 @@ public class MenuController {
 
     /** A reservation the business takes itself (phone, walk-in); it is confirmed straight away. */
     @PostMapping("/{menuId}/reservations")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.ReservationResponse> createReservation(
             @PathVariable Long menuId,
             @Valid @RequestBody MenuDtos.ReservationCreateRequest request,
@@ -238,7 +238,7 @@ public class MenuController {
     }
 
     @PatchMapping("/{menuId}/reservations/{reservationId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<MenuDtos.ReservationResponse> updateReservation(
             @PathVariable Long menuId,
             @PathVariable Long reservationId,
@@ -421,7 +421,7 @@ public class MenuController {
     }
 
     @DeleteMapping("/{menuId}")
-    @RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+    @RequiresFeature(FeatureKey.QR_MENU)
     public ResponseEntity<Void> deleteMenu(@PathVariable Long menuId) {
         menuService.deleteMenu(menuId);
         return ResponseEntity.noContent().build();

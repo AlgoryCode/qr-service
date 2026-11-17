@@ -1,9 +1,9 @@
 package com.ael.algoryqrservice.qrservice.integration.ubereatsmenu.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
 import com.ael.algoryqrservice.qrservice.integration.ubereatsmenu.model.dto.UberEatsMenuDtos;
 import com.ael.algoryqrservice.qrservice.integration.service.ubereatsmenu.UberEatsMenuConnectionService;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/integrations/ubereats-menu")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.QR_MENU_OWNER)
+@RequiresFeature(FeatureKey.QR_MENU)
 public class UberEatsMenuConnectionController {
 
     private final UberEatsMenuConnectionService connectionService;

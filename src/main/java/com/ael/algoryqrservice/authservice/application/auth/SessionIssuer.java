@@ -172,13 +172,12 @@ public class SessionIssuer {
                 .subject(subject.loginIdentifier())
                 .claim("subjectType", subject.subjectType())
                 .claim("roles", List.of("ROLE_" + subject.roleCode()))
-                .claim("scopes", access.scopes())
                 .claim("provider", subject.provider())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + jwtProperties.getAccessExpirationMs()));
         if (access.snapshot().present()) {
-            builder.claim("activePackage", access.snapshot().activePackage());
-            builder.claim("products", access.snapshot().products());
+            // Identity, role and the entitlement version only: the plan is read live, never from the token.
+            builder.claim("ent_ver", access.snapshot().entitlementVersion());
         }
         if (AuthSubject.TYPE_MERCHANT.equals(subject.subjectType())) {
             Long merchantId = subject.merchantId() != null ? subject.merchantId() : subject.subjectId();
@@ -204,7 +203,7 @@ public class SessionIssuer {
 
     private TokenAccess tokenAccess(AuthSubject subject) {
         LoginPackageClaims.Snapshot snapshot = loginPackageClaims.resolve(subject);
-        return new TokenAccess(mergeScopes(scopesOf(subject), snapshot.productScopes()), snapshot);
+        return new TokenAccess(mergeScopes(scopesOf(subject), List.of()), snapshot);
     }
 
     private static List<String> scopesOf(AuthSubject subject) {

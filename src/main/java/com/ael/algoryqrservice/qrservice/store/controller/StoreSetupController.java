@@ -1,7 +1,7 @@
 package com.ael.algoryqrservice.qrservice.store.controller;
 
-import com.ael.algoryqrservice.qrservice.catalog.CatalogScopes;
-import com.ael.algoryqrservice.qrservice.security.RequiresProductScope;
+import com.ael.algoryqrservice.qrservice.security.FeatureKey;
+import com.ael.algoryqrservice.qrservice.security.RequiresFeature;
 import com.ael.algoryqrservice.qrservice.store.model.dto.StoreDtos;
 import com.ael.algoryqrservice.qrservice.store.service.MerchantSetupService;
 import jakarta.validation.Valid;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/store/setup")
 @RequiredArgsConstructor
-@RequiresProductScope(CatalogScopes.ONLINE_ORDER_OWNER)
+@RequiresFeature(FeatureKey.ONLINE_ORDER)
 public class StoreSetupController {
 
     private final MerchantSetupService merchantSetupService;
