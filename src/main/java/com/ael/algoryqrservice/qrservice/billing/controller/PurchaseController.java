@@ -35,6 +35,7 @@ public class PurchaseController {
     private final PurchaseLogService purchaseLogService;
     private final ExternalPackageViewService externalPackageView;
     private final SecurityUtils securityUtils;
+    private final com.ael.algoryqrservice.qrservice.billing.admin.FeatureLabels featureLabels;
 
     @PostMapping
     public ResponseEntity<PurchaseInitiateResponse> purchase(
@@ -84,7 +85,7 @@ public class PurchaseController {
     @GetMapping("/my/entitlements")
     public ResponseEntity<List<UserEntitlementResponse>> getMyEntitlements() {
         Long merchantId = securityUtils.getCurrentMerchantId();
-        return ResponseEntity.ok(externalPackageView.entitlements(merchantId).orElseGet(List::of));
+        return ResponseEntity.ok(featureLabels.name(externalPackageView.entitlements(merchantId).orElseGet(List::of)));
     }
 
     @GetMapping("/my/logs")

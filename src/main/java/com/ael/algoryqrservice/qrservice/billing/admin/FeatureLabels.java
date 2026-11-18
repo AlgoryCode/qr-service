@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.billing.admin;
 
+import com.ael.algoryqrservice.qrservice.billing.dto.UserEntitlementResponse;
 import com.ael.algoryqrservice.qrservice.model.Feature;
 import com.ael.algoryqrservice.qrservice.model.PlanPackageItem;
 import com.ael.algoryqrservice.qrservice.repository.FeatureRepository;
@@ -29,6 +30,28 @@ public class FeatureLabels {
                 .map(item -> label(item, features.get(item.getProduct().getFeatureCode())))
                 .distinct()
                 .toList();
+    }
+
+    /** Replaces feature codes on a merchant's entitlements with the catalog's display name and description. */
+    public List<UserEntitlementResponse> name(List<UserEntitlementResponse> entitlements) {
+        if (entitlements == null || entitlements.isEmpty()) {
+            return entitlements;
+        }
+        Map<String, Feature> features = featureRepository.findAll().stream()
+                .collect(Collectors.toMap(Feature::getKey, Function.identity()));
+        entitlements.forEach(entitlement -> {
+            Feature feature = entitlement.getProductCode() == null ? null : features.get(entitlement.getProductCode());
+            if (feature == null) {
+                return;
+            }
+            entitlement.setProductName(feature.getName());
+            entitlement.setProductDescription(blankToNull(feature.getDescription()));
+        });
+        return entitlements;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static String label(PlanPackageItem item, Feature feature) {

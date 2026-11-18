@@ -105,6 +105,7 @@ public class PurchaseService {
     private final com.ael.algoryqrservice.qrservice.billing.invoice.InvoiceService invoiceService;
     private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
     private final DuplicatePackageRefunder duplicatePackageRefunder;
+    private final com.ael.algoryqrservice.qrservice.billing.admin.FeatureLabels featureLabels;
 
     /** Freezes the cart's module lines onto the purchase so pricing and grants stay reproducible. */
     private List<PurchaseItem> persistModuleLines(Purchase purchase, CartPricingService.CartPricing pricing) {
@@ -853,6 +854,7 @@ public class PurchaseService {
         purchaseExpiryService.expireDueForMerchant(merchantId);
         SubscriptionOverviewResponse overview = externalPackageView.overview(merchantId)
                 .orElseThrow(() -> new FulfillmentUnavailableException("Paket bilgisi şu an alınamıyor"));
+        featureLabels.name(overview.getEntitlements());
         if (overview.getActivePackage() != null) {
             overview.getActivePackage().setProducts(overview.getEntitlements());
         }
