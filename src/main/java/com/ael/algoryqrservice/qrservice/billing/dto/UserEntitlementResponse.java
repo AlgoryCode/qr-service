@@ -14,6 +14,8 @@ public class UserEntitlementResponse {
     private Long productId;
     private String productCode;
     private String productName;
+    /** What the feature gives, in the merchant's words; null when the catalog has none. */
+    private String productDescription;
     private Long purchaseId;
     private Integer totalQuantity;
     private Integer remainingQuantity;

@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.controller;
 
+import com.ael.algoryqrservice.qrservice.billing.admin.FeatureLabels;
+import com.ael.algoryqrservice.qrservice.repository.FeatureRepository;
 import com.ael.algoryqrservice.qrservice.billing.controller.PurchaseController;
 
 import com.ael.algoryqrservice.qrservice.model.User;
@@ -45,7 +47,8 @@ class PurchaseControllerCouponTest {
                 mock(AddonPurchaseService.class),
                 mock(PurchaseLogService.class),
                 mock(ExternalPackageViewService.class),
-                securityUtils
+                securityUtils,
+                new FeatureLabels(mock(FeatureRepository.class))
         );
         MockHttpServletRequest http = new MockHttpServletRequest();
         http.setRemoteAddr("127.0.0.1");
@@ -73,7 +76,8 @@ class PurchaseControllerCouponTest {
                 mock(AddonPurchaseService.class),
                 mock(PurchaseLogService.class),
                 externalPackageView,
-                securityUtils
+                securityUtils,
+                new FeatureLabels(mock(FeatureRepository.class))
         );
 
         ResponseEntity<List<UserEntitlementResponse>> response = controller.getMyEntitlements();
