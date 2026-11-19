@@ -129,6 +129,19 @@ class AuthorizationMatrixTest {
                 .isEqualTo(403);
     }
 
+    @Test
+    void consoleRental_withStaffToken_isForbidden() throws Exception {
+        assertThat(status(get("/api/v1/console/branches/{id}/sessions/active", 3L), staffToken(OWN_MERCHANT)))
+                .isEqualTo(403);
+        assertThat(status(post("/api/v1/console/sessions/{id}/finish", 5L),
+                staffToken(OWN_MERCHANT))).isEqualTo(403);
+    }
+
+    @Test
+    void consoleRental_withoutToken_isDenied() throws Exception {
+        assertDenied(status(get("/api/v1/console/branches/{id}/consoles", 3L), null));
+    }
+
     // ---- token validity ------------------------------------------------------------------------
 
     @Test
