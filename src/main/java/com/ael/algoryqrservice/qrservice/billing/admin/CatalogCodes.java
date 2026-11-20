@@ -30,7 +30,7 @@ public final class CatalogCodes {
             new Option(CatalogProducts.WAITER_PANEL, "Garson paneli"),
             new Option(CatalogProducts.AI_MENU_IMPORT, "Yapay zekâ ile menü aktarma"),
             new Option(CatalogProducts.ONLINE_ORDER, "Online sipariş"),
-            new Option(CatalogProducts.CONSOLE_RENTAL, "Konsol takip")
+            new Option(CatalogProducts.CONSOLE_RENTAL, "Oyun & cihaz takip")
     );
 
     public static final List<Option> SCOPES = List.of(
@@ -45,7 +45,7 @@ public final class CatalogCodes {
             new Option(CatalogScopes.WAITER_PANEL_OWNER, "Garson paneli"),
             new Option(CatalogScopes.AI_MENU_IMPORT_OWNER, "Yapay zekâ ile menü aktarma"),
             new Option(CatalogScopes.ONLINE_ORDER_OWNER, "Online sipariş"),
-            new Option(CatalogScopes.CONSOLE_RENTAL_OWNER, "Konsol takip")
+            new Option(CatalogScopes.CONSOLE_RENTAL_OWNER, "Oyun & cihaz takip")
     );
 
     public static final Response ALL = new Response(FEATURES, SCOPES);

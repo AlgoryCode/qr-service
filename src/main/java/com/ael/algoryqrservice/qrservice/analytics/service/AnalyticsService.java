@@ -841,7 +841,7 @@ public class AnalyticsService {
         // Only merchants that rent consoles get the channel, so the others' reports stay as they were.
         boolean showConsole = consoleStats.connected();
         if (showConsole) {
-            channels.add(platformShare(CHANNEL_CONSOLE, "Konsol", consoleStats, gross));
+            channels.add(platformShare(CHANNEL_CONSOLE, "Oyun & cihaz", consoleStats, gross));
         }
 
         List<AnalyticsDtos.ChannelDailyPoint> channelDaily = new ArrayList<>();

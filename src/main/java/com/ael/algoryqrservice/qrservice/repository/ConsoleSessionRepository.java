@@ -64,4 +64,17 @@ public interface ConsoleSessionRepository extends JpaRepository<ConsoleSession, 
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );
+
+    @Query("""
+            select s from ConsoleSession s
+            where s.branchId = :branchId and s.deleted = false and s.endedAt is not null
+              and s.endedAt between :from and :to
+            """)
+    List<ConsoleSession> findClosedAtBranch(
+            @Param("branchId") Long branchId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    Optional<ConsoleSession> findFirstByConsoleIdAndEndedAtIsNullAndDeletedFalse(Long consoleId);
 }

@@ -82,6 +82,10 @@ public class UserAccountingEntry {
     @Column(name = "source_console_session_id")
     private Long sourceConsoleSessionId;
 
+    /** For DEVICE_SALE: "MEMBERSHIP:{id}" or "TOURNAMENT:{id}"; unique, so a sale is booked once. */
+    @Column(name = "source_device_ref", length = 40)
+    private String sourceDeviceRef;
+
     @Column(name = "created_by_staff_id")
     private Long createdByStaffId;
 

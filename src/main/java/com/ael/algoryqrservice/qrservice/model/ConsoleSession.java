@@ -1,5 +1,8 @@
 package com.ael.algoryqrservice.qrservice.model;
 
+import com.ael.algoryqrservice.qrservice.console.domain.DevicePaymentMethod;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,8 +19,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * One rental of a console. Open while {@code endedAt} is null; the hourly rate is fixed when it starts,
- * and duration and amount are written when it is finished.
+ * One rental. Open while {@code endedAt} is null. The play time lives in {@link DeviceSessionSegment}s (pausing
+ * and switching device split it); {@code consoleId} and {@code hourlyRate} are the current device and rate.
+ * {@code amount} is what was charged: time + items - discount.
  */
 @Entity
 @Table(name = "tbl_console_session")
@@ -62,6 +66,93 @@ public class ConsoleSession extends QrBaseModel {
 
     @Column(precision = 12, scale = 2)
     private BigDecimal amount;
+
+    @Column(name = "controller_count", nullable = false)
+    @lombok.Builder.Default
+    private int controllerCount = 2;
+
+    /** Time the customer asked for; the screen counts down and warns when it runs out. Null = open-ended. */
+    @Column(name = "planned_minutes")
+    private Integer plannedMinutes;
+
+    /** Set while the session is paused; paused time is not charged. */
+    @Column(name = "paused_at")
+    private LocalDateTime pausedAt;
+
+    @Column(name = "customer_id")
+    private Long customerId;
+
+    @Column(name = "reservation_id")
+    private Long reservationId;
+
+    @Column(name = "time_amount", precision = 12, scale = 2)
+    private BigDecimal timeAmount;
+
+    @Column(name = "items_amount", precision = 12, scale = 2)
+    private BigDecimal itemsAmount;
+
+    @Column(name = "gross_amount", precision = 12, scale = 2)
+    private BigDecimal grossAmount;
+
+    /** Everything taken off the gross: membership and loyalty minutes, level discount, bonus balance, manual discount. */
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "loyalty_minutes_used")
+    private Integer loyaltyMinutesUsed;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 16)
+    private DevicePaymentMethod paymentMethod;
+
+    @Column(name = "opened_by_staff_id")
+    private Long openedByStaffId;
+
+    @Column(name = "closed_by_staff_id")
+    private Long closedByStaffId;
+
+    @Column(name = "package_id")
+    private Long packageId;
+
+    @Column(name = "package_name", length = 80)
+    private String packageName;
+
+    /** Minutes covered by {@link #packagePrice}; time beyond is charged at the normal rate. */
+    @Column(name = "package_minutes")
+    private Integer packageMinutes;
+
+    @Column(name = "package_price", precision = 12, scale = 2)
+    private BigDecimal packagePrice;
+
+    @Column(name = "game_id")
+    private Long gameId;
+
+    @Column(name = "game_name", length = 120)
+    private String gameName;
+
+    @Column(name = "membership_id")
+    private Long membershipId;
+
+    @Column(name = "membership_minutes_used")
+    private Integer membershipMinutesUsed;
+
+    @Column(name = "tier_discount_amount", precision = 12, scale = 2)
+    private BigDecimal tierDiscountAmount;
+
+    /** Gift/referral balance spent on this session (part of {@link #discountAmount}). */
+    @Column(name = "bonus_used", precision = 12, scale = 2)
+    private BigDecimal bonusUsed;
+
+    /** More time the customer asked for from the device's QR page, waiting for staff. */
+    @Column(name = "extension_request_minutes")
+    private Integer extensionRequestMinutes;
+
+    @Column(name = "extension_requested_at")
+    private LocalDateTime extensionRequestedAt;
+
+    public boolean isPaused() {
+        return endedAt == null && pausedAt != null;
+    }
 
     public boolean isActive() {
         return endedAt == null;

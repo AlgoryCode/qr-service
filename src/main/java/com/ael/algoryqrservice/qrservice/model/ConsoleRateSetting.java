@@ -14,7 +14,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 
-/** A branch's default hourly console rate. */
+/** A branch's device rental settings: default rates, minimum and rounding, loyalty rule. */
 @Entity
 @Table(name = "tbl_console_rate_setting")
 @Data
@@ -37,4 +37,23 @@ public class ConsoleRateSetting extends QrBaseModel {
 
     @Column(name = "default_hourly_rate", precision = 12, scale = 2)
     private BigDecimal defaultHourlyRate;
+
+    @Column(name = "default_multi_hourly_rate", precision = 12, scale = 2)
+    private BigDecimal defaultMultiHourlyRate;
+
+    /** Shortest time charged; 0 charges what was played. */
+    @Column(name = "minimum_minutes", nullable = false)
+    private int minimumMinutes;
+
+    /** Played minutes are rounded up to a multiple of this; 1 charges by the minute. */
+    @Column(name = "rounding_minutes", nullable = false)
+    @lombok.Builder.Default
+    private int roundingMinutes = 1;
+
+    /** Every this many paid minutes earn {@link #loyaltyRewardMinutes} free minutes; null turns loyalty off. */
+    @Column(name = "loyalty_every_minutes")
+    private Integer loyaltyEveryMinutes;
+
+    @Column(name = "loyalty_reward_minutes")
+    private Integer loyaltyRewardMinutes;
 }

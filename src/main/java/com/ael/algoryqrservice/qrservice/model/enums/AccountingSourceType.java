@@ -5,5 +5,7 @@ public enum AccountingSourceType {
     BILL_SALE,
     BILL_TIP,
     ORDER_SALE,
-    CONSOLE_SESSION
+    CONSOLE_SESSION,
+    /** Membership sale or tournament entry fees; see {@code sourceDeviceRef}. */
+    DEVICE_SALE
 }

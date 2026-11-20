@@ -29,7 +29,8 @@ public final class UserAccountingEntrySpecifications {
             predicates.add(root.get("sourceType").in(
                     AccountingSourceType.MANUAL,
                     AccountingSourceType.BILL_SALE,
-                    AccountingSourceType.CONSOLE_SESSION
+                    AccountingSourceType.CONSOLE_SESSION,
+                    AccountingSourceType.DEVICE_SALE
             ));
             if (entryTypes != null && !entryTypes.isEmpty()) {
                 predicates.add(root.get("entryType").in(entryTypes));
