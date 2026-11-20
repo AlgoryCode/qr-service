@@ -747,7 +747,7 @@ class AnalyticsServiceTest {
                 .filteredOn(channel -> "CONSOLE".equals(channel.code()))
                 .singleElement()
                 .satisfies(channel -> {
-                    assertThat(channel.label()).isEqualTo("Konsol");
+                    assertThat(channel.label()).isEqualTo("Oyun & cihaz");
                     assertThat(channel.revenue()).isEqualByComparingTo("165.50");
                     assertThat(channel.orderCount()).isEqualTo(2L);
                     assertThat(channel.connected()).isTrue();

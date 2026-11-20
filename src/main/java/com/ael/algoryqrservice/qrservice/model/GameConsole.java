@@ -1,5 +1,8 @@
 package com.ael.algoryqrservice.qrservice.model;
 
+import com.ael.algoryqrservice.qrservice.console.domain.DeviceType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -14,7 +17,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 
-/** A game console (or table) a branch rents by the hour. A null rate falls back to the branch default. */
+/** A rentable device (console, PC, VR, table...). A null rate falls back to the type rate, then the branch default. */
 @Entity
 @Table(name = "tbl_game_console")
 @Data
@@ -40,4 +43,13 @@ public class GameConsole extends QrBaseModel {
 
     @Column(name = "hourly_rate", precision = 12, scale = 2)
     private BigDecimal hourlyRate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "device_type", nullable = false, length = 20)
+    @lombok.Builder.Default
+    private DeviceType deviceType = DeviceType.PLAYSTATION;
+
+    /** Rate for a 4-controller session; null falls back to the type rate, then the branch default. */
+    @Column(name = "multi_hourly_rate", precision = 12, scale = 2)
+    private BigDecimal multiHourlyRate;
 }

@@ -1,5 +1,8 @@
 package com.ael.algoryqrservice.qrservice.model;
 
+import com.ael.algoryqrservice.qrservice.console.domain.DevicePaymentMethod;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,8 +19,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * One rental of a console. Open while {@code endedAt} is null; the hourly rate is fixed when it starts,
- * and duration and amount are written when it is finished.
+ * One rental. Open while {@code endedAt} is null. The play time lives in {@link DeviceSessionSegment}s (pausing
+ * and switching device split it); {@code consoleId} and {@code hourlyRate} are the current device and rate.
+ * {@code amount} is what was charged: time + items - discount.
  */
 @Entity
 @Table(name = "tbl_console_session")
@@ -62,6 +66,54 @@ public class ConsoleSession extends QrBaseModel {
 
     @Column(precision = 12, scale = 2)
     private BigDecimal amount;
+
+    @Column(name = "controller_count", nullable = false)
+    @lombok.Builder.Default
+    private int controllerCount = 2;
+
+    /** Time the customer asked for; the screen counts down and warns when it runs out. Null = open-ended. */
+    @Column(name = "planned_minutes")
+    private Integer plannedMinutes;
+
+    /** Set while the session is paused; paused time is not charged. */
+    @Column(name = "paused_at")
+    private LocalDateTime pausedAt;
+
+    @Column(name = "customer_id")
+    private Long customerId;
+
+    @Column(name = "reservation_id")
+    private Long reservationId;
+
+    @Column(name = "time_amount", precision = 12, scale = 2)
+    private BigDecimal timeAmount;
+
+    @Column(name = "items_amount", precision = 12, scale = 2)
+    private BigDecimal itemsAmount;
+
+    @Column(name = "gross_amount", precision = 12, scale = 2)
+    private BigDecimal grossAmount;
+
+    /** Manual discount plus the value of the loyalty minutes used. */
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "loyalty_minutes_used")
+    private Integer loyaltyMinutesUsed;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 16)
+    private DevicePaymentMethod paymentMethod;
+
+    @Column(name = "opened_by_staff_id")
+    private Long openedByStaffId;
+
+    @Column(name = "closed_by_staff_id")
+    private Long closedByStaffId;
+
+    public boolean isPaused() {
+        return endedAt == null && pausedAt != null;
+    }
 
     public boolean isActive() {
         return endedAt == null;

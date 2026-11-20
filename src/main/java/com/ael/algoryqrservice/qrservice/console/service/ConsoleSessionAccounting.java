@@ -19,7 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** Books a finished console session as income ("GELIR") in the merchant's accounting, once per session. */
+/** Books a finished device session (time, items, less discount) as income ("GELIR") in the merchant's accounting, once per session. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -52,12 +52,12 @@ public class ConsoleSessionAccounting {
         }
         String consoleName = consoleRepository.findById(session.getConsoleId())
                 .map(console -> console.getName())
-                .orElse("Konsol");
+                .orElse("Cihaz");
         LocalDateTime now = AppTime.nowLocal();
         UserAccountingEntry entry = UserAccountingEntry.builder()
                 .merchantId(session.getMerchantId())
                 .entryType(AccountingEntryType.GELIR)
-                .title(truncate("Konsol - " + consoleName, 200))
+                .title(truncate("Cihaz kiralama - " + consoleName, 200))
                 .amount(session.getAmount())
                 .occurredAt(session.getEndedAt())
                 .note(truncate(note(session), 500))
@@ -78,9 +78,19 @@ public class ConsoleSessionAccounting {
     static String note(ConsoleSession session) {
         StringBuilder note = new StringBuilder()
                 .append(session.getDurationMinutes() == null ? 0 : session.getDurationMinutes())
-                .append(" dk × ")
-                .append(plain(session.getHourlyRate()))
-                .append(" TL/saat");
+                .append(" dk");
+        if (session.getHourlyRate() != null) {
+            note.append(" × ").append(plain(session.getHourlyRate())).append(" TL/saat");
+        }
+        if (session.getItemsAmount() != null && session.getItemsAmount().signum() > 0) {
+            note.append(" · Ürünler: ").append(plain(session.getItemsAmount())).append(" TL");
+        }
+        if (session.getDiscountAmount() != null && session.getDiscountAmount().signum() > 0) {
+            note.append(" · İndirim: ").append(plain(session.getDiscountAmount())).append(" TL");
+        }
+        if (session.getPaymentMethod() != null) {
+            note.append(" · Ödeme: ").append(session.getPaymentMethod().label());
+        }
         if (session.getCustomerName() != null && !session.getCustomerName().isBlank()) {
             note.append(" · Müşteri: ").append(session.getCustomerName().trim());
         }

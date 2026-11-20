@@ -84,7 +84,7 @@ class ConsoleSessionAccountingTest {
         assertThat(entry.getSourceConsoleSessionId()).isEqualTo(500L);
         assertThat(entry.getAmount()).isEqualByComparingTo("192.00");
         assertThat(entry.getOccurredAt()).isEqualTo(ENDED);
-        assertThat(entry.getTitle()).isEqualTo("Konsol - PS5 - 1");
+        assertThat(entry.getTitle()).isEqualTo("Cihaz kiralama - PS5 - 1");
         assertThat(entry.getNote()).isEqualTo("96 dk × 120 TL/saat · Müşteri: Ahmet");
     }
 
@@ -117,5 +117,21 @@ class ConsoleSessionAccountingTest {
         when(accountingRepository.save(any())).thenThrow(new DataIntegrityViolationException("dup"));
 
         assertThatCode(() -> accounting.record(500L)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void note_listsItemsDiscountAndPayment() {
+        ConsoleSession session = finished("230.00");
+        session.setItemsAmount(new BigDecimal("48.00"));
+        session.setDiscountAmount(new BigDecimal("10.00"));
+        session.setPaymentMethod(com.ael.algoryqrservice.qrservice.console.domain.DevicePaymentMethod.CARD);
+
+        when(sessionRepository.findById(500L)).thenReturn(Optional.of(session));
+
+        accounting.record(500L);
+
+        ArgumentCaptor<UserAccountingEntry> saved = ArgumentCaptor.forClass(UserAccountingEntry.class);
+        verify(accountingRepository).save(saved.capture());
+        assertThat(saved.getValue().getNote()).isEqualTo("96 dk × 120 TL/saat · Ürünler: 48 TL · İndirim: 10 TL · Ödeme: Kart · Müşteri: Ahmet");
     }
 }

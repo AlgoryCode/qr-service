@@ -140,6 +140,14 @@ class AuthorizationMatrixTest {
     @Test
     void consoleRental_withoutToken_isDenied() throws Exception {
         assertDenied(status(get("/api/v1/console/branches/{id}/consoles", 3L), null));
+        assertDenied(status(get("/api/v1/staff/devices/sessions/active"), null));
+    }
+
+    @Test
+    void deviceSettings_withStaffToken_isForbidden() throws Exception {
+        assertThat(status(get("/api/v1/console/branches/{id}/tariffs", 3L), staffToken(OWN_MERCHANT))).isEqualTo(403);
+        assertThat(status(get("/api/v1/console/branches/{id}/report", 3L), staffToken(OWN_MERCHANT))).isEqualTo(403);
+        assertThat(status(post("/api/v1/console/customers/{id}/adjust", 4L), staffToken(OWN_MERCHANT))).isEqualTo(403);
     }
 
     // ---- token validity ------------------------------------------------------------------------
