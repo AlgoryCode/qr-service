@@ -7,12 +7,14 @@ import com.ael.algoryqrservice.qrservice.console.domain.DeviceType;
 import com.ael.algoryqrservice.qrservice.console.dto.ConsoleDtos;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.ConsoleRateSetting;
+import com.ael.algoryqrservice.qrservice.model.DeviceGame;
 import com.ael.algoryqrservice.qrservice.model.DeviceReservation;
 import com.ael.algoryqrservice.qrservice.model.DeviceTariffRule;
 import com.ael.algoryqrservice.qrservice.model.DeviceTypeRate;
 import com.ael.algoryqrservice.qrservice.model.GameConsole;
 import com.ael.algoryqrservice.qrservice.repository.ConsoleRateSettingRepository;
 import com.ael.algoryqrservice.qrservice.repository.ConsoleSessionRepository;
+import com.ael.algoryqrservice.qrservice.repository.DeviceGameRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceReservationRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceTariffRuleRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceTypeRateRepository;
@@ -54,6 +56,7 @@ public class ConsoleCatalogService {
     private final DeviceTariffRuleRepository tariffRepository;
     private final DeviceReservationRepository reservationRepository;
     private final ConsoleAccess access;
+    private final DeviceGameRepository gameRepository;
 
     // ---- Devices -----------------------------------------------------------------------------------------------
 
@@ -73,11 +76,13 @@ public class ConsoleCatalogService {
                 next.putIfAbsent(r.getConsoleId(), r);
             }
         }
+        Map<Long, List<ConsoleDtos.GameRef>> games = gamesByConsole(consoles.stream().map(GameConsole::getId).toList());
         return consoles.stream()
                 .map(console -> toResponse(console, rates,
                         Optional.ofNullable(next.get(console.getId()))
                                 .map(r -> DeviceMappers.reservation(r, names.get(r.getConsoleId())))
-                                .orElse(null)))
+                                .orElse(null),
+                        games.getOrDefault(console.getId(), List.of())))
                 .toList();
     }
 
@@ -91,9 +96,12 @@ public class ConsoleCatalogService {
                 .deviceType(request.deviceType() == null ? DeviceType.PLAYSTATION : request.deviceType())
                 .hourlyRate(ConsoleRentalPricing.scaleRate(request.hourlyRate()))
                 .multiHourlyRate(ConsoleRentalPricing.scaleRate(request.multiHourlyRate()))
+                .purchaseCost(ConsoleRentalPricing.scaleRate(request.purchaseCost()))
+                .purchasedOn(request.purchasedOn())
+                .publicToken(DeviceMappers.newToken(24))
                 .deleted(false)
                 .build());
-        return toResponse(saved, rateContext(saved.getBranchId(), saved.getMerchantId()), null);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -105,8 +113,52 @@ public class ConsoleCatalogService {
         }
         console.setHourlyRate(ConsoleRentalPricing.scaleRate(request.hourlyRate()));
         console.setMultiHourlyRate(ConsoleRentalPricing.scaleRate(request.multiHourlyRate()));
-        GameConsole saved = consoleRepository.save(console);
-        return toResponse(saved, rateContext(saved.getBranchId(), saved.getMerchantId()), null);
+        console.setPurchaseCost(ConsoleRentalPricing.scaleRate(request.purchaseCost()));
+        console.setPurchasedOn(request.purchasedOn());
+        return toResponse(consoleRepository.save(console));
+    }
+
+    /** A new QR key; the old QR stops working. */
+    @Transactional
+    public ConsoleDtos.ConsoleResponse rotateToken(Long consoleId) {
+        GameConsole console = requireOwned(consoleId);
+        console.setPublicToken(DeviceMappers.newToken(24));
+        return toResponse(consoleRepository.save(console));
+    }
+
+    /** Refuses a device that is out of service. */
+    public static void requireInService(GameConsole console) {
+        if (console.isMaintenance()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cihaz bakımda; önce bakımı bitirin");
+        }
+    }
+
+    public ConsoleDtos.ConsoleResponse toResponse(GameConsole console) {
+        return toResponse(console, rateContext(console.getBranchId(), console.getMerchantId()), null,
+                gamesByConsole(List.of(console.getId())).getOrDefault(console.getId(), List.of()));
+    }
+
+    public Map<Long, List<ConsoleDtos.GameRef>> gamesByConsole(List<Long> consoleIds) {
+        if (consoleIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> links = gameRepository.findLinks(consoleIds);
+        if (links.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, DeviceGame> games = new HashMap<>();
+        gameRepository.findByIdIn(links.stream().map(row -> ((Number) row[1]).longValue()).distinct().toList())
+                .stream().filter(g -> !g.isDeleted()).forEach(g -> games.put(g.getId(), g));
+        Map<Long, List<ConsoleDtos.GameRef>> result = new HashMap<>();
+        for (Object[] row : links) {
+            DeviceGame game = games.get(((Number) row[1]).longValue());
+            if (game != null) {
+                result.computeIfAbsent(((Number) row[0]).longValue(), id -> new ArrayList<>())
+                        .add(new ConsoleDtos.GameRef(game.getId(), game.getName()));
+            }
+        }
+        result.values().forEach(list -> list.sort(java.util.Comparator.comparing(ConsoleDtos.GameRef::name)));
+        return result;
     }
 
     @Transactional
@@ -346,7 +398,8 @@ public class ConsoleCatalogService {
     private ConsoleDtos.ConsoleResponse toResponse(
             GameConsole console,
             RateContext rates,
-            ConsoleDtos.ReservationResponse nextReservation
+            ConsoleDtos.ReservationResponse nextReservation,
+            List<ConsoleDtos.GameRef> games
     ) {
         BigDecimal normal = rates.normalRate(console);
         BigDecimal multi = rates.multiRate(console);
@@ -360,7 +413,14 @@ public class ConsoleCatalogService {
                 normal,
                 multi != null ? multi : normal,
                 sessionRepository.existsByConsoleIdAndEndedAtIsNullAndDeletedFalse(console.getId()),
-                nextReservation
+                nextReservation,
+                console.getPublicToken(),
+                console.isMaintenance(),
+                console.getMaintenanceNote(),
+                console.getMaintenanceSince(),
+                console.getPurchaseCost(),
+                console.getPurchasedOn(),
+                games
         );
     }
 }

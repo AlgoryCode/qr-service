@@ -94,7 +94,7 @@ public class ConsoleSession extends QrBaseModel {
     @Column(name = "gross_amount", precision = 12, scale = 2)
     private BigDecimal grossAmount;
 
-    /** Manual discount plus the value of the loyalty minutes used. */
+    /** Everything taken off the gross: membership and loyalty minutes, level discount, bonus balance, manual discount. */
     @Column(name = "discount_amount", precision = 12, scale = 2)
     private BigDecimal discountAmount;
 
@@ -110,6 +110,45 @@ public class ConsoleSession extends QrBaseModel {
 
     @Column(name = "closed_by_staff_id")
     private Long closedByStaffId;
+
+    @Column(name = "package_id")
+    private Long packageId;
+
+    @Column(name = "package_name", length = 80)
+    private String packageName;
+
+    /** Minutes covered by {@link #packagePrice}; time beyond is charged at the normal rate. */
+    @Column(name = "package_minutes")
+    private Integer packageMinutes;
+
+    @Column(name = "package_price", precision = 12, scale = 2)
+    private BigDecimal packagePrice;
+
+    @Column(name = "game_id")
+    private Long gameId;
+
+    @Column(name = "game_name", length = 120)
+    private String gameName;
+
+    @Column(name = "membership_id")
+    private Long membershipId;
+
+    @Column(name = "membership_minutes_used")
+    private Integer membershipMinutesUsed;
+
+    @Column(name = "tier_discount_amount", precision = 12, scale = 2)
+    private BigDecimal tierDiscountAmount;
+
+    /** Gift/referral balance spent on this session (part of {@link #discountAmount}). */
+    @Column(name = "bonus_used", precision = 12, scale = 2)
+    private BigDecimal bonusUsed;
+
+    /** More time the customer asked for from the device's QR page, waiting for staff. */
+    @Column(name = "extension_request_minutes")
+    private Integer extensionRequestMinutes;
+
+    @Column(name = "extension_requested_at")
+    private LocalDateTime extensionRequestedAt;
 
     public boolean isPaused() {
         return endedAt == null && pausedAt != null;

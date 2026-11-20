@@ -27,4 +27,6 @@ public interface GameConsoleRepository extends JpaRepository<GameConsole, Long> 
     boolean existsByMerchantIdAndDeletedFalse(Long merchantId);
 
     boolean existsByMerchantIdAndBranchIdAndDeletedFalse(Long merchantId, Long branchId);
+
+    Optional<GameConsole> findByPublicTokenAndDeletedFalse(String publicToken);
 }

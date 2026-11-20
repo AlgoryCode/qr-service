@@ -7,6 +7,7 @@ import com.ael.algoryqrservice.qrservice.model.DeviceCustomer;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomerTxn;
 import com.ael.algoryqrservice.qrservice.repository.DeviceCustomerRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceCustomerTxnRepository;
+import com.ael.algoryqrservice.qrservice.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,6 +31,7 @@ public class DeviceCustomerService {
     private final DeviceCustomerRepository customerRepository;
     private final DeviceCustomerTxnRepository txnRepository;
     private final ConsoleAccess access;
+    private final DeviceProgramService programService;
 
     @Transactional(readOnly = true)
     public ConsoleDtos.CustomerPageResponse search(String query, int page, int size) {
@@ -42,7 +44,7 @@ public class DeviceCustomerService {
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
         );
         return new ConsoleDtos.CustomerPageResponse(
-                result.getContent().stream().map(DeviceMappers::customer).toList(),
+                programService.customers(result.getContent()),
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
@@ -53,7 +55,7 @@ public class DeviceCustomerService {
 
     @Transactional(readOnly = true)
     public ConsoleDtos.CustomerResponse get(Long customerId) {
-        return DeviceMappers.customer(requireOwned(customerId));
+        return programService.customer(requireOwned(customerId));
     }
 
     @Transactional
@@ -63,6 +65,13 @@ public class DeviceCustomerService {
         if (phone != null && customerRepository.existsByMerchantIdAndPhoneAndDeletedFalse(merchantId, phone)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu telefonla kayıtlı bir müşteri var");
         }
+        DeviceCustomer referrer = null;
+        String code = DeviceMappers.blankToNull(request.referralCode());
+        if (code != null) {
+            referrer = customerRepository
+                    .findByMerchantIdAndReferralCodeAndDeletedFalse(merchantId, code.toUpperCase(Locale.ROOT))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Davet kodu bulunamadı"));
+        }
         DeviceCustomer saved = customerRepository.save(DeviceCustomer.builder()
                 .merchantId(merchantId)
                 .name(request.name().trim())
@@ -70,9 +79,18 @@ public class DeviceCustomerService {
                 .note(DeviceMappers.blankToNull(request.note()))
                 .balance(BigDecimal.ZERO.setScale(2))
                 .totalSpent(BigDecimal.ZERO.setScale(2))
+                .referralCode(uniqueReferralCode(merchantId))
+                .referredById(referrer == null ? null : referrer.getId())
                 .deleted(false)
                 .build());
-        return DeviceMappers.customer(saved);
+        BigDecimal welcome = referrer == null
+                ? null
+                : programService.setting(merchantId).map(s -> s.getReferralWelcomeAmount()).orElse(null);
+        if (welcome != null && welcome.signum() > 0) {
+            addBonus(saved, welcome, DeviceCustomerTxnType.REFERRAL, "Hoş geldin hediyesi (" + referrer.getName() + " davet etti)", null);
+            saved = customerRepository.save(saved);
+        }
+        return programService.customer(saved);
     }
 
     @Transactional
@@ -86,7 +104,7 @@ public class DeviceCustomerService {
         customer.setName(request.name().trim());
         customer.setPhone(phone);
         customer.setNote(DeviceMappers.blankToNull(request.note()));
-        return DeviceMappers.customer(customerRepository.save(customer));
+        return programService.customer(customerRepository.save(customer));
     }
 
     @Transactional
@@ -112,12 +130,14 @@ public class DeviceCustomerService {
                 .merchantId(customer.getMerchantId())
                 .customerId(customer.getId())
                 .txnType(DeviceCustomerTxnType.TOPUP)
+                .branchId(branchOf(request.branchId()))
+                .staffId(access.staffId())
                 .amount(amount)
                 .paymentMethod(method)
                 .note(DeviceMappers.blankToNull(request.note()))
                 .deleted(false)
                 .build());
-        return DeviceMappers.customer(customerRepository.save(customer));
+        return programService.customer(customerRepository.save(customer));
     }
 
     @Transactional
@@ -148,7 +168,63 @@ public class DeviceCustomerService {
                 .note(note == null ? null : note.substring(0, Math.min(note.length(), 255)))
                 .deleted(false)
                 .build());
-        return DeviceMappers.customer(customerRepository.save(customer));
+        return programService.customer(customerRepository.save(customer));
+    }
+
+    /** Gift money on the bonus balance; spent as a discount, never income. */
+    @Transactional
+    public ConsoleDtos.CustomerResponse gift(Long customerId, ConsoleDtos.GiftRequest request) {
+        DeviceCustomer customer = lockOwned(customerId);
+        String note = DeviceMappers.blankToNull(request.note());
+        addBonus(customer, request.amount().setScale(2, RoundingMode.HALF_UP), DeviceCustomerTxnType.GIFT,
+                note == null ? "Hediye bakiye" : note, null);
+        return programService.customer(customerRepository.save(customer));
+    }
+
+    /** Best customers, and good customers who have not come for {@code lapsedDays}. */
+    @Transactional(readOnly = true)
+    public ConsoleDtos.CustomerInsightsResponse insights(Integer lapsedDays, Integer limit) {
+        int days = lapsedDays == null ? 30 : Math.min(Math.max(lapsedDays, 1), 365);
+        int size = limit == null ? 20 : Math.min(Math.max(limit, 1), 100);
+        Long merchantId = access.merchantId();
+        return new ConsoleDtos.CustomerInsightsResponse(
+                days,
+                programService.customers(customerRepository.findTopSpenders(merchantId, PageRequest.of(0, size))),
+                programService.customers(customerRepository.findLapsed(
+                        merchantId, AppTime.nowLocal().minusDays(days), PageRequest.of(0, size)))
+        );
+    }
+
+    /** Adds to the bonus balance with its history line; the caller saves the customer. */
+    public void addBonus(DeviceCustomer customer, BigDecimal amount, DeviceCustomerTxnType type, String note, Long sessionId) {
+        customer.setBonusBalance(customer.getBonusBalance().add(amount));
+        txnRepository.save(DeviceCustomerTxn.builder()
+                .merchantId(customer.getMerchantId())
+                .customerId(customer.getId())
+                .txnType(type)
+                .amount(amount)
+                .sessionId(sessionId)
+                .staffId(access.staffId())
+                .note(note == null ? null : note.substring(0, Math.min(note.length(), 255)))
+                .deleted(false)
+                .build());
+    }
+
+    private String uniqueReferralCode(Long merchantId) {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            String code = DeviceMappers.newCode(6);
+            if (!customerRepository.existsByMerchantIdAndReferralCode(merchantId, code)) {
+                return code;
+            }
+        }
+        return DeviceMappers.newCode(10);
+    }
+
+    private Long branchOf(Long requested) {
+        if (access.staffId() != null) {
+            return access.staffBranchId();
+        }
+        return requested == null ? null : access.requireBranch(requested).getId();
     }
 
     @Transactional(readOnly = true)

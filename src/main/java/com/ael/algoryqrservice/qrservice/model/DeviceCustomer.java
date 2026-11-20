@@ -1,6 +1,7 @@
 package com.ael.algoryqrservice.qrservice.model;
 
 
+import java.time.LocalDateTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -56,4 +57,27 @@ public class DeviceCustomer extends QrBaseModel {
 
     @Column(name = "total_spent", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalSpent;
+
+    /** Gift and referral money; spent as a discount, never booked as income. */
+    @Column(name = "bonus_balance", nullable = false, precision = 12, scale = 2)
+    @lombok.Builder.Default
+    private BigDecimal bonusBalance = BigDecimal.ZERO.setScale(2);
+
+    /** Code a friend gives when opening a card. */
+    @Column(name = "referral_code", length = 16)
+    private String referralCode;
+
+    @Column(name = "referred_by_id")
+    private Long referredById;
+
+    /** The referrer has been paid for this customer's first session. */
+    @Column(name = "referral_rewarded", nullable = false)
+    private boolean referralRewarded;
+
+    @Column(name = "last_visit_at")
+    private LocalDateTime lastVisitAt;
+
+    /** Finished sessions. */
+    @Column(name = "visits", nullable = false)
+    private int visits;
 }

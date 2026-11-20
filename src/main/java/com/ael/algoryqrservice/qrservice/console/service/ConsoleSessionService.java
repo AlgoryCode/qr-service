@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.console.service;
 
+import com.ael.algoryqrservice.qrservice.console.domain.DeviceCheckout;
 import com.ael.algoryqrservice.qrservice.console.domain.DeviceCustomerTxnType;
 import com.ael.algoryqrservice.qrservice.console.domain.DevicePaymentMethod;
 import com.ael.algoryqrservice.qrservice.console.domain.DeviceRentalPricing;
@@ -9,6 +10,11 @@ import com.ael.algoryqrservice.qrservice.model.ConsoleRateSetting;
 import com.ael.algoryqrservice.qrservice.model.ConsoleSession;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomer;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomerTxn;
+import com.ael.algoryqrservice.qrservice.model.DeviceGame;
+import com.ael.algoryqrservice.qrservice.model.DeviceMembership;
+import com.ael.algoryqrservice.qrservice.model.DevicePackage;
+import com.ael.algoryqrservice.qrservice.model.DeviceProgramSetting;
+import com.ael.algoryqrservice.qrservice.model.DeviceTier;
 import com.ael.algoryqrservice.qrservice.model.DeviceSessionItem;
 import com.ael.algoryqrservice.qrservice.model.DeviceSessionSegment;
 import com.ael.algoryqrservice.qrservice.model.GameConsole;
@@ -19,6 +25,7 @@ import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepositor
 import com.ael.algoryqrservice.qrservice.repository.ConsoleSessionRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceCustomerRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceCustomerTxnRepository;
+import com.ael.algoryqrservice.qrservice.repository.DeviceMembershipRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceSessionItemRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceSessionSegmentRepository;
 import com.ael.algoryqrservice.qrservice.repository.GameConsoleRepository;
@@ -54,7 +61,6 @@ import java.util.stream.Collectors;
 public class ConsoleSessionService {
 
     static final int DEFAULT_CONTROLLERS = 2;
-    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private final ConsoleSessionRepository sessionRepository;
     private final GameConsoleRepository consoleRepository;
@@ -67,6 +73,10 @@ public class ConsoleSessionService {
     private final MenuProductRepository menuProductRepository;
     private final MenuRepository menuRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final DeviceLibraryService libraryService;
+    private final DeviceProgramService programService;
+    private final DeviceCustomerService customerService;
+    private final DeviceMembershipRepository membershipRepository;
 
     // ---- Lifecycle ---------------------------------------------------------------------------------------------
 
@@ -78,6 +88,7 @@ public class ConsoleSessionService {
 
     /** Starts a session on an already locked and access-checked console. */
     public ConsoleDtos.SessionResponse startOn(GameConsole console, ConsoleDtos.StartSessionRequest request, Long reservationId) {
+        ConsoleCatalogService.requireInService(console);
         if (sessionRepository.existsByConsoleIdAndEndedAtIsNullAndDeletedFalse(console.getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu cihazda zaten açık bir oturum var");
         }
@@ -102,6 +113,16 @@ public class ConsoleSessionService {
             customerName = customer.getName();
         }
         LocalDateTime now = AppTime.nowLocal();
+        DevicePackage pkg = request == null || request.packageId() == null
+                ? null
+                : libraryService.requirePackageFor(console, request.packageId(), now);
+        DeviceGame game = request == null || request.gameId() == null
+                ? null
+                : libraryService.requireGameFor(console, request.gameId());
+        Integer planned = request == null ? null : request.plannedMinutes();
+        if (planned == null && pkg != null) {
+            planned = pkg.getMinutes();
+        }
         ConsoleSession saved = sessionRepository.save(ConsoleSession.builder()
                 .merchantId(console.getMerchantId())
                 .branchId(console.getBranchId())
@@ -111,7 +132,13 @@ public class ConsoleSessionService {
                 .note(DeviceMappers.blankToNull(request == null ? null : request.note()))
                 .hourlyRate(rate)
                 .controllerCount(controllers)
-                .plannedMinutes(request == null ? null : request.plannedMinutes())
+                .plannedMinutes(planned)
+                .packageId(pkg == null ? null : pkg.getId())
+                .packageName(pkg == null ? null : pkg.getName())
+                .packageMinutes(pkg == null ? null : pkg.getMinutes())
+                .packagePrice(pkg == null ? null : pkg.getPrice())
+                .gameId(game == null ? null : game.getId())
+                .gameName(game == null ? null : game.getName())
                 .reservationId(reservationId)
                 .openedByStaffId(access.staffId())
                 .startedAt(now)
@@ -162,6 +189,7 @@ public class ConsoleSessionService {
             if (!Objects.equals(target.getBranchId(), session.getBranchId())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cihaz aynı şubede olmalı");
             }
+            ConsoleCatalogService.requireInService(target);
             if (sessionRepository.existsByConsoleIdAndEndedAtIsNullAndDeletedFalse(target.getId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Hedef cihazda açık oturum var");
             }
@@ -200,6 +228,26 @@ public class ConsoleSessionService {
             base = (int) (quote.playedSeconds() / 60);
         }
         session.setPlannedMinutes(Math.min(base + request.minutes(), 24 * 60 * 2));
+        session.setExtensionRequestMinutes(null);
+        session.setExtensionRequestedAt(null);
+        return single(sessionRepository.save(session), null);
+    }
+
+    /** Grants the time the customer asked for on the device's QR page. */
+    @Transactional
+    public ConsoleDtos.SessionResponse approveExtension(Long sessionId) {
+        ConsoleSession session = lockActive(sessionId);
+        if (session.getExtensionRequestMinutes() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bekleyen süre isteği yok");
+        }
+        return extend(sessionId, new ConsoleDtos.ExtendRequest(session.getExtensionRequestMinutes()));
+    }
+
+    @Transactional
+    public ConsoleDtos.SessionResponse dismissExtension(Long sessionId) {
+        ConsoleSession session = lockActive(sessionId);
+        session.setExtensionRequestMinutes(null);
+        session.setExtensionRequestedAt(null);
         return single(sessionRepository.save(session), null);
     }
 
@@ -254,8 +302,9 @@ public class ConsoleSessionService {
         return single(session, null);
     }
 
+    /** What finishing now would charge with {@code options} (the finish request without the payment). */
     @Transactional(readOnly = true)
-    public ConsoleDtos.SessionQuoteResponse quote(Long sessionId) {
+    public ConsoleDtos.SessionQuoteResponse quote(Long sessionId, ConsoleDtos.FinishSessionRequest options) {
         ConsoleSession session = sessionRepository.findById(sessionId)
                 .filter(s -> !s.isDeleted() && Objects.equals(s.getMerchantId(), access.merchantId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Oturum bulunamadı"));
@@ -263,30 +312,46 @@ public class ConsoleSessionService {
         if (!session.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Oturum zaten bitmiş");
         }
+        checkDiscount(options);
+        LocalDateTime now = AppTime.nowLocal();
         ConsoleCatalogService.RateContext rates = catalogService.rateContext(session.getBranchId(), session.getMerchantId());
-        DeviceRentalPricing.Quote quote = DeviceRentalPricing.quote(
-                toPricing(segmentRepository.findBySessionIdAndDeletedFalseOrderByStartedAtAscIdAsc(session.getId())),
-                rates.rules(),
-                AppTime.nowLocal());
+        DeviceRentalPricing.Quote quote = quoteOf(session,
+                segmentRepository.findBySessionIdAndDeletedFalseOrderByStartedAtAscIdAsc(session.getId()), rates.rules(), now);
         BigDecimal items = itemsTotal(itemRepository.findBySessionIdAndDeletedFalseOrderByIdAsc(session.getId()));
         DeviceCustomer customer = session.getCustomerId() == null
                 ? null
                 : customerRepository.findById(session.getCustomerId()).filter(c -> !c.isDeleted()).orElse(null);
-        int available = customer == null ? 0 : customer.getFreeMinutes();
-        int usable = Math.min(available, quote.billedMinutes());
+        Holdings holdings = holdings(customer, session, now);
+        DeviceCheckout.Result result = DeviceCheckout.compute(
+                quote.amount(), quote.billedMinutes(), items, session.getPackageId() != null, holdings.checkout(), checkoutOptions(options));
         return new ConsoleDtos.SessionQuoteResponse(
                 session.getId(),
                 quote.playedSeconds(),
                 quote.billedMinutes(),
                 quote.amount(),
                 items,
-                quote.amount().add(items),
+                result.grossAmount(),
                 customer == null ? null : customer.getId(),
                 customer == null ? session.getCustomerName() : customer.getName(),
                 customer == null ? null : customer.getBalance(),
-                available,
-                usable,
-                DeviceRentalPricing.valueOfMinutes(quote.amount(), quote.billedMinutes(), usable)
+                customer == null ? 0 : customer.getFreeMinutes(),
+                Math.min(customer == null ? 0 : customer.getFreeMinutes(), quote.billedMinutes()),
+                DeviceRentalPricing.valueOfMinutes(quote.amount(), quote.billedMinutes(),
+                        Math.min(customer == null ? 0 : customer.getFreeMinutes(), quote.billedMinutes())),
+                session.getPackageName(),
+                holdings.checkout().membershipMinutes(),
+                result.membershipMinutesUsed(),
+                result.membershipValue(),
+                holdings.tier() == null ? null : holdings.tier().getName(),
+                holdings.tier() == null ? null : holdings.tier().getDiscountPercent(),
+                result.tierDiscount(),
+                customer == null ? null : customer.getBonusBalance(),
+                result.bonusUsed(),
+                result.manualDiscount(),
+                result.loyaltyMinutesUsed(),
+                result.loyaltyValue(),
+                result.totalDiscount(),
+                result.amount()
         );
     }
 
@@ -296,33 +361,23 @@ public class ConsoleSessionService {
         DevicePaymentMethod method = request == null || request.paymentMethod() == null
                 ? DevicePaymentMethod.CASH
                 : request.paymentMethod();
-        if (request != null && request.discountAmount() != null && request.discountPercent() != null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "İndirimi tutar ya da yüzde olarak girin, ikisi birden olmaz");
-        }
+        checkDiscount(request);
         LocalDateTime endedAt = AppTime.nowLocal();
         closeOpenSegment(session.getId(), endedAt);
         ConsoleCatalogService.RateContext rates = catalogService.rateContext(session.getBranchId(), session.getMerchantId());
-        DeviceRentalPricing.Quote quote = DeviceRentalPricing.quote(
-                toPricing(segmentRepository.findBySessionIdAndDeletedFalseOrderByStartedAtAscIdAsc(session.getId())),
-                rates.rules(),
-                endedAt);
+        DeviceRentalPricing.Quote quote = quoteOf(session,
+                segmentRepository.findBySessionIdAndDeletedFalseOrderByStartedAtAscIdAsc(session.getId()), rates.rules(), endedAt);
         BigDecimal timeAmount = quote.amount();
         BigDecimal itemsAmount = itemsTotal(itemRepository.findBySessionIdAndDeletedFalseOrderByIdAsc(session.getId()));
-        BigDecimal gross = timeAmount.add(itemsAmount);
 
         DeviceCustomer customer = session.getCustomerId() == null
                 ? null
                 : customerRepository.lockOwned(session.getCustomerId(), session.getMerchantId()).orElse(null);
-        int loyaltyUsed = 0;
-        BigDecimal loyaltyValue = BigDecimal.ZERO.setScale(2);
-        if (customer != null && request != null && Boolean.TRUE.equals(request.useLoyaltyMinutes())) {
-            loyaltyUsed = Math.min(customer.getFreeMinutes(), quote.billedMinutes());
-            loyaltyValue = DeviceRentalPricing.valueOfMinutes(timeAmount, quote.billedMinutes(), loyaltyUsed);
-        }
-        BigDecimal afterLoyalty = gross.subtract(loyaltyValue);
-        BigDecimal manual = manualDiscount(request, afterLoyalty);
-        BigDecimal discount = loyaltyValue.add(manual);
-        BigDecimal amount = gross.subtract(discount).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        Holdings holdings = holdings(customer, session, endedAt);
+        DeviceCheckout.Result result = DeviceCheckout.compute(
+                timeAmount, quote.billedMinutes(), itemsAmount, session.getPackageId() != null, holdings.checkout(),
+                checkoutOptions(request));
+        BigDecimal amount = result.amount();
 
         if (method == DevicePaymentMethod.BALANCE) {
             if (customer == null) {
@@ -335,43 +390,119 @@ public class ConsoleSessionService {
 
         session.setEndedAt(endedAt);
         session.setPausedAt(null);
+        session.setExtensionRequestMinutes(null);
+        session.setExtensionRequestedAt(null);
         session.setDurationMinutes(quote.billedMinutes());
         session.setTimeAmount(timeAmount);
         session.setItemsAmount(itemsAmount);
-        session.setGrossAmount(gross);
-        session.setDiscountAmount(discount.setScale(2, RoundingMode.HALF_UP));
-        session.setLoyaltyMinutesUsed(loyaltyUsed == 0 ? null : loyaltyUsed);
+        session.setGrossAmount(result.grossAmount());
+        session.setDiscountAmount(result.totalDiscount());
+        session.setLoyaltyMinutesUsed(result.loyaltyMinutesUsed() == 0 ? null : result.loyaltyMinutesUsed());
+        session.setMembershipMinutesUsed(result.membershipMinutesUsed() == 0 ? null : result.membershipMinutesUsed());
+        session.setTierDiscountAmount(result.tierDiscount().signum() == 0 ? null : result.tierDiscount());
+        session.setBonusUsed(result.bonusUsed().signum() == 0 ? null : result.bonusUsed());
         session.setAmount(amount);
         session.setPaymentMethod(method);
         session.setClosedByStaffId(access.staffId());
+        if (result.membershipMinutesUsed() > 0) {
+            session.setMembershipId(spendMembership(holdings.memberships(), result.membershipMinutesUsed()));
+        }
         ConsoleSession saved = sessionRepository.save(session);
 
         if (customer != null) {
-            settleCustomer(customer, saved, method, loyaltyUsed, rates.setting());
+            settleCustomer(customer, saved, method, result, rates.setting());
         }
         eventPublisher.publishEvent(new ConsoleSessionFinishedEvent(saved.getId()));
         return single(saved, rates);
     }
 
-    private static BigDecimal manualDiscount(ConsoleDtos.FinishSessionRequest request, BigDecimal base) {
-        if (request == null || base.signum() <= 0) {
-            return BigDecimal.ZERO.setScale(2);
-        }
-        BigDecimal discount = BigDecimal.ZERO;
-        if (request.discountAmount() != null) {
-            discount = request.discountAmount();
-        } else if (request.discountPercent() != null) {
-            discount = base.multiply(request.discountPercent()).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-        }
-        return discount.min(base).setScale(2, RoundingMode.HALF_UP);
+    /** What the customer can use at the end of {@code session}. */
+    private record Holdings(DeviceCheckout.Customer checkout, DeviceTier tier, List<DeviceMembership> memberships) {
     }
 
-    /** Spends the balance, uses and earns loyalty minutes, and keeps the customer's totals. */
+    private Holdings holdings(DeviceCustomer customer, ConsoleSession session, LocalDateTime now) {
+        if (customer == null) {
+            return new Holdings(DeviceCheckout.Customer.NONE, null, List.of());
+        }
+        DeviceTier tier = DeviceProgramService.tierFor(programService.tiers(customer.getMerchantId()), customer.getTotalSpent());
+        com.ael.algoryqrservice.qrservice.console.domain.DeviceType type = consoleRepository.findById(session.getConsoleId())
+                .map(GameConsole::getDeviceType)
+                .orElse(null);
+        List<DeviceMembership> memberships = programService.usable(customer.getId(), customer.getMerchantId(), type, now);
+        int membershipMinutes = memberships.stream().mapToInt(DeviceMembership::getMinutesLeft).sum();
+        return new Holdings(
+                new DeviceCheckout.Customer(membershipMinutes, customer.getFreeMinutes(),
+                        tier == null ? null : tier.getDiscountPercent(), customer.getBonusBalance()),
+                tier,
+                memberships
+        );
+    }
+
+    /** Takes the minutes from the memberships ending first; returns the first one used. */
+    private Long spendMembership(List<DeviceMembership> memberships, int minutes) {
+        int left = minutes;
+        Long first = null;
+        for (DeviceMembership candidate : memberships) {
+            if (left <= 0) {
+                break;
+            }
+            DeviceMembership membership = membershipRepository.lockById(candidate.getId()).orElse(candidate);
+            int take = Math.min(membership.getMinutesLeft(), left);
+            if (take <= 0) {
+                continue;
+            }
+            membership.setMinutesLeft(membership.getMinutesLeft() - take);
+            membershipRepository.save(membership);
+            left -= take;
+            if (first == null) {
+                first = membership.getId();
+            }
+        }
+        if (left > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Üyelik dakikası yetersiz; tekrar deneyin");
+        }
+        return first;
+    }
+
+    private static void checkDiscount(ConsoleDtos.FinishSessionRequest request) {
+        if (request != null && request.discountAmount() != null && request.discountPercent() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "İndirimi tutar ya da yüzde olarak girin, ikisi birden olmaz");
+        }
+    }
+
+    private static DeviceCheckout.Options checkoutOptions(ConsoleDtos.FinishSessionRequest request) {
+        if (request == null) {
+            return DeviceCheckout.Options.NONE;
+        }
+        return new DeviceCheckout.Options(
+                Boolean.TRUE.equals(request.useMembershipMinutes()),
+                Boolean.TRUE.equals(request.useLoyaltyMinutes()),
+                Boolean.TRUE.equals(request.useBonusBalance()),
+                request.discountAmount(),
+                request.discountPercent()
+        );
+    }
+
+    /** The session's charge so far: with its package when it has one. */
+    static DeviceRentalPricing.Quote quoteOf(
+            ConsoleSession session,
+            List<DeviceSessionSegment> segments,
+            DeviceRentalPricing.Rules rules,
+            LocalDateTime now
+    ) {
+        return DeviceRentalPricing.quoteWithPackage(toPricing(segments), rules, now,
+                session.getPackageMinutes(), session.getPackagePrice());
+    }
+
+    /**
+     * Spends the balance and the bonus, uses and earns loyalty minutes, keeps the customer's totals, and pays the
+     * referrer once the customer's first session is done.
+     */
     private void settleCustomer(
             DeviceCustomer customer,
             ConsoleSession session,
             DevicePaymentMethod method,
-            int loyaltyUsed,
+            DeviceCheckout.Result result,
             ConsoleRateSetting setting
     ) {
         if (method == DevicePaymentMethod.BALANCE && session.getAmount().signum() > 0) {
@@ -379,6 +510,8 @@ public class ConsoleSessionService {
             customerTxnRepository.save(DeviceCustomerTxn.builder()
                     .merchantId(customer.getMerchantId())
                     .customerId(customer.getId())
+                    .branchId(session.getBranchId())
+                    .staffId(access.staffId())
                     .txnType(DeviceCustomerTxnType.SPEND)
                     .amount(session.getAmount().negate())
                     .sessionId(session.getId())
@@ -387,18 +520,54 @@ public class ConsoleSessionService {
                     .deleted(false)
                     .build());
         }
+        if (result.bonusUsed().signum() > 0) {
+            customer.setBonusBalance(customer.getBonusBalance().subtract(result.bonusUsed()));
+            customerTxnRepository.save(DeviceCustomerTxn.builder()
+                    .merchantId(customer.getMerchantId())
+                    .customerId(customer.getId())
+                    .branchId(session.getBranchId())
+                    .staffId(access.staffId())
+                    .txnType(DeviceCustomerTxnType.GIFT)
+                    .amount(result.bonusUsed().negate())
+                    .sessionId(session.getId())
+                    .note("Oturum #" + session.getId() + " için kullanıldı")
+                    .deleted(false)
+                    .build());
+        }
+        int loyaltyUsed = result.loyaltyMinutesUsed();
         customer.setFreeMinutes(customer.getFreeMinutes() - loyaltyUsed);
         int minutes = session.getDurationMinutes() == null ? 0 : session.getDurationMinutes();
         customer.setTotalMinutes(customer.getTotalMinutes() + minutes);
         customer.setTotalSpent(customer.getTotalSpent().add(session.getAmount()));
+        customer.setVisits(customer.getVisits() + 1);
+        customer.setLastVisitAt(session.getEndedAt());
         if (setting != null && setting.getLoyaltyEveryMinutes() != null && setting.getLoyaltyRewardMinutes() != null) {
-            int progress = customer.getLoyaltyProgressMinutes() + Math.max(minutes - loyaltyUsed, 0);
+            int free = loyaltyUsed + result.membershipMinutesUsed();
+            int progress = customer.getLoyaltyProgressMinutes() + Math.max(minutes - free, 0);
             int every = setting.getLoyaltyEveryMinutes();
             int earned = (progress / every) * setting.getLoyaltyRewardMinutes();
             customer.setLoyaltyProgressMinutes(progress % every);
             customer.setFreeMinutes(customer.getFreeMinutes() + earned);
         }
+        if (customer.getReferredById() != null && !customer.isReferralRewarded()) {
+            customer.setReferralRewarded(true);
+            rewardReferrer(customer, session);
+        }
         customerRepository.save(customer);
+    }
+
+    private void rewardReferrer(DeviceCustomer customer, ConsoleSession session) {
+        BigDecimal reward = programService.setting(customer.getMerchantId())
+                .map(DeviceProgramSetting::getReferralRewardAmount)
+                .orElse(null);
+        if (reward == null || reward.signum() <= 0) {
+            return;
+        }
+        customerRepository.lockOwned(customer.getReferredById(), customer.getMerchantId()).ifPresent(referrer -> {
+            customerService.addBonus(referrer, reward, DeviceCustomerTxnType.REFERRAL,
+                    "Arkadaş getirdi: " + customer.getName(), session.getId());
+            customerRepository.save(referrer);
+        });
     }
 
     // ---- Reading -----------------------------------------------------------------------------------------------
@@ -563,10 +732,8 @@ public class ConsoleSessionService {
         BigDecimal discount;
         BigDecimal amount;
         if (session.isActive()) {
-            DeviceRentalPricing.Quote quote = DeviceRentalPricing.quote(
-                    toPricing(segments),
-                    rates == null ? DeviceRentalPricing.Rules.NONE : rates.rules(),
-                    now);
+            DeviceRentalPricing.Quote quote = quoteOf(session, segments,
+                    rates == null ? DeviceRentalPricing.Rules.NONE : rates.rules(), now);
             playedSeconds = quote.playedSeconds();
             minutes = quote.billedMinutes();
             timeAmount = quote.amount();
@@ -623,7 +790,18 @@ public class ConsoleSessionService {
                             seg.getStartedAt(),
                             seg.getEndedAt()
                     );
-                }).toList()
+                }).toList(),
+                session.getPackageId(),
+                session.getPackageName(),
+                session.getPackageMinutes(),
+                session.getPackagePrice(),
+                session.getGameId(),
+                session.getGameName(),
+                session.getMembershipMinutesUsed(),
+                session.getTierDiscountAmount(),
+                session.getBonusUsed(),
+                session.getExtensionRequestMinutes(),
+                session.getExtensionRequestedAt()
         );
     }
 }

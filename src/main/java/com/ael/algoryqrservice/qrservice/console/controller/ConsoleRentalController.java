@@ -4,6 +4,11 @@ import com.ael.algoryqrservice.qrservice.console.dto.ConsoleDtos;
 import com.ael.algoryqrservice.qrservice.console.service.ConsoleCatalogService;
 import com.ael.algoryqrservice.qrservice.console.service.ConsoleSessionService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceCustomerService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceLibraryService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceMaintenanceService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceProgramService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceShiftService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceTournamentService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceReportService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceReservationService;
 import com.ael.algoryqrservice.qrservice.security.FeatureKey;
@@ -40,6 +45,11 @@ public class ConsoleRentalController {
     private final DeviceCustomerService customerService;
     private final DeviceReservationService reservationService;
     private final DeviceReportService reportService;
+    private final DeviceLibraryService libraryService;
+    private final DeviceMaintenanceService maintenanceService;
+    private final DeviceProgramService programService;
+    private final DeviceShiftService shiftService;
+    private final DeviceTournamentService tournamentService;
 
     // ---- Devices and rates -------------------------------------------------------------------------------------
 
@@ -193,8 +203,15 @@ public class ConsoleRentalController {
 
     @GetMapping("/sessions/{sessionId}/quote")
     @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
-    public ResponseEntity<ConsoleDtos.SessionQuoteResponse> quoteSession(@PathVariable Long sessionId) {
-        return ResponseEntity.ok(sessionService.quote(sessionId));
+    public ResponseEntity<ConsoleDtos.SessionQuoteResponse> quoteSession(
+            @PathVariable Long sessionId,
+            @RequestParam(required = false) Boolean useLoyaltyMinutes,
+            @RequestParam(required = false) Boolean useMembershipMinutes,
+            @RequestParam(required = false) Boolean useBonusBalance,
+            @RequestParam(required = false) java.math.BigDecimal discountAmount,
+            @RequestParam(required = false) java.math.BigDecimal discountPercent
+    ) {
+        return ResponseEntity.ok(sessionService.quote(sessionId, new ConsoleDtos.FinishSessionRequest(null, discountAmount, discountPercent, useLoyaltyMinutes, useMembershipMinutes, useBonusBalance)));
     }
 
     @PostMapping("/sessions/{sessionId}/finish")
@@ -357,5 +374,381 @@ public class ConsoleRentalController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return ResponseEntity.ok(reportService.report(branchId, from, to));
+    }
+
+    // ---- Device extras: QR key, games, maintenance -------------------------------------------------------------
+
+    @PostMapping("/consoles/{consoleId}/public-token/rotate")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ConsoleResponse> rotateToken(
+            @PathVariable Long consoleId
+    ) {
+        return ResponseEntity.ok(catalogService.rotateToken(consoleId));
+    }
+
+    @PutMapping("/consoles/{consoleId}/games")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ConsoleResponse> setConsoleGames(
+            @PathVariable Long consoleId,
+            @Valid @RequestBody ConsoleDtos.ConsoleGamesRequest request
+    ) {
+        return ResponseEntity.ok(libraryService.setConsoleGames(consoleId, request));
+    }
+
+    @PostMapping("/consoles/{consoleId}/maintenance")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ConsoleResponse> startMaintenance(
+            @PathVariable Long consoleId,
+            @Valid @RequestBody(required = false) ConsoleDtos.MaintenanceStartRequest request
+    ) {
+        return ResponseEntity.ok(maintenanceService.start(consoleId, request));
+    }
+
+    @PostMapping("/consoles/{consoleId}/maintenance/end")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ConsoleResponse> endMaintenance(
+            @PathVariable Long consoleId,
+            @Valid @RequestBody(required = false) ConsoleDtos.MaintenanceEndRequest request
+    ) {
+        return ResponseEntity.ok(maintenanceService.end(consoleId, request));
+    }
+
+    @PostMapping("/consoles/{consoleId}/expenses")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.MaintenanceLogResponse> addExpense(
+            @PathVariable Long consoleId,
+            @Valid @RequestBody ConsoleDtos.ExpenseRequest request
+    ) {
+        return ResponseEntity.status(201).body(maintenanceService.expense(consoleId, request));
+    }
+
+    @GetMapping("/consoles/{consoleId}/maintenance-logs")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.MaintenanceLogResponse>> maintenanceLogs(
+            @PathVariable Long consoleId
+    ) {
+        return ResponseEntity.ok(maintenanceService.logs(consoleId));
+    }
+
+    // ---- Game library and packages ---------------------------------------------------------------------------
+
+    @GetMapping("/branches/{branchId}/games")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.GameResponse>> listGames(
+            @PathVariable Long branchId
+    ) {
+        return ResponseEntity.ok(libraryService.listGames(branchId));
+    }
+
+    @PostMapping("/branches/{branchId}/games")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.GameResponse> createGame(
+            @PathVariable Long branchId,
+            @Valid @RequestBody ConsoleDtos.GameRequest request
+    ) {
+        return ResponseEntity.status(201).body(libraryService.createGame(branchId, request));
+    }
+
+    @PutMapping("/games/{gameId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.GameResponse> updateGame(
+            @PathVariable Long gameId,
+            @Valid @RequestBody ConsoleDtos.GameRequest request
+    ) {
+        return ResponseEntity.ok(libraryService.updateGame(gameId, request));
+    }
+
+    @DeleteMapping("/games/{gameId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<Void> deleteGame(
+            @PathVariable Long gameId
+    ) {
+        libraryService.deleteGame(gameId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/branches/{branchId}/packages")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.PackageResponse>> listPackages(
+            @PathVariable Long branchId,
+            @RequestParam(defaultValue = "false") boolean activeOnly
+    ) {
+        return ResponseEntity.ok(libraryService.listPackages(branchId, activeOnly));
+    }
+
+    @PostMapping("/branches/{branchId}/packages")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.PackageResponse> createPackage(
+            @PathVariable Long branchId,
+            @Valid @RequestBody ConsoleDtos.PackageRequest request
+    ) {
+        return ResponseEntity.status(201).body(libraryService.createPackage(branchId, request));
+    }
+
+    @PutMapping("/packages/{packageId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.PackageResponse> updatePackage(
+            @PathVariable Long packageId,
+            @Valid @RequestBody ConsoleDtos.PackageRequest request
+    ) {
+        return ResponseEntity.ok(libraryService.updatePackage(packageId, request));
+    }
+
+    @DeleteMapping("/packages/{packageId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<Void> deletePackage(
+            @PathVariable Long packageId
+    ) {
+        libraryService.deletePackage(packageId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---- Extension requests from the device QR page -----------------------------------------------------------
+
+    @PostMapping("/sessions/{sessionId}/extension-request/approve")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.SessionResponse> approveExtension(
+            @PathVariable Long sessionId
+    ) {
+        return ResponseEntity.ok(sessionService.approveExtension(sessionId));
+    }
+
+    @PostMapping("/sessions/{sessionId}/extension-request/dismiss")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.SessionResponse> dismissExtension(
+            @PathVariable Long sessionId
+    ) {
+        return ResponseEntity.ok(sessionService.dismissExtension(sessionId));
+    }
+
+    // ---- Customer programme ----------------------------------------------------------------------------------
+
+    @GetMapping("/customers/insights")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.CustomerInsightsResponse> customerInsights(
+            @RequestParam(required = false) Integer lapsedDays,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return ResponseEntity.ok(customerService.insights(lapsedDays, limit));
+    }
+
+    @PostMapping("/customers/{customerId}/gift")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.CustomerResponse> giftCustomer(
+            @PathVariable Long customerId,
+            @Valid @RequestBody ConsoleDtos.GiftRequest request
+    ) {
+        return ResponseEntity.ok(customerService.gift(customerId, request));
+    }
+
+    @GetMapping("/customers/{customerId}/memberships")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.MembershipResponse>> customerMemberships(
+            @PathVariable Long customerId
+    ) {
+        return ResponseEntity.ok(programService.memberships(customerId));
+    }
+
+    @PostMapping("/customers/{customerId}/memberships")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.MembershipResponse> sellMembership(
+            @PathVariable Long customerId,
+            @Valid @RequestBody ConsoleDtos.SellMembershipRequest request
+    ) {
+        return ResponseEntity.status(201).body(programService.sell(customerId, request));
+    }
+
+    @PostMapping("/memberships/{membershipId}/cancel")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.MembershipResponse> cancelMembership(
+            @PathVariable Long membershipId
+    ) {
+        return ResponseEntity.ok(programService.cancel(membershipId));
+    }
+
+    @GetMapping("/program")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ProgramResponse> getProgram() {
+        return ResponseEntity.ok(programService.getProgram());
+    }
+
+    @PutMapping("/program")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ProgramResponse> updateProgram(
+            @Valid @RequestBody ConsoleDtos.ProgramRequest request
+    ) {
+        return ResponseEntity.ok(programService.updateProgram(request));
+    }
+
+    @GetMapping("/membership-plans")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.MembershipPlanResponse>> listMembershipPlans(
+            @RequestParam(defaultValue = "false") boolean activeOnly
+    ) {
+        return ResponseEntity.ok(programService.listPlans(activeOnly));
+    }
+
+    @PostMapping("/membership-plans")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.MembershipPlanResponse> createMembershipPlan(
+            @Valid @RequestBody ConsoleDtos.MembershipPlanRequest request
+    ) {
+        return ResponseEntity.status(201).body(programService.createPlan(request));
+    }
+
+    @PutMapping("/membership-plans/{planId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.MembershipPlanResponse> updateMembershipPlan(
+            @PathVariable Long planId,
+            @Valid @RequestBody ConsoleDtos.MembershipPlanRequest request
+    ) {
+        return ResponseEntity.ok(programService.updatePlan(planId, request));
+    }
+
+    @DeleteMapping("/membership-plans/{planId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<Void> deleteMembershipPlan(
+            @PathVariable Long planId
+    ) {
+        programService.deletePlan(planId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---- Shifts ----------------------------------------------------------------------------------------------
+
+    @PostMapping("/branches/{branchId}/shifts")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ShiftResponse> openShift(
+            @PathVariable Long branchId,
+            @Valid @RequestBody(required = false) ConsoleDtos.OpenShiftRequest request
+    ) {
+        return ResponseEntity.status(201).body(shiftService.open(branchId, request));
+    }
+
+    @GetMapping("/branches/{branchId}/shifts/current")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ShiftResponse> currentShift(@PathVariable Long branchId) {
+        return shiftService.current(branchId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/branches/{branchId}/shifts")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ShiftPageResponse> listShifts(
+            @PathVariable Long branchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(shiftService.list(branchId, page, size));
+    }
+
+    @PostMapping("/shifts/{shiftId}/close")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ShiftResponse> closeShift(
+            @PathVariable Long shiftId,
+            @Valid @RequestBody ConsoleDtos.CloseShiftRequest request
+    ) {
+        return ResponseEntity.ok(shiftService.close(shiftId, request));
+    }
+
+    // ---- Tournaments -----------------------------------------------------------------------------------------
+
+    @GetMapping("/branches/{branchId}/tournaments")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.TournamentResponse>> listTournaments(
+            @PathVariable Long branchId
+    ) {
+        return ResponseEntity.ok(tournamentService.list(branchId));
+    }
+
+    @GetMapping("/tournaments/{tournamentId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> getTournament(
+            @PathVariable Long tournamentId
+    ) {
+        return ResponseEntity.ok(tournamentService.get(tournamentId));
+    }
+
+    @PostMapping("/branches/{branchId}/tournaments")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> createTournament(
+            @PathVariable Long branchId,
+            @Valid @RequestBody ConsoleDtos.TournamentRequest request
+    ) {
+        return ResponseEntity.status(201).body(tournamentService.create(branchId, request));
+    }
+
+    @PutMapping("/tournaments/{tournamentId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> updateTournament(
+            @PathVariable Long tournamentId,
+            @Valid @RequestBody ConsoleDtos.TournamentRequest request
+    ) {
+        return ResponseEntity.ok(tournamentService.update(tournamentId, request));
+    }
+
+    @PostMapping("/tournaments/{tournamentId}/cancel")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> cancelTournament(
+            @PathVariable Long tournamentId
+    ) {
+        return ResponseEntity.ok(tournamentService.cancel(tournamentId));
+    }
+
+    @PostMapping("/tournaments/{tournamentId}/players")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> addTournamentPlayer(
+            @PathVariable Long tournamentId,
+            @Valid @RequestBody ConsoleDtos.TournamentPlayerRequest request
+    ) {
+        return ResponseEntity.ok(tournamentService.addPlayer(tournamentId, request));
+    }
+
+    @DeleteMapping("/tournaments/{tournamentId}/players/{playerId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> removeTournamentPlayer(
+            @PathVariable Long tournamentId,
+            @PathVariable Long playerId
+    ) {
+        return ResponseEntity.ok(tournamentService.removePlayer(tournamentId, playerId));
+    }
+
+    @PostMapping("/tournaments/{tournamentId}/players/{playerId}/pay")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> payTournamentPlayer(
+            @PathVariable Long tournamentId,
+            @PathVariable Long playerId,
+            @Valid @RequestBody(required = false) ConsoleDtos.TournamentPayRequest request
+    ) {
+        return ResponseEntity.ok(tournamentService.pay(tournamentId, playerId, request));
+    }
+
+    @PostMapping("/tournaments/{tournamentId}/start")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> startTournament(
+            @PathVariable Long tournamentId
+    ) {
+        return ResponseEntity.ok(tournamentService.start(tournamentId));
+    }
+
+    @PostMapping("/tournaments/{tournamentId}/matches/{matchId}/result")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.TournamentResponse> reportMatch(
+            @PathVariable Long tournamentId,
+            @PathVariable Long matchId,
+            @Valid @RequestBody ConsoleDtos.MatchResultRequest request
+    ) {
+        return ResponseEntity.ok(tournamentService.report(tournamentId, matchId, request));
+    }
+
+    // ---- Profitability ---------------------------------------------------------------------------------------
+
+    @GetMapping("/branches/{branchId}/profitability")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.ProfitabilityResponse> profitability(
+            @PathVariable Long branchId
+    ) {
+        return ResponseEntity.ok(reportService.profitability(branchId));
     }
 }

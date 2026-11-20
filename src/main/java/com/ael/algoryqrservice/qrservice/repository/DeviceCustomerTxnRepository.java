@@ -12,4 +12,14 @@ public interface DeviceCustomerTxnRepository extends JpaRepository<DeviceCustome
             Long merchantId,
             Pageable pageable
     );
+
+    @org.springframework.data.jpa.repository.Query("""
+            select t from DeviceCustomerTxn t
+            where t.branchId = :branchId and t.deleted = false and t.createdAt between :from and :to
+            """)
+    java.util.List<DeviceCustomerTxn> findAtBranch(
+            @org.springframework.data.repository.query.Param("branchId") Long branchId,
+            @org.springframework.data.repository.query.Param("from") java.time.LocalDateTime from,
+            @org.springframework.data.repository.query.Param("to") java.time.LocalDateTime to
+    );
 }

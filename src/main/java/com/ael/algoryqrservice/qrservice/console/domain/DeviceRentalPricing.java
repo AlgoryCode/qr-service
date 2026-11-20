@@ -36,7 +36,7 @@ public final class DeviceRentalPricing {
 
     public record Tariff(Long id, DeviceType deviceType, int daysMask, LocalTime start, LocalTime end, BigDecimal adjustPercent) {
 
-        boolean covers(LocalDateTime at, DeviceType type) {
+        public boolean covers(LocalDateTime at, DeviceType type) {
             if (deviceType != null && deviceType != type) {
                 return false;
             }
@@ -114,6 +114,48 @@ public final class DeviceRentalPricing {
                     .divide(SECONDS_PER_HOUR, MC), MC);
         }
         return new Quote(played, billed, amount.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    /**
+     * Like {@link #quote} for a session started with a package: the first {@code packageMinutes} of play cost
+     * {@code packagePrice}; play beyond that is charged normally (rounding and tariffs, but no minimum). Within the
+     * package the billed minutes are the package's minutes. A null package falls back to {@link #quote}.
+     */
+    public static Quote quoteWithPackage(
+            List<Segment> segments,
+            Rules rules,
+            LocalDateTime now,
+            Integer packageMinutes,
+            BigDecimal packagePrice
+    ) {
+        if (packageMinutes == null || packagePrice == null) {
+            return quote(segments, rules, now);
+        }
+        Rules r = rules == null ? Rules.NONE : rules;
+        long coveredNanos = packageMinutes * 60L * 1_000_000_000L;
+        long playedNanos = 0;
+        List<Segment> beyond = new java.util.ArrayList<>();
+        for (Segment segment : segments) {
+            LocalDateTime end = segment.endedAt() == null ? now : segment.endedAt();
+            if (!end.isAfter(segment.startedAt())) {
+                continue;
+            }
+            long nanos = Duration.between(segment.startedAt(), end).toNanos();
+            long before = playedNanos;
+            playedNanos += nanos;
+            if (playedNanos <= coveredNanos) {
+                continue;
+            }
+            LocalDateTime start = before >= coveredNanos ? segment.startedAt() : segment.startedAt().plusNanos(coveredNanos - before);
+            beyond.add(new Segment(start, end, segment.hourlyRate(), segment.deviceType()));
+        }
+        long played = playedNanos / 1_000_000_000L;
+        BigDecimal price = packagePrice.setScale(2, RoundingMode.HALF_UP);
+        if (beyond.isEmpty()) {
+            return new Quote(played, packageMinutes, price);
+        }
+        Quote extra = quote(beyond, new Rules(0, r.roundingMinutes(), r.tariffs()), now);
+        return new Quote(played, packageMinutes + extra.billedMinutes(), price.add(extra.amount()));
     }
 
     public static int billedMinutes(long playedSeconds, Rules rules) {

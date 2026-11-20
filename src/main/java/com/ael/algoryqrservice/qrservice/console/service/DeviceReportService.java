@@ -44,6 +44,7 @@ public class DeviceReportService {
     private final DeviceSessionSegmentRepository segmentRepository;
     private final GameConsoleRepository consoleRepository;
     private final ConsoleAccess access;
+    private final com.ael.algoryqrservice.qrservice.repository.DeviceMaintenanceLogRepository maintenanceRepository;
 
     @Transactional(readOnly = true)
     public ConsoleDtos.ReportResponse report(Long branchId, LocalDate fromDay, LocalDate toDay) {
@@ -85,6 +86,7 @@ public class DeviceReportService {
         java.util.Arrays.fill(hourRevenue, BigDecimal.ZERO);
         Map<DevicePaymentMethod, PaymentAcc> payments = new EnumMap<>(DevicePaymentMethod.class);
 
+        Map<String, GameAcc> games = new LinkedHashMap<>();
         BigDecimal timeRevenue = BigDecimal.ZERO;
         BigDecimal itemsRevenue = BigDecimal.ZERO;
         BigDecimal discounts = BigDecimal.ZERO;
@@ -117,6 +119,12 @@ public class DeviceReportService {
                 spreadOverHours(seg.getStartedAt(), end, hourSeconds);
             }
             playedSecondsTotal += sessionSeconds;
+            if (session.getGameName() != null) {
+                GameAcc game = games.computeIfAbsent(session.getGameId() + "|" + session.getGameName(),
+                        key -> new GameAcc(session.getGameId(), session.getGameName()));
+                game.sessions++;
+                game.seconds += sessionSeconds;
+            }
             Long lastConsole = segs.isEmpty() ? session.getConsoleId() : segs.get(segs.size() - 1).getConsoleId();
             if (perDevice.isEmpty()) {
                 perDevice.put(lastConsole, 0L);
@@ -188,8 +196,142 @@ public class DeviceReportService {
                 percent(playedSecondsTotal / 60.0, periodMinutes * deviceCount),
                 deviceRows,
                 hourRows,
-                paymentRows
+                paymentRows,
+                games.values().stream()
+                        .sorted(Comparator.comparingLong((GameAcc g) -> g.seconds).reversed())
+                        .map(g -> new ConsoleDtos.GameReportRow(g.id, g.name, g.sessions, (int) (g.seconds / 60)))
+                        .toList()
         );
+    }
+
+    /**
+     * Lifetime figures per device of the branch: revenue (split by played time as in the report), maintenance and
+     * other costs, and how far the purchase cost is paid back.
+     */
+    @Transactional(readOnly = true)
+    public ConsoleDtos.ProfitabilityResponse profitability(Long branchId) {
+        Branch branch = access.requireBranch(branchId);
+        LocalDateTime now = AppTime.nowLocal();
+        LocalDateTime monthAgo = now.minusDays(30);
+        List<GameConsole> consoles = consoleRepository.findByBranchIdAndMerchantIdAndDeletedFalseOrderByNameAscIdAsc(
+                branch.getId(), branch.getMerchantId());
+        List<ConsoleSession> sessions = sessionRepository.findFinishedForBranch(
+                branch.getMerchantId(), branch.getId(), LocalDateTime.of(2000, 1, 1, 0, 0), now);
+        Map<Long, List<DeviceSessionSegment>> segments = sessions.isEmpty()
+                ? Map.of()
+                : segmentRepository.findBySessionIdInAndDeletedFalseOrderByStartedAtAscIdAsc(
+                                sessions.stream().map(ConsoleSession::getId).toList()).stream()
+                        .collect(Collectors.groupingBy(DeviceSessionSegment::getSessionId));
+        Map<Long, BigDecimal> revenue = new HashMap<>();
+        Map<Long, BigDecimal> recent = new HashMap<>();
+        Map<Long, Long> seconds = new HashMap<>();
+        for (ConsoleSession session : sessions) {
+            List<DeviceSessionSegment> segs = segments.getOrDefault(session.getId(), List.of());
+            Map<Long, Long> perDevice = new LinkedHashMap<>();
+            long total = 0;
+            for (DeviceSessionSegment seg : segs) {
+                LocalDateTime end = seg.getEndedAt() == null ? session.getEndedAt() : seg.getEndedAt();
+                long secs = Math.max(Duration.between(seg.getStartedAt(), end).getSeconds(), 0);
+                perDevice.merge(seg.getConsoleId(), secs, Long::sum);
+                total += secs;
+            }
+            if (perDevice.isEmpty()) {
+                perDevice.put(session.getConsoleId(), 0L);
+            }
+            Map<Long, BigDecimal> shares = split(nz(session.getAmount()), perDevice, total);
+            boolean isRecent = !session.getEndedAt().isBefore(monthAgo);
+            shares.forEach((consoleId, share) -> {
+                revenue.merge(consoleId, share, BigDecimal::add);
+                if (isRecent) {
+                    recent.merge(consoleId, share, BigDecimal::add);
+                }
+            });
+            perDevice.forEach((consoleId, secs) -> seconds.merge(consoleId, secs, Long::sum));
+        }
+        Map<Long, BigDecimal> costs = new HashMap<>();
+        maintenanceRepository.findByBranchIdAndMerchantIdAndDeletedFalse(branch.getId(), branch.getMerchantId())
+                .forEach(log -> {
+                    if (log.getCost() != null) {
+                        costs.merge(log.getConsoleId(), log.getCost(), BigDecimal::add);
+                    }
+                });
+
+        BigDecimal sumPurchase = BigDecimal.ZERO;
+        BigDecimal sumRevenue = BigDecimal.ZERO;
+        BigDecimal sumCost = BigDecimal.ZERO;
+        List<ConsoleDtos.DeviceProfitRow> rows = new ArrayList<>();
+        for (GameConsole console : consoles) {
+            BigDecimal rev = revenue.getOrDefault(console.getId(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal cost = costs.getOrDefault(console.getId(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal last30 = recent.getOrDefault(console.getId(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal purchase = console.getPurchaseCost();
+            BigDecimal earned = rev.subtract(cost);
+            BigDecimal net = purchase == null ? earned : earned.subtract(purchase);
+            BigDecimal payback = null;
+            Integer days = null;
+            boolean paidBack = false;
+            if (purchase != null && purchase.signum() > 0) {
+                payback = earned.max(BigDecimal.ZERO).multiply(HUNDRED).divide(purchase, 1, RoundingMode.HALF_UP);
+                paidBack = earned.compareTo(purchase) >= 0;
+                if (paidBack) {
+                    days = 0;
+                } else if (last30.signum() > 0) {
+                    BigDecimal perDay = last30.divide(BigDecimal.valueOf(30), 6, RoundingMode.HALF_UP);
+                    days = purchase.subtract(earned).divide(perDay, 0, RoundingMode.CEILING).min(BigDecimal.valueOf(36500)).intValue();
+                }
+            } else if (purchase != null) {
+                paidBack = true;
+                days = 0;
+            }
+            rows.add(new ConsoleDtos.DeviceProfitRow(
+                    console.getId(),
+                    console.getName(),
+                    console.getDeviceType(),
+                    purchase,
+                    console.getPurchasedOn(),
+                    (int) (seconds.getOrDefault(console.getId(), 0L) / 60),
+                    rev,
+                    cost,
+                    net.setScale(2, RoundingMode.HALF_UP),
+                    payback,
+                    paidBack,
+                    last30,
+                    days
+            ));
+            sumPurchase = sumPurchase.add(purchase == null ? BigDecimal.ZERO : purchase);
+            sumRevenue = sumRevenue.add(rev);
+            sumCost = sumCost.add(cost);
+        }
+        return new ConsoleDtos.ProfitabilityResponse(
+                branch.getId(),
+                sumPurchase.setScale(2, RoundingMode.HALF_UP),
+                sumRevenue.setScale(2, RoundingMode.HALF_UP),
+                sumCost.setScale(2, RoundingMode.HALF_UP),
+                sumRevenue.subtract(sumCost).subtract(sumPurchase).setScale(2, RoundingMode.HALF_UP),
+                rows
+        );
+    }
+
+    /** Splits {@code amount} by seconds; the last device takes the rounding remainder. */
+    static Map<Long, BigDecimal> split(BigDecimal amount, Map<Long, Long> seconds, long total) {
+        Map<Long, BigDecimal> shares = new LinkedHashMap<>();
+        List<Map.Entry<Long, Long>> entries = new ArrayList<>(seconds.entrySet());
+        BigDecimal assigned = BigDecimal.ZERO;
+        for (int i = 0; i < entries.size(); i++) {
+            Map.Entry<Long, Long> entry = entries.get(i);
+            BigDecimal share;
+            if (i == entries.size() - 1) {
+                share = amount.subtract(assigned);
+            } else {
+                share = total == 0
+                        ? BigDecimal.ZERO
+                        : amount.multiply(BigDecimal.valueOf(entry.getValue()))
+                                .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+                assigned = assigned.add(share);
+            }
+            shares.put(entry.getKey(), share);
+        }
+        return shares;
     }
 
     /** Adds the seconds of [start, end) to the hour of day each part falls in. */
@@ -220,6 +362,18 @@ public class DeviceReportService {
         int sessions;
         long seconds;
         BigDecimal revenue = BigDecimal.ZERO;
+    }
+
+    private static final class GameAcc {
+        final Long id;
+        final String name;
+        int sessions;
+        long seconds;
+
+        GameAcc(Long id, String name) {
+            this.id = id;
+            this.name = name;
+        }
     }
 
     private static final class PaymentAcc {

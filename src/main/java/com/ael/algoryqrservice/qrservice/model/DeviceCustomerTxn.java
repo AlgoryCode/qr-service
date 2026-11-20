@@ -55,4 +55,10 @@ public class DeviceCustomerTxn extends QrBaseModel {
 
     @Column(name = "note", length = 255)
     private String note;
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Column(name = "staff_id")
+    private Long staffId;
 }

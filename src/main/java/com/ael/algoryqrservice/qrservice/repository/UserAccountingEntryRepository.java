@@ -11,4 +11,6 @@ public interface UserAccountingEntryRepository
     boolean existsBySourceTypeAndSourceBillId(AccountingSourceType sourceType, Long sourceBillId);
 
     boolean existsBySourceTypeAndSourceConsoleSessionId(AccountingSourceType sourceType, Long sourceConsoleSessionId);
+
+    boolean existsBySourceDeviceRef(String sourceDeviceRef);
 }

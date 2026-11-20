@@ -58,6 +58,7 @@ class FeatureCoverageTest {
             entry("qrservice.integration.ubereats.controller.UberEatsWebhookController", "Sağlayıcı webhook'u, imza ile"),
             entry("qrservice.qr.controller.FeatureQrController", "QR_CREATE hakkı serviste kota ile düşülür"),
             entry("qrservice.qr.controller.QrPublicController", "Herkese açık QR yönlendirme"),
+            entry("qrservice.console.controller.PublicDeviceController", "Cihaz QR sayfası; eklenti serviste kontrol edilir"),
             entry("qrservice.print.controller.PrintAgentController", "Yazıcı ajanı kendi anahtarıyla"),
             entry("qrservice.common.controller.HealthCheckController", "Sağlık kontrolü"),
             entry("qrservice.platform.controller.PlatformFeedbackController", "Ürün geri bildirimi, her pakette"),

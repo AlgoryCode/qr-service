@@ -9,6 +9,7 @@ import com.ael.algoryqrservice.qrservice.console.dto.ConsoleDtos;
 import com.ael.algoryqrservice.qrservice.console.service.ConsoleAccess;
 import com.ael.algoryqrservice.qrservice.console.service.ConsoleSessionService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceCustomerService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceProgramService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceReportService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceReservationService;
 import com.ael.algoryqrservice.qrservice.model.Branch;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -79,6 +81,19 @@ class DeviceCustomerAndReservationTest {
     private SecurityUtils securityUtils;
 
     private DeviceCustomerService customerService;
+    private DeviceProgramService programService;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceProgramSettingRepository settingRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceTierRepository tierRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceMembershipPlanRepository planRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceMembershipRepository membershipRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.console.service.DeviceSaleAccounting saleAccounting;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceMaintenanceLogRepository maintenanceRepository;
     private DeviceReservationService reservationService;
     private DeviceReportService reportService;
 
@@ -86,10 +101,13 @@ class DeviceCustomerAndReservationTest {
     void setUp() {
         AppTime.setClock(Clock.fixed(NOW.atZone(AppTime.ZONE).toInstant(), AppTime.ZONE));
         ConsoleAccess access = new ConsoleAccess(branchService, securityUtils);
-        customerService = new DeviceCustomerService(customerRepository, txnRepository, access);
+        programService = new DeviceProgramService(settingRepository, tierRepository, planRepository, membershipRepository,
+                customerRepository, txnRepository, saleAccounting, access);
+        customerService = new DeviceCustomerService(customerRepository, txnRepository, access, programService);
         reservationService = new DeviceReservationService(
                 reservationRepository, consoleRepository, customerRepository, sessionService, access);
-        reportService = new DeviceReportService(sessionRepository, segmentRepository, consoleRepository, access);
+        reportService = new DeviceReportService(sessionRepository, segmentRepository, consoleRepository, access,
+                maintenanceRepository);
         when(securityUtils.getCurrentMerchantId()).thenReturn(MERCHANT);
         when(securityUtils.findCurrentStaffId()).thenReturn(Optional.empty());
         Branch branch = new Branch();
@@ -115,6 +133,62 @@ class DeviceCustomerAndReservationTest {
         assertThatThrownBy(() -> customerService.create(new ConsoleDtos.CustomerRequest("Ali", "0532 111 22 33", null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("telefonla");
+    }
+
+    @Test
+    void create_withAFriendsCode_givesTheWelcomeBonus_andRemembersTheReferrer() {
+        DeviceCustomer friend = DeviceCustomer.builder().id(71L).merchantId(MERCHANT).name("Ayşe")
+                .balance(BigDecimal.ZERO).totalSpent(BigDecimal.ZERO).referralCode("ABC234").build();
+        when(customerRepository.findByMerchantIdAndReferralCodeAndDeletedFalse(MERCHANT, "ABC234")).thenReturn(Optional.of(friend));
+        when(settingRepository.findByMerchantId(MERCHANT)).thenReturn(Optional.of(
+                com.ael.algoryqrservice.qrservice.model.DeviceProgramSetting.builder()
+                        .merchantId(MERCHANT).referralWelcomeAmount(new BigDecimal("25.00")).build()));
+
+        ConsoleDtos.CustomerResponse created = customerService.create(
+                new ConsoleDtos.CustomerRequest("Mert", null, null, " abc234 "));
+
+        assertThat(created.referredById()).isEqualTo(71L);
+        assertThat(created.bonusBalance()).isEqualByComparingTo("25.00");
+        assertThat(created.balance()).isEqualByComparingTo("0.00");
+        assertThat(created.referralCode()).hasSize(6);
+    }
+
+    @Test
+    void create_withAnUnknownCode_isBadRequest() {
+        assertThatThrownBy(() -> customerService.create(new ConsoleDtos.CustomerRequest("Mert", null, null, "NOPE")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void gift_goesToTheBonusBalance_notThePaidBalance() {
+        DeviceCustomer customer = customer("20.00");
+
+        ConsoleDtos.CustomerResponse gifted = customerService.gift(customer.getId(),
+                new ConsoleDtos.GiftRequest(new BigDecimal("40"), "Doğum günü"));
+
+        assertThat(gifted.balance()).isEqualByComparingTo("20.00");
+        assertThat(gifted.bonusBalance()).isEqualByComparingTo("40.00");
+        ArgumentCaptor<DeviceCustomerTxn> txn = ArgumentCaptor.forClass(DeviceCustomerTxn.class);
+        verify(txnRepository).save(txn.capture());
+        assertThat(txn.getValue().getTxnType()).isEqualTo(com.ael.algoryqrservice.qrservice.console.domain.DeviceCustomerTxnType.GIFT);
+    }
+
+    @Test
+    void customer_showsTheLevelReached() {
+        DeviceCustomer customer = customer("0.00");
+        customer.setTotalSpent(new BigDecimal("750.00"));
+        when(customerRepository.findByIdAndMerchantIdAndDeletedFalse(70L, MERCHANT)).thenReturn(Optional.of(customer));
+        when(tierRepository.findByMerchantIdAndDeletedFalseOrderByMinSpentAscIdAsc(MERCHANT)).thenReturn(List.of(
+                com.ael.algoryqrservice.qrservice.model.DeviceTier.builder().name("Bronz").minSpent(new BigDecimal("0")).discountPercent(BigDecimal.ZERO).build(),
+                com.ael.algoryqrservice.qrservice.model.DeviceTier.builder().name("Gümüş").minSpent(new BigDecimal("500")).discountPercent(new BigDecimal("5")).build(),
+                com.ael.algoryqrservice.qrservice.model.DeviceTier.builder().name("Altın").minSpent(new BigDecimal("2000")).discountPercent(new BigDecimal("10")).build()));
+
+        ConsoleDtos.CustomerResponse response = customerService.get(customer.getId());
+
+        assertThat(response.tierName()).isEqualTo("Gümüş");
+        assertThat(response.tierDiscountPercent()).isEqualByComparingTo("5");
     }
 
     @Test
@@ -300,7 +374,8 @@ class DeviceCustomerAndReservationTest {
     private static ConsoleDtos.SessionResponse sessionResponse(Long id) {
         return new ConsoleDtos.SessionResponse(id, BRANCH, 7L, "PS5 - 1", DeviceType.PLAYSTATION, null, "Zeynep", null,
                 BigDecimal.TEN, 2, NOW, null, null, false, 90, 0, 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, null, BigDecimal.ZERO, null, true, 40L, List.of(), List.of());
+                BigDecimal.ZERO, null, BigDecimal.ZERO, null, true, 40L, List.of(), List.of(),
+                null, null, null, null, null, null, null, null, null, null, null);
     }
 
 }

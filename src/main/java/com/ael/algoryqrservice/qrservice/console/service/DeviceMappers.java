@@ -2,6 +2,7 @@ package com.ael.algoryqrservice.qrservice.console.service;
 
 import com.ael.algoryqrservice.qrservice.console.dto.ConsoleDtos;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomer;
+import com.ael.algoryqrservice.qrservice.model.DeviceTier;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomerTxn;
 import com.ael.algoryqrservice.qrservice.model.DeviceReservation;
 import com.ael.algoryqrservice.qrservice.model.DeviceSessionItem;
@@ -67,6 +68,10 @@ final class DeviceMappers {
     }
 
     static ConsoleDtos.CustomerResponse customer(DeviceCustomer c) {
+        return customer(c, null, 0);
+    }
+
+    static ConsoleDtos.CustomerResponse customer(DeviceCustomer c, DeviceTier tier, int membershipMinutes) {
         return new ConsoleDtos.CustomerResponse(
                 c.getId(),
                 c.getName(),
@@ -76,7 +81,15 @@ final class DeviceMappers {
                 c.getFreeMinutes(),
                 c.getLoyaltyProgressMinutes(),
                 c.getTotalMinutes(),
-                c.getTotalSpent()
+                c.getTotalSpent(),
+                c.getBonusBalance(),
+                c.getReferralCode(),
+                c.getReferredById(),
+                c.getVisits(),
+                c.getLastVisitAt(),
+                tier == null ? null : tier.getName(),
+                tier == null ? null : tier.getDiscountPercent(),
+                membershipMinutes
         );
     }
 
@@ -101,6 +114,28 @@ final class DeviceMappers {
                 i.getQuantity(),
                 i.getLineTotal()
         );
+    }
+
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+    private static final String TOKEN_CHARS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    /** Unguessable key for a public link. */
+    static String newToken(int length) {
+        return random(TOKEN_CHARS, length);
+    }
+
+    /** Short code people can read out, without look-alike characters. */
+    static String newCode(int length) {
+        return random(CODE_CHARS, length);
+    }
+
+    private static String random(String alphabet, int length) {
+        StringBuilder out = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            out.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
+        }
+        return out.toString();
     }
 
     static String blankToNull(String value) {

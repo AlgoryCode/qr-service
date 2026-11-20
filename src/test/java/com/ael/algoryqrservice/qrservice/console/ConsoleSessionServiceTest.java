@@ -103,6 +103,16 @@ class ConsoleSessionServiceTest {
     private SecurityUtils securityUtils;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceGameRepository gameRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.console.service.DeviceLibraryService libraryService;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.console.service.DeviceProgramService programService;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.console.service.DeviceCustomerService customerService;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.DeviceMembershipRepository membershipRepository;
 
     private final List<DeviceSessionSegment> segments = new ArrayList<>();
     private final List<DeviceSessionItem> items = new ArrayList<>();
@@ -116,10 +126,10 @@ class ConsoleSessionServiceTest {
         at(NOW);
         ConsoleAccess access = new ConsoleAccess(branchService, securityUtils);
         catalogService = new ConsoleCatalogService(consoleRepository, rateSettingRepository, sessionRepository,
-                typeRateRepository, tariffRepository, reservationRepository, access);
+                typeRateRepository, tariffRepository, reservationRepository, access, gameRepository);
         sessionService = new ConsoleSessionService(sessionRepository, consoleRepository, catalogService, access,
                 segmentRepository, itemRepository, customerRepository, customerTxnRepository, menuProductRepository,
-                menuRepository, eventPublisher);
+                menuRepository, eventPublisher, libraryService, programService, customerService, membershipRepository);
         when(securityUtils.getCurrentMerchantId()).thenReturn(MERCHANT);
         when(securityUtils.findCurrentStaffId()).thenReturn(Optional.empty());
         when(sessionRepository.save(any(ConsoleSession.class))).thenAnswer(inv -> {
@@ -581,7 +591,7 @@ class ConsoleSessionServiceTest {
         when(sessionRepository.findById(500L)).thenReturn(Optional.of(open));
         when(customerRepository.findById(70L)).thenReturn(Optional.of(c));
 
-        ConsoleDtos.SessionQuoteResponse quote = sessionService.quote(500L);
+        ConsoleDtos.SessionQuoteResponse quote = sessionService.quote(500L, null);
 
         assertThat(quote.timeAmount()).isEqualByComparingTo("120.00");
         assertThat(quote.loyaltyMinutesAvailable()).isEqualTo(90);
@@ -600,6 +610,179 @@ class ConsoleSessionServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("açık oturum");
         verify(consoleRepository, never()).save(any());
+    }
+
+    // ---- v3: packages, games, maintenance, programme, QR requests ------------------------------------------------
+
+    @Test
+    void start_withPackage_plansItsMinutes_andChargesTheFixedPrice() {
+        when(consoleRepository.lockOwned(7L, MERCHANT)).thenReturn(Optional.of(console(7L, new BigDecimal("120.00"))));
+        com.ael.algoryqrservice.qrservice.model.DevicePackage pkg = com.ael.algoryqrservice.qrservice.model.DevicePackage.builder()
+                .id(3L).merchantId(MERCHANT).branchId(BRANCH).name("3 saat").minutes(180).price(new BigDecimal("250.00")).build();
+        when(libraryService.requirePackageFor(any(), eq(3L), any())).thenReturn(pkg);
+
+        ConsoleDtos.SessionResponse started = sessionService.start(7L,
+                new ConsoleDtos.StartSessionRequest(null, null, null, null, null, 3L, null));
+
+        assertThat(started.plannedMinutes()).isEqualTo(180);
+        assertThat(started.packageName()).isEqualTo("3 saat");
+        ConsoleSession saved = captureSaved();
+        when(sessionRepository.lockOwned(500L, MERCHANT)).thenReturn(Optional.of(saved));
+        at(NOW.plusMinutes(200));
+
+        sessionService.finish(500L, null);
+
+        // 180 min in the package (250) + 20 min at 120/h (40).
+        assertThat(saved.getTimeAmount()).isEqualByComparingTo("290.00");
+        assertThat(saved.getDurationMinutes()).isEqualTo(200);
+    }
+
+    @Test
+    void start_onDeviceInMaintenance_isRefused() {
+        GameConsole broken = console(7L, new BigDecimal("120.00"));
+        broken.setMaintenance(true);
+        when(consoleRepository.lockOwned(7L, MERCHANT)).thenReturn(Optional.of(broken));
+
+        assertThatThrownBy(() -> sessionService.start(7L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void start_withGame_keepsItsName() {
+        when(consoleRepository.lockOwned(7L, MERCHANT)).thenReturn(Optional.of(console(7L, new BigDecimal("120.00"))));
+        when(libraryService.requireGameFor(any(), eq(9L))).thenReturn(com.ael.algoryqrservice.qrservice.model.DeviceGame.builder()
+                .id(9L).merchantId(MERCHANT).branchId(BRANCH).name("EA FC 26").build());
+
+        ConsoleDtos.SessionResponse started = sessionService.start(7L,
+                new ConsoleDtos.StartSessionRequest(null, null, null, null, null, null, 9L));
+
+        assertThat(started.gameId()).isEqualTo(9L);
+        assertThat(started.gameName()).isEqualTo("EA FC 26");
+    }
+
+    @Test
+    void finish_takesLevelDiscount_thenBonus_andCountsTheVisit() {
+        ConsoleSession open = running(NOW.minusMinutes(60), "120.00");
+        open.setCustomerId(70L);
+        DeviceCustomer c = customer("0.00", 0, 0);
+        c.setBonusBalance(new BigDecimal("30.00"));
+        c.setTotalSpent(new BigDecimal("1000.00"));
+        when(programService.tiers(MERCHANT)).thenReturn(List.of(com.ael.algoryqrservice.qrservice.model.DeviceTier.builder()
+                .name("Gümüş").minSpent(new BigDecimal("500.00")).discountPercent(new BigDecimal("10")).build()));
+
+        sessionService.finish(500L, new ConsoleDtos.FinishSessionRequest(null, null, null, false, false, true));
+
+        // 120 − 10% (12) − 30 bonus = 78.
+        assertThat(open.getTierDiscountAmount()).isEqualByComparingTo("12.00");
+        assertThat(open.getBonusUsed()).isEqualByComparingTo("30.00");
+        assertThat(open.getDiscountAmount()).isEqualByComparingTo("42.00");
+        assertThat(open.getAmount()).isEqualByComparingTo("78.00");
+        assertThat(c.getBonusBalance()).isEqualByComparingTo("0.00");
+        assertThat(c.getVisits()).isEqualTo(1);
+        assertThat(c.getLastVisitAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void finish_spendsMembershipMinutes_beforeLoyaltyMinutes() {
+        ConsoleSession open = running(NOW.minusMinutes(60), "120.00");
+        open.setCustomerId(70L);
+        DeviceCustomer c = customer("0.00", 30, 0);
+        com.ael.algoryqrservice.qrservice.model.DeviceMembership membership = com.ael.algoryqrservice.qrservice.model.DeviceMembership.builder()
+                .id(44L).merchantId(MERCHANT).customerId(70L).minutesTotal(600).minutesLeft(40).build();
+        when(programService.usable(eq(70L), eq(MERCHANT), any(), any())).thenReturn(List.of(membership));
+        when(membershipRepository.lockById(44L)).thenReturn(Optional.of(membership));
+
+        sessionService.finish(500L, new ConsoleDtos.FinishSessionRequest(null, null, null, true, true, false));
+
+        // 40 membership minutes (80 TL), then 20 of the 30 loyalty minutes (40 TL): nothing left to pay.
+        assertThat(open.getMembershipMinutesUsed()).isEqualTo(40);
+        assertThat(open.getLoyaltyMinutesUsed()).isEqualTo(20);
+        assertThat(open.getAmount()).isEqualByComparingTo("0.00");
+        assertThat(open.getMembershipId()).isEqualTo(44L);
+        assertThat(membership.getMinutesLeft()).isZero();
+        assertThat(c.getFreeMinutes()).isEqualTo(10);
+    }
+
+    @Test
+    void finish_levelDiscount_doesNotApplyToPackages() {
+        ConsoleSession open = running(NOW.minusMinutes(60), "120.00");
+        open.setCustomerId(70L);
+        open.setPackageId(3L);
+        open.setPackageMinutes(120);
+        open.setPackagePrice(new BigDecimal("200.00"));
+        DeviceCustomer c = customer("0.00", 0, 0);
+        c.setTotalSpent(new BigDecimal("1000.00"));
+        when(programService.tiers(MERCHANT)).thenReturn(List.of(com.ael.algoryqrservice.qrservice.model.DeviceTier.builder()
+                .name("Gümüş").minSpent(new BigDecimal("500.00")).discountPercent(new BigDecimal("10")).build()));
+
+        sessionService.finish(500L, null);
+
+        assertThat(open.getAmount()).isEqualByComparingTo("200.00");
+        assertThat(open.getTierDiscountAmount()).isNull();
+    }
+
+    @Test
+    void finish_firstVisitOfAReferredCustomer_paysTheReferrerOnce() {
+        ConsoleSession open = running(NOW.minusMinutes(30), "120.00");
+        open.setCustomerId(70L);
+        DeviceCustomer c = customer("0.00", 0, 0);
+        c.setReferredById(71L);
+        DeviceCustomer referrer = DeviceCustomer.builder().id(71L).merchantId(MERCHANT).name("Ayşe")
+                .balance(BigDecimal.ZERO).totalSpent(BigDecimal.ZERO).build();
+        when(customerRepository.lockOwned(71L, MERCHANT)).thenReturn(Optional.of(referrer));
+        when(programService.setting(MERCHANT)).thenReturn(Optional.of(
+                com.ael.algoryqrservice.qrservice.model.DeviceProgramSetting.builder()
+                        .merchantId(MERCHANT).referralRewardAmount(new BigDecimal("50.00")).build()));
+
+        sessionService.finish(500L, null);
+
+        assertThat(c.isReferralRewarded()).isTrue();
+        verify(customerService).addBonus(eq(referrer), eq(new BigDecimal("50.00")),
+                eq(com.ael.algoryqrservice.qrservice.console.domain.DeviceCustomerTxnType.REFERRAL), any(), eq(500L));
+    }
+
+    @Test
+    void approveExtension_addsTheRequestedMinutes_andClearsTheRequest() {
+        ConsoleSession open = running(NOW.minusMinutes(50), "120.00");
+        open.setPlannedMinutes(60);
+        open.setExtensionRequestMinutes(30);
+        open.setExtensionRequestedAt(NOW.minusMinutes(1));
+
+        ConsoleDtos.SessionResponse response = sessionService.approveExtension(500L);
+
+        assertThat(response.plannedMinutes()).isEqualTo(90);
+        assertThat(open.getExtensionRequestMinutes()).isNull();
+        assertThat(open.getExtensionRequestedAt()).isNull();
+    }
+
+    @Test
+    void approveExtension_withoutARequest_isRefused() {
+        running(NOW.minusMinutes(50), "120.00");
+
+        assertThatThrownBy(() -> sessionService.approveExtension(500L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void quote_withOptions_showsTheFinalAmount() {
+        ConsoleSession open = running(NOW.minusMinutes(60), "120.00");
+        open.setCustomerId(70L);
+        DeviceCustomer c = customer("0.00", 0, 0);
+        c.setBonusBalance(new BigDecimal("20.00"));
+        when(sessionRepository.findById(500L)).thenReturn(Optional.of(open));
+        when(customerRepository.findById(70L)).thenReturn(Optional.of(c));
+
+        ConsoleDtos.SessionQuoteResponse quote = sessionService.quote(500L,
+                new ConsoleDtos.FinishSessionRequest(null, null, new BigDecimal("10"), false, false, true));
+
+        // 120 − 20 bonus = 100, then 10% = 10.
+        assertThat(quote.bonusUsed()).isEqualByComparingTo("20.00");
+        assertThat(quote.manualDiscount()).isEqualByComparingTo("10.00");
+        assertThat(quote.amount()).isEqualByComparingTo("90.00");
     }
 
     // ---- fixtures ----------------------------------------------------------------------------------------------

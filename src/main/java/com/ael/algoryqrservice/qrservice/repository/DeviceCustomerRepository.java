@@ -35,4 +35,29 @@ public interface DeviceCustomerRepository extends JpaRepository<DeviceCustomer, 
             order by c.name asc, c.id asc
             """)
     Page<DeviceCustomer> search(@Param("merchantId") Long merchantId, @Param("q") String q, Pageable pageable);
+
+    Optional<DeviceCustomer> findByMerchantIdAndReferralCodeAndDeletedFalse(Long merchantId, String referralCode);
+
+    boolean existsByMerchantIdAndReferralCode(Long merchantId, String referralCode);
+
+    /** Best customers by total spending. */
+    @Query("""
+            select c from DeviceCustomer c
+            where c.merchantId = :merchantId and c.deleted = false and c.totalSpent > 0
+            order by c.totalSpent desc, c.id asc
+            """)
+    List<DeviceCustomer> findTopSpenders(@Param("merchantId") Long merchantId, Pageable pageable);
+
+    /** Customers who came before but not since {@code before}, best first. */
+    @Query("""
+            select c from DeviceCustomer c
+            where c.merchantId = :merchantId and c.deleted = false and c.visits > 0
+              and c.lastVisitAt is not null and c.lastVisitAt < :before
+            order by c.totalSpent desc, c.lastVisitAt desc, c.id asc
+            """)
+    List<DeviceCustomer> findLapsed(
+            @Param("merchantId") Long merchantId,
+            @Param("before") java.time.LocalDateTime before,
+            Pageable pageable
+    );
 }
