@@ -49,7 +49,7 @@ public class LegacyApiPathCompatFilter extends OncePerRequestFilter {
     /** First path segments of controllers that moved under {@code /api/v1} unchanged. */
     private static final Set<String> MOVED_ROOTS = Set.of(
             "access", "account", "accounting", "admin", "analytics", "billing-addresses", "branches",
-            "campaign", "coupons", "customer", "dashboard", "features", "integrations", "internal", "invoices",
+            "campaign", "console", "coupons", "customer", "dashboard", "features", "integrations", "internal", "invoices",
             "menu", "menus", "merchant", "onboarding", "order-flows", "payments", "plan-changes", "platform-feedback", "print-agent",
             "purchases", "staff", "stock", "store", "subscription"
     );
