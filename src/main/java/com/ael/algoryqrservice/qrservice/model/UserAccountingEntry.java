@@ -79,6 +79,9 @@ public class UserAccountingEntry {
     @Column(name = "source_order_id")
     private Long sourceOrderId;
 
+    @Column(name = "source_console_session_id")
+    private Long sourceConsoleSessionId;
+
     @Column(name = "created_by_staff_id")
     private Long createdByStaffId;
 

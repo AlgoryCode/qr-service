@@ -10,6 +10,7 @@ import com.ael.algoryqrservice.qrservice.repository.GameConsoleRepository;
 import com.ael.algoryqrservice.qrservice.util.AppTime;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ public class ConsoleSessionService {
     private final ConsoleCatalogService catalogService;
     private final BranchService branchService;
     private final SecurityUtils securityUtils;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ConsoleDtos.SessionResponse start(Long consoleId, ConsoleDtos.StartSessionRequest request) {
@@ -76,6 +78,7 @@ public class ConsoleSessionService {
         session.setDurationMinutes(minutes);
         session.setAmount(ConsoleRentalPricing.amount(session.getHourlyRate(), minutes));
         ConsoleSession saved = sessionRepository.save(session);
+        eventPublisher.publishEvent(new ConsoleSessionFinishedEvent(saved.getId()));
         return toResponse(saved, consoleNames(List.of(saved.getConsoleId())).get(saved.getConsoleId()), endedAt);
     }
 

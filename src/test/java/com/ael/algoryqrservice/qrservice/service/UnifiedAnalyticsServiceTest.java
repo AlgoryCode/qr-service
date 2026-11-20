@@ -184,6 +184,7 @@ class UnifiedAnalyticsServiceTest {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
+                BigDecimal.ZERO,
                 new BigDecimal("240.00"),
                 BigDecimal.ZERO,
                 new BigDecimal("240.00"),
@@ -242,7 +243,7 @@ class UnifiedAnalyticsServiceTest {
                 new AnalyticsDtos.UnsoldCatalog(0L, List.of()),
                 new AnalyticsDtos.RevenuePaymentBreakdown(
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, "TRY"),
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, "TRY"),
                 List.of(), List.of(), List.of()
         );
     }

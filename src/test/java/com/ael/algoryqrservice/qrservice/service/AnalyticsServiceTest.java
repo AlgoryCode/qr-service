@@ -36,6 +36,9 @@ import com.ael.algoryqrservice.qrservice.repository.MenuRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuSubCategoryRepository;
 import com.ael.algoryqrservice.qrservice.repository.MenuVisitRepository;
 import org.junit.jupiter.api.BeforeEach;
+import com.ael.algoryqrservice.qrservice.model.ConsoleSession;
+import com.ael.algoryqrservice.qrservice.repository.ConsoleSessionRepository;
+import com.ael.algoryqrservice.qrservice.repository.GameConsoleRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -97,6 +100,10 @@ class AnalyticsServiceTest {
     private YemekSepetiConnectionRepository yemekSepetiConnectionRepository;
     @Mock
     private YemekSepetiOrderRepository yemekSepetiOrderRepository;
+    @Mock
+    private ConsoleSessionRepository consoleSessionRepository;
+    @Mock
+    private GameConsoleRepository gameConsoleRepository;
 
     private AnalyticsService service;
 
@@ -120,7 +127,9 @@ class AnalyticsServiceTest {
                 uberEatsOrderRepository,
                 yemekSepetiConnectionRepository,
                 yemekSepetiOrderRepository,
-                waiterPerformanceReportService
+                waiterPerformanceReportService,
+                consoleSessionRepository,
+                gameConsoleRepository
         );
     }
 
@@ -686,6 +695,99 @@ class AnalyticsServiceTest {
         assertThat(report.branchId()).isEqualTo(branchId);
         assertThat(report.menuId()).isNull();
         assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("40.00");
+    }
+
+    private void stubEmptyBranch(Long ownerId, Long branchId, Menu menu) {
+        when(branchService.requireOwnedForMerchant(branchId, ownerId))
+                .thenReturn(Branch.builder().id(branchId).merchantId(ownerId).name("Kadikoy").build());
+        when(menuRepository.findByBranchIdAndChannelAndDeletedFalse(branchId, MenuChannel.QR)).thenReturn(List.of(menu));
+        when(menuProductRepository.findByMenuIdInAndDeletedFalseOrderBySortOrderAscProductIdAsc(any()))
+                .thenReturn(List.of());
+        when(menuSubCategoryRepository.findByIdInAndDeletedFalse(any())).thenReturn(List.of());
+        when(merchantStaffRepository.findByBranchIdOrderByDisplayNameAsc(any())).thenReturn(List.of());
+        when(menuFixedExpenseService.totalDailyActiveAmount(List.of(5L))).thenReturn(BigDecimal.ZERO);
+        when(billPaymentRepository.findByMenuIdInAndPaidAtBetween(any(), any(), any())).thenReturn(List.of());
+    }
+
+    private static ConsoleSession finishedConsoleSession(String amount, LocalDateTime endedAt) {
+        ConsoleSession session = ConsoleSession.builder()
+                .merchantId(9L)
+                .branchId(2L)
+                .consoleId(7L)
+                .hourlyRate(new BigDecimal("120.00"))
+                .startedAt(endedAt.minusHours(1))
+                .endedAt(endedAt)
+                .durationMinutes(60)
+                .amount(new BigDecimal(amount))
+                .build();
+        return session;
+    }
+
+    @Test
+    void getBranchRevenueReport_whenConsoleSessionsFinished_thenAddsConsoleChannelToGross() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        Menu menu = publicMenu(5L, ownerId);
+        menu.setBranchId(branchId);
+        stubEmptyBranch(ownerId, branchId, menu);
+        when(consoleSessionRepository.findFinishedForBranch(eq(ownerId), eq(branchId), any(), any()))
+                .thenReturn(List.of(
+                        finishedConsoleSession("120.00", LocalDateTime.of(2026, 8, 13, 20, 0)),
+                        finishedConsoleSession("45.50", LocalDateTime.of(2026, 8, 13, 22, 15))
+                ));
+
+        AnalyticsDtos.MenuRevenueReportResponse report =
+                service.getBranchRevenueReport(branchId, null, ownerId, day, day);
+
+        assertThat(report.kpis().totalRevenue()).isEqualByComparingTo("165.50");
+        assertThat(report.paymentBreakdown().consoleRevenue()).isEqualByComparingTo("165.50");
+        assertThat(report.paymentBreakdown().grossRevenue()).isEqualByComparingTo("165.50");
+        assertThat(report.channels())
+                .filteredOn(channel -> "CONSOLE".equals(channel.code()))
+                .singleElement()
+                .satisfies(channel -> {
+                    assertThat(channel.label()).isEqualTo("Konsol");
+                    assertThat(channel.revenue()).isEqualByComparingTo("165.50");
+                    assertThat(channel.orderCount()).isEqualTo(2L);
+                    assertThat(channel.connected()).isTrue();
+                });
+        assertThat(report.channelDaily())
+                .filteredOn(point -> "CONSOLE".equals(point.channelCode()))
+                .singleElement()
+                .satisfies(point -> assertThat(point.revenue()).isEqualByComparingTo("165.50"));
+    }
+
+    @Test
+    void getBranchRevenueReport_whenMerchantHasNoConsoles_thenNoConsoleChannel() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        Menu menu = publicMenu(5L, ownerId);
+        menu.setBranchId(branchId);
+        stubEmptyBranch(ownerId, branchId, menu);
+
+        AnalyticsDtos.MenuRevenueReportResponse report =
+                service.getBranchRevenueReport(branchId, null, ownerId, day, day);
+
+        assertThat(report.channels()).noneMatch(channel -> "CONSOLE".equals(channel.code()));
+        assertThat(report.channelDaily()).noneMatch(point -> "CONSOLE".equals(point.channelCode()));
+        assertThat(report.paymentBreakdown().consoleRevenue()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void getBranchRevenueReport_forOneMenu_thenLeavesConsolesOut() {
+        Long ownerId = 9L;
+        Long branchId = 2L;
+        LocalDate day = LocalDate.of(2026, 8, 13);
+        Menu menu = publicMenu(5L, ownerId);
+        menu.setBranchId(branchId);
+        stubEmptyBranch(ownerId, branchId, menu);
+
+        service.getBranchRevenueReport(branchId, 5L, ownerId, day, day);
+
+        verify(consoleSessionRepository, never()).findFinishedForBranch(any(), any(), any(), any());
+        verify(consoleSessionRepository, never()).findFinishedForMerchant(any(), any(), any());
     }
 
     private Menu publicMenu(Long menuId, Long ownerId) {

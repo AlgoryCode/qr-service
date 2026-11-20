@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,5 +33,35 @@ public interface ConsoleSessionRepository extends JpaRepository<ConsoleSession, 
             Long branchId,
             Long merchantId,
             Pageable pageable
+    );
+
+    /** Finished sessions of the merchant (every branch) that ended in the period. */
+    @Query("""
+            select s from ConsoleSession s
+            where s.merchantId = :merchantId
+              and s.deleted = false
+              and s.endedAt is not null
+              and s.endedAt between :from and :to
+            """)
+    List<ConsoleSession> findFinishedForMerchant(
+            @Param("merchantId") Long merchantId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    /** Finished sessions of one branch that ended in the period. */
+    @Query("""
+            select s from ConsoleSession s
+            where s.merchantId = :merchantId
+              and s.branchId = :branchId
+              and s.deleted = false
+              and s.endedAt is not null
+              and s.endedAt between :from and :to
+            """)
+    List<ConsoleSession> findFinishedForBranch(
+            @Param("merchantId") Long merchantId,
+            @Param("branchId") Long branchId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
     );
 }

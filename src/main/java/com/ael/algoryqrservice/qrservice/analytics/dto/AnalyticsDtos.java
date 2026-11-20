@@ -305,6 +305,7 @@ public class AnalyticsDtos {
             BigDecimal tipRevenue,
             BigDecimal uberEatsRevenue,
             BigDecimal yemeksepetiRevenue,
+            BigDecimal consoleRevenue,
             BigDecimal grossRevenue,
             BigDecimal fixedExpenseTotal,
             BigDecimal netRevenue,
