@@ -1,5 +1,9 @@
 package com.ael.algoryqrservice.qrservice.analytics.service;
 
+import com.ael.algoryqrservice.qrservice.model.ConsoleSession;
+import com.ael.algoryqrservice.qrservice.repository.ConsoleSessionRepository;
+import com.ael.algoryqrservice.qrservice.repository.GameConsoleRepository;
+
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsConnectionRepository;
 import com.ael.algoryqrservice.qrservice.integration.ubereats.repository.UberEatsOrderRepository;
 import com.ael.algoryqrservice.qrservice.integration.yemeksepeti.repository.YemekSepetiConnectionRepository;
@@ -95,6 +99,8 @@ public class AnalyticsService {
     private final YemekSepetiConnectionRepository yemekSepetiConnectionRepository;
     private final YemekSepetiOrderRepository yemekSepetiOrderRepository;
     private final WaiterPerformanceReportService waiterPerformanceReportService;
+    private final ConsoleSessionRepository consoleSessionRepository;
+    private final GameConsoleRepository gameConsoleRepository;
 
     @Transactional
     public void recordEvents(Long menuId, AnalyticsDtos.AnalyticsEventsRequest request, String ipAddress, String userAgent) {
@@ -395,11 +401,13 @@ public class AnalyticsService {
         LocalDateTime toDt = to.plusDays(1).atStartOfDay().minusNanos(1);
         PlatformChannelStats uberStats = loadUberEatsChannelStats(ownerId, scope.branchId(), fromDt, toDt);
         PlatformChannelStats yemeksepetiStats = loadYemeksepetiChannelStats(ownerId, scope.branchId(), fromDt, toDt);
+        PlatformChannelStats consoleStats = loadConsoleChannelStats(scope, ownerId, fromDt, toDt);
         BigDecimal uberEatsRevenue = uberStats.revenue();
         BigDecimal yemeksepetiRevenue = yemeksepetiStats.revenue();
+        BigDecimal consoleRevenue = consoleStats.revenue();
 
         if (scope.menuIds().isEmpty()) {
-            return emptyRevenueReport(scope, from, to, uberStats, yemeksepetiStats);
+            return emptyRevenueReport(scope, from, to, uberStats, yemeksepetiStats, consoleStats);
         }
         Collection<Long> menuIds = scope.menuIds();
 
@@ -586,7 +594,7 @@ public class AnalyticsService {
         BigDecimal fixedExpenseTotal = dailyFixedTotal.multiply(BigDecimal.valueOf(dayCount))
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal paymentGross = totalRevenue;
-        BigDecimal grossRevenue = paymentGross.add(uberEatsRevenue).add(yemeksepetiRevenue);
+        BigDecimal grossRevenue = paymentGross.add(uberEatsRevenue).add(yemeksepetiRevenue).add(consoleRevenue);
         BigDecimal netRevenue = grossRevenue.subtract(fixedExpenseTotal).max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -615,6 +623,7 @@ public class AnalyticsService {
                 tipRevenue.setScale(2, RoundingMode.HALF_UP),
                 uberEatsRevenue.setScale(2, RoundingMode.HALF_UP),
                 yemeksepetiRevenue.setScale(2, RoundingMode.HALF_UP),
+                consoleRevenue.setScale(2, RoundingMode.HALF_UP),
                 grossRevenue.setScale(2, RoundingMode.HALF_UP),
                 fixedExpenseTotal,
                 netRevenue,
@@ -631,6 +640,7 @@ public class AnalyticsService {
                 ordersByDay,
                 uberStats,
                 yemeksepetiStats,
+                consoleStats,
                 grossRevenue
         );
 
@@ -667,6 +677,7 @@ public class AnalyticsService {
     private static final String CHANNEL_IN_HOUSE = "IN_HOUSE";
     private static final String CHANNEL_UBER_EATS = "UBER_EATS";
     private static final String CHANNEL_YEMEKSEPETI = "YEMEKSEPETI";
+    private static final String CHANNEL_CONSOLE = "CONSOLE";
 
     private record PlatformChannelStats(
             boolean connected,
@@ -745,6 +756,35 @@ public class AnalyticsService {
     private record PlatformSale(BigDecimal amount, LocalDateTime createdAt) {
     }
 
+    /**
+     * Finished console rentals, counted on the day they ended. Consoles belong to a branch, not a menu, so a
+     * single-menu report leaves them out; branch and merchant reports take the branch's or all consoles.
+     */
+    private PlatformChannelStats loadConsoleChannelStats(
+            ReportScope scope,
+            Long ownerId,
+            LocalDateTime fromDt,
+            LocalDateTime toDt
+    ) {
+        if (ownerId == null || scope.menuId() != null) {
+            return NO_PLATFORM;
+        }
+        Long branchId = scope.branchId();
+        List<ConsoleSession> sessions = branchId == null
+                ? consoleSessionRepository.findFinishedForMerchant(ownerId, fromDt, toDt)
+                : consoleSessionRepository.findFinishedForBranch(ownerId, branchId, fromDt, toDt);
+        boolean rentsConsoles = !sessions.isEmpty() || (branchId == null
+                ? gameConsoleRepository.existsByMerchantIdAndDeletedFalse(ownerId)
+                : gameConsoleRepository.existsByMerchantIdAndBranchIdAndDeletedFalse(ownerId, branchId));
+        if (!rentsConsoles) {
+            return NO_PLATFORM;
+        }
+        return platformStats(
+                sessions.stream().map(session -> new PlatformSale(session.getAmount(), session.getEndedAt())).toList(),
+                fromDt
+        );
+    }
+
     private static PlatformChannelStats platformStats(List<PlatformSale> sales, LocalDateTime fromDt) {
         Map<LocalDate, BigDecimal> revenueByDay = new HashMap<>();
         Map<LocalDate, Long> ordersByDay = new HashMap<>();
@@ -774,6 +814,7 @@ public class AnalyticsService {
             Map<LocalDate, Long> inHouseOrdersByDay,
             PlatformChannelStats uberStats,
             PlatformChannelStats yemeksepetiStats,
+            PlatformChannelStats consoleStats,
             BigDecimal grossRevenue
     ) {
         BigDecimal gross = grossRevenue == null || grossRevenue.compareTo(BigDecimal.ZERO) <= 0
@@ -783,7 +824,7 @@ public class AnalyticsService {
                 ? BigDecimal.ZERO
                 : inHouseRevenue.divide(BigDecimal.valueOf(inHouseOrderCount), 2, RoundingMode.HALF_UP);
 
-        List<AnalyticsDtos.ChannelShare> channels = List.of(
+        List<AnalyticsDtos.ChannelShare> channels = new ArrayList<>(List.of(
                 new AnalyticsDtos.ChannelShare(
                         CHANNEL_IN_HOUSE,
                         "Masa / QR",
@@ -796,7 +837,12 @@ public class AnalyticsService {
                 ),
                 platformShare(CHANNEL_UBER_EATS, "Uber Eats", uberStats, gross),
                 platformShare(CHANNEL_YEMEKSEPETI, "Yemeksepeti", yemeksepetiStats, gross)
-        );
+        ));
+        // Only merchants that rent consoles get the channel, so the others' reports stay as they were.
+        boolean showConsole = consoleStats.connected();
+        if (showConsole) {
+            channels.add(platformShare(CHANNEL_CONSOLE, "Konsol", consoleStats, gross));
+        }
 
         List<AnalyticsDtos.ChannelDailyPoint> channelDaily = new ArrayList<>();
         for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
@@ -808,6 +854,9 @@ public class AnalyticsService {
             ));
             channelDaily.add(platformDailyPoint(cursor, CHANNEL_UBER_EATS, uberStats));
             channelDaily.add(platformDailyPoint(cursor, CHANNEL_YEMEKSEPETI, yemeksepetiStats));
+            if (showConsole) {
+                channelDaily.add(platformDailyPoint(cursor, CHANNEL_CONSOLE, consoleStats));
+            }
         }
         return new ChannelBundle(channels, channelDaily);
     }
@@ -1203,11 +1252,13 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to,
             PlatformChannelStats uberStats,
-            PlatformChannelStats yemeksepetiStats
+            PlatformChannelStats yemeksepetiStats,
+            PlatformChannelStats consoleStats
     ) {
         BigDecimal uber = uberStats.revenue();
         BigDecimal yemeksepeti = yemeksepetiStats.revenue();
-        BigDecimal platforms = uber.add(yemeksepeti);
+        BigDecimal console = consoleStats.revenue();
+        BigDecimal platforms = uber.add(yemeksepeti).add(console);
         List<AnalyticsDtos.DailyRevenuePoint> daily = new ArrayList<>();
         for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
             daily.add(new AnalyticsDtos.DailyRevenuePoint(cursor, BigDecimal.ZERO, 0L));
@@ -1225,6 +1276,7 @@ public class AnalyticsService {
                 Map.of(),
                 uberStats,
                 yemeksepetiStats,
+                consoleStats,
                 platforms
         );
         return new AnalyticsDtos.MenuRevenueReportResponse(
@@ -1247,6 +1299,7 @@ public class AnalyticsService {
                         BigDecimal.ZERO,
                         uber.setScale(2, RoundingMode.HALF_UP),
                         yemeksepeti.setScale(2, RoundingMode.HALF_UP),
+                        console.setScale(2, RoundingMode.HALF_UP),
                         platforms.setScale(2, RoundingMode.HALF_UP),
                         BigDecimal.ZERO,
                         platforms.setScale(2, RoundingMode.HALF_UP),

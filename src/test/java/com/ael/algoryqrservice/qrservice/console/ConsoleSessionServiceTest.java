@@ -14,6 +14,8 @@ import com.ael.algoryqrservice.qrservice.repository.GameConsoleRepository;
 import com.ael.algoryqrservice.qrservice.util.AppTime;
 import com.ael.algoryqrservice.qrservice.util.SecurityUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.context.ApplicationEventPublisher;
+import com.ael.algoryqrservice.qrservice.console.service.ConsoleSessionFinishedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,6 +58,8 @@ class ConsoleSessionServiceTest {
     private BranchService branchService;
     @Mock
     private SecurityUtils securityUtils;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private ConsoleCatalogService catalogService;
     private ConsoleSessionService sessionService;
@@ -66,7 +70,7 @@ class ConsoleSessionServiceTest {
         catalogService = new ConsoleCatalogService(
                 consoleRepository, rateSettingRepository, sessionRepository, branchService, securityUtils);
         sessionService = new ConsoleSessionService(
-                sessionRepository, consoleRepository, catalogService, branchService, securityUtils);
+                sessionRepository, consoleRepository, catalogService, branchService, securityUtils, eventPublisher);
         when(securityUtils.getCurrentMerchantId()).thenReturn(MERCHANT);
         when(sessionRepository.save(any(ConsoleSession.class))).thenAnswer(inv -> {
             ConsoleSession s = inv.getArgument(0);
@@ -157,6 +161,7 @@ class ConsoleSessionServiceTest {
         assertThat(response.durationMinutes()).isEqualTo(96);
         assertThat(response.amount()).isEqualByComparingTo("192.00");
         assertThat(response.consoleName()).isEqualTo("PS5 - 1");
+        verify(eventPublisher).publishEvent(new ConsoleSessionFinishedEvent(500L));
     }
 
     @Test
@@ -169,6 +174,7 @@ class ConsoleSessionServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("zaten bitmiş");
         verify(sessionRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

@@ -23,4 +23,8 @@ public interface GameConsoleRepository extends JpaRepository<GameConsole, Long> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from GameConsole c where c.id = :id and c.merchantId = :merchantId and c.deleted = false")
     Optional<GameConsole> lockOwned(@Param("id") Long id, @Param("merchantId") Long merchantId);
+
+    boolean existsByMerchantIdAndDeletedFalse(Long merchantId);
+
+    boolean existsByMerchantIdAndBranchIdAndDeletedFalse(Long merchantId, Long branchId);
 }

@@ -28,7 +28,8 @@ public final class UserAccountingEntrySpecifications {
             predicates.add(cb.equal(root.get("merchantId"), merchantId));
             predicates.add(root.get("sourceType").in(
                     AccountingSourceType.MANUAL,
-                    AccountingSourceType.BILL_SALE
+                    AccountingSourceType.BILL_SALE,
+                    AccountingSourceType.CONSOLE_SESSION
             ));
             if (entryTypes != null && !entryTypes.isEmpty()) {
                 predicates.add(root.get("entryType").in(entryTypes));

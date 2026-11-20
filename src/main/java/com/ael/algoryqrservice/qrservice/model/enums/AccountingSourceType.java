@@ -4,5 +4,6 @@ public enum AccountingSourceType {
     MANUAL,
     BILL_SALE,
     BILL_TIP,
-    ORDER_SALE
+    ORDER_SALE,
+    CONSOLE_SESSION
 }
