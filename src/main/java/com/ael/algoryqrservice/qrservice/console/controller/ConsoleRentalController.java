@@ -8,6 +8,7 @@ import com.ael.algoryqrservice.qrservice.console.service.DeviceLibraryService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceMaintenanceService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceProgramService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceShiftService;
+import com.ael.algoryqrservice.qrservice.console.service.DeviceQrService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceTournamentService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceReportService;
 import com.ael.algoryqrservice.qrservice.console.service.DeviceReservationService;
@@ -50,6 +51,7 @@ public class ConsoleRentalController {
     private final DeviceProgramService programService;
     private final DeviceShiftService shiftService;
     private final DeviceTournamentService tournamentService;
+    private final DeviceQrService deviceQrService;
 
     // ---- Devices and rates -------------------------------------------------------------------------------------
 
@@ -377,6 +379,12 @@ public class ConsoleRentalController {
     }
 
     // ---- Device extras: QR key, games, maintenance -------------------------------------------------------------
+
+    @GetMapping("/consoles/{consoleId}/qr")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.DeviceQrResponse> deviceQr(@PathVariable Long consoleId) {
+        return ResponseEntity.ok(deviceQrService.qr(consoleId));
+    }
 
     @PostMapping("/consoles/{consoleId}/public-token/rotate")
     @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
