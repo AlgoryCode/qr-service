@@ -20,5 +20,6 @@ public enum FeatureKey {
     AI_MENU_IMPORT,
     AI_MENU_IMPORT_RUN,
     ONLINE_ORDER,
-    KAFE_MENU
+    KAFE_MENU,
+    CONSOLE_RENTAL
 }

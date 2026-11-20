@@ -17,6 +17,8 @@ public final class CatalogProducts {
     /** Metered: dashboard assistant questions per day (unlimited with SMART_ASSISTANT). */
     public static final String ASSISTANT_QUESTION = "ASSISTANT_QUESTION";
     public static final String ONLINE_ORDER = "ONLINE_ORDER";
+    /** Konsol takip add-on: hourly game console rentals. */
+    public static final String CONSOLE_RENTAL = "CONSOLE_RENTAL";
 
     public static final String QR_MENU_ADDON = "QR_MENU_ADDON";
     public static final String QR_BRANCH_ADDON = "QR_BRANCH_ADDON";

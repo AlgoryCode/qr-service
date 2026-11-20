@@ -33,13 +33,13 @@ public class ConsoleRentalController {
     private final ConsoleSessionService sessionService;
 
     @GetMapping("/branches/{branchId}/consoles")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<List<ConsoleDtos.ConsoleResponse>> listConsoles(@PathVariable Long branchId) {
         return ResponseEntity.ok(catalogService.list(branchId));
     }
 
     @PostMapping("/branches/{branchId}/consoles")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.ConsoleResponse> createConsole(
             @PathVariable Long branchId,
             @Valid @RequestBody ConsoleDtos.ConsoleRequest request
@@ -48,7 +48,7 @@ public class ConsoleRentalController {
     }
 
     @PutMapping("/consoles/{consoleId}")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.ConsoleResponse> updateConsole(
             @PathVariable Long consoleId,
             @Valid @RequestBody ConsoleDtos.ConsoleRequest request
@@ -57,20 +57,20 @@ public class ConsoleRentalController {
     }
 
     @DeleteMapping("/consoles/{consoleId}")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<Void> deleteConsole(@PathVariable Long consoleId) {
         catalogService.delete(consoleId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/branches/{branchId}/rate")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.RateSettingResponse> getRate(@PathVariable Long branchId) {
         return ResponseEntity.ok(catalogService.getRate(branchId));
     }
 
     @PutMapping("/branches/{branchId}/rate")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.RateSettingResponse> updateRate(
             @PathVariable Long branchId,
             @Valid @RequestBody ConsoleDtos.RateSettingRequest request
@@ -79,7 +79,7 @@ public class ConsoleRentalController {
     }
 
     @PostMapping("/consoles/{consoleId}/sessions")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.SessionResponse> startSession(
             @PathVariable Long consoleId,
             @Valid @RequestBody(required = false) ConsoleDtos.StartSessionRequest request
@@ -88,19 +88,19 @@ public class ConsoleRentalController {
     }
 
     @PostMapping("/sessions/{sessionId}/finish")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.SessionResponse> finishSession(@PathVariable Long sessionId) {
         return ResponseEntity.ok(sessionService.finish(sessionId));
     }
 
     @GetMapping("/branches/{branchId}/sessions/active")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<List<ConsoleDtos.SessionResponse>> listActive(@PathVariable Long branchId) {
         return ResponseEntity.ok(sessionService.listActive(branchId));
     }
 
     @GetMapping("/branches/{branchId}/sessions")
-    @RequiresFeature(FeatureKey.QR_MENU)
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<ConsoleDtos.SessionPageResponse> listHistory(
             @PathVariable Long branchId,
             @RequestParam(defaultValue = "0") int page,

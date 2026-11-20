@@ -13,6 +13,7 @@ public final class CatalogScopes {
     public static final String WAITER_PANEL_OWNER = "WAITER_PANEL_OWNER";
     public static final String AI_MENU_IMPORT_OWNER = "AI_MENU_IMPORT_OWNER";
     public static final String ONLINE_ORDER_OWNER = "ONLINE_ORDER_OWNER";
+    public static final String CONSOLE_RENTAL_OWNER = "CONSOLE_RENTAL_OWNER";
 
     private static final String OWNER_SUFFIX = "_OWNER";
 
