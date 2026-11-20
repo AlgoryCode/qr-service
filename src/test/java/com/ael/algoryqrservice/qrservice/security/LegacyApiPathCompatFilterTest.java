@@ -24,6 +24,8 @@ class LegacyApiPathCompatFilterTest {
                 .isEqualTo("/api/v1/payments/paytr/notification");
         assertThat(LegacyApiPathCompatFilter.rewrite("/menu")).isEqualTo("/api/v1/menu");
         assertThat(LegacyApiPathCompatFilter.rewrite("/menus/3/ai-import")).isEqualTo("/api/v1/menus/3/ai-import");
+        assertThat(LegacyApiPathCompatFilter.rewrite("/console/branches/4/consoles"))
+                .isEqualTo("/api/v1/console/branches/4/consoles");
     }
 
     @Test
