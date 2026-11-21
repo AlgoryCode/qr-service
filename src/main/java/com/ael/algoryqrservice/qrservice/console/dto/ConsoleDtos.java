@@ -823,4 +823,8 @@ public final class ConsoleDtos {
 
     public record PublicExtensionRequest(@NotNull @Min(5) @Max(240) Integer minutes) {
     }
+
+    /** The device's public page link and its QR as a base64 PNG. */
+    public record DeviceQrResponse(Long consoleId, String consoleName, String url, String imageBase64) {
+    }
 }
