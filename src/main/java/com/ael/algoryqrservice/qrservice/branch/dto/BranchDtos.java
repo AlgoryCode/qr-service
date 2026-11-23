@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.branch.dto;
 
+import com.ael.algoryqrservice.qrservice.common.social.SocialDtos;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -57,6 +59,9 @@ public final class BranchDtos {
         private String receiptIntro;
         @Size(max = 500)
         private String receiptFooter;
+        /** Social links; a null field keeps the stored value, an empty string clears it. */
+        @jakarta.validation.Valid
+        private SocialDtos.Links socialLinks;
     }
 
     @Data
@@ -91,6 +96,7 @@ public final class BranchDtos {
         private String receiptHeader;
         private String receiptIntro;
         private String receiptFooter;
+        private SocialDtos.Links socialLinks;
         /** Read-only because the plan allows fewer branches; see /capacity/branches. */
         private boolean locked;
         private List<MenuSummary> menus;

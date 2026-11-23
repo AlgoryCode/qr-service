@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.branch.service;
 
+import com.ael.algoryqrservice.qrservice.common.social.SocialLinks;
 import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.client.FulfillmentServiceClient;
 import com.ael.algoryqrservice.qrservice.exception.BadRequestException;
@@ -125,6 +126,7 @@ public class BranchService {
         if (request.getReceiptFooter() != null) {
             branch.setReceiptFooter(trimToNull(request.getReceiptFooter()));
         }
+        SocialLinks.apply(branch, request.getSocialLinks());
         return toResponse(branchRepository.save(branch), menuRepository.findByBranchIdAndChannelAndDeletedFalse(branch.getId(), MenuChannel.QR));
     }
 
@@ -244,6 +246,7 @@ public class BranchService {
                 .receiptHeader(branch.getReceiptHeader())
                 .receiptIntro(branch.getReceiptIntro())
                 .receiptFooter(branch.getReceiptFooter())
+                .socialLinks(SocialLinks.of(branch))
                 .locked(branch.getCapacityLockedAt() != null)
                 .menus(menus.stream()
                         .map(menu -> BranchDtos.MenuSummary.builder()

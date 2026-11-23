@@ -76,6 +76,41 @@ public class Menu extends QrBaseModel {
     @Column(name = "google_reviews_url", length = 1024)
     private String googleReviewsUrl;
 
+    @Column(name = "facebook_url", length = 512)
+    private String facebookUrl;
+
+    @Column(name = "instagram_url", length = 512)
+    private String instagramUrl;
+
+    @Column(name = "youtube_url", length = 512)
+    private String youtubeUrl;
+
+    @Column(name = "tiktok_url", length = 512)
+    private String tiktokUrl;
+
+    @Column(name = "x_url", length = 512)
+    private String xUrl;
+
+    @Column(name = "show_facebook", nullable = false)
+    @Builder.Default
+    private boolean showFacebook = true;
+
+    @Column(name = "show_instagram", nullable = false)
+    @Builder.Default
+    private boolean showInstagram = true;
+
+    @Column(name = "show_youtube", nullable = false)
+    @Builder.Default
+    private boolean showYoutube = true;
+
+    @Column(name = "show_tiktok", nullable = false)
+    @Builder.Default
+    private boolean showTiktok = true;
+
+    @Column(name = "show_x", nullable = false)
+    @Builder.Default
+    private boolean showX = true;
+
     private Long packageId;
 
     @Column(nullable = false)
