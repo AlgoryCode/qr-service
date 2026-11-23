@@ -1,5 +1,7 @@
 package com.ael.algoryqrservice.qrservice.menu.dto;
 
+import com.ael.algoryqrservice.qrservice.common.social.SocialDtos;
+
 import com.ael.algoryqrservice.qrservice.model.enums.MenuReservationStatus;
 import com.ael.algoryqrservice.qrservice.model.nutrition.NutritionFacts;
 import jakarta.validation.constraints.Email;
@@ -417,6 +419,11 @@ public final class MenuDtos {
         private String email;
         private String address;
         private String googleReviewsUrl;
+        /** The menu's own social links. */
+        private SocialDtos.Links socialLinks;
+        /** The branch's social links; on the public menu they win over the menu's own. */
+        private SocialDtos.Links branchSocialLinks;
+        private SocialDtos.Visibility socialVisibility;
         private String publicUrl;
         private boolean active;
         private BigDecimal ratingAvg;
@@ -445,6 +452,8 @@ public final class MenuDtos {
         private String email;
         private String address;
         private String googleReviewsUrl;
+        /** Only the links that are set and switched on; the rest are null. */
+        private SocialDtos.Links socialLinks;
         private String publicUrl;
         private boolean active;
         private BigDecimal ratingAvg;
@@ -549,6 +558,9 @@ public final class MenuDtos {
         private String address;
         @Size(max = 1024)
         private String googleReviewsUrl;
+        @jakarta.validation.Valid
+        private SocialDtos.Links socialLinks;
+        private SocialDtos.Visibility socialVisibility;
         private Boolean active;
     }
 

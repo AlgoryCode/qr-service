@@ -41,6 +41,21 @@ public class Branch extends QrBaseModel {
     @Column(length = 255)
     private String email;
 
+    @Column(name = "facebook_url", length = 512)
+    private String facebookUrl;
+
+    @Column(name = "instagram_url", length = 512)
+    private String instagramUrl;
+
+    @Column(name = "youtube_url", length = 512)
+    private String youtubeUrl;
+
+    @Column(name = "tiktok_url", length = 512)
+    private String tiktokUrl;
+
+    @Column(name = "x_url", length = 512)
+    private String xUrl;
+
     @Column(name = "photo_url", length = 1024)
     private String photoUrl;
 

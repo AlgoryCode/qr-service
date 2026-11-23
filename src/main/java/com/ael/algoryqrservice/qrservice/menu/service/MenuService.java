@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.menu.service;
 
+import com.ael.algoryqrservice.qrservice.common.social.SocialLinks;
 import com.ael.algoryqrservice.qrservice.product.catalog.CatalogProducts;
 import com.ael.algoryqrservice.qrservice.catalog.CatalogThemes;
 import com.ael.algoryqrservice.qrservice.security.ProductUsageGateway;
@@ -1072,6 +1073,8 @@ public class MenuService {
         if (request.getGoogleReviewsUrl() != null) {
             menu.setGoogleReviewsUrl(normalizeGoogleReviewsUrl(request.getGoogleReviewsUrl()));
         }
+        SocialLinks.apply(menu, request.getSocialLinks());
+        SocialLinks.apply(menu, request.getSocialVisibility());
         if (request.getActive() != null) {
             boolean nextActive = request.getActive();
             if (nextActive && !menu.isActive()) {
@@ -1502,6 +1505,7 @@ public class MenuService {
                 .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
                 .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
                 .googleReviewsUrl(menu.getGoogleReviewsUrl())
+                .socialLinks(SocialLinks.publicLinks(menu, branch))
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
                 .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
@@ -1759,6 +1763,9 @@ public class MenuService {
                 .email(branch != null && branch.getEmail() != null ? branch.getEmail() : menu.getEmail())
                 .address(branch != null && branch.getAddress() != null ? branch.getAddress() : menu.getAddress())
                 .googleReviewsUrl(menu.getGoogleReviewsUrl())
+                .socialLinks(SocialLinks.of(menu))
+                .branchSocialLinks(SocialLinks.of(branch))
+                .socialVisibility(SocialLinks.visibilityOf(menu))
                 .publicUrl(publicUrl)
                 .active(menu.isActive())
                 .ratingAvg(menu.getRatingAvg() == null ? java.math.BigDecimal.ZERO : menu.getRatingAvg())
