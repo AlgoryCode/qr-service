@@ -113,6 +113,12 @@ class ConsoleSessionServiceTest {
     private com.ael.algoryqrservice.qrservice.console.service.DeviceCustomerService customerService;
     @Mock
     private com.ael.algoryqrservice.qrservice.repository.DeviceMembershipRepository membershipRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.ConsoleSessionChangeRepository changeRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.repository.BranchRepository branchRepository;
+    @Mock
+    private com.ael.algoryqrservice.qrservice.console.service.ConsoleSessionAccounting accounting;
 
     private final List<DeviceSessionSegment> segments = new ArrayList<>();
     private final List<DeviceSessionItem> items = new ArrayList<>();
@@ -129,7 +135,8 @@ class ConsoleSessionServiceTest {
                 typeRateRepository, tariffRepository, reservationRepository, access, gameRepository);
         sessionService = new ConsoleSessionService(sessionRepository, consoleRepository, catalogService, access,
                 segmentRepository, itemRepository, customerRepository, customerTxnRepository, menuProductRepository,
-                menuRepository, eventPublisher, libraryService, programService, customerService, membershipRepository);
+                menuRepository, eventPublisher, libraryService, programService, customerService, membershipRepository,
+                changeRepository, branchRepository, accounting);
         when(securityUtils.getCurrentMerchantId()).thenReturn(MERCHANT);
         when(securityUtils.findCurrentStaffId()).thenReturn(Optional.empty());
         when(sessionRepository.save(any(ConsoleSession.class))).thenAnswer(inv -> {
@@ -333,6 +340,142 @@ class ConsoleSessionServiceTest {
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
         assertThat(done.getCancelledAt()).isNull();
         verify(sessionRepository, never()).save(any());
+    }
+
+    // ---- overdue -----------------------------------------------------------------------------------------------
+
+    @Test
+    void overdue_listsFlaggedSessionsStillLate_withBranchAndMinutesPast() {
+        ConsoleSession late = running(NOW.minusMinutes(100), "120.00");
+        late.setPlannedMinutes(60);
+        late.setOverdueAt(NOW.minusMinutes(25));
+        late.setOverdueReason("PLANNED_EXCEEDED");
+        Branch branch = branch();
+        branch.setName("Kadıköy");
+        when(branchRepository.findByMerchantIdAndDeletedFalse(MERCHANT)).thenReturn(List.of(branch));
+        when(sessionRepository.findByMerchantIdAndEndedAtIsNullAndOverdueAtIsNotNullAndDeletedFalseOrderByOverdueAtAscIdAsc(MERCHANT))
+                .thenReturn(List.of(late));
+
+        List<ConsoleDtos.OverdueSessionResponse> overdue = sessionService.overdue();
+
+        assertThat(overdue).hasSize(1);
+        assertThat(overdue.get(0).reason()).isEqualTo("PLANNED_EXCEEDED");
+        assertThat(overdue.get(0).overMinutes()).isEqualTo(40);
+        assertThat(overdue.get(0).branchName()).isEqualTo("Kadıköy");
+        assertThat(overdue.get(0).consoleName()).isEqualTo("PS5 - 1");
+    }
+
+    @Test
+    void extend_clearsTheOverdueFlag() {
+        ConsoleSession late = running(NOW.minusMinutes(100), "120.00");
+        late.setPlannedMinutes(60);
+        late.setOverdueAt(NOW.minusMinutes(25));
+        late.setOverdueReason("PLANNED_EXCEEDED");
+
+        sessionService.extend(500L, new ConsoleDtos.ExtendRequest(60));
+
+        assertThat(late.getOverdueAt()).isNull();
+        assertThat(late.getOverdueReason()).isNull();
+    }
+
+    // ---- edit --------------------------------------------------------------------------------------------------
+
+    /** Played 5 hours at 120/h until NOW, paid 600 in cash. */
+    private ConsoleSession finishedFiveHours() {
+        branchRate("120.00", null);
+        ConsoleSession done = running(NOW.minusHours(5), "120.00");
+        segments.get(0).setEndedAt(NOW);
+        done.setEndedAt(NOW);
+        done.setDurationMinutes(300);
+        done.setTimeAmount(new BigDecimal("600.00"));
+        done.setItemsAmount(new BigDecimal("0.00"));
+        done.setGrossAmount(new BigDecimal("600.00"));
+        done.setDiscountAmount(new BigDecimal("0.00"));
+        done.setAmount(new BigDecimal("600.00"));
+        done.setPaymentMethod(DevicePaymentMethod.CASH);
+        return done;
+    }
+
+    @Test
+    void edit_realEndTime_rechargesUpToIt_andLogsTheChange() {
+        ConsoleSession done = finishedFiveHours();
+
+        ConsoleDtos.SessionResponse response = sessionService.edit(500L, new ConsoleDtos.EditSessionRequest(
+                "Geç bitirildi", null, null, DevicePaymentMethod.CARD, NOW.minusHours(4), null, null, null));
+
+        assertThat(done.getEndedAt()).isEqualTo(NOW.minusHours(4));
+        assertThat(segments.get(0).getEndedAt()).isEqualTo(NOW.minusHours(4));
+        assertThat(done.getDurationMinutes()).isEqualTo(60);
+        assertThat(done.getAmount()).isEqualByComparingTo("120.00");
+        assertThat(done.getPaymentMethod()).isEqualTo(DevicePaymentMethod.CARD);
+        assertThat(done.getEditedAt()).isEqualTo(NOW);
+        assertThat(response.amount()).isEqualByComparingTo("120.00");
+        ArgumentCaptor<com.ael.algoryqrservice.qrservice.model.ConsoleSessionChange> change =
+                ArgumentCaptor.forClass(com.ael.algoryqrservice.qrservice.model.ConsoleSessionChange.class);
+        verify(changeRepository).save(change.capture());
+        assertThat(change.getValue().getReason()).isEqualTo("Geç bitirildi");
+        assertThat(change.getValue().getOldAmount()).isEqualByComparingTo("600.00");
+        assertThat(change.getValue().getNewAmount()).isEqualByComparingTo("120.00");
+        assertThat(change.getValue().getSummary()).contains("Ödeme: Nakit → Kart", "Tutar: 600.00 TL → 120.00 TL");
+        verify(accounting).resync(done);
+    }
+
+    @Test
+    void edit_addsAForgottenProduct_andAppliesADiscount() {
+        ConsoleSession done = finishedFiveHours();
+
+        sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("Kola unutulmuş", null, null, null, null,
+                new BigDecimal("50"), List.of(new ConsoleDtos.AddItemRequest(null, "Kola", new BigDecimal("40"), 2)), null));
+
+        assertThat(done.getItemsAmount()).isEqualByComparingTo("80.00");
+        assertThat(done.getGrossAmount()).isEqualByComparingTo("680.00");
+        assertThat(done.getDiscountAmount()).isEqualByComparingTo("50.00");
+        assertThat(done.getAmount()).isEqualByComparingTo("630.00");
+        assertThat(done.getDurationMinutes()).isEqualTo(300);
+    }
+
+    @Test
+    void edit_balancePayment_followsTheNewAmountOnTheCard() {
+        ConsoleSession done = finishedFiveHours();
+        done.setPaymentMethod(DevicePaymentMethod.BALANCE);
+        done.setCustomerId(70L);
+        DeviceCustomer customer = customer("100.00", 0, 0);
+        customer.setTotalSpent(new BigDecimal("600.00"));
+
+        sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("Geç bitirildi", null, null, null,
+                NOW.minusHours(4), null, null, null));
+
+        assertThat(customer.getBalance()).isEqualByComparingTo("580.00");
+        assertThat(customer.getTotalSpent()).isEqualByComparingTo("120.00");
+        ArgumentCaptor<DeviceCustomerTxn> txn = ArgumentCaptor.forClass(DeviceCustomerTxn.class);
+        verify(customerTxnRepository).save(txn.capture());
+        assertThat(txn.getValue().getTxnType()).isEqualTo(DeviceCustomerTxnType.ADJUST);
+        assertThat(txn.getValue().getAmount()).isEqualByComparingTo("480.00");
+    }
+
+    @Test
+    void edit_rejectsALaterEnd_aBalanceSwitch_anOpenOrCancelledSession_andNoChange() {
+        ConsoleSession done = finishedFiveHours();
+        assertStatus(() -> sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("x", null, null, null,
+                NOW.plusHours(1), null, null, null)), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("x", null, null,
+                DevicePaymentMethod.BALANCE, null, null, null, null)), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("x", null, null,
+                DevicePaymentMethod.CASH, null, null, null, null)), HttpStatus.BAD_REQUEST);
+        done.setCancelledAt(NOW);
+        assertStatus(() -> sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("x", "Ali", null, null,
+                null, null, null, null)), HttpStatus.CONFLICT);
+        done.setCancelledAt(null);
+        done.setEndedAt(null);
+        assertStatus(() -> sessionService.edit(500L, new ConsoleDtos.EditSessionRequest("x", "Ali", null, null,
+                null, null, null, null)), HttpStatus.CONFLICT);
+        verify(changeRepository, never()).save(any());
+    }
+
+    private static void assertStatus(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, HttpStatus status) {
+        assertThatThrownBy(call)
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(status));
     }
 
     // ---- finish ------------------------------------------------------------------------------------------------

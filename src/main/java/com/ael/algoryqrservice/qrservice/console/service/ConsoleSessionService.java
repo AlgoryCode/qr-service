@@ -1,5 +1,6 @@
 package com.ael.algoryqrservice.qrservice.console.service;
 
+import com.ael.algoryqrservice.qrservice.console.domain.ConsoleOverdue;
 import com.ael.algoryqrservice.qrservice.console.domain.DeviceCheckout;
 import com.ael.algoryqrservice.qrservice.console.domain.DeviceCustomerTxnType;
 import com.ael.algoryqrservice.qrservice.console.domain.DevicePaymentMethod;
@@ -8,6 +9,7 @@ import com.ael.algoryqrservice.qrservice.console.dto.ConsoleDtos;
 import com.ael.algoryqrservice.qrservice.model.Branch;
 import com.ael.algoryqrservice.qrservice.model.ConsoleRateSetting;
 import com.ael.algoryqrservice.qrservice.model.ConsoleSession;
+import com.ael.algoryqrservice.qrservice.model.ConsoleSessionChange;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomer;
 import com.ael.algoryqrservice.qrservice.model.DeviceCustomerTxn;
 import com.ael.algoryqrservice.qrservice.model.DeviceGame;
@@ -22,6 +24,8 @@ import com.ael.algoryqrservice.qrservice.model.Menu;
 import com.ael.algoryqrservice.qrservice.model.enums.MenuChannel;
 import com.ael.algoryqrservice.qrservice.product.model.MenuProduct;
 import com.ael.algoryqrservice.qrservice.product.repository.MenuProductRepository;
+import com.ael.algoryqrservice.qrservice.repository.BranchRepository;
+import com.ael.algoryqrservice.qrservice.repository.ConsoleSessionChangeRepository;
 import com.ael.algoryqrservice.qrservice.repository.ConsoleSessionRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceCustomerRepository;
 import com.ael.algoryqrservice.qrservice.repository.DeviceCustomerTxnRepository;
@@ -43,6 +47,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -77,6 +85,9 @@ public class ConsoleSessionService {
     private final DeviceProgramService programService;
     private final DeviceCustomerService customerService;
     private final DeviceMembershipRepository membershipRepository;
+    private final ConsoleSessionChangeRepository changeRepository;
+    private final BranchRepository branchRepository;
+    private final ConsoleSessionAccounting accounting;
 
     // ---- Lifecycle ---------------------------------------------------------------------------------------------
 
@@ -169,6 +180,9 @@ public class ConsoleSessionService {
         GameConsole console = consoleRepository.findById(session.getConsoleId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cihaz bulunamadı"));
         session.setPausedAt(null);
+        if (ConsoleOverdue.Reason.PAUSED_TOO_LONG.name().equals(session.getOverdueReason())) {
+            clearOverdue(session);
+        }
         openSegment(session, console, AppTime.nowLocal());
         return single(sessionRepository.save(session), null);
     }
@@ -228,6 +242,7 @@ public class ConsoleSessionService {
             base = (int) (quote.playedSeconds() / 60);
         }
         session.setPlannedMinutes(Math.min(base + request.minutes(), 24 * 60 * 2));
+        clearOverdue(session);
         session.setExtensionRequestMinutes(null);
         session.setExtensionRequestedAt(null);
         return single(sessionRepository.save(session), null);
@@ -254,6 +269,11 @@ public class ConsoleSessionService {
     @Transactional
     public ConsoleDtos.SessionResponse addItem(Long sessionId, ConsoleDtos.AddItemRequest request) {
         ConsoleSession session = lockActive(sessionId);
+        saveItem(session, request);
+        return single(session, null);
+    }
+
+    private DeviceSessionItem saveItem(ConsoleSession session, ConsoleDtos.AddItemRequest request) {
         String name;
         BigDecimal unitPrice;
         Long productId = null;
@@ -279,7 +299,7 @@ public class ConsoleSessionService {
             unitPrice = request.unitPrice();
         }
         BigDecimal price = unitPrice.setScale(2, RoundingMode.HALF_UP);
-        itemRepository.save(DeviceSessionItem.builder()
+        return itemRepository.save(DeviceSessionItem.builder()
                 .merchantId(session.getMerchantId())
                 .sessionId(session.getId())
                 .menuProductId(productId)
@@ -289,7 +309,6 @@ public class ConsoleSessionService {
                 .lineTotal(price.multiply(BigDecimal.valueOf(request.quantity())))
                 .deleted(false)
                 .build());
-        return single(session, null);
     }
 
     @Transactional
@@ -390,6 +409,7 @@ public class ConsoleSessionService {
 
         session.setEndedAt(endedAt);
         session.setPausedAt(null);
+        clearOverdue(session);
         session.setExtensionRequestMinutes(null);
         session.setExtensionRequestedAt(null);
         session.setDurationMinutes(quote.billedMinutes());
@@ -432,6 +452,7 @@ public class ConsoleSessionService {
 
         session.setEndedAt(endedAt);
         session.setPausedAt(null);
+        clearOverdue(session);
         session.setExtensionRequestMinutes(null);
         session.setExtensionRequestedAt(null);
         session.setDurationMinutes(0);
@@ -445,6 +466,288 @@ public class ConsoleSessionService {
         session.setCancelledByStaffId(access.staffId());
         session.setClosedByStaffId(access.staffId());
         return single(sessionRepository.save(session), null);
+    }
+
+    // ---- Overdue warning ---------------------------------------------------------------------------------------
+
+    /** Open sessions the overdue job flagged, still late now; the owner's panel keeps warning until they are handled. */
+    @Transactional(readOnly = true)
+    public List<ConsoleDtos.OverdueSessionResponse> overdue() {
+        Long merchantId = access.merchantId();
+        List<ConsoleSession> flagged = sessionRepository
+                .findByMerchantIdAndEndedAtIsNullAndOverdueAtIsNotNullAndDeletedFalseOrderByOverdueAtAscIdAsc(merchantId);
+        Long staffId = access.staffId();
+        if (staffId != null) {
+            Long branchId = access.staffBranchId();
+            flagged = flagged.stream().filter(s -> Objects.equals(s.getBranchId(), branchId)).toList();
+        }
+        if (flagged.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, String> branchNames = branchRepository.findByMerchantIdAndDeletedFalse(merchantId).stream()
+                .collect(Collectors.toMap(Branch::getId, Branch::getName, (a, b) -> a));
+        LocalDateTime now = AppTime.nowLocal();
+        List<ConsoleDtos.OverdueSessionResponse> result = new ArrayList<>();
+        for (ConsoleDtos.SessionResponse session : responses(flagged, null)) {
+            ConsoleOverdue.Reason reason = ConsoleOverdue.check(session.plannedMinutes(), session.playedSeconds(),
+                    session.paused() ? session.pausedAt() : null, now);
+            if (reason == null) {
+                continue;
+            }
+            result.add(new ConsoleDtos.OverdueSessionResponse(
+                    session.id(),
+                    session.branchId(),
+                    branchNames.get(session.branchId()),
+                    session.consoleId(),
+                    session.consoleName(),
+                    session.deviceType(),
+                    session.customerName(),
+                    session.startedAt(),
+                    session.plannedMinutes(),
+                    session.playedSeconds(),
+                    session.paused(),
+                    session.pausedAt(),
+                    reason.name(),
+                    ConsoleOverdue.overMinutes(reason, session.plannedMinutes(), session.playedSeconds(),
+                            session.pausedAt(), now),
+                    session.amount(),
+                    session.overdueAt()
+            ));
+        }
+        return result;
+    }
+
+    private static void clearOverdue(ConsoleSession session) {
+        session.setOverdueAt(null);
+        session.setOverdueReason(null);
+    }
+
+    // ---- Correcting a finished session -------------------------------------------------------------------------
+
+    private static final DateTimeFormatter CHANGE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+
+    /**
+     * Corrects a finished session: customer name, note, payment method, the real end time (only earlier; time is
+     * recharged up to it), products and the total discount. Every change is logged with its reason. The customer's
+     * total spent, a BALANCE payment and the accounting entry follow the new amount; loyalty and membership minutes
+     * already used stay as they are.
+     */
+    @Transactional
+    public ConsoleDtos.SessionResponse edit(Long sessionId, ConsoleDtos.EditSessionRequest request) {
+        ConsoleSession session = sessionRepository.lockOwned(sessionId, access.merchantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Oturum bulunamadı"));
+        access.checkBranch(session.getBranchId());
+        if (session.isActive()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Açık oturum buradan düzenlenmez; cihaz kartından yönetin");
+        }
+        if (session.isCancelled()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "İptal edilen oturum düzenlenemez");
+        }
+        String reason = DeviceMappers.blankToNull(request.reason());
+        if (reason == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Düzeltme nedeni yazın");
+        }
+        List<String> lines = new ArrayList<>();
+        BigDecimal oldAmount = money(session.getAmount());
+
+        if (request.customerName() != null) {
+            String name = DeviceMappers.blankToNull(request.customerName());
+            if (!Objects.equals(name, session.getCustomerName())) {
+                lines.add("Müşteri: " + orDash(session.getCustomerName()) + " → " + orDash(name));
+                session.setCustomerName(name);
+            }
+        }
+        if (request.note() != null) {
+            String note = DeviceMappers.blankToNull(request.note());
+            if (!Objects.equals(note, session.getNote())) {
+                lines.add("Not: " + orDash(session.getNote()) + " → " + orDash(note));
+                session.setNote(note);
+            }
+        }
+        if (request.paymentMethod() != null && request.paymentMethod() != session.getPaymentMethod()) {
+            if (request.paymentMethod() == DevicePaymentMethod.BALANCE || session.getPaymentMethod() == DevicePaymentMethod.BALANCE) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bakiyeden ödeme sonradan değiştirilemez");
+            }
+            lines.add("Ödeme: " + label(session.getPaymentMethod()) + " → " + request.paymentMethod().label());
+            session.setPaymentMethod(request.paymentMethod());
+        }
+
+        boolean recharge = false;
+        if (request.endedAt() != null) {
+            LocalDateTime newEnd = request.endedAt().truncatedTo(ChronoUnit.MINUTES);
+            LocalDateTime oldEnd = session.getEndedAt();
+            if (!newEnd.equals(oldEnd.truncatedTo(ChronoUnit.MINUTES))) {
+                if (!newEnd.isAfter(session.getStartedAt())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bitiş saati başlangıçtan sonra olmalı");
+                }
+                if (newEnd.isAfter(oldEnd)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bitiş saati yalnızca öne alınabilir");
+                }
+                for (DeviceSessionSegment segment : segmentRepository.findBySessionIdAndDeletedFalseOrderByStartedAtAscIdAsc(session.getId())) {
+                    if (!segment.getStartedAt().isBefore(newEnd)) {
+                        segment.setDeleted(true);
+                        segmentRepository.save(segment);
+                    } else if (segment.getEndedAt() == null || segment.getEndedAt().isAfter(newEnd)) {
+                        segment.setEndedAt(newEnd);
+                        segmentRepository.save(segment);
+                    }
+                }
+                lines.add("Bitiş: " + CHANGE_TIME.format(oldEnd) + " → " + CHANGE_TIME.format(newEnd));
+                session.setEndedAt(newEnd);
+                recharge = true;
+            }
+        }
+        if (request.removeItemIds() != null) {
+            for (Long itemId : request.removeItemIds()) {
+                DeviceSessionItem item = itemRepository.findByIdAndSessionIdAndDeletedFalse(itemId, session.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ürün bulunamadı"));
+                item.setDeleted(true);
+                itemRepository.save(item);
+                lines.add("Ürün çıkarıldı: " + item.getQuantity() + " × " + item.getName());
+                recharge = true;
+            }
+        }
+        if (request.addItems() != null) {
+            for (ConsoleDtos.AddItemRequest add : request.addItems()) {
+                DeviceSessionItem item = saveItem(session, add);
+                lines.add("Ürün eklendi: " + item.getQuantity() + " × " + item.getName() + " (" + plain(item.getLineTotal()) + " TL)");
+                recharge = true;
+            }
+        }
+        BigDecimal discount = money(session.getDiscountAmount());
+        boolean discountGiven = false;
+        if (request.discountAmount() != null) {
+            BigDecimal wanted = request.discountAmount().setScale(2, RoundingMode.HALF_UP);
+            if (wanted.compareTo(discount) != 0) {
+                lines.add("İndirim: " + plain(discount) + " TL → " + plain(wanted) + " TL");
+                discount = wanted;
+                discountGiven = true;
+                recharge = true;
+            }
+        }
+
+        if (recharge) {
+            ConsoleCatalogService.RateContext rates = catalogService.rateContext(session.getBranchId(), session.getMerchantId());
+            DeviceRentalPricing.Quote quote = quoteOf(session,
+                    segmentRepository.findBySessionIdAndDeletedFalseOrderByStartedAtAscIdAsc(session.getId()),
+                    rates.rules(), session.getEndedAt());
+            BigDecimal time = quote.amount();
+            BigDecimal items = itemsTotal(itemRepository.findBySessionIdAndDeletedFalseOrderByIdAsc(session.getId()));
+            BigDecimal gross = time.add(items);
+            if (discount.compareTo(gross) > 0) {
+                if (discountGiven) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "İndirim toplam tutardan büyük olamaz");
+                }
+                discount = gross;
+            }
+            int oldMinutes = session.getDurationMinutes() == null ? 0 : session.getDurationMinutes();
+            if (oldMinutes != quote.billedMinutes()) {
+                lines.add("Süre: " + oldMinutes + " dk → " + quote.billedMinutes() + " dk");
+            }
+            session.setDurationMinutes(quote.billedMinutes());
+            session.setTimeAmount(time);
+            session.setItemsAmount(items);
+            session.setGrossAmount(gross);
+            session.setDiscountAmount(discount);
+            session.setAmount(gross.subtract(discount));
+        }
+        if (lines.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Değişiklik yok");
+        }
+
+        BigDecimal newAmount = money(session.getAmount());
+        BigDecimal delta = newAmount.subtract(oldAmount);
+        if (delta.signum() != 0) {
+            lines.add("Tutar: " + plain(oldAmount) + " TL → " + plain(newAmount) + " TL");
+            adjustCustomer(session, delta);
+        }
+        session.setEditedAt(AppTime.nowLocal());
+        ConsoleSession saved = sessionRepository.save(session);
+        changeRepository.save(ConsoleSessionChange.builder()
+                .merchantId(saved.getMerchantId())
+                .sessionId(saved.getId())
+                .staffId(access.staffId())
+                .changedBy(truncate(access.actorName(), 160))
+                .reason(truncate(reason, 255))
+                .summary(truncate(String.join("\n", lines), 2000))
+                .oldAmount(oldAmount)
+                .newAmount(newAmount)
+                .deleted(false)
+                .build());
+        accounting.resync(saved);
+        return single(saved, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConsoleDtos.SessionChangeResponse> changes(Long sessionId) {
+        ConsoleSession session = sessionRepository.findById(sessionId)
+                .filter(s -> !s.isDeleted() && Objects.equals(s.getMerchantId(), access.merchantId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Oturum bulunamadı"));
+        access.checkBranch(session.getBranchId());
+        return changeRepository.findBySessionIdAndMerchantIdAndDeletedFalseOrderByCreatedAtDescIdDesc(session.getId(), session.getMerchantId())
+                .stream()
+                .map(change -> new ConsoleDtos.SessionChangeResponse(
+                        change.getId(),
+                        change.getCreatedAt(),
+                        change.getChangedBy(),
+                        change.getReason(),
+                        Arrays.asList(change.getSummary().split("\n")),
+                        change.getOldAmount(),
+                        change.getNewAmount()))
+                .toList();
+    }
+
+    /** Keeps the customer card in step with a corrected amount: total spent, and the balance when paid from it. */
+    private void adjustCustomer(ConsoleSession session, BigDecimal delta) {
+        if (session.getCustomerId() == null) {
+            return;
+        }
+        DeviceCustomer customer = customerRepository.lockOwned(session.getCustomerId(), session.getMerchantId()).orElse(null);
+        if (customer == null) {
+            return;
+        }
+        if (session.getPaymentMethod() == DevicePaymentMethod.BALANCE) {
+            BigDecimal balance = customer.getBalance().subtract(delta);
+            if (balance.signum() < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Müşterinin bakiyesi yetersiz");
+            }
+            customer.setBalance(balance);
+            customerTxnRepository.save(DeviceCustomerTxn.builder()
+                    .merchantId(customer.getMerchantId())
+                    .customerId(customer.getId())
+                    .branchId(session.getBranchId())
+                    .staffId(access.staffId())
+                    .txnType(DeviceCustomerTxnType.ADJUST)
+                    .amount(delta.negate())
+                    .sessionId(session.getId())
+                    .paymentMethod(DevicePaymentMethod.BALANCE)
+                    .note("Oturum #" + session.getId() + " düzeltmesi")
+                    .deleted(false)
+                    .build());
+        }
+        BigDecimal spent = customer.getTotalSpent().add(delta);
+        customer.setTotalSpent(spent.signum() < 0 ? BigDecimal.ZERO.setScale(2) : spent);
+        customerRepository.save(customer);
+    }
+
+    private static BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static String plain(BigDecimal value) {
+        return value == null ? "0" : value.setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private static String orDash(String value) {
+        return value == null || value.isBlank() ? "—" : value;
+    }
+
+    private static String label(DevicePaymentMethod method) {
+        return method == null ? "—" : method.label();
+    }
+
+    private static String truncate(String value, int max) {
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     /** What the customer can use at the end of {@code session}. */
@@ -835,7 +1138,10 @@ public class ConsoleSessionService {
                 session.getExtensionRequestedAt(),
                 session.isCancelled(),
                 session.getCancelledAt(),
-                session.getCancelReason()
+                session.getCancelReason(),
+                session.getOverdueAt(),
+                session.getOverdueReason(),
+                session.getEditedAt()
         );
     }
 }

@@ -30,6 +30,21 @@ public class ConsoleAccess {
         return securityUtils.findCurrentStaffId().orElse(null);
     }
 
+    /** Who is acting, for change logs: the staff id or the owner's name / e-mail. */
+    public String actorName() {
+        Long staffId = staffId();
+        if (staffId != null) {
+            return "Personel #" + staffId;
+        }
+        return securityUtils.findCurrentUser()
+                .map(user -> {
+                    String name = ((user.getFirstName() == null ? "" : user.getFirstName()) + " "
+                            + (user.getLastName() == null ? "" : user.getLastName())).trim();
+                    return name.isEmpty() ? user.getEmail() : name;
+                })
+                .orElse("İşletme sahibi");
+    }
+
     public Branch requireBranch(Long branchId) {
         Branch branch = branchService.requireOwned(branchId);
         checkBranch(branch.getId());

@@ -12,5 +12,8 @@ public interface UserAccountingEntryRepository
 
     boolean existsBySourceTypeAndSourceConsoleSessionId(AccountingSourceType sourceType, Long sourceConsoleSessionId);
 
+    java.util.Optional<UserAccountingEntry> findFirstBySourceTypeAndSourceConsoleSessionId(
+            AccountingSourceType sourceType, Long sourceConsoleSessionId);
+
     boolean existsBySourceDeviceRef(String sourceDeviceRef);
 }
