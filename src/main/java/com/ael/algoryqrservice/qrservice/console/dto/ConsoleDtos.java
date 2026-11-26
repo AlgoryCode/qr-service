@@ -326,7 +326,16 @@ public final class ConsoleDtos {
             BigDecimal tierDiscountAmount,
             BigDecimal bonusUsed,
             Integer extensionRequestMinutes,
-            LocalDateTime extensionRequestedAt
+            LocalDateTime extensionRequestedAt,
+            boolean cancelled,
+            LocalDateTime cancelledAt,
+            String cancelReason
+    ) {
+    }
+
+    /** Closes an open session without charging it; it stays in the history marked as cancelled. */
+    public record CancelSessionRequest(
+            @Size(max = 255) String reason
     ) {
     }
 

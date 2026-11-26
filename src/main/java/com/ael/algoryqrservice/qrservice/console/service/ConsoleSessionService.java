@@ -416,6 +416,37 @@ public class ConsoleSessionService {
         return single(saved, rates);
     }
 
+    /**
+     * Closes an open session without charging it, e.g. one left running by mistake. Nothing is settled on the
+     * customer card and no accounting entry is posted; reports, shifts and analytics skip it.
+     */
+    @Transactional
+    public ConsoleDtos.SessionResponse cancel(Long sessionId, ConsoleDtos.CancelSessionRequest request) {
+        ConsoleSession session = lockActive(sessionId);
+        LocalDateTime endedAt = AppTime.nowLocal();
+        closeOpenSegment(session.getId(), endedAt);
+        BigDecimal zero = BigDecimal.ZERO.setScale(2);
+        String reason = request == null || request.reason() == null || request.reason().isBlank()
+                ? null
+                : request.reason().trim();
+
+        session.setEndedAt(endedAt);
+        session.setPausedAt(null);
+        session.setExtensionRequestMinutes(null);
+        session.setExtensionRequestedAt(null);
+        session.setDurationMinutes(0);
+        session.setTimeAmount(zero);
+        session.setItemsAmount(zero);
+        session.setGrossAmount(zero);
+        session.setDiscountAmount(zero);
+        session.setAmount(zero);
+        session.setCancelledAt(endedAt);
+        session.setCancelReason(reason);
+        session.setCancelledByStaffId(access.staffId());
+        session.setClosedByStaffId(access.staffId());
+        return single(sessionRepository.save(session), null);
+    }
+
     /** What the customer can use at the end of {@code session}. */
     private record Holdings(DeviceCheckout.Customer checkout, DeviceTier tier, List<DeviceMembership> memberships) {
     }
@@ -801,7 +832,10 @@ public class ConsoleSessionService {
                 session.getTierDiscountAmount(),
                 session.getBonusUsed(),
                 session.getExtensionRequestMinutes(),
-                session.getExtensionRequestedAt()
+                session.getExtensionRequestedAt(),
+                session.isCancelled(),
+                session.getCancelledAt(),
+                session.getCancelReason()
         );
     }
 }

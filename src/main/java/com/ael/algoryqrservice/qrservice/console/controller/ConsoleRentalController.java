@@ -225,6 +225,16 @@ public class ConsoleRentalController {
         return ResponseEntity.ok(sessionService.finish(sessionId, request));
     }
 
+    /** Closes the session without charge; it is left out of revenue, shift and analytics totals. */
+    @PostMapping("/sessions/{sessionId}/cancel")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.SessionResponse> cancelSession(
+            @PathVariable Long sessionId,
+            @Valid @RequestBody(required = false) ConsoleDtos.CancelSessionRequest request
+    ) {
+        return ResponseEntity.ok(sessionService.cancel(sessionId, request));
+    }
+
     @GetMapping("/branches/{branchId}/sessions/active")
     @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<List<ConsoleDtos.SessionResponse>> listActive(@PathVariable Long branchId) {
