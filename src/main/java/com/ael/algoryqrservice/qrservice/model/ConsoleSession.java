@@ -150,6 +150,20 @@ public class ConsoleSession extends QrBaseModel {
     @Column(name = "extension_requested_at")
     private LocalDateTime extensionRequestedAt;
 
+    /** Set when the session was cancelled: closed at zero charge and left out of every total. */
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancel_reason", length = 255)
+    private String cancelReason;
+
+    @Column(name = "cancelled_by_staff_id")
+    private Long cancelledByStaffId;
+
+    public boolean isCancelled() {
+        return cancelledAt != null;
+    }
+
     public boolean isPaused() {
         return endedAt == null && pausedAt != null;
     }

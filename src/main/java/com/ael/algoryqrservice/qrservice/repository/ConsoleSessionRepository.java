@@ -42,6 +42,7 @@ public interface ConsoleSessionRepository extends JpaRepository<ConsoleSession, 
               and s.deleted = false
               and s.endedAt is not null
               and s.endedAt between :from and :to
+              and s.cancelledAt is null
             """)
     List<ConsoleSession> findFinishedForMerchant(
             @Param("merchantId") Long merchantId,
@@ -57,6 +58,7 @@ public interface ConsoleSessionRepository extends JpaRepository<ConsoleSession, 
               and s.deleted = false
               and s.endedAt is not null
               and s.endedAt between :from and :to
+              and s.cancelledAt is null
             """)
     List<ConsoleSession> findFinishedForBranch(
             @Param("merchantId") Long merchantId,
@@ -69,6 +71,7 @@ public interface ConsoleSessionRepository extends JpaRepository<ConsoleSession, 
             select s from ConsoleSession s
             where s.branchId = :branchId and s.deleted = false and s.endedAt is not null
               and s.endedAt between :from and :to
+              and s.cancelledAt is null
             """)
     List<ConsoleSession> findClosedAtBranch(
             @Param("branchId") Long branchId,

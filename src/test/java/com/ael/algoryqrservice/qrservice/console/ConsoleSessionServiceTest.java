@@ -282,6 +282,59 @@ class ConsoleSessionServiceTest {
         assertThat(saved.getValue().getOpenedByStaffId()).isEqualTo(44L);
     }
 
+    // ---- cancel ------------------------------------------------------------------------------------------------
+
+    @Test
+    void cancel_closesTheSessionAtZeroCharge_withoutSettlingOrPosting() {
+        ConsoleSession open = running(NOW.minusHours(24), "120.00");
+        open.setCustomerId(77L);
+        open.setPausedAt(NOW.minusHours(1));
+
+        ConsoleDtos.SessionResponse response = sessionService.cancel(
+                500L, new ConsoleDtos.CancelSessionRequest("  Açık kalmış  "));
+
+        assertThat(open.getEndedAt()).isEqualTo(NOW);
+        assertThat(open.getCancelledAt()).isEqualTo(NOW);
+        assertThat(open.getCancelReason()).isEqualTo("Açık kalmış");
+        assertThat(open.getPausedAt()).isNull();
+        assertThat(open.getDurationMinutes()).isZero();
+        assertThat(open.getAmount()).isEqualByComparingTo("0");
+        assertThat(open.getGrossAmount()).isEqualByComparingTo("0");
+        assertThat(open.getPaymentMethod()).isNull();
+        assertThat(segments.get(0).getEndedAt()).isEqualTo(NOW);
+        assertThat(response.active()).isFalse();
+        assertThat(response.cancelled()).isTrue();
+        assertThat(response.amount()).isEqualByComparingTo("0");
+        verify(eventPublisher, never()).publishEvent(any());
+        verify(customerRepository, never()).lockOwned(anyLong(), anyLong());
+        verify(customerTxnRepository, never()).save(any());
+    }
+
+    @Test
+    void cancel_withoutReason_leavesItEmpty_andRecordsTheStaff() {
+        when(securityUtils.findCurrentStaffId()).thenReturn(Optional.of(44L));
+        when(securityUtils.getCurrentWaiterBranchId()).thenReturn(BRANCH);
+        ConsoleSession open = running(NOW.minusMinutes(30), "120.00");
+
+        sessionService.cancel(500L, new ConsoleDtos.CancelSessionRequest("   "));
+
+        assertThat(open.getCancelReason()).isNull();
+        assertThat(open.getCancelledByStaffId()).isEqualTo(44L);
+    }
+
+    @Test
+    void cancel_ofAFinishedSession_isConflict() {
+        ConsoleSession done = session(NOW.minusHours(2), "120.00");
+        done.setEndedAt(NOW.minusHours(1));
+        when(sessionRepository.lockOwned(500L, MERCHANT)).thenReturn(Optional.of(done));
+
+        assertThatThrownBy(() -> sessionService.cancel(500L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(done.getCancelledAt()).isNull();
+        verify(sessionRepository, never()).save(any());
+    }
+
     // ---- finish ------------------------------------------------------------------------------------------------
 
     @Test
