@@ -80,4 +80,10 @@ public interface ConsoleSessionRepository extends JpaRepository<ConsoleSession, 
     );
 
     Optional<ConsoleSession> findFirstByConsoleIdAndEndedAtIsNullAndDeletedFalse(Long consoleId);
+
+    /** Every open session, for the overdue job. */
+    List<ConsoleSession> findByEndedAtIsNullAndDeletedFalse();
+
+    /** Open sessions the overdue job flagged, for the owner's warning. */
+    List<ConsoleSession> findByMerchantIdAndEndedAtIsNullAndOverdueAtIsNotNullAndDeletedFalseOrderByOverdueAtAscIdAsc(Long merchantId);
 }

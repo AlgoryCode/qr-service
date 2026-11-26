@@ -329,7 +329,62 @@ public final class ConsoleDtos {
             LocalDateTime extensionRequestedAt,
             boolean cancelled,
             LocalDateTime cancelledAt,
-            String cancelReason
+            String cancelReason,
+            LocalDateTime overdueAt,
+            String overdueReason,
+            LocalDateTime editedAt
+    ) {
+    }
+
+    /**
+     * An open session the overdue job flagged. {@code reason}: PLANNED_EXCEEDED, OPEN_TOO_LONG or PAUSED_TOO_LONG;
+     * {@code overMinutes} is how far past the limit it is.
+     */
+    public record OverdueSessionResponse(
+            Long sessionId,
+            Long branchId,
+            String branchName,
+            Long consoleId,
+            String consoleName,
+            DeviceType deviceType,
+            String customerName,
+            LocalDateTime startedAt,
+            Integer plannedMinutes,
+            long playedSeconds,
+            boolean paused,
+            LocalDateTime pausedAt,
+            String reason,
+            long overMinutes,
+            BigDecimal currentAmount,
+            LocalDateTime overdueAt
+    ) {
+    }
+
+    /**
+     * Corrects a finished session. Only the fields given change. {@code endedAt} can only move earlier (the real end
+     * when the session was finished late); time is recharged up to it. {@code discountAmount} is the new total
+     * discount. A BALANCE payment cannot be switched; its balance follows the new amount.
+     */
+    public record EditSessionRequest(
+            @NotBlank @Size(max = 255) String reason,
+            @Size(max = 120) String customerName,
+            @Size(max = 500) String note,
+            DevicePaymentMethod paymentMethod,
+            LocalDateTime endedAt,
+            @DecimalMin("0") @Digits(integer = 10, fraction = 2) BigDecimal discountAmount,
+            @Size(max = 50) List<@Valid AddItemRequest> addItems,
+            @Size(max = 200) List<Long> removeItemIds
+    ) {
+    }
+
+    public record SessionChangeResponse(
+            Long id,
+            LocalDateTime changedAt,
+            String changedBy,
+            String reason,
+            List<String> lines,
+            BigDecimal oldAmount,
+            BigDecimal newAmount
     ) {
     }
 

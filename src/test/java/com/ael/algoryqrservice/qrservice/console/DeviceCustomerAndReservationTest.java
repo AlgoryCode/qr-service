@@ -375,7 +375,7 @@ class DeviceCustomerAndReservationTest {
         return new ConsoleDtos.SessionResponse(id, BRANCH, 7L, "PS5 - 1", DeviceType.PLAYSTATION, null, "Zeynep", null,
                 BigDecimal.TEN, 2, NOW, null, null, false, 90, 0, 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 BigDecimal.ZERO, null, BigDecimal.ZERO, null, true, 40L, List.of(), List.of(),
-                null, null, null, null, null, null, null, null, null, null, null, false, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null);
     }
 
 }

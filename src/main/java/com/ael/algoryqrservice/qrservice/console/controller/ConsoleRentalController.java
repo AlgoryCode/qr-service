@@ -235,6 +235,29 @@ public class ConsoleRentalController {
         return ResponseEntity.ok(sessionService.cancel(sessionId, request));
     }
 
+    /** Corrects a finished session (end time, products, discount, payment, name, note); every change is logged. */
+    @PutMapping("/sessions/{sessionId}")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<ConsoleDtos.SessionResponse> editSession(
+            @PathVariable Long sessionId,
+            @Valid @RequestBody ConsoleDtos.EditSessionRequest request
+    ) {
+        return ResponseEntity.ok(sessionService.edit(sessionId, request));
+    }
+
+    @GetMapping("/sessions/{sessionId}/changes")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.SessionChangeResponse>> sessionChanges(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(sessionService.changes(sessionId));
+    }
+
+    /** Open sessions past their time or left paused, across the merchant's branches; the panel warns about them. */
+    @GetMapping("/alerts/overdue")
+    @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
+    public ResponseEntity<List<ConsoleDtos.OverdueSessionResponse>> overdueSessions() {
+        return ResponseEntity.ok(sessionService.overdue());
+    }
+
     @GetMapping("/branches/{branchId}/sessions/active")
     @RequiresFeature(FeatureKey.CONSOLE_RENTAL)
     public ResponseEntity<List<ConsoleDtos.SessionResponse>> listActive(@PathVariable Long branchId) {

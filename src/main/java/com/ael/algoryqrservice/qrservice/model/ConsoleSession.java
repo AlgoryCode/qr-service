@@ -160,6 +160,18 @@ public class ConsoleSession extends QrBaseModel {
     @Column(name = "cancelled_by_staff_id")
     private Long cancelledByStaffId;
 
+    /** Set by the overdue job while the open session runs past its time (or is left paused); cleared when it no longer does. */
+    @Column(name = "overdue_at")
+    private LocalDateTime overdueAt;
+
+    /** Why it is overdue: see {@code ConsoleOverdue.Reason}. */
+    @Column(name = "overdue_reason", length = 24)
+    private String overdueReason;
+
+    /** Last time the finished session was corrected; the changes are in {@code tbl_console_session_change}. */
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt;
+
     public boolean isCancelled() {
         return cancelledAt != null;
     }

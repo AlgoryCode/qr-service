@@ -75,6 +75,30 @@ public class ConsoleSessionAccounting {
         }
     }
 
+    /** Brings the session's income entry in line after a correction: updates it, adds it, or removes it at zero. */
+    public void resync(ConsoleSession session) {
+        UserAccountingEntry entry = accountingRepository
+                .findFirstBySourceTypeAndSourceConsoleSessionId(AccountingSourceType.CONSOLE_SESSION, session.getId())
+                .orElse(null);
+        boolean charged = session.getAmount() != null && session.getAmount().signum() > 0;
+        if (entry == null) {
+            if (charged) {
+                record(session.getId());
+            }
+            return;
+        }
+        if (!charged) {
+            accountingRepository.delete(entry);
+            return;
+        }
+        entry.setAmount(session.getAmount());
+        entry.setOrderAmount(session.getAmount());
+        entry.setOccurredAt(session.getEndedAt());
+        entry.setNote(truncate(note(session), 500));
+        entry.setUpdatedAt(AppTime.nowLocal());
+        accountingRepository.save(entry);
+    }
+
     static String note(ConsoleSession session) {
         StringBuilder note = new StringBuilder()
                 .append(session.getDurationMinutes() == null ? 0 : session.getDurationMinutes())
