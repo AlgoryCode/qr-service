@@ -3,6 +3,7 @@ package com.ael.algoryqrservice.qrservice.billing.service;
 import com.ael.algoryqrservice.qrservice.coupon.service.CouponRedemptionService;
 import com.ael.algoryqrservice.qrservice.client.PaymentServiceClient;
 import com.ael.algoryqrservice.qrservice.client.dto.BillingPaymentDtos;
+import com.ael.algoryqrservice.qrservice.client.dto.PaymentThreeDsRequest;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentCheckoutFormRequest;
 import com.ael.algoryqrservice.qrservice.client.dto.PaymentCheckoutFormResponse;
 import com.ael.algoryqrservice.qrservice.config.AppProperties;
@@ -140,6 +141,13 @@ public class PurchaseService {
         if (!request.isPaymentPlanValid()) {
             throw new BadRequestException("Geçersiz ödeme planı");
         }
+        // A package is paid with a saved card, with the merchant's consent that the same card renews it.
+        if (request.getPaymentMode() != PaymentMode.DIRECT || request.getPaymentMethodId() == null) {
+            throw new BadRequestException("Ödeme kayıtlı kartınızdan alınır. Önce bir kart ekleyin.");
+        }
+        if (!Boolean.TRUE.equals(request.getRecurringConsent())) {
+            throw new BadRequestException("Düzenli ödeme onayı zorunludur.");
+        }
         purchaseExpiryService.expireDueForMerchant(user.getId());
         rejectIfPaidPackageActive(user.getId());
 
@@ -163,6 +171,11 @@ public class PurchaseService {
         String couponCode = request.getCouponCode();
         boolean applyCoupon = couponCode != null && !couponCode.isBlank();
         CardSnapshot cardSnapshot = resolveCardSnapshot(user.getId(), request.getPaymentMethodId());
+        boolean ownCard = paymentServiceClient.getPaymentMethods(user.getId()).stream()
+                .anyMatch(method -> String.valueOf(request.getPaymentMethodId()).equals(method.id()));
+        if (!ownCard) {
+            throw new BadRequestException("Seçilen kart bulunamadı. Kartınızı tekrar ekleyin.");
+        }
         String conversationId = paymentRequestMapper.newPaymentAttemptId(user.getId());
         Purchase purchase = purchaseRepository.save(Purchase.builder()
                 .merchantId(user.getId())
@@ -175,7 +188,7 @@ public class PurchaseService {
                 .modulesTotal(pricing.modulesTotal())
                 .recurringPrice(pricing.recurringPrice())
                 .currency(planPackage.getCurrency())
-                .paymentMode(PaymentMode.CHECKOUT_FORM)
+                .paymentMode(PaymentMode.DIRECT)
                 .paymentStyle(paymentStyle)
                 .billingPeriod(billingPeriod)
                 .billingIntervalMonths(billingPeriod.intervalMonths())
@@ -218,52 +231,41 @@ public class PurchaseService {
                 planPackage.getName() + " paketi ödeme bekliyor"
         );
 
+        BillingPaymentDtos.StoredCardCharge charge;
         try {
-            PaymentCheckoutFormRequest checkoutFormRequest = paymentRequestMapper.toDebtCheckoutFormRequest(
-                    purchase,
-                    user,
-                    planPackage,
-                    clientIp,
-                    appProperties,
-                    paymentClientProperties,
-                    conversationId,
-                    1,
-                    moduleLines
-            );
-            log.info(
-                    "PayTR iframe checkout selected. purchaseId={} provider={}",
-                    purchase.getId(),
-                    checkoutFormRequest.getProvider()
-            );
-            PaymentCheckoutFormResponse checkoutFormResponse =
-                    paymentServiceClient.initializeCheckoutForm(user.getId(), checkoutFormRequest);
-            if (checkoutFormResponse.getConversationId() != null
-                    && !checkoutFormResponse.getConversationId().isBlank()) {
-                purchase.setPaymentConversationId(checkoutFormResponse.getConversationId());
-                purchaseRepository.save(purchase);
-            }
-
-            return PurchaseInitiateResponse.builder()
-                    .purchaseId(purchase.getId())
-                    .status(purchase.getStatus())
-                    .conversationId(checkoutFormResponse.getConversationId())
-                    .token(checkoutFormResponse.getToken())
-                    .paymentPageUrl(checkoutFormResponse.getPaymentPageUrl())
-                    .checkoutFormContent(checkoutFormResponse.getCheckoutFormContent())
-                    .build();
-        } catch (PaymentServiceException exception) {
-            purchase.setStatus(PurchaseStatus.FAILED);
-            purchase.setPaymentConversationId(null);
-            purchaseRepository.save(purchase);
-            couponRedemptionService.release(purchase);
-            purchaseLogService.log(
-                    purchase.getId(),
-                    user.getId(),
-                    PurchaseLogAction.PURCHASE_PAYMENT_FAILED,
-                    "Ödeme başlatılamadı: " + exception.getMessage()
-            );
-            throw exception;
+            PaymentThreeDsRequest chargeRequest = paymentRequestMapper.toThreeDsRequest(
+                    purchase, user, planPackage, request, clientIp, appProperties);
+            log.info("Stored card checkout selected. purchaseId={} paymentMethodId={}",
+                    purchase.getId(), request.getPaymentMethodId());
+            charge = paymentServiceClient.chargeStoredCard(user.getId(), chargeRequest);
+        } catch (RuntimeException exception) {
+            failPurchase(purchase, user.getId(), "Ödeme alınamadı: " + exception.getMessage());
+            throw new PaymentServiceException(
+                    "Kartınızdan ödeme alınamadı. Kart bilgilerinizi kontrol edip tekrar deneyin.", 402);
         }
+        if (!charge.isSuccess() && !charge.isInitiated()) {
+            // The payment side has already reported the failure; make sure this attempt is closed.
+            Purchase current = purchaseRepository.findById(purchase.getId()).orElse(purchase);
+            if (current.getStatus() == PurchaseStatus.PENDING) {
+                failPurchase(current, user.getId(), "Ödeme reddedildi: " + charge.status());
+            }
+            throw new PaymentServiceException(
+                    "Kartınızdan ödeme alınamadı. Bankanız işlemi onaylamadı ya da bakiye yetersiz.", 402);
+        }
+        Purchase current = purchaseRepository.findById(purchase.getId()).orElse(purchase);
+        return PurchaseInitiateResponse.builder()
+                .purchaseId(current.getId())
+                .status(current.getStatus())
+                .conversationId(charge.conversationId())
+                .build();
+    }
+
+    private void failPurchase(Purchase purchase, Long merchantId, String reason) {
+        purchase.setStatus(PurchaseStatus.FAILED);
+        purchase.setPaymentConversationId(null);
+        purchaseRepository.save(purchase);
+        couponRedemptionService.release(purchase);
+        purchaseLogService.log(purchase.getId(), merchantId, PurchaseLogAction.PURCHASE_PAYMENT_FAILED, reason);
     }
 
     /**

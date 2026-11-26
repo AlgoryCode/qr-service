@@ -60,6 +60,10 @@ public class PaymentRequestMapper {
         sourceMetadata.put("paymentStyle", style.name());
         sourceMetadata.put("validityDays", planPackage.getValidityDays());
         sourceMetadata.put("totalAmount", chargeAmount);
+        // Renewals charge the recurring part only; one-time module lines are paid once, now.
+        if (purchase.getRecurringPrice() != null) {
+            sourceMetadata.put("recurringPrice", purchase.getRecurringPrice());
+        }
 
         return PaymentThreeDsRequest.builder()
                 .serviceName(appProperties.getServiceName())
