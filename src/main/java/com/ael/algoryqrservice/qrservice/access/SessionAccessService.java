@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
  * <ul>
  *   <li>ALLOW: any open package (trial, paid, free, or paid in payment grace); {@code billingState}
  *       tells the panel which banner to show.</li>
- *   <li>START_PACKAGE: the merchant never had a package; the panel offers the trial.</li>
+ *   <li>START_PACKAGE: the merchant never had a package; the panel sends it to the shop to buy one.</li>
  *   <li>REQUIRE_PURCHASE: the merchant had a package that is closed. Only happens when the free
  *       package is unavailable, since every ending package normally falls back to free.</li>
  * </ul>

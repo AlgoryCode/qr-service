@@ -86,6 +86,12 @@ public class PaymentServiceImpl implements PaymentService {
             return paymentApplicationMapper.toPaymentResultDto(existingTransaction.get());
         }
         prepareStoredCardCommand(command);
+        if (command.getPaymentStyle() == PaymentStyle.SUBSCRIPTION
+                && (command.getSubscriptionId() == null || command.getSubscriptionId().isBlank())) {
+            // First charge of a subscription paid with a saved card: open the renewal record now, as the
+            // checkout form does before its first payment, so the renewal job charges the same card later.
+            subscriptionService.initialize(command);
+        }
         PaymentProvider provider = resolveProvider(command.getProvider());
         command.setProvider(provider);
         PaymentTransaction transaction = buildInitiatedTransaction(command, PaymentType.DIRECT);
